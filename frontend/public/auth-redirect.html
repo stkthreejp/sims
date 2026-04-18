@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Signing in…</title>
+    <style>
+      body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: #64748b; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <span>Completing sign-in…</span>
+    <script src="/msal-redirect-bridge.min.js"></script>
+    <script>
+      msalRedirectBridge.broadcastResponseToMainFrame().catch(function (err) {
+        console.error('MSAL redirect bridge error:', err);
+      });
+    </script>
+  </body>
+</html>

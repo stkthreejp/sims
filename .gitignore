@@ -1,0 +1,45 @@
+# .NET
+backend/src/*/bin/
+backend/src/*/obj/
+*.user
+*.suo
+.vs/
+
+# Secrets — never commit real config
+backend/src/IMS.API/appsettings.json
+backend/src/IMS.API/appsettings.Production.json
+backend/src/IMS.API/appsettings.Development.json
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# Environment
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & error files
+*.log
+*.err
+backend_ms.log
+frontend_ms.log
+
+# Claude Code local settings (may contain personal config)
+.claude/settings.local.json
+.claude/launch.json
+
+# Planning documents (keep locally, not in repo)
+*.docx
+*.xlsx
+*.pptx
+
+# Attachments (runtime data)
+backend/attachments/
