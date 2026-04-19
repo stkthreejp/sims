@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pin, PinOff, Pencil, Trash2, Plus, X, Check } from 'lucide-react'
+import { Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -9,11 +9,14 @@ import { LOB_LABELS, QUOTE_STATUS_LABELS } from '@/types/quote.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
+import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { usePermissions } from '@/hooks/usePermissions'
 
 export function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
+
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
 
   const [noteSubject, setNoteSubject] = useState('')
   const [noteBody, setNoteBody] = useState('')
@@ -69,7 +72,7 @@ export function PolicyDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['quotes', id, 'notes'] }),
   })
 
-  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments } = usePermissions()
+  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canCreatePolicies } = usePermissions()
 
   if (isLoading) return <LoadingSpinner />
   if (!policy) return <p className="p-6 text-slate-500">Policy not found.</p>
@@ -95,10 +98,28 @@ export function PolicyDetailPage() {
           <h1 className="text-xl font-semibold text-slate-900">{policy.policyNumber ?? policy.quoteNumber}</h1>
           <p className="text-sm text-slate-500 mt-0.5">{policy.insuredName} · {policy.carrierName}</p>
         </div>
-        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-          {QUOTE_STATUS_LABELS[policy.status]}
-        </span>
+        <div className="flex items-center gap-2">
+          {canCreatePolicies && (
+            <button
+              onClick={() => setShowGenerateModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <FileText className="h-3.5 w-3.5" /> Generate Document
+            </button>
+          )}
+          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+            {QUOTE_STATUS_LABELS[policy.status]}
+          </span>
+        </div>
       </div>
+
+      {showGenerateModal && (
+        <GenerateDocumentModal
+          entityType="Policy"
+          entityId={id!}
+          onClose={() => setShowGenerateModal(false)}
+        />
+      )}
 
       {/* Policy details */}
       <div className="bg-white border rounded-lg p-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">

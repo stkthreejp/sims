@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
 import { quotesApi } from '@/api/quotes.api'
@@ -13,6 +13,7 @@ import { LOB_LABELS, ALL_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, t
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
+import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { usePermissions } from '@/hooks/usePermissions'
 
 const STATUS_COLORS: Record<SubmissionStatus, string> = {
@@ -57,7 +58,9 @@ export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { canUploadAttachments, canDeleteAttachments } = usePermissions()
+  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies } = usePermissions()
+
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
 
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
@@ -171,10 +174,28 @@ export function SubmissionDetailPage() {
           <h1 className="text-xl font-semibold text-slate-900">{submission.submissionNumber}</h1>
           <p className="text-sm text-slate-500 mt-0.5">{submission.insuredName}</p>
         </div>
-        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[submission.status]}`}>
-          {SUBMISSION_STATUS_LABELS[submission.status]}
-        </span>
+        <div className="flex items-center gap-2">
+          {canCreatePolicies && (
+            <button
+              onClick={() => setShowGenerateModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <FileText className="h-3.5 w-3.5" /> Generate Document
+            </button>
+          )}
+          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[submission.status]}`}>
+            {SUBMISSION_STATUS_LABELS[submission.status]}
+          </span>
+        </div>
       </div>
+
+      {showGenerateModal && (
+        <GenerateDocumentModal
+          entityType="Submission"
+          entityId={id!}
+          onClose={() => setShowGenerateModal(false)}
+        />
+      )}
 
       {/* Submission info */}
       <div className="bg-white border rounded-lg p-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
