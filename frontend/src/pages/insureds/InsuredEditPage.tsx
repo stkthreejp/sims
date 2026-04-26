@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { rhfValidators, formatPhoneInput } from '@/lib/validators'
-import type { InsuredUpdate } from '@/types/insured.types'
+import { BUSINESS_ENTITY_TYPE_LABELS, type InsuredUpdate } from '@/types/insured.types'
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 
@@ -52,6 +52,25 @@ export function InsuredEditPage() {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
           <input {...register('companyName')} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">DBA</label>
+            <input {...register('dba')} placeholder="Doing business as (optional)" className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Entity Type</label>
+            <select {...register('entityType')} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Select —</option>
+              {(Object.keys(BUSINESS_ENTITY_TYPE_LABELS) as (keyof typeof BUSINESS_ENTITY_TYPE_LABELS)[]).map((k) => (
+                <option key={k} value={k}>{BUSINESS_ENTITY_TYPE_LABELS[k]}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="w-1/3">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Years in Business</label>
+          <input {...register('yearsInBusiness', { valueAsNumber: true })} type="number" min="0" max="200" placeholder="e.g. 12" className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>

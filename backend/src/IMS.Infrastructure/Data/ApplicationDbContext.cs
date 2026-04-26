@@ -29,6 +29,15 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
     public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
     public DbSet<EmailAttachment> EmailAttachments => Set<EmailAttachment>();
+    public DbSet<SubmissionLocation> SubmissionLocations => Set<SubmissionLocation>();
+    public DbSet<SubmissionDriver> SubmissionDrivers => Set<SubmissionDriver>();
+    public DbSet<SubmissionVehicle> SubmissionVehicles => Set<SubmissionVehicle>();
+    public DbSet<SubmissionPriorCarrier> SubmissionPriorCarriers => Set<SubmissionPriorCarrier>();
+    public DbSet<SubmissionSupplemental> SubmissionSupplementals => Set<SubmissionSupplemental>();
+    public DbSet<SubmissionGLCoverages> SubmissionGLCoverages => Set<SubmissionGLCoverages>();
+    public DbSet<SubmissionGLClassification> SubmissionGLClassifications => Set<SubmissionGLClassification>();
+    public DbSet<SubmissionIMCoverages> SubmissionIMCoverages => Set<SubmissionIMCoverages>();
+    public DbSet<SubmissionEquipment> SubmissionEquipment => Set<SubmissionEquipment>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -62,6 +71,15 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<DocumentTemplate>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<InboundEmail>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<EmailAttachment>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionLocation>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionDriver>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionVehicle>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionPriorCarrier>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionSupplemental>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionGLCoverages>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionGLClassification>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionIMCoverages>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionEquipment>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()

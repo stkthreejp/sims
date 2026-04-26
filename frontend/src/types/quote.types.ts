@@ -73,6 +73,8 @@ export interface Quote {
   coverageDescription: string | null
   deductible: number | null
   limit: number | null
+  uninsuredMotoristLimit: number | null
+  medicalPaymentsLimit: number | null
   createdAt: string
 }
 
@@ -88,6 +90,8 @@ export interface QuoteCreate {
   coverageDescription?: string
   deductible?: number
   limit?: number
+  uninsuredMotoristLimit?: number
+  medicalPaymentsLimit?: number
 }
 
 export interface QuoteUpdate extends QuoteCreate {

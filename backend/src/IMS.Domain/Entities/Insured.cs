@@ -13,6 +13,9 @@ public class Insured : BaseEntity
 
     // Commercial fields
     public string? CompanyName { get; set; }
+    public string? Dba { get; set; }
+    public BusinessEntityType? EntityType { get; set; }
+    public int? YearsInBusiness { get; set; }
     public string? TaxId { get; set; }
 
     // Contact

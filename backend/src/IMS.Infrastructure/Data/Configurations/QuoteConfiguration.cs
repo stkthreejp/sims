@@ -22,6 +22,8 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.CommissionAmount).HasPrecision(18, 2);
         builder.Property(q => q.Deductible).HasPrecision(18, 2);
         builder.Property(q => q.Limit).HasPrecision(18, 2);
+        builder.Property(q => q.UninsuredMotoristLimit).HasPrecision(18, 2);
+        builder.Property(q => q.MedicalPaymentsLimit).HasPrecision(18, 2);
 
         builder.HasOne(q => q.Submission).WithMany(s => s.Quotes)
             .HasForeignKey(q => q.SubmissionId).OnDelete(DeleteBehavior.Restrict);

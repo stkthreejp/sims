@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
 import { quotesApi } from '@/api/quotes.api'
 import { carriersApi } from '@/api/carriers.api'
 import { usersApi } from '@/api/users.api'
 import { agentsApi } from '@/api/agents.api'
+import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi } from '@/api/submissionLob.api'
+import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate } from '@/types/submission.types'
 import { LOB_LABELS, ALL_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -46,12 +49,15 @@ type QuoteForm = {
   coverageDescription: string
   deductible: string
   limit: string
+  uninsuredMotoristLimit: string
+  medicalPaymentsLimit: string
 }
 
 const emptyQuoteForm = (): QuoteForm => ({
   carrierId: '', lineOfBusiness: '', effectiveDate: '', expirationDate: '',
   premiumAmount: '', taxesAndFees: '0', commissionRate: '0',
   coverageDescription: '', deductible: '', limit: '',
+  uninsuredMotoristLimit: '', medicalPaymentsLimit: '',
 })
 
 export function SubmissionDetailPage() {
@@ -66,6 +72,35 @@ export function SubmissionDetailPage() {
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
   const [bindingQuoteId, setBindingQuoteId] = useState<string | null>(null)
   const [bindForm, setBindForm] = useState({ boundDate: '', effectiveDate: '', expirationDate: '' })
+
+  // LOB section open/close
+  const [driversOpen, setDriversOpen] = useState(false)
+  const [vehiclesOpen, setVehiclesOpen] = useState(false)
+  const [priorCarriersOpen, setPriorCarriersOpen] = useState(false)
+  const [supplementalOpen, setSupplementalOpen] = useState(false)
+
+  // Driver form state
+  const emptyDriverForm = (): SubmissionDriverCreate => ({ driverNumber: 1, name: '', dateOfBirth: undefined, licenseNumber: undefined, licenseState: undefined, dateHired: undefined })
+  const [showDriverForm, setShowDriverForm] = useState(false)
+  const [driverForm, setDriverForm] = useState<SubmissionDriverCreate>(emptyDriverForm())
+  const [editingDriverId, setEditingDriverId] = useState<string | null>(null)
+
+  // Vehicle form state
+  const emptyVehicleForm = (): SubmissionVehicleCreate => ({ unitNumber: 1, vehicleClass: 'Unknown' })
+  const [showVehicleForm, setShowVehicleForm] = useState(false)
+  const [vehicleForm, setVehicleForm] = useState<SubmissionVehicleCreate>(emptyVehicleForm())
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
+
+  // Prior carrier form state
+  const emptyCarrierForm = (): SubmissionPriorCarrierCreate => ({ carrierName: '' })
+  const [showCarrierForm, setShowCarrierForm] = useState(false)
+  const [carrierForm, setCarrierForm] = useState<SubmissionPriorCarrierCreate>(emptyCarrierForm())
+  const [editingCarrierId, setEditingCarrierId] = useState<string | null>(null)
+
+  // Supplemental form state
+  const emptySupplementalForm = (): SubmissionSupplementalUpsert => ({ commoditiesHauled: [], terminalLocations: [], safetyProgramInPlace: false, filingsRequired: [], ownerOperator: false })
+  const [supplementalForm, setSupplementalForm] = useState<SubmissionSupplementalUpsert>(emptySupplementalForm())
+  const [supplementalDirty, setSupplementalDirty] = useState(false)
 
   const { data: submission, isLoading } = useQuery({
     queryKey: ['submissions', id],
@@ -82,6 +117,42 @@ export function SubmissionDetailPage() {
     queryKey: ['carriers', 'active'],
     queryFn: () => carriersApi.getAll(true),
   })
+
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['submission-drivers', id],
+    queryFn: () => submissionDriversApi.getAll(id!),
+    enabled: !!id && driversOpen,
+  })
+
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ['submission-vehicles', id],
+    queryFn: () => submissionVehiclesApi.getAll(id!),
+    enabled: !!id && vehiclesOpen,
+  })
+
+  const { data: priorCarriers = [] } = useQuery({
+    queryKey: ['submission-prior-carriers', id],
+    queryFn: () => submissionPriorCarriersApi.getAll(id!),
+    enabled: !!id && priorCarriersOpen,
+  })
+
+  const { data: supplemental } = useQuery({
+    queryKey: ['submission-supplemental', id],
+    queryFn: () => submissionSupplementalApi.get(id!),
+    enabled: !!id && supplementalOpen,
+  })
+
+  useEffect(() => {
+    if (supplemental) {
+      setSupplementalForm({
+        commoditiesHauled: supplemental.commoditiesHauled,
+        terminalLocations: supplemental.terminalLocations,
+        filingsRequired: supplemental.filingsRequired,
+        safetyProgramInPlace: supplemental.safetyProgramInPlace,
+        ownerOperator: supplemental.ownerOperator,
+      })
+    }
+  }, [supplemental])
 
   const selectedCarrier = carriers.find((c) => c.id === quoteForm.carrierId)
   const availableLobs = selectedCarrier ? selectedCarrier.linesOfBusiness : ALL_LOBS
@@ -118,6 +189,71 @@ export function SubmissionDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to bind quote'),
   })
 
+  // Driver mutations
+  const saveDriverMutation = useMutation({
+    mutationFn: (dto: SubmissionDriverCreate) =>
+      editingDriverId
+        ? submissionDriversApi.update(id!, editingDriverId, dto)
+        : submissionDriversApi.create(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-drivers', id] })
+      setShowDriverForm(false); setDriverForm(emptyDriverForm()); setEditingDriverId(null)
+      toast.success('Driver saved')
+    },
+    onError: () => toast.error('Failed to save driver'),
+  })
+  const deleteDriverMutation = useMutation({
+    mutationFn: (dId: string) => submissionDriversApi.delete(id!, dId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-drivers', id] }); toast.success('Driver removed') },
+  })
+
+  // Vehicle mutations
+  const saveVehicleMutation = useMutation({
+    mutationFn: (dto: SubmissionVehicleCreate) =>
+      editingVehicleId
+        ? submissionVehiclesApi.update(id!, editingVehicleId, dto)
+        : submissionVehiclesApi.create(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-vehicles', id] })
+      setShowVehicleForm(false); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null)
+      toast.success('Vehicle saved')
+    },
+    onError: () => toast.error('Failed to save vehicle'),
+  })
+  const deleteVehicleMutation = useMutation({
+    mutationFn: (vId: string) => submissionVehiclesApi.delete(id!, vId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-vehicles', id] }); toast.success('Vehicle removed') },
+  })
+
+  // Prior carrier mutations
+  const savePriorCarrierMutation = useMutation({
+    mutationFn: (dto: SubmissionPriorCarrierCreate) =>
+      editingCarrierId
+        ? submissionPriorCarriersApi.update(id!, editingCarrierId, dto)
+        : submissionPriorCarriersApi.create(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] })
+      setShowCarrierForm(false); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null)
+      toast.success('Prior carrier saved')
+    },
+    onError: () => toast.error('Failed to save prior carrier'),
+  })
+  const deletePriorCarrierMutation = useMutation({
+    mutationFn: (cId: string) => submissionPriorCarriersApi.delete(id!, cId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] }); toast.success('Prior carrier removed') },
+  })
+
+  // Supplemental mutation
+  const saveSupplementalMutation = useMutation({
+    mutationFn: (dto: SubmissionSupplementalUpsert) => submissionSupplementalApi.upsert(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-supplemental', id] })
+      setSupplementalDirty(false)
+      toast.success('Supplemental info saved')
+    },
+    onError: () => toast.error('Failed to save supplemental info'),
+  })
+
   const handleCreateQuote = () => {
     if (!quoteForm.carrierId || !quoteForm.lineOfBusiness || !quoteForm.effectiveDate || !quoteForm.expirationDate) {
       toast.error('Carrier, line of business, and dates are required')
@@ -135,6 +271,8 @@ export function SubmissionDetailPage() {
       coverageDescription: quoteForm.coverageDescription || undefined,
       deductible: quoteForm.deductible ? parseFloat(quoteForm.deductible) : undefined,
       limit: quoteForm.limit ? parseFloat(quoteForm.limit) : undefined,
+      uninsuredMotoristLimit: quoteForm.uninsuredMotoristLimit ? parseFloat(quoteForm.uninsuredMotoristLimit) : undefined,
+      medicalPaymentsLimit: quoteForm.medicalPaymentsLimit ? parseFloat(quoteForm.medicalPaymentsLimit) : undefined,
     })
   }
 
@@ -291,6 +429,18 @@ export function SubmissionDetailPage() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Deductible</label>
                 <input type="number" value={quoteForm.deductible} onChange={setQF('deductible')} placeholder="Optional" className="w-full border rounded px-2 py-1.5" />
               </div>
+              {quoteForm.lineOfBusiness === 'CommercialAuto' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">UM/UIM Limit</label>
+                    <input type="number" value={quoteForm.uninsuredMotoristLimit} onChange={setQF('uninsuredMotoristLimit')} placeholder="Optional" className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Med Pay Limit</label>
+                    <input type="number" value={quoteForm.medicalPaymentsLimit} onChange={setQF('medicalPaymentsLimit')} placeholder="Optional" className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <button onClick={handleCreateQuote} disabled={createQuoteMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
@@ -384,6 +534,373 @@ export function SubmissionDetailPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Drivers */}
+      <div className="bg-white border rounded-lg">
+        <button
+          onClick={() => setDriversOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+        >
+          <span>Drivers ({driversOpen ? drivers.length : '…'})</span>
+          {driversOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        </button>
+        {driversOpen && (
+          <div className="border-t">
+            {/* Driver form */}
+            {showDriverForm && (
+              <div className="px-5 py-4 bg-slate-50 border-b space-y-3 text-sm">
+                <h3 className="font-medium text-slate-700">{editingDriverId ? 'Edit Driver' : 'Add Driver'}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Driver #</label>
+                    <input type="number" value={driverForm.driverNumber} onChange={(e) => setDriverForm((f) => ({ ...f, driverNumber: parseInt(e.target.value) || 1 }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Name *</label>
+                    <input value={driverForm.name} onChange={(e) => setDriverForm((f) => ({ ...f, name: e.target.value }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Date of Birth</label>
+                    <input type="date" value={driverForm.dateOfBirth ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, dateOfBirth: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">License #</label>
+                    <input value={driverForm.licenseNumber ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, licenseNumber: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">License State</label>
+                    <input maxLength={2} value={driverForm.licenseState ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, licenseState: e.target.value.toUpperCase() || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Date Hired</label>
+                    <input type="date" value={driverForm.dateHired ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, dateHired: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => saveDriverMutation.mutate(driverForm)} disabled={!driverForm.name || saveDriverMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
+                    <Check className="h-3.5 w-3.5" /> Save
+                  </button>
+                  <button onClick={() => { setShowDriverForm(false); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-white">
+                    <X className="h-3.5 w-3.5" /> Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Driver list */}
+            {drivers.length === 0 && !showDriverForm ? (
+              <p className="text-sm text-slate-400 px-5 py-6 text-center">No drivers added yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+                  <tr>
+                    <th className="px-5 py-2 text-left">#</th>
+                    <th className="px-5 py-2 text-left">Name</th>
+                    <th className="px-5 py-2 text-left">DOB</th>
+                    <th className="px-5 py-2 text-left">License</th>
+                    <th className="px-5 py-2 text-left">State</th>
+                    <th className="px-5 py-2 text-left">Hired</th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {drivers.map((d) => (
+                    <tr key={d.id} className="hover:bg-slate-50">
+                      <td className="px-5 py-2">{d.driverNumber}</td>
+                      <td className="px-5 py-2 font-medium">{d.name}</td>
+                      <td className="px-5 py-2 text-slate-500">{d.dateOfBirth ?? '—'}</td>
+                      <td className="px-5 py-2 text-slate-500">{d.licenseNumber ?? '—'}</td>
+                      <td className="px-5 py-2 text-slate-500">{d.licenseState ?? '—'}</td>
+                      <td className="px-5 py-2 text-slate-500">{d.dateHired ?? '—'}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex gap-1">
+                          <button onClick={() => { setDriverForm({ driverNumber: d.driverNumber, name: d.name, dateOfBirth: d.dateOfBirth ?? undefined, licenseNumber: d.licenseNumber ?? undefined, licenseState: d.licenseState ?? undefined, dateHired: d.dateHired ?? undefined }); setEditingDriverId(d.id); setShowDriverForm(true) }} className="p-1 text-slate-400 hover:text-blue-600 rounded"><Pencil className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => { if (confirm('Remove driver?')) deleteDriverMutation.mutate(d.id) }} className="p-1 text-slate-400 hover:text-red-600 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {!showDriverForm && (
+              <div className="px-5 py-3 border-t">
+                <button onClick={() => { setShowDriverForm(true); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                  <Plus className="h-3.5 w-3.5" /> Add Driver
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Vehicles */}
+      <div className="bg-white border rounded-lg">
+        <button
+          onClick={() => setVehiclesOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+        >
+          <span>Vehicles ({vehiclesOpen ? vehicles.length : '…'})</span>
+          {vehiclesOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        </button>
+        {vehiclesOpen && (
+          <div className="border-t">
+            {showVehicleForm && (
+              <div className="px-5 py-4 bg-slate-50 border-b space-y-3 text-sm">
+                <h3 className="font-medium text-slate-700">{editingVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Unit #</label>
+                    <input type="number" value={vehicleForm.unitNumber} onChange={(e) => setVehicleForm((f) => ({ ...f, unitNumber: parseInt(e.target.value) || 1 }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Year</label>
+                    <input type="number" value={vehicleForm.year ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, year: parseInt(e.target.value) || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Make</label>
+                    <input value={vehicleForm.make ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, make: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Model</label>
+                    <input value={vehicleForm.model ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, model: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">VIN</label>
+                    <input value={vehicleForm.vin ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, vin: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">GVW (lbs)</label>
+                    <input type="number" value={vehicleForm.gvw ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, gvw: parseInt(e.target.value) || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Class *</label>
+                    <select value={vehicleForm.vehicleClass} onChange={(e) => setVehicleForm((f) => ({ ...f, vehicleClass: e.target.value as VehicleClass }))} className="w-full border rounded px-2 py-1.5">
+                      {(Object.keys(VEHICLE_CLASS_LABELS) as VehicleClass[]).map((k) => <option key={k} value={k}>{VEHICLE_CLASS_LABELS[k]}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Garaging ZIP</label>
+                    <input value={vehicleForm.garagingZip ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, garagingZip: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Radius</label>
+                    <select value={vehicleForm.radius ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, radius: (e.target.value as OperatingRadius) || undefined }))} className="w-full border rounded px-2 py-1.5">
+                      <option value="">— Select —</option>
+                      {(Object.keys(OPERATING_RADIUS_LABELS) as OperatingRadius[]).map((k) => <option key={k} value={k}>{OPERATING_RADIUS_LABELS[k]}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => saveVehicleMutation.mutate(vehicleForm)} disabled={saveVehicleMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
+                    <Check className="h-3.5 w-3.5" /> Save
+                  </button>
+                  <button onClick={() => { setShowVehicleForm(false); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-white">
+                    <X className="h-3.5 w-3.5" /> Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {vehicles.length === 0 && !showVehicleForm ? (
+              <p className="text-sm text-slate-400 px-5 py-6 text-center">No vehicles added yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+                  <tr>
+                    <th className="px-5 py-2 text-left">Unit</th>
+                    <th className="px-5 py-2 text-left">Year</th>
+                    <th className="px-5 py-2 text-left">Make / Model</th>
+                    <th className="px-5 py-2 text-left">VIN</th>
+                    <th className="px-5 py-2 text-left">Class</th>
+                    <th className="px-5 py-2 text-left">GVW</th>
+                    <th className="px-5 py-2 text-left">Radius</th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {vehicles.map((v) => (
+                    <tr key={v.id} className="hover:bg-slate-50">
+                      <td className="px-5 py-2">{v.unitNumber}</td>
+                      <td className="px-5 py-2">{v.year ?? '—'}</td>
+                      <td className="px-5 py-2 font-medium">{[v.make, v.model].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="px-5 py-2 text-slate-500 font-mono text-xs">{v.vin ?? '—'}</td>
+                      <td className="px-5 py-2">{VEHICLE_CLASS_LABELS[v.vehicleClass]}</td>
+                      <td className="px-5 py-2 text-slate-500">{v.gvw ? v.gvw.toLocaleString() : '—'}</td>
+                      <td className="px-5 py-2">{v.radius ? OPERATING_RADIUS_LABELS[v.radius] : '—'}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex gap-1">
+                          <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="p-1 text-slate-400 hover:text-blue-600 rounded"><Pencil className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="p-1 text-slate-400 hover:text-red-600 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {!showVehicleForm && (
+              <div className="px-5 py-3 border-t">
+                <button onClick={() => { setShowVehicleForm(true); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                  <Plus className="h-3.5 w-3.5" /> Add Vehicle
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Prior Carriers */}
+      <div className="bg-white border rounded-lg">
+        <button
+          onClick={() => setPriorCarriersOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+        >
+          <span>Prior Carriers ({priorCarriersOpen ? priorCarriers.length : '…'})</span>
+          {priorCarriersOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        </button>
+        {priorCarriersOpen && (
+          <div className="border-t">
+            {showCarrierForm && (
+              <div className="px-5 py-4 bg-slate-50 border-b space-y-3 text-sm">
+                <h3 className="font-medium text-slate-700">{editingCarrierId ? 'Edit Prior Carrier' : 'Add Prior Carrier'}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Carrier Name *</label>
+                    <input value={carrierForm.carrierName} onChange={(e) => setCarrierForm((f) => ({ ...f, carrierName: e.target.value }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
+                    <input value={carrierForm.lineOfBusiness ?? ''} onChange={(e) => setCarrierForm((f) => ({ ...f, lineOfBusiness: e.target.value || undefined }))} placeholder="e.g. CommercialAuto" className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Policy Number</label>
+                    <input value={carrierForm.policyNumber ?? ''} onChange={(e) => setCarrierForm((f) => ({ ...f, policyNumber: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Expiration Date</label>
+                    <input type="date" value={carrierForm.expirationDate ?? ''} onChange={(e) => setCarrierForm((f) => ({ ...f, expirationDate: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Premium</label>
+                    <input type="number" value={carrierForm.premium ?? ''} onChange={(e) => setCarrierForm((f) => ({ ...f, premium: parseFloat(e.target.value) || undefined }))} placeholder="Optional" className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => savePriorCarrierMutation.mutate(carrierForm)} disabled={!carrierForm.carrierName || savePriorCarrierMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
+                    <Check className="h-3.5 w-3.5" /> Save
+                  </button>
+                  <button onClick={() => { setShowCarrierForm(false); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null) }} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-white">
+                    <X className="h-3.5 w-3.5" /> Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {priorCarriers.length === 0 && !showCarrierForm ? (
+              <p className="text-sm text-slate-400 px-5 py-6 text-center">No prior carrier history added.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+                  <tr>
+                    <th className="px-5 py-2 text-left">Carrier</th>
+                    <th className="px-5 py-2 text-left">LOB</th>
+                    <th className="px-5 py-2 text-left">Policy #</th>
+                    <th className="px-5 py-2 text-left">Expiration</th>
+                    <th className="px-5 py-2 text-left">Premium</th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {priorCarriers.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-50">
+                      <td className="px-5 py-2 font-medium">{p.carrierName}</td>
+                      <td className="px-5 py-2 text-slate-500">{p.lineOfBusiness ?? '—'}</td>
+                      <td className="px-5 py-2 text-slate-500">{p.policyNumber ?? '—'}</td>
+                      <td className="px-5 py-2 text-slate-500">{p.expirationDate ?? '—'}</td>
+                      <td className="px-5 py-2 text-slate-500">{p.premium != null ? `$${p.premium.toLocaleString()}` : '—'}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex gap-1">
+                          <button onClick={() => { setCarrierForm({ carrierName: p.carrierName, lineOfBusiness: p.lineOfBusiness ?? undefined, policyNumber: p.policyNumber ?? undefined, expirationDate: p.expirationDate ?? undefined, premium: p.premium ?? undefined }); setEditingCarrierId(p.id); setShowCarrierForm(true) }} className="p-1 text-slate-400 hover:text-blue-600 rounded"><Pencil className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => { if (confirm('Remove prior carrier?')) deletePriorCarrierMutation.mutate(p.id) }} className="p-1 text-slate-400 hover:text-red-600 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {!showCarrierForm && (
+              <div className="px-5 py-3 border-t">
+                <button onClick={() => { setShowCarrierForm(true); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null) }} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                  <Plus className="h-3.5 w-3.5" /> Add Prior Carrier
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Supplemental */}
+      <div className="bg-white border rounded-lg">
+        <button
+          onClick={() => {
+            setSupplementalOpen((o) => !o)
+            if (!supplementalOpen && supplemental) {
+              setSupplementalForm({ commoditiesHauled: supplemental.commoditiesHauled, terminalLocations: supplemental.terminalLocations, safetyProgramInPlace: supplemental.safetyProgramInPlace, filingsRequired: supplemental.filingsRequired, ownerOperator: supplemental.ownerOperator })
+            }
+          }}
+          className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+        >
+          <span>Supplemental Info</span>
+          {supplementalOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        </button>
+        {supplementalOpen && (
+          <div className="border-t px-5 py-4 space-y-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Commodities Hauled <span className="text-slate-400">(comma-separated)</span></label>
+                <input
+                  value={supplementalForm.commoditiesHauled.join(', ')}
+                  onChange={(e) => { setSupplementalForm((f) => ({ ...f, commoditiesHauled: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }}
+                  placeholder="e.g. Lumber, Steel, Gravel"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Terminal Locations <span className="text-slate-400">(comma-separated)</span></label>
+                <input
+                  value={supplementalForm.terminalLocations.join(', ')}
+                  onChange={(e) => { setSupplementalForm((f) => ({ ...f, terminalLocations: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }}
+                  placeholder="e.g. Dallas TX, Houston TX"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Filings Required <span className="text-slate-400">(comma-separated)</span></label>
+                <input
+                  value={supplementalForm.filingsRequired.join(', ')}
+                  onChange={(e) => { setSupplementalForm((f) => ({ ...f, filingsRequired: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }}
+                  placeholder="e.g. MCS-90, Form E"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div className="flex flex-col gap-3 justify-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={supplementalForm.safetyProgramInPlace} onChange={(e) => { setSupplementalForm((f) => ({ ...f, safetyProgramInPlace: e.target.checked })); setSupplementalDirty(true) }} className="rounded" />
+                  <span>Safety program in place</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={supplementalForm.ownerOperator} onChange={(e) => { setSupplementalForm((f) => ({ ...f, ownerOperator: e.target.checked })); setSupplementalDirty(true) }} className="rounded" />
+                  <span>Owner-operator</span>
+                </label>
+              </div>
+            </div>
+            {supplementalDirty && (
+              <button onClick={() => saveSupplementalMutation.mutate(supplementalForm)} disabled={saveSupplementalMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
+                <Check className="h-3.5 w-3.5" /> Save Supplemental Info
+              </button>
+            )}
           </div>
         )}
       </div>

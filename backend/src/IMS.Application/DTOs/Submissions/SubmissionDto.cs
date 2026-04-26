@@ -18,6 +18,7 @@ public class SubmissionDto
     public DateOnly? EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
     public SubmissionStatus Status { get; set; }
+    public string? DescriptionOfOperations { get; set; }
     public int QuoteCount { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -44,6 +45,7 @@ public class SubmissionCreateDto
     public Guid? AssistantUWId { get; set; }
     public DateOnly? EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
+    public string? DescriptionOfOperations { get; set; }
 }
 
 public class SubmissionUpdateDto : SubmissionCreateDto
