@@ -28,6 +28,8 @@ public class QuoteDto
     public string? CoverageDescription { get; set; }
     public decimal? Deductible { get; set; }
     public decimal? Limit { get; set; }
+    public decimal? UninsuredMotoristLimit { get; set; }
+    public decimal? MedicalPaymentsLimit { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -61,6 +63,8 @@ public class QuoteCreateDto
     public string? CoverageDescription { get; set; }
     public decimal? Deductible { get; set; }
     public decimal? Limit { get; set; }
+    public decimal? UninsuredMotoristLimit { get; set; }
+    public decimal? MedicalPaymentsLimit { get; set; }
 }
 
 public class QuoteUpdateDto : QuoteCreateDto

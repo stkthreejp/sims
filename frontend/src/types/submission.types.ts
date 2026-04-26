@@ -37,6 +37,7 @@ export interface Submission {
   effectiveDate: string | null
   expirationDate: string | null
   status: SubmissionStatus
+  descriptionOfOperations: string | null
   quoteCount: number
   createdAt: string
 }
@@ -48,6 +49,7 @@ export interface SubmissionCreate {
   assistantUWId?: string
   effectiveDate?: string
   expirationDate?: string
+  descriptionOfOperations?: string
 }
 
 export interface SubmissionUpdate extends SubmissionCreate {

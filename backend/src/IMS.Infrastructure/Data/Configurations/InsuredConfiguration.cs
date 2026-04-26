@@ -13,6 +13,7 @@ public class InsuredConfiguration : IEntityTypeConfiguration<Insured>
         builder.Property(i => i.FirstName).HasMaxLength(100);
         builder.Property(i => i.LastName).HasMaxLength(100);
         builder.Property(i => i.CompanyName).HasMaxLength(200);
+        builder.Property(i => i.Dba).HasMaxLength(200);
         builder.Property(i => i.TaxId).HasMaxLength(20);
         builder.Property(i => i.Email).HasMaxLength(200);
         builder.Property(i => i.Phone).HasMaxLength(30);

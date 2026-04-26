@@ -12,6 +12,7 @@ public class Submission : BaseEntity
     public DateOnly? EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
     public SubmissionStatus Status { get; set; } = SubmissionStatus.New;
+    public string? DescriptionOfOperations { get; set; }
     public Guid CreatedById { get; set; }
 
     // Navigation
@@ -21,4 +22,13 @@ public class Submission : BaseEntity
     public User? AssistantUW { get; set; }
     public User CreatedBy { get; set; } = null!;
     public ICollection<Quote> Quotes { get; set; } = new List<Quote>();
+    public ICollection<SubmissionLocation> Locations { get; set; } = new List<SubmissionLocation>();
+    public ICollection<SubmissionDriver> Drivers { get; set; } = new List<SubmissionDriver>();
+    public ICollection<SubmissionVehicle> Vehicles { get; set; } = new List<SubmissionVehicle>();
+    public ICollection<SubmissionPriorCarrier> PriorCarriers { get; set; } = new List<SubmissionPriorCarrier>();
+    public ICollection<SubmissionGLClassification> GLClassifications { get; set; } = new List<SubmissionGLClassification>();
+    public ICollection<SubmissionEquipment> Equipment { get; set; } = new List<SubmissionEquipment>();
+    public SubmissionSupplemental? Supplemental { get; set; }
+    public SubmissionGLCoverages? GLCoverages { get; set; }
+    public SubmissionIMCoverages? IMCoverages { get; set; }
 }

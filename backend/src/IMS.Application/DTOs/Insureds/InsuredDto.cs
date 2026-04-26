@@ -11,6 +11,9 @@ public class InsuredDto
     public string? LastName { get; set; }
     public DateOnly? DateOfBirth { get; set; }
     public string? CompanyName { get; set; }
+    public string? Dba { get; set; }
+    public BusinessEntityType? EntityType { get; set; }
+    public int? YearsInBusiness { get; set; }
     public string? TaxId { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
@@ -33,6 +36,9 @@ public class InsuredCreateDto
     public string? LastName { get; set; }
     public DateOnly? DateOfBirth { get; set; }
     public string? CompanyName { get; set; }
+    public string? Dba { get; set; }
+    public BusinessEntityType? EntityType { get; set; }
+    public int? YearsInBusiness { get; set; }
     public string? TaxId { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }

@@ -1,4 +1,16 @@
 export type InsuredType = 'Individual' | 'Commercial'
+export type BusinessEntityType = 'Unknown' | 'Individual' | 'SoleProprietor' | 'Partnership' | 'LLC' | 'Corporation' | 'Trust' | 'Other'
+
+export const BUSINESS_ENTITY_TYPE_LABELS: Record<BusinessEntityType, string> = {
+  Unknown: 'Unknown',
+  Individual: 'Individual',
+  SoleProprietor: 'Sole Proprietor',
+  Partnership: 'Partnership',
+  LLC: 'LLC',
+  Corporation: 'Corporation',
+  Trust: 'Trust',
+  Other: 'Other',
+}
 
 export interface InsuredListItem {
   id: string
@@ -21,6 +33,9 @@ export interface Insured {
   lastName: string | null
   dateOfBirth: string | null
   companyName: string | null
+  dba: string | null
+  entityType: BusinessEntityType | null
+  yearsInBusiness: number | null
   taxId: string | null
   email: string | null
   phone: string | null
@@ -42,6 +57,9 @@ export interface InsuredCreate {
   lastName?: string
   dateOfBirth?: string
   companyName?: string
+  dba?: string
+  entityType?: BusinessEntityType
+  yearsInBusiness?: number
   taxId?: string
   email?: string
   phone?: string

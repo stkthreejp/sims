@@ -32,6 +32,10 @@ public class Quote : BaseEntity
     public decimal? Deductible { get; set; }
     public decimal? Limit { get; set; }
 
+    // Commercial auto coverage limits (populated for CommercialAuto LOB)
+    public decimal? UninsuredMotoristLimit { get; set; }
+    public decimal? MedicalPaymentsLimit { get; set; }
+
     public Guid CreatedById { get; set; }
 
     // Navigation
