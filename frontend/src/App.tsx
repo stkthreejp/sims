@@ -24,6 +24,8 @@ import { CarriersPage } from '@/pages/carriers/CarriersPage'
 import { CarrierDetailPage } from '@/pages/carriers/CarrierDetailPage'
 import { DocumentLibraryPage } from '@/pages/documents/DocumentLibraryPage'
 import { TemplateEditorPage } from '@/pages/documents/TemplateEditorPage'
+import { InboxPage } from '@/pages/inbox/InboxPage'
+import { InboxDetailPage } from '@/pages/inbox/InboxDetailPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -68,6 +70,9 @@ export default function App() {
             <Route path="/carriers" element={<CarriersPage />} />
             <Route path="/carriers/:id" element={<CarrierDetailPage />} />
             <Route path="/users" element={<UsersPage />} />
+
+            <Route path="/inbox" element={<InboxPage />} />
+            <Route path="/inbox/:id" element={<InboxDetailPage />} />
 
             <Route path="/document-library" element={<DocumentLibraryPage />} />
             <Route path="/document-library/new" element={<TemplateEditorPage />} />

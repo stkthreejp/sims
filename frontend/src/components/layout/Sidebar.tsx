@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/inbox', label: 'Inbox', icon: Inbox, roles: ['Underwriter', 'Admin'] },
   { to: '/insureds', label: 'Insureds', icon: Building2 },
   { to: '/policies', label: 'Policies', icon: FileText },
   { to: '/carriers', label: 'Carriers', icon: ShieldCheck, adminOnly: true },
@@ -23,8 +24,9 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-4 space-y-0.5">
-        {navItems.map(({ to, label, icon: Icon, adminOnly }) => {
+        {navItems.map(({ to, label, icon: Icon, adminOnly, roles }) => {
           if (adminOnly && !hasRole('Admin')) return null
+          if (roles && !roles.some((r) => hasRole(r))) return null
           return (
             <NavLink
               key={to}

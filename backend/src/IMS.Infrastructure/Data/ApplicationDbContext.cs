@@ -27,6 +27,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
+    public DbSet<EmailAttachment> EmailAttachments => Set<EmailAttachment>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -58,6 +60,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Note>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<DocumentTemplate>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<InboundEmail>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<EmailAttachment>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()
