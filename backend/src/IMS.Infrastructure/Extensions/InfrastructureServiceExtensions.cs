@@ -3,6 +3,7 @@ using IMS.Application.Services;
 using IMS.Domain.Entities;
 using IMS.Infrastructure.Data;
 using IMS.Infrastructure.Services;
+using IMS.Infrastructure.Workers;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -49,6 +50,9 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IAttachmentService, AttachmentService>();
         services.AddScoped<IDocumentTemplateService, DocumentTemplateService>();
         services.AddScoped<IDocumentGenerationService, DocumentGenerationService>();
+        services.AddScoped<IInboundEmailService, InboundEmailService>();
+        services.AddScoped<IEmailIngestionService, EmailIngestionService>();
+        services.AddHostedService<EmailIngestionWorker>();
 
         return services;
     }
