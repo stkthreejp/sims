@@ -34,6 +34,9 @@ cd frontend && npm run dev
 npx tsc --noEmit   # type check
 ```
 
+## Git workflow
+This is a solo developer project. **Commit directly to `main`** — do not create feature branches or worktrees. Use `git push origin main` for all changes.
+
 ## Dev server startup
 Use the backend_ms.log and frontend_ms.log files in the root to check server status.
 Backend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\IMS\backend_ms.log' -Tail 20"`
