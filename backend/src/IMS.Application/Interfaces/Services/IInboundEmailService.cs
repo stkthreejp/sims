@@ -8,5 +8,5 @@ public interface IInboundEmailService
 {
     Task<IEnumerable<InboundEmailListItemDto>> GetUnprocessedAsync();
     Task<Result<InboundEmailDto>> GetByIdAsync(Guid id);
-    Task<Result<SubmissionDto>> CreateSubmissionFromEmailAsync(Guid emailId, Guid currentUserId);
+    Task<Result<SubmissionDto>> CreateSubmissionFromEmailAsync(Guid emailId, Guid currentUserId, Guid? insuredId = null);
 }

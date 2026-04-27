@@ -38,9 +38,11 @@ public class InboundEmailService : IInboundEmailService
             : Result<InboundEmailDto>.Success(MapToDto(email));
     }
 
-    public async Task<Result<SubmissionDto>> CreateSubmissionFromEmailAsync(Guid emailId, Guid currentUserId)
+    public async Task<Result<SubmissionDto>> CreateSubmissionFromEmailAsync(
+        Guid emailId, Guid currentUserId, Guid? insuredId = null)
     {
         var email = await Db.Set<InboundEmail>()
+            .Include(e => e.Attachments.Where(a => !a.IsDeleted))
             .FirstOrDefaultAsync(e => e.Id == emailId && !e.IsDeleted);
 
         if (email == null)
@@ -49,10 +51,22 @@ public class InboundEmailService : IInboundEmailService
         if (email.IsProcessed && email.LinkedSubmissionId.HasValue)
             return Result<SubmissionDto>.Failure("ALREADY_PROCESSED", "A submission has already been created from this email.");
 
-        // Create a placeholder Insured from sender info
-        var insured = BuildInsuredFromSender(email.FromName, email.FromAddress, currentUserId);
-        Db.Set<Insured>().Add(insured);
-        await Db.SaveChangesAsync();
+        // Use provided insured or create a placeholder from sender info
+        Guid resolvedInsuredId;
+        if (insuredId.HasValue)
+        {
+            var exists = await Db.Set<Insured>().AnyAsync(i => i.Id == insuredId.Value && !i.IsDeleted);
+            if (!exists)
+                return Result<SubmissionDto>.Failure("INSURED_NOT_FOUND", "Selected insured not found.");
+            resolvedInsuredId = insuredId.Value;
+        }
+        else
+        {
+            var newInsured = BuildInsuredFromSender(email.FromName, email.FromAddress, currentUserId);
+            Db.Set<Insured>().Add(newInsured);
+            await Db.SaveChangesAsync();
+            resolvedInsuredId = newInsured.Id;
+        }
 
         // Generate submission number
         var year = DateTime.UtcNow.Year;
@@ -60,17 +74,33 @@ public class InboundEmailService : IInboundEmailService
         var count = await Db.Set<Submission>()
             .IgnoreQueryFilters()
             .CountAsync(s => s.SubmissionNumber.StartsWith(prefix));
-        var submissionNumber = $"{prefix}{(count + 1):D4}";
 
         var submission = new Submission
         {
-            SubmissionNumber = submissionNumber,
-            InsuredId = insured.Id,
+            SubmissionNumber = $"{prefix}{(count + 1):D4}",
+            InsuredId = resolvedInsuredId,
             UnderwriterId = currentUserId,
             CreatedById = currentUserId,
             Status = SubmissionStatus.New,
         };
         Db.Set<Submission>().Add(submission);
+
+        // Copy email attachments to submission attachments
+        foreach (var emailAttachment in email.Attachments)
+        {
+            Db.Set<Attachment>().Add(new Attachment
+            {
+                SubmissionId = submission.Id,
+                EntityType = DocumentEntityType.Submission,
+                DocumentType = MapDocumentType(emailAttachment.DocumentType),
+                FileName = emailAttachment.FileName,
+                BlobPath = emailAttachment.BlobUrl,
+                ContentType = emailAttachment.ContentType ?? "application/octet-stream",
+                FileSizeBytes = emailAttachment.FileSizeBytes,
+                Description = $"Imported from email: {email.Subject}",
+                UploadedById = currentUserId,
+            });
+        }
 
         // Link and mark email as processed
         email.LinkedSubmissionId = submission.Id;
@@ -86,8 +116,8 @@ public class InboundEmailService : IInboundEmailService
         {
             Id = submission.Id,
             SubmissionNumber = submission.SubmissionNumber,
-            InsuredId = insured.Id,
-            InsuredName = insured.DisplayName,
+            InsuredId = resolvedInsuredId,
+            InsuredName = submission.Insured?.DisplayName ?? "",
             UnderwriterId = currentUserId,
             UnderwriterName = submission.Underwriter?.FullName ?? "",
             Status = submission.Status,
@@ -95,9 +125,19 @@ public class InboundEmailService : IInboundEmailService
         });
     }
 
+    private static DocumentType MapDocumentType(EmailAttachmentDocumentType t) => t switch
+    {
+        EmailAttachmentDocumentType.Acord125 => DocumentType.Application,
+        EmailAttachmentDocumentType.Acord126 => DocumentType.SupplementalApplication,
+        EmailAttachmentDocumentType.LossRun => DocumentType.LossRuns,
+        EmailAttachmentDocumentType.DecPage => DocumentType.DeclarationsPage,
+        EmailAttachmentDocumentType.ScheduleOfValues => DocumentType.StatementOfValues,
+        EmailAttachmentDocumentType.SignedApplication => DocumentType.SignedApplication,
+        _ => DocumentType.Other,
+    };
+
     private static Insured BuildInsuredFromSender(string? fromName, string fromAddress, Guid createdById)
     {
-        // Treat as Individual; use email as placeholder address fields
         var parts = (fromName ?? fromAddress).Trim().Split(' ', 2);
         return new Insured
         {
