@@ -29,10 +29,15 @@ public class InboundEmailsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/create-submission")]
-    public async Task<IActionResult> CreateSubmission(Guid id)
+    public async Task<IActionResult> CreateSubmission(Guid id, [FromBody] CreateSubmissionFromEmailRequest? request = null)
     {
-        var result = await _inboundEmailService.CreateSubmissionFromEmailAsync(id, CurrentUserId);
+        var result = await _inboundEmailService.CreateSubmissionFromEmailAsync(id, CurrentUserId, request?.InsuredId);
         if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
         return Ok(result.Value);
     }
+}
+
+public class CreateSubmissionFromEmailRequest
+{
+    public Guid? InsuredId { get; set; }
 }
