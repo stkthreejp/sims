@@ -31,7 +31,7 @@ public class InboundEmailsController : ControllerBase
     [HttpPost("{id:guid}/create-submission")]
     public async Task<IActionResult> CreateSubmission(Guid id, [FromBody] CreateSubmissionFromEmailRequest? request = null)
     {
-        var result = await _inboundEmailService.CreateSubmissionFromEmailAsync(id, CurrentUserId, request?.InsuredId);
+        var result = await _inboundEmailService.CreateSubmissionFromEmailAsync(id, CurrentUserId, request?.InsuredId, request?.AttachmentIds);
         if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
         return Ok(result.Value);
     }
@@ -48,4 +48,6 @@ public class InboundEmailsController : ControllerBase
 public class CreateSubmissionFromEmailRequest
 {
     public Guid? InsuredId { get; set; }
+    /// <summary>If provided, only these attachment IDs are copied and extracted. Omit to include all.</summary>
+    public List<Guid>? AttachmentIds { get; set; }
 }

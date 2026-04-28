@@ -53,7 +53,7 @@ public class InboundEmailService : IInboundEmailService
     }
 
     public async Task<Result<CreateSubmissionFromEmailResponse>> CreateSubmissionFromEmailAsync(
-        Guid emailId, Guid currentUserId, Guid? insuredId = null)
+        Guid emailId, Guid currentUserId, Guid? insuredId = null, List<Guid>? attachmentIds = null)
     {
         var email = await Db.Set<InboundEmail>()
             .Include(e => e.Attachments.Where(a => !a.IsDeleted))
@@ -99,8 +99,13 @@ public class InboundEmailService : IInboundEmailService
         };
         Db.Set<Submission>().Add(submission);
 
+        // Filter to selected attachments only (if caller specified a subset)
+        var attachmentsToProcess = attachmentIds?.Count > 0
+            ? email.Attachments.Where(a => attachmentIds.Contains(a.Id)).ToList()
+            : email.Attachments.ToList();
+
         // Copy email attachments to submission
-        foreach (var emailAttachment in email.Attachments)
+        foreach (var emailAttachment in attachmentsToProcess)
         {
             Db.Set<Attachment>().Add(new Attachment
             {
@@ -126,7 +131,7 @@ public class InboundEmailService : IInboundEmailService
         var extractionStatus = "NotApplicable";
         try
         {
-            var extraction = await _gemini.ExtractFromAttachmentsAsync(email.Attachments);
+            var extraction = await _gemini.ExtractFromAttachmentsAsync(attachmentsToProcess);
             if (extraction != null)
             {
                 await ApplyExtractionAsync(submission.Id, resolvedInsuredId, extraction, currentUserId);

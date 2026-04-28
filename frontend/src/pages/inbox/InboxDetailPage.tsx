@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileText, Paperclip, CheckCircle2, AlertCircle, Search, UserPlus, User } from 'lucide-react'
+import { ArrowLeft, FileText, Paperclip, CheckCircle2, AlertCircle, Search, UserPlus, User, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { inboundEmailsApi } from '@/api/inboundEmails.api'
 import type { CreateSubmissionResult } from '@/api/inboundEmails.api'
@@ -19,6 +19,12 @@ const DOC_TYPE_LABELS: Record<EmailAttachmentDocumentType, string> = {
   ScheduleOfValues: 'Schedule of Values',
   SignedApplication: 'Signed Application',
   Other: 'Other',
+}
+
+const LOB_FROM_DOC_TYPE: Partial<Record<EmailAttachmentDocumentType, string>> = {
+  Acord125: 'Commercial Auto',
+  Acord126: 'General Liability',
+  ScheduleOfValues: 'Inland Marine',
 }
 
 function formatBytes(bytes: number): string {
@@ -39,6 +45,9 @@ export function InboxDetailPage() {
   const [selectedInsured, setSelectedInsured] = useState<InsuredListItem | null>(null)
   const [createNew, setCreateNew] = useState(false)
 
+  // Track deselected attachment IDs (all start selected)
+  const [deselectedIds, setDeselectedIds] = useState<Set<string>>(new Set())
+
   const { data: email, isLoading, isError } = useQuery({
     queryKey: ['inbound-emails', id],
     queryFn: () => inboundEmailsApi.getById(id!),
@@ -52,11 +61,35 @@ export function InboxDetailPage() {
     placeholderData: (prev) => prev,
   })
 
+  // Derive selected attachments and detected LOB from selections
+  const selectedAttachments = useMemo(
+    () => (email?.attachments ?? []).filter(a => !deselectedIds.has(a.id)),
+    [email, deselectedIds]
+  )
+
+  const detectedLob = useMemo(() => {
+    for (const att of selectedAttachments) {
+      const lob = LOB_FROM_DOC_TYPE[att.documentType]
+      if (lob) return lob
+    }
+    return null
+  }, [selectedAttachments])
+
+  const toggleAttachment = (attId: string) => {
+    setDeselectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(attId)) next.delete(attId)
+      else next.add(attId)
+      return next
+    })
+  }
+
   const createSubmission = useMutation({
     mutationFn: () =>
       inboundEmailsApi.createSubmission(
         id!,
-        (!createNew && selectedInsured) ? selectedInsured.id : undefined
+        (!createNew && selectedInsured) ? selectedInsured.id : undefined,
+        selectedAttachments.map(a => a.id)
       ),
     onSuccess: (result: CreateSubmissionResult) => {
       queryClient.invalidateQueries({ queryKey: ['inbound-emails'] })
@@ -76,7 +109,6 @@ export function InboxDetailPage() {
     },
   })
 
-  // Pre-populate search with sender name when modal opens
   const openSearch = () => {
     setSearchQuery(email?.fromName ?? email?.fromAddress ?? '')
     setSelectedInsured(null)
@@ -128,7 +160,8 @@ export function InboxDetailPage() {
           ) : (
             <button
               onClick={openSearch}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              disabled={selectedAttachments.length === 0 && email.attachments.length > 0}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <FileText className="h-4 w-4" />
               Create Submission from Email
@@ -152,33 +185,58 @@ export function InboxDetailPage() {
 
         {email.attachments.length > 0 && (
           <div className="bg-white border border-slate-200 rounded-lg p-6">
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-              Attachments ({email.attachments.length})
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+                Attachments ({email.attachments.length})
+              </h2>
+              {!email.isProcessed && (
+                <p className="text-xs text-slate-400">Uncheck logos or irrelevant files before creating a submission</p>
+              )}
+            </div>
             <ul className="divide-y divide-slate-100">
-              {email.attachments.map((att) => (
-                <li key={att.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Paperclip className="h-4 w-4 text-slate-400 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{att.fileName}</p>
-                      <p className="text-xs text-slate-400">{DOC_TYPE_LABELS[att.documentType]} · {formatBytes(att.fileSizeBytes)}</p>
+              {email.attachments.map((att) => {
+                const checked = !deselectedIds.has(att.id)
+                return (
+                  <li key={att.id} className={`flex items-center justify-between py-3 ${!checked ? 'opacity-50' : ''}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {!email.isProcessed ? (
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleAttachment(att.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+                        />
+                      ) : (
+                        <Paperclip className="h-4 w-4 text-slate-400 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{att.fileName}</p>
+                        <p className="text-xs text-slate-400">
+                          {DOC_TYPE_LABELS[att.documentType]} · {formatBytes(att.fileSizeBytes)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <a href={att.blobUrl} target="_blank" rel="noopener noreferrer" className="ml-4 shrink-0 text-xs text-blue-600 hover:underline">
-                    Download
-                  </a>
-                </li>
-              ))}
+                    <a href={att.blobUrl} target="_blank" rel="noopener noreferrer" className="ml-4 shrink-0 text-xs text-blue-600 hover:underline">
+                      Download
+                    </a>
+                  </li>
+                )
+              })}
             </ul>
+            {!email.isProcessed && deselectedIds.size > 0 && (
+              <p className="mt-3 text-xs text-slate-400">
+                {selectedAttachments.length} of {email.attachments.length} attachments selected
+              </p>
+            )}
           </div>
         )}
       </div>
 
-      {/* Insured Search Modal */}
+      {/* Create Submission Modal */}
       {step !== 'idle' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+
             {step === 'search' && (
               <>
                 <div className="px-6 py-4 border-b border-slate-200">
@@ -249,6 +307,7 @@ export function InboxDetailPage() {
                   <h2 className="text-base font-semibold text-slate-900">Confirm submission</h2>
                 </div>
                 <div className="px-6 py-5 space-y-3">
+                  {/* Insured */}
                   <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
                     <p className="text-slate-500 text-xs uppercase font-medium mb-1">Insured</p>
                     {createNew ? (
@@ -260,14 +319,39 @@ export function InboxDetailPage() {
                       <p className="text-slate-800 font-medium">{selectedInsured?.displayName}</p>
                     )}
                   </div>
+
+                  {/* Detected LOB */}
+                  {detectedLob && (
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-500 shrink-0" />
+                      <div>
+                        <p className="text-blue-800 font-medium">Detected line of business: {detectedLob}</p>
+                        <p className="text-blue-600 text-xs mt-0.5">AI will extract {detectedLob} data from the selected attachments</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Email subject */}
                   <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
                     <p className="text-slate-500 text-xs uppercase font-medium mb-1">Email subject</p>
                     <p className="text-slate-800">{email.subject}</p>
                   </div>
-                  {email.attachments.length > 0 && (
+
+                  {/* Selected attachments */}
+                  {selectedAttachments.length > 0 && (
                     <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
-                      <p className="text-slate-500 text-xs uppercase font-medium mb-1">Attachments to copy</p>
-                      <p className="text-slate-800">{email.attachments.length} file{email.attachments.length !== 1 ? 's' : ''} will be added to the submission</p>
+                      <p className="text-slate-500 text-xs uppercase font-medium mb-2">
+                        Attachments to copy ({selectedAttachments.length})
+                      </p>
+                      <ul className="space-y-1">
+                        {selectedAttachments.map(att => (
+                          <li key={att.id} className="flex items-center gap-2 text-slate-700">
+                            <Paperclip className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{att.fileName}</span>
+                            <span className="text-slate-400 shrink-0">· {DOC_TYPE_LABELS[att.documentType]}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>
