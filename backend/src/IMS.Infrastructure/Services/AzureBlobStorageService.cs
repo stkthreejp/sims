@@ -49,6 +49,13 @@ public class AzureBlobStorageService : IBlobStorageService
         return Task.FromResult(sasUri.ToString());
     }
 
+    public async Task<byte[]> DownloadAsync(string blobPath)
+    {
+        var blobClient = _container.GetBlobClient(blobPath);
+        var response = await blobClient.DownloadContentAsync();
+        return response.Value.Content.ToArray();
+    }
+
     public async Task DeleteAsync(string blobPath)
     {
         var blobClient = _container.GetBlobClient(blobPath);

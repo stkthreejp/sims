@@ -52,6 +52,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IDocumentGenerationService, DocumentGenerationService>();
         services.AddScoped<IInboundEmailService, InboundEmailService>();
         services.AddScoped<IEmailIngestionService, EmailIngestionService>();
+        services.AddScoped<IGeminiExtractionService, GeminiExtractionService>();
+        services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
 
         return services;

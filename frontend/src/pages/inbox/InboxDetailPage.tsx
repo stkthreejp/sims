@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FileText, Paperclip, CheckCircle2, AlertCircle, Search, UserPlus, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { inboundEmailsApi } from '@/api/inboundEmails.api'
+import type { CreateSubmissionResult } from '@/api/inboundEmails.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { format } from 'date-fns'
 import type { EmailAttachmentDocumentType } from '@/types/inboundEmail.types'
@@ -57,10 +58,18 @@ export function InboxDetailPage() {
         id!,
         (!createNew && selectedInsured) ? selectedInsured.id : undefined
       ),
-    onSuccess: (submission) => {
+    onSuccess: (result: CreateSubmissionResult) => {
       queryClient.invalidateQueries({ queryKey: ['inbound-emails'] })
-      toast.success('Submission created successfully')
-      navigate(`/submissions/${submission.id}`)
+      if (result.extractionStatus === 'Completed') {
+        toast.success('Submission created — data pre-filled from attachments')
+      } else if (result.extractionStatus === 'Failed') {
+        toast.warning('Submission created — AI extraction failed. Fill in manually or re-run from the submission page.')
+      } else {
+        toast.success('Submission created successfully')
+      }
+      navigate(`/submissions/${result.submission.id}`, {
+        state: { extractionStatus: result.extractionStatus, emailId: result.emailId },
+      })
     },
     onError: () => {
       toast.error('Failed to create submission')

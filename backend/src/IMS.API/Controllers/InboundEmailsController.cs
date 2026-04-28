@@ -35,6 +35,14 @@ public class InboundEmailsController : ControllerBase
         if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
         return Ok(result.Value);
     }
+
+    [HttpPost("{id:guid}/re-extract")]
+    public async Task<IActionResult> ReExtract(Guid id)
+    {
+        var result = await _inboundEmailService.ReExtractAsync(id, CurrentUserId);
+        if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        return Ok(new { extractionStatus = result.Value });
+    }
 }
 
 public class CreateSubmissionFromEmailRequest

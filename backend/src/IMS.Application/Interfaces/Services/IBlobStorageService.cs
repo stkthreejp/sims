@@ -8,6 +8,9 @@ public interface IBlobStorageService
     /// <summary>Returns a short-lived signed URL for direct browser download.</summary>
     Task<string> GetDownloadUrlAsync(string blobPath, string fileName, TimeSpan? expiry = null);
 
+    /// <summary>Downloads a blob and returns its bytes.</summary>
+    Task<byte[]> DownloadAsync(string blobPath);
+
     /// <summary>Permanently deletes the blob.</summary>
     Task DeleteAsync(string blobPath);
 }

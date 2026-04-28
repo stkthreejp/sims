@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight, RefreshCw, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
+import { inboundEmailsApi } from '@/api/inboundEmails.api'
 import { quotesApi } from '@/api/quotes.api'
 import { carriersApi } from '@/api/carriers.api'
 import { usersApi } from '@/api/users.api'
@@ -63,8 +64,32 @@ const emptyQuoteForm = (): QuoteForm => ({
 export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
   const { canUploadAttachments, canDeleteAttachments, canCreatePolicies } = usePermissions()
+
+  const extractionState = location.state as { extractionStatus?: string; emailId?: string } | null
+  const [showExtractionBanner, setShowExtractionBanner] = useState(
+    extractionState?.extractionStatus === 'Failed'
+  )
+
+  const reExtract = useMutation({
+    mutationFn: () => inboundEmailsApi.reExtract(extractionState!.emailId!),
+    onSuccess: (result) => {
+      if (result.extractionStatus === 'Completed') {
+        toast.success('Data extracted successfully — refreshing page data')
+        setShowExtractionBanner(false)
+        qc.invalidateQueries({ queryKey: ['submissions', id] })
+        qc.invalidateQueries({ queryKey: ['submission-drivers', id] })
+        qc.invalidateQueries({ queryKey: ['submission-vehicles', id] })
+        qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] })
+        qc.invalidateQueries({ queryKey: ['submission-supplemental', id] })
+      } else {
+        toast.error('Extraction failed again — please fill in the fields manually below')
+      }
+    },
+    onError: () => toast.error('Re-extraction request failed'),
+  })
 
   const [showGenerateModal, setShowGenerateModal] = useState(false)
 
@@ -298,6 +323,32 @@ export function SubmissionDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Extraction failure banner */}
+      {showExtractionBanner && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-800">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>AI extraction failed</strong> — the attachment data could not be read automatically.
+              You can re-run the extraction or fill in the fields below manually.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => reExtract.mutate()}
+              disabled={reExtract.isPending}
+              className="flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-900 border border-amber-300 rounded px-3 py-1.5 hover:bg-amber-100 disabled:opacity-60 transition-colors"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${reExtract.isPending ? 'animate-spin' : ''}`} />
+              {reExtract.isPending ? 'Re-extracting…' : 'Re-run Extraction'}
+            </button>
+            <button onClick={() => setShowExtractionBanner(false)} className="text-amber-500 hover:text-amber-700">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <Link
         to={`/insureds/${submission.insuredId}`}

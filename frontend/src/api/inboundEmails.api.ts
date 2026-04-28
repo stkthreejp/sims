@@ -2,6 +2,12 @@ import { apiClient } from './client'
 import type { InboundEmail, InboundEmailListItem } from '@/types/inboundEmail.types'
 import type { Submission } from '@/types/submission.types'
 
+export interface CreateSubmissionResult {
+  submission: Submission
+  extractionStatus: 'NotApplicable' | 'Completed' | 'Failed'
+  emailId: string
+}
+
 export const inboundEmailsApi = {
   getUnprocessed: () =>
     apiClient.get<InboundEmailListItem[]>('/inbound-emails').then((r) => r.data),
@@ -11,6 +17,11 @@ export const inboundEmailsApi = {
 
   createSubmission: (id: string, insuredId?: string) =>
     apiClient
-      .post<Submission>(`/inbound-emails/${id}/create-submission`, insuredId ? { insuredId } : {})
+      .post<CreateSubmissionResult>(`/inbound-emails/${id}/create-submission`, insuredId ? { insuredId } : {})
+      .then((r) => r.data),
+
+  reExtract: (emailId: string) =>
+    apiClient
+      .post<{ extractionStatus: string }>(`/inbound-emails/${emailId}/re-extract`, {})
       .then((r) => r.data),
 }
