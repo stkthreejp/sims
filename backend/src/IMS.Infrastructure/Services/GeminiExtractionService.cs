@@ -34,16 +34,27 @@ public class GeminiExtractionService : IGeminiExtractionService
     public async Task<GeminiExtractionResult?> ExtractFromAttachmentsAsync(
         IEnumerable<EmailAttachment> attachments, CancellationToken ct = default)
     {
+        // Include any PDF — recognized ACORD types use targeted prompts,
+        // Unknown/Other PDFs use the generic prompt. Images are skipped.
         var eligible = attachments
             .Where(a => a.DocumentType is
                 EmailAttachmentDocumentType.Acord125 or
                 EmailAttachmentDocumentType.Acord126 or
                 EmailAttachmentDocumentType.LossRun or
                 EmailAttachmentDocumentType.ScheduleOfValues or
-                EmailAttachmentDocumentType.SignedApplication)
+                EmailAttachmentDocumentType.SignedApplication
+                || IsPdf(a))
             .ToList();
 
-        if (eligible.Count == 0) return null;
+        _logger.LogInformation(
+            "Gemini extraction: {Total} attachments total, {Eligible} eligible PDFs",
+            attachments.Count(), eligible.Count);
+
+        if (eligible.Count == 0)
+        {
+            _logger.LogInformation("No eligible PDF attachments found — skipping extraction");
+            return null;
+        }
 
         var merged = new GeminiExtractionResult();
 
@@ -51,8 +62,17 @@ public class GeminiExtractionService : IGeminiExtractionService
         {
             try
             {
+                _logger.LogInformation("Extracting from attachment {FileName} (type: {DocType})", attachment.FileName, attachment.DocumentType);
                 var result = await ExtractSingleAsync(attachment, ct);
-                if (result != null) MergeInto(merged, result);
+                if (result != null)
+                {
+                    _logger.LogInformation("Extraction succeeded for {FileName}", attachment.FileName);
+                    MergeInto(merged, result);
+                }
+                else
+                {
+                    _logger.LogWarning("Extraction returned null for {FileName}", attachment.FileName);
+                }
             }
             catch (Exception ex)
             {
@@ -101,7 +121,12 @@ public class GeminiExtractionService : IGeminiExtractionService
         try
         {
             response = await _httpClient.PostAsJsonAsync(url, requestBody, ct);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("Gemini API returned {Status} for {FileName}: {Body}", response.StatusCode, attachment.FileName, errorBody);
+                return null;
+            }
         }
         catch (Exception ex)
         {
@@ -131,6 +156,10 @@ public class GeminiExtractionService : IGeminiExtractionService
             return null;
         }
     }
+
+    private static bool IsPdf(EmailAttachment a) =>
+        a.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) == true
+        || a.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
     private static string GetPrompt(EmailAttachmentDocumentType docType) => docType switch
     {
