@@ -31,7 +31,7 @@ public class InboundEmailsController : ControllerBase
     [HttpPost("{id:guid}/create-submission")]
     public async Task<IActionResult> CreateSubmission(Guid id, [FromBody] CreateSubmissionFromEmailRequest? request = null)
     {
-        var result = await _inboundEmailService.CreateSubmissionFromEmailAsync(id, CurrentUserId, request?.InsuredId, request?.AttachmentIds);
+        var result = await _inboundEmailService.CreateSubmissionFromEmailAsync(id, CurrentUserId, request?.InsuredId, request?.AttachmentIds, request?.LineOfBusiness);
         if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
         return Ok(result.Value);
     }
@@ -50,4 +50,6 @@ public class CreateSubmissionFromEmailRequest
     public Guid? InsuredId { get; set; }
     /// <summary>If provided, only these attachment IDs are copied and extracted. Omit to include all.</summary>
     public List<Guid>? AttachmentIds { get; set; }
+    /// <summary>Line of business selected by the user — used to guide Gemini extraction prompt.</summary>
+    public string? LineOfBusiness { get; set; }
 }

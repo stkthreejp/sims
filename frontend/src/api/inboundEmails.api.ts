@@ -15,11 +15,12 @@ export const inboundEmailsApi = {
   getById: (id: string) =>
     apiClient.get<InboundEmail>(`/inbound-emails/${id}`).then((r) => r.data),
 
-  createSubmission: (id: string, insuredId?: string, attachmentIds?: string[]) =>
+  createSubmission: (id: string, insuredId?: string, attachmentIds?: string[], lineOfBusiness?: string) =>
     apiClient
       .post<CreateSubmissionResult>(`/inbound-emails/${id}/create-submission`, {
         ...(insuredId ? { insuredId } : {}),
         ...(attachmentIds ? { attachmentIds } : {}),
+        ...(lineOfBusiness ? { lineOfBusiness } : {}),
       })
       .then((r) => r.data),
 

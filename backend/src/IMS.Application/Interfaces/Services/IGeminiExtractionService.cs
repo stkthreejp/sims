@@ -6,5 +6,5 @@ namespace IMS.Application.Interfaces.Services;
 public interface IGeminiExtractionService
 {
     Task<GeminiExtractionResult?> ExtractFromAttachmentsAsync(
-        IEnumerable<EmailAttachment> attachments, CancellationToken ct = default);
+        IEnumerable<EmailAttachment> attachments, string? lineOfBusinessHint = null, CancellationToken ct = default);
 }

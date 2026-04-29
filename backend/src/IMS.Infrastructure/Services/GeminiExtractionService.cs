@@ -32,7 +32,7 @@ public class GeminiExtractionService : IGeminiExtractionService
     }
 
     public async Task<GeminiExtractionResult?> ExtractFromAttachmentsAsync(
-        IEnumerable<EmailAttachment> attachments, CancellationToken ct = default)
+        IEnumerable<EmailAttachment> attachments, string? lineOfBusinessHint = null, CancellationToken ct = default)
     {
         // Include any PDF — recognized ACORD types use targeted prompts,
         // Unknown/Other PDFs use the generic prompt. Images are skipped.
@@ -63,7 +63,7 @@ public class GeminiExtractionService : IGeminiExtractionService
             try
             {
                 _logger.LogInformation("Extracting from attachment {FileName} (type: {DocType})", attachment.FileName, attachment.DocumentType);
-                var result = await ExtractSingleAsync(attachment, ct);
+                var result = await ExtractSingleAsync(attachment, lineOfBusinessHint, ct);
                 if (result != null)
                 {
                     _logger.LogInformation("Extraction succeeded for {FileName}", attachment.FileName);
@@ -83,7 +83,7 @@ public class GeminiExtractionService : IGeminiExtractionService
         return merged;
     }
 
-    private async Task<GeminiExtractionResult?> ExtractSingleAsync(EmailAttachment attachment, CancellationToken ct)
+    private async Task<GeminiExtractionResult?> ExtractSingleAsync(EmailAttachment attachment, string? lobHint, CancellationToken ct)
     {
         byte[] bytes;
         try
@@ -108,7 +108,7 @@ public class GeminiExtractionService : IGeminiExtractionService
                     parts = new object[]
                     {
                         new { inline_data = new { mime_type = mimeType, data = base64 } },
-                        new { text = GetPrompt(attachment.DocumentType) }
+                        new { text = GetPrompt(attachment.DocumentType, lobHint) }
                     }
                 }
             },
@@ -116,6 +116,7 @@ public class GeminiExtractionService : IGeminiExtractionService
         };
 
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
+        _logger.LogInformation("Sending {Bytes} bytes to Gemini for {FileName} with prompt type {PromptType}", bytes.Length, attachment.FileName, GetPrompt(attachment.DocumentType, lobHint).Substring(0, 30));
 
         HttpResponseMessage response;
         try
@@ -161,13 +162,24 @@ public class GeminiExtractionService : IGeminiExtractionService
         a.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) == true
         || a.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
-    private static string GetPrompt(EmailAttachmentDocumentType docType) => docType switch
+    private static string GetPrompt(EmailAttachmentDocumentType docType, string? lobHint = null)
     {
-        EmailAttachmentDocumentType.Acord125 => CommercialAutoPrompt,
-        EmailAttachmentDocumentType.Acord126 => GeneralLiabilityPrompt,
-        EmailAttachmentDocumentType.ScheduleOfValues => InlandMarinePrompt,
-        _ => GenericPrompt,
-    };
+        // Named doc types always win
+        return docType switch
+        {
+            EmailAttachmentDocumentType.Acord125 => CommercialAutoPrompt,
+            EmailAttachmentDocumentType.Acord126 => GeneralLiabilityPrompt,
+            EmailAttachmentDocumentType.ScheduleOfValues => InlandMarinePrompt,
+            // For Unknown/Other, fall back to the LOB the user selected
+            _ => lobHint switch
+            {
+                "CommercialAuto" => CommercialAutoPrompt,
+                "GeneralLiability" => GeneralLiabilityPrompt,
+                "Property" or "InlandMarine" => InlandMarinePrompt,
+                _ => GenericPrompt,
+            }
+        };
+    }
 
     private const string CommercialAutoPrompt = """
         Extract all data from this commercial auto insurance application (ACORD 125 or similar).

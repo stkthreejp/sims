@@ -9,6 +9,7 @@ import { insuredsApi } from '@/api/insureds.api'
 import { format } from 'date-fns'
 import type { EmailAttachmentDocumentType } from '@/types/inboundEmail.types'
 import type { InsuredListItem } from '@/types/insured.types'
+import { LOB_LABELS, ALL_LOBS, type PolicyLineOfBusiness } from '@/types/quote.types'
 
 const DOC_TYPE_LABELS: Record<EmailAttachmentDocumentType, string> = {
   Unknown: 'Unknown',
@@ -21,10 +22,10 @@ const DOC_TYPE_LABELS: Record<EmailAttachmentDocumentType, string> = {
   Other: 'Other',
 }
 
-const LOB_FROM_DOC_TYPE: Partial<Record<EmailAttachmentDocumentType, string>> = {
-  Acord125: 'Commercial Auto',
-  Acord126: 'General Liability',
-  ScheduleOfValues: 'Inland Marine',
+const LOB_FROM_DOC_TYPE: Partial<Record<EmailAttachmentDocumentType, PolicyLineOfBusiness>> = {
+  Acord125: 'CommercialAuto',
+  Acord126: 'GeneralLiability',
+  ScheduleOfValues: 'InlandMarine',
 }
 
 function formatBytes(bytes: number): string {
@@ -47,6 +48,7 @@ export function InboxDetailPage() {
 
   // Track deselected attachment IDs (all start selected)
   const [deselectedIds, setDeselectedIds] = useState<Set<string>>(new Set())
+  const [selectedLob, setSelectedLob] = useState<PolicyLineOfBusiness | ''>('')
 
   const { data: email, isLoading, isError } = useQuery({
     queryKey: ['inbound-emails', id],
@@ -67,13 +69,16 @@ export function InboxDetailPage() {
     [email, deselectedIds]
   )
 
-  const detectedLob = useMemo(() => {
+  const detectedLob = useMemo<PolicyLineOfBusiness | null>(() => {
     for (const att of selectedAttachments) {
       const lob = LOB_FROM_DOC_TYPE[att.documentType]
       if (lob) return lob
     }
     return null
   }, [selectedAttachments])
+
+  // Effective LOB: user's explicit selection wins, then detected from doc types
+  const effectiveLob: PolicyLineOfBusiness | '' = selectedLob || detectedLob || ''
 
   const toggleAttachment = (attId: string) => {
     setDeselectedIds(prev => {
@@ -89,7 +94,8 @@ export function InboxDetailPage() {
       inboundEmailsApi.createSubmission(
         id!,
         (!createNew && selectedInsured) ? selectedInsured.id : undefined,
-        selectedAttachments.map(a => a.id)
+        selectedAttachments.map(a => a.id),
+        effectiveLob || undefined,
       ),
     onSuccess: (result: CreateSubmissionResult) => {
       queryClient.invalidateQueries({ queryKey: ['inbound-emails'] })
@@ -113,6 +119,7 @@ export function InboxDetailPage() {
     setSearchQuery(email?.fromName ?? email?.fromAddress ?? '')
     setSelectedInsured(null)
     setCreateNew(false)
+    setSelectedLob('')
     setStep('search')
   }
 
@@ -320,16 +327,36 @@ export function InboxDetailPage() {
                     )}
                   </div>
 
-                  {/* Detected LOB */}
-                  {detectedLob && (
-                    <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-blue-500 shrink-0" />
-                      <div>
-                        <p className="text-blue-800 font-medium">Detected line of business: {detectedLob}</p>
-                        <p className="text-blue-600 text-xs mt-0.5">AI will extract {detectedLob} data from the selected attachments</p>
+                  {/* LOB selector */}
+                  <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
+                    <label className="block text-slate-500 text-xs uppercase font-medium mb-1.5">
+                      Line of Business {!detectedLob && <span className="text-red-500">*</span>}
+                    </label>
+                    {detectedLob && !selectedLob ? (
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-blue-500 shrink-0" />
+                        <span className="text-blue-800 font-medium">{LOB_LABELS[detectedLob]}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLob(detectedLob)}
+                          className="ml-auto text-xs text-slate-400 hover:text-slate-600 underline"
+                        >
+                          Change
+                        </button>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <select
+                        value={effectiveLob}
+                        onChange={(e) => setSelectedLob(e.target.value as PolicyLineOfBusiness)}
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="">Select a line of business…</option>
+                        {ALL_LOBS.map(lob => (
+                          <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
 
                   {/* Email subject */}
                   <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
@@ -361,8 +388,8 @@ export function InboxDetailPage() {
                   </button>
                   <button
                     onClick={() => createSubmission.mutate()}
-                    disabled={createSubmission.isPending}
-                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                    disabled={createSubmission.isPending || !effectiveLob}
+                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                   >
                     {createSubmission.isPending ? 'Creating…' : 'Create Submission'}
                   </button>
