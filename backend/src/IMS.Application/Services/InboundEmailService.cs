@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using IMS.Application.Common;
 using IMS.Application.DTOs.Gemini;
 using IMS.Application.DTOs.InboundEmails;
@@ -82,86 +82,118 @@ public class InboundEmailService : IInboundEmailService
             resolvedInsuredId = newInsured.Id;
         }
 
-        // Generate submission number
-        var year = DateTime.UtcNow.Year;
-        var prefix = $"SUB-{year}-";
-        var count = await Db.Set<Submission>()
-            .IgnoreQueryFilters()
-            .CountAsync(s => s.SubmissionNumber.StartsWith(prefix));
-
-        var submission = new Submission
-        {
-            SubmissionNumber = $"{prefix}{(count + 1):D4}",
-            InsuredId = resolvedInsuredId,
-            UnderwriterId = currentUserId,
-            CreatedById = currentUserId,
-            Status = SubmissionStatus.New,
-        };
-        Db.Set<Submission>().Add(submission);
-
         // Filter to selected attachments only (if caller specified a subset)
         var attachmentsToProcess = attachmentIds?.Count > 0
             ? email.Attachments.Where(a => attachmentIds.Contains(a.Id)).ToList()
             : email.Attachments.ToList();
 
-        // Copy email attachments to submission
-        foreach (var emailAttachment in attachmentsToProcess)
+        // Run Gemini extraction first so we know how many LOBs to create submissions for
+        var extractionStatus = "NotApplicable";
+        List<GeminiLobExtraction>? extractions = null;
+        try
         {
-            Db.Set<Attachment>().Add(new Attachment
-            {
-                SubmissionId = submission.Id,
-                EntityType = DocumentEntityType.Submission,
-                DocumentType = MapDocumentType(emailAttachment.DocumentType),
-                FileName = emailAttachment.FileName,
-                BlobPath = emailAttachment.BlobUrl,
-                ContentType = emailAttachment.ContentType ?? "application/octet-stream",
-                FileSizeBytes = emailAttachment.FileSizeBytes,
-                Description = $"Imported from email: {email.Subject}",
-                UploadedById = currentUserId,
-            });
+            extractions = await _gemini.ExtractFromAttachmentsAsync(attachmentsToProcess, lineOfBusiness);
+            if (extractions != null)
+                extractionStatus = extractions.Count > 0 ? "Completed" : "Failed";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Gemini extraction failed for email {EmailId}", emailId);
+            extractionStatus = "Failed";
         }
 
-        email.LinkedSubmissionId = submission.Id;
+        // Create one submission per detected LOB; fall back to a single generic submission
+        var lobsToCreate = extractions?.Count > 0
+            ? extractions
+            : [new GeminiLobExtraction("", new GeminiExtractionResult())];
+
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"SUB-{year}-";
+        var baseCount = await Db.Set<Submission>()
+            .IgnoreQueryFilters()
+            .CountAsync(s => s.SubmissionNumber.StartsWith(prefix));
+
+        var submissions = new List<Submission>();
+        for (var i = 0; i < lobsToCreate.Count; i++)
+        {
+            var submission = new Submission
+            {
+                SubmissionNumber = $"{prefix}{(baseCount + i + 1):D4}",
+                InsuredId = resolvedInsuredId,
+                UnderwriterId = currentUserId,
+                CreatedById = currentUserId,
+                Status = SubmissionStatus.New,
+            };
+            Db.Set<Submission>().Add(submission);
+            submissions.Add(submission);
+        }
+
+        // Copy attachments to every created submission
+        foreach (var sub in submissions)
+        {
+            foreach (var emailAttachment in attachmentsToProcess)
+            {
+                Db.Set<Attachment>().Add(new Attachment
+                {
+                    SubmissionId = sub.Id,
+                    EntityType = DocumentEntityType.Submission,
+                    DocumentType = MapDocumentType(emailAttachment.DocumentType),
+                    FileName = emailAttachment.FileName,
+                    BlobPath = emailAttachment.BlobUrl,
+                    ContentType = emailAttachment.ContentType ?? "application/octet-stream",
+                    FileSizeBytes = emailAttachment.FileSizeBytes,
+                    Description = $"Imported from email: {email.Subject}",
+                    UploadedById = currentUserId,
+                });
+            }
+        }
+
+        // Link email to the primary (first) submission
+        email.LinkedSubmissionId = submissions[0].Id;
         email.IsProcessed = true;
         email.ProcessedAt = DateTime.UtcNow;
 
         await Db.SaveChangesAsync();
 
-        // Run Gemini extraction â€” never fails the submission creation
-        var extractionStatus = "NotApplicable";
-        try
+        // Apply each LOB's extraction data to its corresponding submission
+        if (extractions?.Count > 0)
         {
-            var extraction = await _gemini.ExtractFromAttachmentsAsync(attachmentsToProcess, lineOfBusiness);
-            if (extraction != null)
+            for (var i = 0; i < extractions.Count; i++)
             {
-                await ApplyExtractionAsync(submission.Id, resolvedInsuredId, extraction, currentUserId);
-                extractionStatus = "Completed";
+                try
+                {
+                    await ApplyExtractionAsync(submissions[i].Id, resolvedInsuredId, extractions[i].Data, currentUserId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to apply extraction for LOB {Lob} to submission {SubmissionId}",
+                        extractions[i].LineOfBusiness, submissions[i].Id);
+                }
             }
         }
-        catch (Exception ex)
+
+        // Build response DTOs
+        var submissionDtos = new List<SubmissionDto>();
+        foreach (var sub in submissions)
         {
-            _logger.LogWarning(ex, "Gemini extraction failed for submission {SubmissionId}", submission.Id);
-            extractionStatus = "Failed";
+            await Db.Entry(sub).Reference(s => s.Insured).LoadAsync();
+            await Db.Entry(sub).Reference(s => s.Underwriter).LoadAsync();
+            submissionDtos.Add(new SubmissionDto
+            {
+                Id = sub.Id,
+                SubmissionNumber = sub.SubmissionNumber,
+                InsuredId = resolvedInsuredId,
+                InsuredName = sub.Insured?.DisplayName ?? "",
+                UnderwriterId = currentUserId,
+                UnderwriterName = sub.Underwriter?.FullName ?? "",
+                Status = sub.Status,
+                CreatedAt = sub.CreatedAt,
+            });
         }
-
-        await Db.Entry(submission).Reference(s => s.Insured).LoadAsync();
-        await Db.Entry(submission).Reference(s => s.Underwriter).LoadAsync();
-
-        var dto = new SubmissionDto
-        {
-            Id = submission.Id,
-            SubmissionNumber = submission.SubmissionNumber,
-            InsuredId = resolvedInsuredId,
-            InsuredName = submission.Insured?.DisplayName ?? "",
-            UnderwriterId = currentUserId,
-            UnderwriterName = submission.Underwriter?.FullName ?? "",
-            Status = submission.Status,
-            CreatedAt = submission.CreatedAt,
-        };
 
         return Result<CreateSubmissionFromEmailResponse>.Success(new CreateSubmissionFromEmailResponse
         {
-            Submission = dto,
+            Submissions = submissionDtos,
             ExtractionStatus = extractionStatus,
             EmailId = emailId,
         });
@@ -181,10 +213,10 @@ public class InboundEmailService : IInboundEmailService
 
         var submissionId = email.LinkedSubmissionId.Value;
 
-        GeminiExtractionResult? extraction;
+        List<GeminiLobExtraction>? extractions;
         try
         {
-            extraction = await _gemini.ExtractFromAttachmentsAsync(email.Attachments, lineOfBusinessHint: null);
+            extractions = await _gemini.ExtractFromAttachmentsAsync(email.Attachments, lineOfBusinessHint: null);
         }
         catch (Exception ex)
         {
@@ -192,14 +224,19 @@ public class InboundEmailService : IInboundEmailService
             return Result<string>.Failure("EXTRACTION_FAILED", "AI extraction failed. Please fill in the data manually.");
         }
 
-        if (extraction == null)
+        if (extractions == null || extractions.Count == 0)
             return Result<string>.Failure("NO_ELIGIBLE_ATTACHMENTS", "No extractable attachments found on this email.");
 
         var submission = await Db.Set<Submission>().FindAsync(submissionId);
         if (submission == null)
             return Result<string>.Failure("SUBMISSION_NOT_FOUND", "Linked submission not found.");
 
-        await ApplyExtractionAsync(submissionId, submission.InsuredId, extraction, currentUserId, replaceExisting: true);
+        // Merge all LOB results into one and re-apply to the linked submission
+        var merged = new GeminiExtractionResult();
+        foreach (var e in extractions)
+            GeminiExtractionResult.MergeInto(merged, e.Data);
+
+        await ApplyExtractionAsync(submissionId, submission.InsuredId, merged, currentUserId, replaceExisting: true);
 
         return Result<string>.Success("Completed");
     }

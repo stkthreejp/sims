@@ -3,7 +3,8 @@ import type { InboundEmail, InboundEmailListItem } from '@/types/inboundEmail.ty
 import type { Submission } from '@/types/submission.types'
 
 export interface CreateSubmissionResult {
-  submission: Submission
+  /** One submission per detected line of business. Always contains at least one entry. */
+  submissions: Submission[]
   extractionStatus: 'NotApplicable' | 'Completed' | 'Failed'
   emailId: string
 }

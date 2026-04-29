@@ -1,5 +1,8 @@
 namespace IMS.Application.DTOs.Gemini;
 
+/// <summary>Extraction result for a single line of business, as returned by GeminiExtractionService.</summary>
+public record GeminiLobExtraction(string LineOfBusiness, GeminiExtractionResult Data);
+
 public class GeminiExtractionResult
 {
     public string? DescriptionOfOperations { get; set; }
@@ -15,6 +18,23 @@ public class GeminiExtractionResult
     public List<ExtractedGLClassification> GLClassifications { get; set; } = [];
     public ExtractedIMCoverages? IMCoverages { get; set; }
     public List<ExtractedEquipment> Equipment { get; set; } = [];
+
+    public static void MergeInto(GeminiExtractionResult target, GeminiExtractionResult source)
+    {
+        target.DescriptionOfOperations ??= source.DescriptionOfOperations;
+        target.Dba ??= source.Dba;
+        target.EntityType ??= source.EntityType;
+        target.YearsInBusiness ??= source.YearsInBusiness;
+        target.Drivers.AddRange(source.Drivers);
+        target.Vehicles.AddRange(source.Vehicles);
+        target.Locations.AddRange(source.Locations);
+        target.PriorCarriers.AddRange(source.PriorCarriers);
+        target.Supplemental ??= source.Supplemental;
+        target.GLCoverages ??= source.GLCoverages;
+        target.GLClassifications.AddRange(source.GLClassifications);
+        target.IMCoverages ??= source.IMCoverages;
+        target.Equipment.AddRange(source.Equipment);
+    }
 }
 
 public class ExtractedDriver

@@ -68,9 +68,16 @@ export function SubmissionDetailPage() {
   const qc = useQueryClient()
   const { canUploadAttachments, canDeleteAttachments, canCreatePolicies } = usePermissions()
 
-  const extractionState = location.state as { extractionStatus?: string; emailId?: string } | null
+  const extractionState = location.state as {
+    extractionStatus?: string
+    emailId?: string
+    additionalSubmissions?: { id: string; submissionNumber: string }[]
+  } | null
   const [showExtractionBanner, setShowExtractionBanner] = useState(
     extractionState?.extractionStatus === 'Failed'
+  )
+  const [showSiblingBanner, setShowSiblingBanner] = useState(
+    (extractionState?.additionalSubmissions?.length ?? 0) > 0
   )
 
   const reExtract = useMutation({
@@ -323,6 +330,30 @@ export function SubmissionDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Sibling submissions banner — shown when multiple LOBs were detected from one email */}
+      {showSiblingBanner && extractionState?.additionalSubmissions && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-blue-800">
+            <FileText className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>Multiple lines of business detected.</strong>{' '}
+              {extractionState.additionalSubmissions.length} additional submission{extractionState.additionalSubmissions.length > 1 ? 's were' : ' was'} also created:{' '}
+              {extractionState.additionalSubmissions.map((s, i) => (
+                <span key={s.id}>
+                  {i > 0 && ', '}
+                  <Link to={`/submissions/${s.id}`} className="underline font-medium hover:text-blue-900">
+                    {s.submissionNumber}
+                  </Link>
+                </span>
+              ))}
+            </span>
+          </div>
+          <button onClick={() => setShowSiblingBanner(false)} className="text-blue-400 hover:text-blue-700 shrink-0">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Extraction failure banner */}
       {showExtractionBanner && (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">

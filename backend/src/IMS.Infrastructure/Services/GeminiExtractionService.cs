@@ -18,6 +18,13 @@ public class GeminiExtractionService : IGeminiExtractionService
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
+    // LOBs Gemini is allowed to return from the detection prompt
+    private static readonly HashSet<string> KnownLobs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CommercialAuto", "GeneralLiability", "InlandMarine", "Property",
+        "WorkersCompensation", "BusinessOwners", "ProfessionalLiability", "Umbrella",
+    };
+
     public GeminiExtractionService(
         IBlobStorageService blobStorage,
         IHttpClientFactory httpClientFactory,
@@ -31,11 +38,9 @@ public class GeminiExtractionService : IGeminiExtractionService
             ?? throw new InvalidOperationException("GeminiApi:ApiKey is not configured.");
     }
 
-    public async Task<GeminiExtractionResult?> ExtractFromAttachmentsAsync(
+    public async Task<List<GeminiLobExtraction>?> ExtractFromAttachmentsAsync(
         IEnumerable<EmailAttachment> attachments, string? lineOfBusinessHint = null, CancellationToken ct = default)
     {
-        // Include any PDF — recognized ACORD types use targeted prompts,
-        // Unknown/Other PDFs use the generic prompt. Images are skipped.
         var eligible = attachments
             .Where(a => a.DocumentType is
                 EmailAttachmentDocumentType.Acord125 or
@@ -56,22 +61,57 @@ public class GeminiExtractionService : IGeminiExtractionService
             return null;
         }
 
-        var merged = new GeminiExtractionResult();
+        // Accumulate results keyed by LOB; same LOB across multiple attachments is merged
+        var resultsByLob = new Dictionary<string, GeminiExtractionResult>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var attachment in eligible)
         {
             try
             {
-                _logger.LogInformation("Extracting from attachment {FileName} (type: {DocType})", attachment.FileName, attachment.DocumentType);
-                var result = await ExtractSingleAsync(attachment, lineOfBusinessHint, ct);
-                if (result != null)
+                var downloaded = await DownloadAttachmentAsync(attachment, ct);
+                if (downloaded == null) continue;
+                var (bytes, mimeType) = downloaded.Value;
+
+                // Determine the LOB(s) to extract for this attachment
+                var knownLob = attachment.DocumentType switch
                 {
-                    _logger.LogInformation("Extraction succeeded for {FileName}", attachment.FileName);
-                    MergeInto(merged, result);
+                    EmailAttachmentDocumentType.Acord125 => "CommercialAuto",
+                    EmailAttachmentDocumentType.Acord126 => "GeneralLiability",
+                    EmailAttachmentDocumentType.ScheduleOfValues => "InlandMarine",
+                    _ => null,
+                };
+
+                if (knownLob != null)
+                {
+                    _logger.LogInformation("Extracting {Lob} from {FileName} (known ACORD type)", knownLob, attachment.FileName);
+                    var data = await ExtractWithPromptAsync(bytes, mimeType, GetPromptForLob(knownLob), attachment.FileName, ct);
+                    if (data != null) Accumulate(resultsByLob, knownLob, data);
                 }
                 else
                 {
-                    _logger.LogWarning("Extraction returned null for {FileName}", attachment.FileName);
+                    // Unknown/Other PDF — ask Gemini which LOBs it contains
+                    _logger.LogInformation("Running LOB detection on {FileName}", attachment.FileName);
+                    var detectedLobs = await DetectLinesOfBusinessAsync(bytes, mimeType, attachment.FileName, ct);
+
+                    if (detectedLobs.Count == 0)
+                    {
+                        // Fall back to user-supplied hint or generic
+                        var fallback = !string.IsNullOrWhiteSpace(lineOfBusinessHint) ? lineOfBusinessHint : "Other";
+                        _logger.LogInformation("No LOBs detected in {FileName} — falling back to {Fallback}", attachment.FileName, fallback);
+                        var data = await ExtractWithPromptAsync(bytes, mimeType, GetPromptForLob(fallback), attachment.FileName, ct);
+                        if (data != null) Accumulate(resultsByLob, fallback, data);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Detected {Count} LOB(s) in {FileName}: {Lobs}",
+                            detectedLobs.Count, attachment.FileName, string.Join(", ", detectedLobs));
+
+                        foreach (var lob in detectedLobs)
+                        {
+                            var data = await ExtractWithPromptAsync(bytes, mimeType, GetPromptForLob(lob), attachment.FileName, ct);
+                            if (data != null) Accumulate(resultsByLob, lob, data);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -80,43 +120,53 @@ public class GeminiExtractionService : IGeminiExtractionService
             }
         }
 
-        return merged;
+        if (resultsByLob.Count == 0)
+        {
+            _logger.LogWarning("Extraction ran but produced no results");
+            return [];
+        }
+
+        var results = resultsByLob
+            .Select(kvp => new GeminiLobExtraction(kvp.Key, kvp.Value))
+            .ToList();
+
+        _logger.LogInformation("Extraction complete — {Count} LOB(s): {Lobs}",
+            results.Count, string.Join(", ", results.Select(r => r.LineOfBusiness)));
+
+        return results;
     }
 
-    private async Task<GeminiExtractionResult?> ExtractSingleAsync(EmailAttachment attachment, string? lobHint, CancellationToken ct)
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private static void Accumulate(Dictionary<string, GeminiExtractionResult> dict, string lob, GeminiExtractionResult data)
     {
-        byte[] bytes;
+        if (dict.TryGetValue(lob, out var existing))
+            GeminiExtractionResult.MergeInto(existing, data);
+        else
+            dict[lob] = data;
+    }
+
+    private async Task<(byte[] bytes, string mimeType)?> DownloadAttachmentAsync(EmailAttachment attachment, CancellationToken ct)
+    {
         try
         {
-            bytes = await _blobStorage.DownloadAsync(attachment.BlobUrl);
+            var bytes = await _blobStorage.DownloadAsync(attachment.BlobUrl);
+            var mimeType = string.IsNullOrWhiteSpace(attachment.ContentType) ? "application/pdf" : attachment.ContentType;
+            return (bytes, mimeType);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not download blob {BlobUrl}", attachment.BlobUrl);
             return null;
         }
+    }
 
-        var base64 = Convert.ToBase64String(bytes);
-        var mimeType = string.IsNullOrWhiteSpace(attachment.ContentType) ? "application/pdf" : attachment.ContentType;
-
-        var requestBody = new
-        {
-            contents = new[]
-            {
-                new
-                {
-                    parts = new object[]
-                    {
-                        new { inline_data = new { mime_type = mimeType, data = base64 } },
-                        new { text = GetPrompt(attachment.DocumentType, lobHint) }
-                    }
-                }
-            },
-            generationConfig = new { responseMimeType = "application/json", temperature = 0.0 }
-        };
-
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
-        _logger.LogInformation("Sending {Bytes} bytes to Gemini for {FileName} with prompt type {PromptType}", bytes.Length, attachment.FileName, GetPrompt(attachment.DocumentType, lobHint).Substring(0, 30));
+    private async Task<List<string>> DetectLinesOfBusinessAsync(byte[] bytes, string mimeType, string fileName, CancellationToken ct)
+    {
+        var requestBody = BuildRequest(bytes, mimeType, DetectionPrompt);
+        var url = GeminiUrl;
 
         HttpResponseMessage response;
         try
@@ -124,27 +174,66 @@ public class GeminiExtractionService : IGeminiExtractionService
             response = await _httpClient.PostAsJsonAsync(url, requestBody, ct);
             if (!response.IsSuccessStatusCode)
             {
-                var errorBody = await response.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning("Gemini API returned {Status} for {FileName}: {Body}", response.StatusCode, attachment.FileName, errorBody);
+                var err = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("Gemini detection returned {Status} for {FileName}: {Body}", response.StatusCode, fileName, err);
+                return [];
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Gemini detection call failed for {FileName}", fileName);
+            return [];
+        }
+
+        var raw = await response.Content.ReadAsStringAsync(ct);
+        try
+        {
+            var text = ExtractTextFromResponse(raw);
+            if (string.IsNullOrWhiteSpace(text)) return [];
+
+            using var inner = JsonDocument.Parse(text);
+            var lobs = new List<string>();
+            foreach (var item in inner.RootElement.GetProperty("linesOfBusiness").EnumerateArray())
+            {
+                var v = item.GetString();
+                if (!string.IsNullOrWhiteSpace(v) && KnownLobs.Contains(v))
+                    lobs.Add(v);
+            }
+            return lobs;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not parse detection response for {FileName}", fileName);
+            return [];
+        }
+    }
+
+    private async Task<GeminiExtractionResult?> ExtractWithPromptAsync(
+        byte[] bytes, string mimeType, string prompt, string fileName, CancellationToken ct)
+    {
+        _logger.LogInformation("Sending {Bytes} bytes to Gemini for {FileName}", bytes.Length, fileName);
+
+        var requestBody = BuildRequest(bytes, mimeType, prompt);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsJsonAsync(GeminiUrl, requestBody, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var err = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("Gemini API returned {Status} for {FileName}: {Body}", response.StatusCode, fileName, err);
                 return null;
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Gemini API call failed for {FileName}", attachment.FileName);
+            _logger.LogWarning(ex, "Gemini API call failed for {FileName}", fileName);
             return null;
         }
 
         var raw = await response.Content.ReadAsStringAsync(ct);
-
-        using var doc = JsonDocument.Parse(raw);
-        var text = doc.RootElement
-            .GetProperty("candidates")[0]
-            .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString();
-
+        var text = ExtractTextFromResponse(raw);
         if (string.IsNullOrWhiteSpace(text)) return null;
 
         try
@@ -153,33 +242,71 @@ public class GeminiExtractionService : IGeminiExtractionService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not deserialize Gemini response for {FileName}: {Text}", attachment.FileName, text);
+            _logger.LogWarning(ex, "Could not deserialize Gemini response for {FileName}: {Text}", fileName, text);
             return null;
         }
+    }
+
+    private string GeminiUrl =>
+        $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
+
+    private static object BuildRequest(byte[] bytes, string mimeType, string prompt) => new
+    {
+        contents = new[]
+        {
+            new
+            {
+                parts = new object[]
+                {
+                    new { inline_data = new { mime_type = mimeType, data = Convert.ToBase64String(bytes) } },
+                    new { text = prompt }
+                }
+            }
+        },
+        generationConfig = new { responseMimeType = "application/json", temperature = 0.0 }
+    };
+
+    private static string? ExtractTextFromResponse(string raw)
+    {
+        using var doc = JsonDocument.Parse(raw);
+        return doc.RootElement
+            .GetProperty("candidates")[0]
+            .GetProperty("content")
+            .GetProperty("parts")[0]
+            .GetProperty("text")
+            .GetString();
     }
 
     private static bool IsPdf(EmailAttachment a) =>
         a.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) == true
         || a.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
-    private static string GetPrompt(EmailAttachmentDocumentType docType, string? lobHint = null)
+    private static string GetPromptForLob(string lob) => lob switch
     {
-        // Named doc types always win
-        return docType switch
-        {
-            EmailAttachmentDocumentType.Acord125 => CommercialAutoPrompt,
-            EmailAttachmentDocumentType.Acord126 => GeneralLiabilityPrompt,
-            EmailAttachmentDocumentType.ScheduleOfValues => InlandMarinePrompt,
-            // For Unknown/Other, fall back to the LOB the user selected
-            _ => lobHint switch
-            {
-                "CommercialAuto" => CommercialAutoPrompt,
-                "GeneralLiability" => GeneralLiabilityPrompt,
-                "Property" or "InlandMarine" => InlandMarinePrompt,
-                _ => GenericPrompt,
-            }
-        };
-    }
+        "CommercialAuto" => CommercialAutoPrompt,
+        "GeneralLiability" => GeneralLiabilityPrompt,
+        "InlandMarine" or "Property" => InlandMarinePrompt,
+        _ => GenericPrompt,
+    };
+
+    // -------------------------------------------------------------------------
+    // Prompts
+    // -------------------------------------------------------------------------
+
+    private const string DetectionPrompt = """
+        Identify all lines of insurance business that this document contains applications or schedules for.
+        Return ONLY valid JSON with this exact schema: {"linesOfBusiness": ["..."]}
+        Use ONLY these exact string values — include all that apply:
+        "CommercialAuto"         — commercial auto application (ACORD 125 or similar)
+        "GeneralLiability"       — general liability application (ACORD 126 or similar)
+        "InlandMarine"           — inland marine or equipment schedule / statement of values
+        "Property"               — commercial property application
+        "WorkersCompensation"    — workers compensation application
+        "BusinessOwners"         — business owners policy (BOP) application
+        "ProfessionalLiability"  — professional liability or E&O application
+        "Umbrella"               — umbrella or excess liability application
+        Return an empty array [] if the document is NOT an insurance application (e.g. loss run, dec page, certificate).
+        """;
 
     private const string CommercialAutoPrompt = """
         Extract all data from this commercial auto insurance application (ACORD 125 or similar).
@@ -264,21 +391,4 @@ public class GeminiExtractionService : IGeminiExtractionService
           "equipment": []
         }
         """;
-
-    private static void MergeInto(GeminiExtractionResult target, GeminiExtractionResult source)
-    {
-        target.DescriptionOfOperations ??= source.DescriptionOfOperations;
-        target.Dba ??= source.Dba;
-        target.EntityType ??= source.EntityType;
-        target.YearsInBusiness ??= source.YearsInBusiness;
-        target.Drivers.AddRange(source.Drivers);
-        target.Vehicles.AddRange(source.Vehicles);
-        target.Locations.AddRange(source.Locations);
-        target.PriorCarriers.AddRange(source.PriorCarriers);
-        target.Supplemental ??= source.Supplemental;
-        target.GLCoverages ??= source.GLCoverages;
-        target.GLClassifications.AddRange(source.GLClassifications);
-        target.IMCoverages ??= source.IMCoverages;
-        target.Equipment.AddRange(source.Equipment);
-    }
 }

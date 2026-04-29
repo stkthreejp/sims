@@ -99,15 +99,22 @@ export function InboxDetailPage() {
       ),
     onSuccess: (result: CreateSubmissionResult) => {
       queryClient.invalidateQueries({ queryKey: ['inbound-emails'] })
+      const count = result.submissions.length
       if (result.extractionStatus === 'Completed') {
-        toast.success('Submission created — data pre-filled from attachments')
+        toast.success(count > 1
+          ? `${count} submissions created — data pre-filled from attachments`
+          : 'Submission created — data pre-filled from attachments')
       } else if (result.extractionStatus === 'Failed') {
         toast.warning('Submission created — AI extraction failed. Fill in manually or re-run from the submission page.')
       } else {
-        toast.success('Submission created successfully')
+        toast.success(count > 1 ? `${count} submissions created` : 'Submission created successfully')
       }
-      navigate(`/submissions/${result.submission.id}`, {
-        state: { extractionStatus: result.extractionStatus, emailId: result.emailId },
+      navigate(`/submissions/${result.submissions[0].id}`, {
+        state: {
+          extractionStatus: result.extractionStatus,
+          emailId: result.emailId,
+          additionalSubmissions: result.submissions.slice(1),
+        },
       })
     },
     onError: () => {
@@ -327,34 +334,71 @@ export function InboxDetailPage() {
                     )}
                   </div>
 
-                  {/* LOB selector */}
-                  <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
-                    <label className="block text-slate-500 text-xs uppercase font-medium mb-1.5">
-                      Line of Business {!detectedLob && <span className="text-red-500">*</span>}
-                    </label>
-                    {detectedLob && !selectedLob ? (
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-blue-500 shrink-0" />
-                        <span className="text-blue-800 font-medium">{LOB_LABELS[detectedLob]}</span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedLob(detectedLob)}
-                          className="ml-auto text-xs text-slate-400 hover:text-slate-600 underline"
-                        >
-                          Change
-                        </button>
-                      </div>
+                  {/* LOB info / selector */}
+                  <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm space-y-2">
+                    <p className="text-slate-500 text-xs uppercase font-medium">Lines of Business</p>
+
+                    {detectedLob ? (
+                      /* At least one ACORD type detected — show confirmed LOBs + optional override */
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-blue-500 shrink-0" />
+                          <span className="text-blue-800 font-medium">
+                            {selectedLob ? LOB_LABELS[selectedLob] : LOB_LABELS[detectedLob]}
+                          </span>
+                          {selectedAttachments.some(a => LOB_FROM_DOC_TYPE[a.documentType] === undefined) && (
+                            <span className="text-slate-400 text-xs ml-1">
+                              · AI will detect additional LOBs from other PDFs
+                            </span>
+                          )}
+                        </div>
+                        {selectedLob ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLob('')}
+                            className="text-xs text-slate-400 hover:text-slate-600 underline"
+                          >
+                            Reset to detected
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLob(detectedLob)}
+                            className="text-xs text-slate-400 hover:text-slate-600 underline"
+                          >
+                            Override
+                          </button>
+                        )}
+                        {selectedLob && (
+                          <select
+                            value={selectedLob}
+                            onChange={(e) => setSelectedLob(e.target.value as PolicyLineOfBusiness)}
+                            className="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          >
+                            {ALL_LOBS.map(lob => (
+                              <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
+                            ))}
+                          </select>
+                        )}
+                      </>
                     ) : (
-                      <select
-                        value={effectiveLob}
-                        onChange={(e) => setSelectedLob(e.target.value as PolicyLineOfBusiness)}
-                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                      >
-                        <option value="">Select a line of business…</option>
-                        {ALL_LOBS.map(lob => (
-                          <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
-                        ))}
-                      </select>
+                      /* No ACORD types — Gemini will auto-detect; user can optionally hint */
+                      <>
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <Sparkles className="h-4 w-4 shrink-0" />
+                          <span>AI will detect lines of business from your PDFs</span>
+                        </div>
+                        <select
+                          value={selectedLob}
+                          onChange={(e) => setSelectedLob(e.target.value as PolicyLineOfBusiness)}
+                          className="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="">Optional hint (helps if AI can't detect)</option>
+                          {ALL_LOBS.map(lob => (
+                            <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
+                          ))}
+                        </select>
+                      </>
                     )}
                   </div>
 
@@ -388,7 +432,7 @@ export function InboxDetailPage() {
                   </button>
                   <button
                     onClick={() => createSubmission.mutate()}
-                    disabled={createSubmission.isPending || !effectiveLob}
+                    disabled={createSubmission.isPending}
                     className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                   >
                     {createSubmission.isPending ? 'Creating…' : 'Create Submission'}

@@ -4,7 +4,8 @@ namespace IMS.Application.DTOs.InboundEmails;
 
 public class CreateSubmissionFromEmailResponse
 {
-    public SubmissionDto Submission { get; set; } = null!;
+    /// <summary>One submission per detected line of business. Always contains at least one entry.</summary>
+    public List<SubmissionDto> Submissions { get; set; } = [];
 
     /// <summary>NotApplicable | Completed | Failed</summary>
     public string ExtractionStatus { get; set; } = "NotApplicable";
