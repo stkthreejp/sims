@@ -87,14 +87,21 @@ public class InboundEmailService : IInboundEmailService
             ? email.Attachments.Where(a => attachmentIds.Contains(a.Id)).ToList()
             : email.Attachments.ToList();
 
-        // Run Gemini extraction first so we know how many LOBs to create submissions for
+        // Run Gemini extraction — all LOB results merged into one submission
         var extractionStatus = "NotApplicable";
         List<GeminiLobExtraction>? extractions = null;
         try
         {
             extractions = await _gemini.ExtractFromAttachmentsAsync(attachmentsToProcess, lineOfBusiness);
             if (extractions != null)
-                extractionStatus = extractions.Count > 0 ? "Completed" : "Failed";
+            {
+                if (extractions.Count == 0)
+                    extractionStatus = "Failed";
+                else if (extractions.Any(e => string.IsNullOrEmpty(e.LineOfBusiness)))
+                    extractionStatus = "DetectionFailed";
+                else
+                    extractionStatus = "Completed";
+            }
         }
         catch (Exception ex)
         {
@@ -102,104 +109,105 @@ public class InboundEmailService : IInboundEmailService
             extractionStatus = "Failed";
         }
 
-        // Create one submission per detected LOB; fall back to a single generic submission
-        var lobsToCreate = extractions?.Count > 0
-            ? extractions
-            : [new GeminiLobExtraction("", new GeminiExtractionResult())];
+        // Determine lines of business: detected LOBs + inference from extracted data
+        var linesOfBusiness = new List<string>();
+        if (extractions != null)
+        {
+            linesOfBusiness.AddRange(extractions
+                .Where(e => !string.IsNullOrEmpty(e.LineOfBusiness))
+                .Select(e => e.LineOfBusiness)
+                .Distinct());
+
+            // For any result with no detected LOB, try to infer from the data
+            foreach (var e in extractions.Where(e => string.IsNullOrEmpty(e.LineOfBusiness)))
+                foreach (var inferred in GeminiExtractionResult.InferLinesOfBusiness(e.Data))
+                    if (!linesOfBusiness.Contains(inferred))
+                        linesOfBusiness.Add(inferred);
+        }
 
         var year = DateTime.UtcNow.Year;
         var prefix = $"SUB-{year}-";
-        var baseCount = await Db.Set<Submission>()
+        var count = await Db.Set<Submission>()
             .IgnoreQueryFilters()
             .CountAsync(s => s.SubmissionNumber.StartsWith(prefix));
 
-        var submissions = new List<Submission>();
-        for (var i = 0; i < lobsToCreate.Count; i++)
+        var submission = new Submission
         {
-            var submission = new Submission
+            SubmissionNumber = $"{prefix}{(count + 1):D4}",
+            InsuredId = resolvedInsuredId,
+            UnderwriterId = currentUserId,
+            CreatedById = currentUserId,
+            Status = SubmissionStatus.New,
+            LinesOfBusiness = linesOfBusiness.Count > 0
+                ? JsonSerializer.Serialize(linesOfBusiness)
+                : null,
+        };
+        Db.Set<Submission>().Add(submission);
+
+        // Copy email attachments to the submission
+        foreach (var emailAttachment in attachmentsToProcess)
+        {
+            Db.Set<Attachment>().Add(new Attachment
             {
-                SubmissionNumber = $"{prefix}{(baseCount + i + 1):D4}",
-                InsuredId = resolvedInsuredId,
-                UnderwriterId = currentUserId,
-                CreatedById = currentUserId,
-                Status = SubmissionStatus.New,
-            };
-            Db.Set<Submission>().Add(submission);
-            submissions.Add(submission);
+                SubmissionId = submission.Id,
+                EntityType = DocumentEntityType.Submission,
+                DocumentType = MapDocumentType(emailAttachment.DocumentType),
+                FileName = emailAttachment.FileName,
+                BlobPath = emailAttachment.BlobUrl,
+                ContentType = emailAttachment.ContentType ?? "application/octet-stream",
+                FileSizeBytes = emailAttachment.FileSizeBytes,
+                Description = $"Imported from email: {email.Subject}",
+                UploadedById = currentUserId,
+            });
         }
 
-        // Copy attachments to every created submission
-        foreach (var sub in submissions)
-        {
-            foreach (var emailAttachment in attachmentsToProcess)
-            {
-                Db.Set<Attachment>().Add(new Attachment
-                {
-                    SubmissionId = sub.Id,
-                    EntityType = DocumentEntityType.Submission,
-                    DocumentType = MapDocumentType(emailAttachment.DocumentType),
-                    FileName = emailAttachment.FileName,
-                    BlobPath = emailAttachment.BlobUrl,
-                    ContentType = emailAttachment.ContentType ?? "application/octet-stream",
-                    FileSizeBytes = emailAttachment.FileSizeBytes,
-                    Description = $"Imported from email: {email.Subject}",
-                    UploadedById = currentUserId,
-                });
-            }
-        }
-
-        // Link email to the primary (first) submission
-        email.LinkedSubmissionId = submissions[0].Id;
+        email.LinkedSubmissionId = submission.Id;
         email.IsProcessed = true;
         email.ProcessedAt = DateTime.UtcNow;
 
         await Db.SaveChangesAsync();
 
-        // Apply each LOB's extraction data to its corresponding submission
+        // Merge all LOB extractions and apply to the single submission
         if (extractions?.Count > 0)
         {
-            for (var i = 0; i < extractions.Count; i++)
+            try
             {
-                try
-                {
-                    await ApplyExtractionAsync(submissions[i].Id, resolvedInsuredId, extractions[i].Data, currentUserId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to apply extraction for LOB {Lob} to submission {SubmissionId}",
-                        extractions[i].LineOfBusiness, submissions[i].Id);
-                }
+                var merged = new GeminiExtractionResult();
+                foreach (var e in extractions)
+                    GeminiExtractionResult.MergeInto(merged, e.Data);
+                await ApplyExtractionAsync(submission.Id, resolvedInsuredId, merged, currentUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to apply extraction to submission {SubmissionId}", submission.Id);
             }
         }
 
-        // Build response DTOs
-        var submissionDtos = new List<SubmissionDto>();
-        foreach (var sub in submissions)
+        await Db.Entry(submission).Reference(s => s.Insured).LoadAsync();
+        await Db.Entry(submission).Reference(s => s.Underwriter).LoadAsync();
+
+        var dto = new SubmissionDto
         {
-            await Db.Entry(sub).Reference(s => s.Insured).LoadAsync();
-            await Db.Entry(sub).Reference(s => s.Underwriter).LoadAsync();
-            submissionDtos.Add(new SubmissionDto
-            {
-                Id = sub.Id,
-                SubmissionNumber = sub.SubmissionNumber,
-                InsuredId = resolvedInsuredId,
-                InsuredName = sub.Insured?.DisplayName ?? "",
-                UnderwriterId = currentUserId,
-                UnderwriterName = sub.Underwriter?.FullName ?? "",
-                Status = sub.Status,
-                CreatedAt = sub.CreatedAt,
-            });
-        }
+            Id = submission.Id,
+            SubmissionNumber = submission.SubmissionNumber,
+            InsuredId = resolvedInsuredId,
+            InsuredName = submission.Insured?.DisplayName ?? "",
+            UnderwriterId = currentUserId,
+            UnderwriterName = submission.Underwriter?.FullName ?? "",
+            Status = submission.Status,
+            LinesOfBusiness = linesOfBusiness,
+            CreatedAt = submission.CreatedAt,
+        };
 
         return Result<CreateSubmissionFromEmailResponse>.Success(new CreateSubmissionFromEmailResponse
         {
-            Submissions = submissionDtos,
+            Submission = dto,
             ExtractionStatus = extractionStatus,
             EmailId = emailId,
         });
     }
 
-    public async Task<Result<string>> ReExtractAsync(Guid emailId, Guid currentUserId)
+    public async Task<Result<string>> ReExtractAsync(Guid emailId, Guid currentUserId, string? lineOfBusiness = null)
     {
         var email = await Db.Set<InboundEmail>()
             .Include(e => e.Attachments.Where(a => !a.IsDeleted))
@@ -216,7 +224,7 @@ public class InboundEmailService : IInboundEmailService
         List<GeminiLobExtraction>? extractions;
         try
         {
-            extractions = await _gemini.ExtractFromAttachmentsAsync(email.Attachments, lineOfBusinessHint: null);
+            extractions = await _gemini.ExtractFromAttachmentsAsync(email.Attachments, lineOfBusinessHint: lineOfBusiness);
         }
         catch (Exception ex)
         {
@@ -231,6 +239,31 @@ public class InboundEmailService : IInboundEmailService
         if (submission == null)
             return Result<string>.Failure("SUBMISSION_NOT_FOUND", "Linked submission not found.");
 
+        // Determine updated lines of business from re-extraction result
+        var linesOfBusiness = new List<string>();
+        linesOfBusiness.AddRange(extractions
+            .Where(e => !string.IsNullOrEmpty(e.LineOfBusiness))
+            .Select(e => e.LineOfBusiness)
+            .Distinct());
+        foreach (var e in extractions.Where(e => string.IsNullOrEmpty(e.LineOfBusiness)))
+            foreach (var inferred in GeminiExtractionResult.InferLinesOfBusiness(e.Data))
+                if (!linesOfBusiness.Contains(inferred))
+                    linesOfBusiness.Add(inferred);
+
+        // If a specific LOB was requested, ensure it's in the list even if detection missed it
+        if (!string.IsNullOrEmpty(lineOfBusiness) && !linesOfBusiness.Contains(lineOfBusiness))
+            linesOfBusiness.Add(lineOfBusiness);
+
+        if (linesOfBusiness.Count > 0)
+        {
+            submission.LinesOfBusiness = JsonSerializer.Serialize(linesOfBusiness);
+            submission.UpdatedAt = DateTime.UtcNow;
+        }
+
+        var extractionStatus = extractions.Any(e => string.IsNullOrEmpty(e.LineOfBusiness))
+            ? "DetectionFailed"
+            : "Completed";
+
         // Merge all LOB results into one and re-apply to the linked submission
         var merged = new GeminiExtractionResult();
         foreach (var e in extractions)
@@ -238,7 +271,7 @@ public class InboundEmailService : IInboundEmailService
 
         await ApplyExtractionAsync(submissionId, submission.InsuredId, merged, currentUserId, replaceExisting: true);
 
-        return Result<string>.Success("Completed");
+        return Result<string>.Success(extractionStatus);
     }
 
     // -------------------------------------------------------------------------

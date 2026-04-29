@@ -99,21 +99,19 @@ export function InboxDetailPage() {
       ),
     onSuccess: (result: CreateSubmissionResult) => {
       queryClient.invalidateQueries({ queryKey: ['inbound-emails'] })
-      const count = result.submissions.length
       if (result.extractionStatus === 'Completed') {
-        toast.success(count > 1
-          ? `${count} submissions created — data pre-filled from attachments`
-          : 'Submission created — data pre-filled from attachments')
+        toast.success('Submission created — data pre-filled from attachments')
+      } else if (result.extractionStatus === 'DetectionFailed') {
+        toast.warning('Submission created — LOB could not be detected. Review and set lines of business on the submission page.')
       } else if (result.extractionStatus === 'Failed') {
         toast.warning('Submission created — AI extraction failed. Fill in manually or re-run from the submission page.')
       } else {
-        toast.success(count > 1 ? `${count} submissions created` : 'Submission created successfully')
+        toast.success('Submission created successfully')
       }
-      navigate(`/submissions/${result.submissions[0].id}`, {
+      navigate(`/submissions/${result.submission.id}`, {
         state: {
           extractionStatus: result.extractionStatus,
           emailId: result.emailId,
-          additionalSubmissions: result.submissions.slice(1),
         },
       })
     },

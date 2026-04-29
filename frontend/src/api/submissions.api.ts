@@ -18,6 +18,9 @@ export const submissionsApi = {
   update: (id: string, data: SubmissionUpdate) =>
     apiClient.put<Submission>(`/submissions/${id}`, data).then((r) => r.data),
 
+  setLinesOfBusiness: (id: string, linesOfBusiness: string[]) =>
+    apiClient.patch<Submission>(`/submissions/${id}/lines-of-business`, { linesOfBusiness }).then((r) => r.data),
+
   delete: (id: string) =>
     apiClient.delete(`/submissions/${id}`),
 }

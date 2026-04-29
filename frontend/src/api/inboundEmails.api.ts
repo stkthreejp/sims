@@ -3,9 +3,8 @@ import type { InboundEmail, InboundEmailListItem } from '@/types/inboundEmail.ty
 import type { Submission } from '@/types/submission.types'
 
 export interface CreateSubmissionResult {
-  /** One submission per detected line of business. Always contains at least one entry. */
-  submissions: Submission[]
-  extractionStatus: 'NotApplicable' | 'Completed' | 'Failed'
+  submission: Submission
+  extractionStatus: 'NotApplicable' | 'Completed' | 'Failed' | 'DetectionFailed'
   emailId: string
 }
 
@@ -25,8 +24,10 @@ export const inboundEmailsApi = {
       })
       .then((r) => r.data),
 
-  reExtract: (emailId: string) =>
+  reExtract: (emailId: string, lineOfBusiness?: string) =>
     apiClient
-      .post<{ extractionStatus: string }>(`/inbound-emails/${emailId}/re-extract`, {})
+      .post<{ extractionStatus: string }>(`/inbound-emails/${emailId}/re-extract`, {
+        ...(lineOfBusiness ? { lineOfBusiness } : {}),
+      })
       .then((r) => r.data),
 }

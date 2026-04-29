@@ -38,6 +38,7 @@ export interface Submission {
   expirationDate: string | null
   status: SubmissionStatus
   descriptionOfOperations: string | null
+  linesOfBusiness: string[]
   quoteCount: number
   createdAt: string
 }

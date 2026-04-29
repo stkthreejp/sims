@@ -37,12 +37,18 @@ public class InboundEmailsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/re-extract")]
-    public async Task<IActionResult> ReExtract(Guid id)
+    public async Task<IActionResult> ReExtract(Guid id, [FromBody] ReExtractRequest? request = null)
     {
-        var result = await _inboundEmailService.ReExtractAsync(id, CurrentUserId);
+        var result = await _inboundEmailService.ReExtractAsync(id, CurrentUserId, request?.LineOfBusiness);
         if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
         return Ok(new { extractionStatus = result.Value });
     }
+}
+
+public class ReExtractRequest
+{
+    /// <summary>Optional LOB hint — guides Gemini toward the correct extraction schema.</summary>
+    public string? LineOfBusiness { get; set; }
 }
 
 public class CreateSubmissionFromEmailRequest

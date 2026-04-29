@@ -9,7 +9,7 @@ import { quotesApi } from '@/api/quotes.api'
 import { carriersApi } from '@/api/carriers.api'
 import { usersApi } from '@/api/users.api'
 import { agentsApi } from '@/api/agents.api'
-import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi } from '@/api/submissionLob.api'
+import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi, submissionGLApi, submissionIMApi } from '@/api/submissionLob.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate } from '@/types/submission.types'
@@ -71,19 +71,16 @@ export function SubmissionDetailPage() {
   const extractionState = location.state as {
     extractionStatus?: string
     emailId?: string
-    additionalSubmissions?: { id: string; submissionNumber: string }[]
   } | null
   const [showExtractionBanner, setShowExtractionBanner] = useState(
-    extractionState?.extractionStatus === 'Failed'
+    extractionState?.extractionStatus === 'Failed' || extractionState?.extractionStatus === 'DetectionFailed'
   )
-  const [showSiblingBanner, setShowSiblingBanner] = useState(
-    (extractionState?.additionalSubmissions?.length ?? 0) > 0
-  )
+  const [reExtractLob, setReExtractLob] = useState('')
 
   const reExtract = useMutation({
-    mutationFn: () => inboundEmailsApi.reExtract(extractionState!.emailId!),
+    mutationFn: () => inboundEmailsApi.reExtract(extractionState!.emailId!, reExtractLob || undefined),
     onSuccess: (result) => {
-      if (result.extractionStatus === 'Completed') {
+      if (result.extractionStatus === 'Completed' || result.extractionStatus === 'DetectionFailed') {
         toast.success('Data extracted successfully — refreshing page data')
         setShowExtractionBanner(false)
         qc.invalidateQueries({ queryKey: ['submissions', id] })
@@ -91,11 +88,19 @@ export function SubmissionDetailPage() {
         qc.invalidateQueries({ queryKey: ['submission-vehicles', id] })
         qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] })
         qc.invalidateQueries({ queryKey: ['submission-supplemental', id] })
+        qc.invalidateQueries({ queryKey: ['submission-gl-coverages', id] })
+        qc.invalidateQueries({ queryKey: ['submission-im-coverages', id] })
       } else {
         toast.error('Extraction failed again — please fill in the fields manually below')
       }
     },
     onError: () => toast.error('Re-extraction request failed'),
+  })
+
+  const setLobsMutation = useMutation({
+    mutationFn: (lobs: string[]) => submissionsApi.setLinesOfBusiness(id!, lobs),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['submissions', id] }),
+    onError: () => toast.error('Failed to update lines of business'),
   })
 
   const [showGenerateModal, setShowGenerateModal] = useState(false)
@@ -172,6 +177,18 @@ export function SubmissionDetailPage() {
     queryKey: ['submission-supplemental', id],
     queryFn: () => submissionSupplementalApi.get(id!),
     enabled: !!id && supplementalOpen,
+  })
+
+  const { data: glCoverages } = useQuery({
+    queryKey: ['submission-gl-coverages', id],
+    queryFn: () => submissionGLApi.getCoverages(id!),
+    enabled: !!id,
+  })
+
+  const { data: imCoverages } = useQuery({
+    queryKey: ['submission-im-coverages', id],
+    queryFn: () => submissionIMApi.getCoverages(id!),
+    enabled: !!id,
   })
 
   useEffect(() => {
@@ -321,6 +338,22 @@ export function SubmissionDetailPage() {
     setQuoteForm((prev) => {
       const next = { ...prev, [k]: val }
       if (k === 'carrierId') next.lineOfBusiness = ''
+      if (k === 'lineOfBusiness') {
+        // Pre-fill limit/deductible from submission's extracted LOB data
+        if (val === 'GeneralLiability' && glCoverages?.eachOccurrence) {
+          next.limit = String(glCoverages.eachOccurrence)
+        } else if (val === 'InlandMarine') {
+          if (imCoverages?.scheduledEquipmentTotalLimit)
+            next.limit = String(imCoverages.scheduledEquipmentTotalLimit)
+          if (imCoverages?.deductible)
+            next.deductible = String(imCoverages.deductible)
+        }
+        // Pre-fill dates from submission if not already set
+        if (!prev.effectiveDate && submission?.effectiveDate)
+          next.effectiveDate = submission.effectiveDate
+        if (!prev.expirationDate && submission?.expirationDate)
+          next.expirationDate = submission.expirationDate
+      }
       return next
     })
   }
@@ -330,41 +363,40 @@ export function SubmissionDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Sibling submissions banner — shown when multiple LOBs were detected from one email */}
-      {showSiblingBanner && extractionState?.additionalSubmissions && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-blue-800">
-            <FileText className="h-4 w-4 shrink-0" />
-            <span>
-              <strong>Multiple lines of business detected.</strong>{' '}
-              {extractionState.additionalSubmissions.length} additional submission{extractionState.additionalSubmissions.length > 1 ? 's were' : ' was'} also created:{' '}
-              {extractionState.additionalSubmissions.map((s, i) => (
-                <span key={s.id}>
-                  {i > 0 && ', '}
-                  <Link to={`/submissions/${s.id}`} className="underline font-medium hover:text-blue-900">
-                    {s.submissionNumber}
-                  </Link>
-                </span>
-              ))}
-            </span>
-          </div>
-          <button onClick={() => setShowSiblingBanner(false)} className="text-blue-400 hover:text-blue-700 shrink-0">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Extraction failure banner */}
+      {/* Extraction banner — shown after email import when extraction failed or LOB wasn't detected */}
       {showExtractionBanner && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-amber-800">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>
-              <strong>AI extraction failed</strong> — the attachment data could not be read automatically.
-              You can re-run the extraction or fill in the fields below manually.
-            </span>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              {extractionState?.extractionStatus === 'DetectionFailed' ? (
+                <span>
+                  <strong>Line of business not detected</strong> — data was extracted from the attachment but the LOB
+                  could not be identified automatically. Select the LOB below and re-run to extract targeted data, or
+                  set the LOBs manually using the chip bar below.
+                </span>
+              ) : (
+                <span>
+                  <strong>AI extraction failed</strong> — the attachment data could not be read automatically.
+                  You can re-run the extraction or fill in the fields below manually.
+                </span>
+              )}
+            </div>
+            <button onClick={() => setShowExtractionBanner(false)} className="text-amber-500 hover:text-amber-700 shrink-0">
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            {extractionState?.extractionStatus === 'DetectionFailed' && (
+              <select
+                value={reExtractLob}
+                onChange={(e) => setReExtractLob(e.target.value)}
+                className="border border-amber-300 rounded px-2 py-1 text-xs bg-white text-amber-900"
+              >
+                <option value="">— Select LOB hint (optional) —</option>
+                {ALL_LOBS.map((l) => <option key={l} value={l}>{LOB_LABELS[l]}</option>)}
+              </select>
+            )}
             <button
               onClick={() => reExtract.mutate()}
               disabled={reExtract.isPending}
@@ -372,9 +404,6 @@ export function SubmissionDetailPage() {
             >
               <RefreshCw className={`h-3.5 w-3.5 ${reExtract.isPending ? 'animate-spin' : ''}`} />
               {reExtract.isPending ? 'Re-extracting…' : 'Re-run Extraction'}
-            </button>
-            <button onClick={() => setShowExtractionBanner(false)} className="text-amber-500 hover:text-amber-700">
-              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -448,6 +477,46 @@ export function SubmissionDetailPage() {
             <p className="font-medium">{new Date(submission.expirationDate).toLocaleDateString()}</p>
           </div>
         )}
+      </div>
+
+      {/* Lines of Business chip bar */}
+      <div className="bg-white border rounded-lg px-5 py-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-slate-500 shrink-0">Lines of Business:</span>
+          {submission.linesOfBusiness.length === 0 && (
+            <span className="text-xs text-slate-400 italic">None detected — add one below</span>
+          )}
+          {submission.linesOfBusiness.map((lob) => (
+            <span key={lob} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              {LOB_LABELS[lob as keyof typeof LOB_LABELS] ?? lob}
+              <button
+                onClick={() => setLobsMutation.mutate(submission.linesOfBusiness.filter((l) => l !== lob))}
+                disabled={setLobsMutation.isPending}
+                className="ml-0.5 hover:text-blue-600 disabled:opacity-50"
+                title={`Remove ${lob}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          {/* Add LOB dropdown */}
+          {ALL_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).length > 0 && (
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value)
+                  setLobsMutation.mutate([...submission.linesOfBusiness, e.target.value])
+              }}
+              disabled={setLobsMutation.isPending}
+              className="text-xs border border-dashed border-slate-300 rounded-full px-2.5 py-1 text-slate-500 hover:border-blue-400 hover:text-blue-600 bg-white disabled:opacity-50 cursor-pointer"
+            >
+              <option value="">+ Add LOB</option>
+              {ALL_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).map((l) => (
+                <option key={l} value={l}>{LOB_LABELS[l]}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
       {/* Quotes section */}
