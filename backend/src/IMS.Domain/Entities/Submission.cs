@@ -13,6 +13,7 @@ public class Submission : BaseEntity
     public DateOnly? ExpirationDate { get; set; }
     public SubmissionStatus Status { get; set; } = SubmissionStatus.New;
     public string? DescriptionOfOperations { get; set; }
+    public string? LinesOfBusiness { get; set; }
     public Guid CreatedById { get; set; }
 
     // Navigation

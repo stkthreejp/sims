@@ -19,6 +19,13 @@ public class GeminiExtractionResult
     public ExtractedIMCoverages? IMCoverages { get; set; }
     public List<ExtractedEquipment> Equipment { get; set; } = [];
 
+    public static IEnumerable<string> InferLinesOfBusiness(GeminiExtractionResult data)
+    {
+        if (data.Vehicles.Count > 0 || data.Drivers.Count > 0) yield return "CommercialAuto";
+        if (data.GLCoverages != null || data.GLClassifications.Count > 0) yield return "GeneralLiability";
+        if (data.IMCoverages != null || data.Equipment.Count > 0) yield return "InlandMarine";
+    }
+
     public static void MergeInto(GeminiExtractionResult target, GeminiExtractionResult source)
     {
         target.DescriptionOfOperations ??= source.DescriptionOfOperations;

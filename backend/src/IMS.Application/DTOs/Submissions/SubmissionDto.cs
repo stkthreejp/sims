@@ -19,6 +19,7 @@ public class SubmissionDto
     public DateOnly? ExpirationDate { get; set; }
     public SubmissionStatus Status { get; set; }
     public string? DescriptionOfOperations { get; set; }
+    public List<string> LinesOfBusiness { get; set; } = [];
     public int QuoteCount { get; set; }
     public DateTime CreatedAt { get; set; }
 }

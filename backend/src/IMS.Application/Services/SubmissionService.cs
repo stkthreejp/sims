@@ -1,3 +1,4 @@
+using System.Text.Json;
 using IMS.Application.Common;
 using IMS.Application.DTOs.Submissions;
 using IMS.Application.Interfaces.Services;
@@ -195,6 +196,9 @@ public class SubmissionService : ISubmissionService
         EffectiveDate = s.EffectiveDate,
         ExpirationDate = s.ExpirationDate,
         Status = s.Status,
+        LinesOfBusiness = s.LinesOfBusiness != null
+            ? JsonSerializer.Deserialize<List<string>>(s.LinesOfBusiness) ?? []
+            : [],
         QuoteCount = s.Quotes?.Count ?? 0,
         CreatedAt = s.CreatedAt
     };
