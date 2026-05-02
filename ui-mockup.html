@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IMS — Submission Form Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; }
+    .step-active .step-circle { background: #2563eb; color: white; border-color: #2563eb; }
+    .step-done .step-circle { background: #16a34a; color: white; border-color: #16a34a; }
+    .step-inactive .step-circle { background: white; color: #94a3b8; border-color: #cbd5e1; }
+    .step-active .step-label { color: #2563eb; font-weight: 600; }
+    .step-done .step-label { color: #16a34a; font-weight: 500; }
+    .step-inactive .step-label { color: #94a3b8; }
+    .connector-done { background: #16a34a; }
+    .connector-inactive { background: #e2e8f0; }
+    .field-group label { display: block; font-size: 0.75rem; font-weight: 500; color: #475569; margin-bottom: 4px; letter-spacing: 0.03em; text-transform: uppercase; }
+    input[type=text], input[type=number], input[type=email], select, textarea {
+      width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px;
+      font-size: 0.875rem; color: #1e293b; background: white; outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .checkbox-pill { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+    .checkbox-pill:hover { border-color: #93c5fd; background: #eff6ff; }
+    .checkbox-pill input:checked + span { color: #2563eb; font-weight: 500; }
+    .checkbox-pill:has(input:checked) { border-color: #2563eb; background: #eff6ff; }
+    .section-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 16px; }
+    .section-header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+    .section-header:hover { background: #f8fafc; }
+    .section-body { padding: 20px; border-top: 1px solid #f1f5f9; }
+    .lob-badge { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .table-row-input { border: none; border-bottom: 1px solid #e2e8f0; border-radius: 0; padding: 4px 6px; background: transparent; }
+    .table-row-input:focus { border-bottom-color: #2563eb; box-shadow: none; }
+    .sub-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .sub-section-title { font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+
+<div class="max-w-4xl mx-auto">
+
+  <!-- Page header -->
+  <div class="mb-6">
+    <p class="text-sm text-slate-500 mb-1">Submissions / New</p>
+    <h1 class="text-2xl font-bold text-slate-800">New Submission</h1>
+  </div>
+
+  <!-- STEPPER -->
+  <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+    <div class="flex items-center" id="stepper"></div>
+  </div>
+
+  <!-- STEP CONTENT -->
+  <div id="step-content"></div>
+
+  <!-- NAV BUTTONS -->
+  <div class="flex justify-between mt-6">
+    <button onclick="prevStep()" id="btn-back"
+      class="px-5 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+      ← Back
+    </button>
+    <button onclick="nextStep()" id="btn-next"
+      class="px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
+      Continue →
+    </button>
+  </div>
+
+  <!-- QUOTE SECTION -->
+  <div class="mt-10 mb-2">
+    <div class="flex items-center gap-3">
+      <h2 class="text-lg font-semibold text-slate-800">Quote</h2>
+      <span class="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Demo — visible on Detail page</span>
+    </div>
+    <p class="text-sm text-slate-500 mt-1">LOB supplemental fields + loss history appear under each selected coverage line.</p>
+  </div>
+  <div id="quote-section" class="mt-4"></div>
+
+</div>
+
+<script>
+const STEPS = [
+  { label: 'Insured Info', id: 'insured' },
+  { label: 'Operations', id: 'operations' },
+  { label: 'Hiring Practices', id: 'hiring' },
+  { label: 'Subcontracting', id: 'subcontracting' },
+];
+
+let current = 0;
+
+// ─── STEPPER ─────────────────────────────────────────────────────────────────
+function renderStepper() {
+  document.getElementById('stepper').innerHTML = STEPS.map((s, i) => {
+    const state = i < current ? 'step-done' : i === current ? 'step-active' : 'step-inactive';
+    const icon = i < current
+      ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`
+      : `<span class="text-sm font-semibold">${i + 1}</span>`;
+    const connector = i < STEPS.length - 1
+      ? `<div class="flex-1 h-0.5 mx-2 ${i < current ? 'connector-done' : 'connector-inactive'}"></div>`
+      : '';
+    return `
+      <div class="flex items-center ${i < STEPS.length - 1 ? 'flex-1' : ''}">
+        <div class="${state} flex flex-col items-center gap-1">
+          <div class="step-circle w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0">${icon}</div>
+          <span class="step-label text-xs whitespace-nowrap">${s.label}</span>
+        </div>
+        ${connector}
+      </div>`;
+  }).join('');
+}
+
+function renderStep() {
+  document.getElementById('btn-back').style.visibility = current === 0 ? 'hidden' : 'visible';
+  document.getElementById('btn-next').textContent = current === STEPS.length - 1 ? 'Submit Submission' : 'Continue →';
+  const fns = [stepInsured, stepOperations, stepHiring, stepSubcontracting];
+  document.getElementById('step-content').innerHTML = fns[current]();
+  bindConditionals();
+}
+
+function nextStep() { if (current < STEPS.length - 1) { current++; renderStepper(); renderStep(); window.scrollTo(0,0); } }
+function prevStep() { if (current > 0) { current--; renderStepper(); renderStep(); window.scrollTo(0,0); } }
+
+// ─── STEP 1: INSURED INFO ────────────────────────────────────────────────────
+function stepInsured() {
+  return `
+  <div class="bg-white border border-slate-200 rounded-xl p-6">
+    <h2 class="text-base font-semibold text-slate-800 mb-5">Insured Information</h2>
+    <div class="grid grid-cols-2 gap-x-6 gap-y-5">
+      <div class="field-group col-span-2"><label>Named Insured</label><input type="text" value="Pacific Northwest Timber LLC" /></div>
+      <div class="field-group"><label>DBA Name</label><input type="text" placeholder="Doing business as..." /></div>
+      <div class="field-group"><label>FEIN</label><input type="text" placeholder="XX-XXXXXXX" /></div>
+      <div class="field-group"><label>DOT / PIN Number</label><input type="text" placeholder="DOT-XXXXXXX" /></div>
+      <div class="field-group"><label>Years of Industry Experience</label><input type="number" placeholder="0" min="0" /></div>
+    </div>
+    <div class="mt-6 pt-5 border-t border-slate-100">
+      <h3 class="text-sm font-semibold text-slate-700 mb-4">Safety / Compliance Contact</h3>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-5">
+        <div class="field-group"><label>Contact Name</label><input type="text" /></div>
+        <div class="field-group"><label>Contact Info (phone / email)</label><input type="text" /></div>
+        <div class="field-group col-span-2">
+          <label>Role</label>
+          <div class="flex gap-4 mt-1">
+            <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"><input type="radio" name="safetyRole" class="accent-blue-600" checked /> Employee</label>
+            <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"><input type="radio" name="safetyRole" class="accent-blue-600" /> Consultant</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── STEP 2: OPERATIONS ──────────────────────────────────────────────────────
+function stepOperations() {
+  const checkGroup = (name, items) => `
+    <div class="flex flex-wrap gap-2">
+      ${items.map(i => `<label class="checkbox-pill"><input type="checkbox" name="${name}" class="accent-blue-600" ${i.checked?'checked':''} /><span class="text-sm text-slate-700">${i.l}</span></label>`).join('')}
+    </div>`;
+  return `
+  <div class="bg-white border border-slate-200 rounded-xl p-6 space-y-6">
+    <h2 class="text-base font-semibold text-slate-800">Description of Operations</h2>
+    <div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Operation Types</p>
+      ${checkGroup('op', [{v:'Logger',l:'Logger',checked:true},{v:'Hauler',l:'Hauler',checked:true},{v:'TimberDealer',l:'Timber Dealer'}])}</div>
+    <div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Logging Types</p>
+      ${checkGroup('log', [{v:'Thinning',l:'Thinning',checked:true},{v:'ClearCut',l:'Clear Cut'},{v:'SwampLogging',l:'Swamp Logging'}])}</div>
+    <div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Wood Types</p>
+      ${checkGroup('wood', [{v:'SoftWood',l:'Soft Wood',checked:true},{v:'HardWood',l:'Hard Wood'},{v:'WoodChips',l:'Wood Chips'}])}</div>
+    <div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Land Owner Types</p>
+      ${checkGroup('land', [{v:'Federal',l:'Federal'},{v:'State',l:'State',checked:true},{v:'Private',l:'Private Landowner',checked:true},{v:'Corp',l:'Corporation'}])}</div>
+    <div class="grid grid-cols-2 gap-x-6 gap-y-5 pt-2 border-t border-slate-100">
+      <div class="field-group"><label>Work Comp</label>
+        <div class="flex gap-4 mt-1">
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="wc" class="accent-blue-600" checked /> Has Work Comp</label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="wc" class="accent-blue-600" /> None</label>
+        </div>
+      </div>
+      <div class="field-group"><label>% Mechanized</label><input type="number" value="65" min="0" max="100" /></div>
+      <div class="field-group"><label>Mill Trips Per Day</label><select><option>1–2</option><option>3–4</option><option>5+</option></select></div>
+      <div class="field-group"><label>Hours of Operation</label><select><option>Day</option><option>Night</option><option>24 Hours</option></select></div>
+    </div>
+    <div class="pt-2 border-t border-slate-100">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Radius of Operations (% must total 100)</p>
+      <div class="grid grid-cols-4 gap-3">
+        ${[['0–50 mi','40'],['51–100 mi','35'],['101–300 mi','20'],['300+ mi','5']].map(([l,v]) => `
+          <div class="field-group text-center"><label class="text-center">${l}</label><input type="number" value="${v}" class="text-center" min="0" max="100" /></div>`).join('')}
+      </div>
+    </div>
+    <div class="pt-2 border-t border-slate-100">
+      <div class="flex items-center justify-between">
+        <p class="text-sm font-medium text-slate-700">Has Non-Logging Operations?</p>
+        <button onclick="toggleNonLogging()" id="nonlog-toggle"
+          class="relative inline-flex h-6 w-11 items-center rounded-full bg-slate-200 transition-colors focus:outline-none">
+          <span id="nonlog-knob" class="inline-block h-4 w-4 transform translate-x-1 rounded-full bg-white shadow transition-transform"></span>
+        </button>
+      </div>
+      <div id="nonlog-fields" class="hidden mt-4 grid grid-cols-2 gap-x-6 gap-y-5">
+        <div class="field-group col-span-2"><label>Description</label><textarea rows="2"></textarea></div>
+        <div class="field-group"><label>Non-Logging Revenue %</label><input type="number" min="0" max="100" /></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── STEP 3: HIRING PRACTICES ─────────────────────────────────────────────────
+function stepHiring() {
+  const practices = ['Written Application','Criminal Background Check','E-Verify','Physical Exam','References','Interview','Drug Test','Road Test','Skills Testing'];
+  return `
+  <div class="bg-white border border-slate-200 rounded-xl p-6">
+    <h2 class="text-base font-semibold text-slate-800 mb-2">Hiring Practices</h2>
+    <p class="text-sm text-slate-500 mb-5">Select all practices used when hiring new employees.</p>
+    <div class="grid grid-cols-3 gap-3">
+      ${practices.map((p,i) => `<label class="checkbox-pill"><input type="checkbox" class="accent-blue-600" ${i<4?'checked':''} /><span class="text-sm text-slate-700">${p}</span></label>`).join('')}
+    </div>
+  </div>`;
+}
+
+// ─── STEP 4: SUBCONTRACTING ───────────────────────────────────────────────────
+function stepSubcontracting() {
+  return `
+  <div class="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
+    <h2 class="text-base font-semibold text-slate-800">Subcontracting</h2>
+    <div>
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Subcontracting Types</p>
+      <div class="flex flex-wrap gap-2">
+        ${[['Hauling','checked'],['Logging','checked'],['Other','']].map(([l,c]) => `<label class="checkbox-pill"><input type="checkbox" class="accent-blue-600" ${c} /><span class="text-sm text-slate-700">${l}</span></label>`).join('')}
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-x-6 gap-y-5">
+      <div class="field-group"><label>Annual Sub Logging Cost</label>
+        <div class="relative"><span class="absolute left-3 top-2 text-slate-400 text-sm">$</span><input type="text" class="pl-6" placeholder="0" /></div></div>
+      <div class="field-group"><label>Annual Sub Hauling Cost</label>
+        <div class="relative"><span class="absolute left-3 top-2 text-slate-400 text-sm">$</span><input type="text" class="pl-6" placeholder="0" /></div></div>
+      <div class="field-group"><label>Number of Subcontractors</label><input type="number" placeholder="0" /></div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 grid grid-cols-2 gap-x-6 gap-y-3">
+      <label class="flex items-center gap-3 text-sm text-slate-700 cursor-pointer"><input type="checkbox" class="accent-blue-600 w-4 h-4" checked /> Subs carry equal limits</label>
+      <label class="flex items-center gap-3 text-sm text-slate-700 cursor-pointer"><input type="checkbox" class="accent-blue-600 w-4 h-4" checked /> Subs provide certs of insurance</label>
+      <label class="flex items-center gap-3 text-sm text-slate-700 cursor-pointer"><input type="checkbox" class="accent-blue-600 w-4 h-4" /> Subs sign hold harmless</label>
+      <label class="flex items-center gap-3 text-sm text-slate-700 cursor-pointer"><input type="checkbox" class="accent-blue-600 w-4 h-4" /> Subs insured with this agency</label>
+    </div>
+    <div class="field-group pt-2">
+      <label>Risk Transfer Method / Notes</label>
+      <textarea rows="2" placeholder="Describe how risk is transferred to subcontractors..."></textarea>
+    </div>
+  </div>`;
+}
+
+// ─── LOSS HISTORY (shared, pass unique suffix) ────────────────────────────────
+function lossHistoryBlock(suffix) {
+  const rows = [
+    [2024, 2, '$42,500', '$28,000', '$65,000', false],
+    [2023, 1, '$8,200',  '$8,200',  '$58,000', false],
+    [2022, 0, '$0',      '$0',      '$52,000', false],
+    [2021, 3, '$91,000', '$55,000', '$48,000', true],
+    [2020, 1, '$15,750', '$15,750', '$45,000', false],
+  ];
+  const makeRow = ([yr,ct,tot,lg,prem,open], s) => `
+    <tr class="border-b border-slate-100 hover:bg-white loss-data-row" data-suffix="${s}">
+      <td class="py-1.5 pr-2"><input type="number" class="table-row-input w-16" value="${yr}" /></td>
+      <td class="py-1.5 pr-2"><input type="number"  class="table-row-input w-12 loss-claims"   value="${ct}"   oninput="updateLossTotals('${s}')" /></td>
+      <td class="py-1.5 pr-2"><input type="text"    class="table-row-input w-24 loss-incurred"  value="${tot}"  oninput="updateLossTotals('${s}')" /></td>
+      <td class="py-1.5 pr-2"><input type="text"    class="table-row-input w-24"                value="${lg}" /></td>
+      <td class="py-1.5 pr-2"><input type="text"    class="table-row-input w-24 loss-premium"   value="${prem}" oninput="updateLossTotals('${s}')" /></td>
+      <td class="py-1.5 pr-2 text-center"><input type="checkbox" class="accent-blue-600" ${open?'checked':''} /></td>
+      <td class="py-1.5"><button onclick="this.closest('tr').remove(); updateLossTotals('${s}')" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>
+    </tr>`;
+  return `
+  <div class="sub-section">
+    <div class="flex items-center justify-between mb-3">
+      <p class="sub-section-title">Loss History</p>
+      <button onclick="addLossRow('${suffix}')" class="text-xs text-blue-600 font-medium hover:text-blue-700">+ Add Year</button>
+    </div>
+    <table class="w-full text-sm">
+      <thead><tr class="border-b border-slate-200 text-left">
+        <th class="pb-2 text-xs font-semibold text-slate-400 uppercase">Year</th>
+        <th class="pb-2 text-xs font-semibold text-slate-400 uppercase">Claims</th>
+        <th class="pb-2 text-xs font-semibold text-slate-400 uppercase">Total Incurred</th>
+        <th class="pb-2 text-xs font-semibold text-slate-400 uppercase">Largest Loss</th>
+        <th class="pb-2 text-xs font-semibold text-slate-400 uppercase">Est. Premium</th>
+        <th class="pb-2 text-xs font-semibold text-slate-400 uppercase">Open</th>
+        <th class="pb-2"></th>
+      </tr></thead>
+      <tbody id="loss-tbody-${suffix}">
+        ${rows.map(r => makeRow(r, suffix)).join('')}
+      </tbody>
+      <tfoot>
+        <tr class="border-t-2 border-slate-300 bg-slate-50 font-semibold text-slate-700 text-sm">
+          <td class="pt-2 pr-2 text-xs text-slate-500 font-semibold uppercase">Totals</td>
+          <td class="pt-2 pr-2" id="loss-total-claims-${suffix}">—</td>
+          <td class="pt-2 pr-2" id="loss-total-incurred-${suffix}">—</td>
+          <td class="pt-2 pr-2"></td>
+          <td class="pt-2 pr-2" id="loss-total-premium-${suffix}">—</td>
+          <td class="pt-2" colspan="2">
+            <span class="text-xs text-slate-500 font-medium uppercase tracking-wide">Loss Ratio </span>
+            <span id="loss-ratio-${suffix}" class="text-sm font-bold">—</span>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+}
+
+function parseCurrency(v) {
+  const n = parseFloat(String(v).replace(/[$,]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+function fmtCurrency(n) {
+  return '$' + Math.round(n).toLocaleString();
+}
+
+function updateLossTotals(suffix) {
+  const tbody = document.getElementById(`loss-tbody-${suffix}`);
+  if (!tbody) return;
+  let claims = 0, incurred = 0, premium = 0;
+  tbody.querySelectorAll('tr').forEach(tr => {
+    claims   += parseFloat(tr.querySelector('.loss-claims')?.value   || 0) || 0;
+    incurred += parseCurrency(tr.querySelector('.loss-incurred')?.value || 0);
+    premium  += parseCurrency(tr.querySelector('.loss-premium')?.value  || 0);
+  });
+  document.getElementById(`loss-total-claims-${suffix}`).textContent   = claims;
+  document.getElementById(`loss-total-incurred-${suffix}`).textContent = fmtCurrency(incurred);
+  document.getElementById(`loss-total-premium-${suffix}`).textContent  = fmtCurrency(premium);
+  const ratioEl = document.getElementById(`loss-ratio-${suffix}`);
+  if (premium > 0) {
+    const ratio = incurred / premium;
+    const pct   = (ratio * 100).toFixed(1) + '%';
+    ratioEl.textContent = pct;
+    ratioEl.className = 'text-sm font-bold ' + (ratio >= 0.7 ? 'text-red-600' : ratio >= 0.5 ? 'text-amber-600' : 'text-emerald-600');
+  } else {
+    ratioEl.textContent = '—';
+    ratioEl.className = 'text-sm font-bold text-slate-400';
+  }
+}
+
+function addLossRow(suffix) {
+  const tbody = document.getElementById(`loss-tbody-${suffix}`);
+  const tr = document.createElement('tr');
+  tr.className = 'border-b border-slate-100 hover:bg-white loss-data-row';
+  tr.innerHTML = `
+    <td class="py-1.5 pr-2"><input type="number" class="table-row-input w-16" placeholder="${new Date().getFullYear()}" /></td>
+    <td class="py-1.5 pr-2"><input type="number" class="table-row-input w-12 loss-claims"   placeholder="0"  oninput="updateLossTotals('${suffix}')" /></td>
+    <td class="py-1.5 pr-2"><input type="text"   class="table-row-input w-24 loss-incurred" placeholder="$0" oninput="updateLossTotals('${suffix}')" /></td>
+    <td class="py-1.5 pr-2"><input type="text"   class="table-row-input w-24" placeholder="$0" /></td>
+    <td class="py-1.5 pr-2"><input type="text"   class="table-row-input w-24 loss-premium"  placeholder="$0" oninput="updateLossTotals('${suffix}')" /></td>
+    <td class="py-1.5 pr-2 text-center"><input type="checkbox" class="accent-blue-600" /></td>
+    <td class="py-1.5"><button onclick="this.closest('tr').remove(); updateLossTotals('${suffix}')" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>`;
+  tbody.appendChild(tr);
+  updateLossTotals(suffix);
+}
+
+// ─── QUOTE SECTION ────────────────────────────────────────────────────────────
+function renderQuoteSection() {
+  const lobs = [
+    { code: 'GL',   label: 'General Liability',           color: 'bg-blue-100 text-blue-700',    fn: glContent },
+    { code: 'IM',   label: 'Inland Marine',               color: 'bg-amber-100 text-amber-700',  fn: imContent },
+    { code: 'CAL',  label: 'Commercial Auto Liability',   color: 'bg-violet-100 text-violet-700',fn: caLiabilityContent },
+    { code: 'CAPD', label: 'Commercial Auto Phys. Damage',color: 'bg-emerald-100 text-emerald-700', fn: caPhysDamageContent },
+  ];
+  document.getElementById('quote-section').innerHTML = lobs.map((l, i) => `
+    <div class="section-card">
+      <div class="section-header" onclick="toggleSection(${i})">
+        <div class="flex items-center gap-3">
+          <span class="lob-badge ${l.color}">${l.code}</span>
+          <span class="font-medium text-slate-800">${l.label}</span>
+        </div>
+        <svg id="chevron-${i}" class="w-5 h-5 text-slate-400 transition-transform ${i===0?'rotate-180':''}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+      <div id="section-body-${i}" class="${i===0?'':'hidden'} section-body">${l.fn()}</div>
+    </div>`).join('');
+}
+
+function toggleSection(i) {
+  document.getElementById(`section-body-${i}`).classList.toggle('hidden');
+  document.getElementById(`chevron-${i}`).classList.toggle('rotate-180');
+}
+
+// ─── GL ───────────────────────────────────────────────────────────────────────
+function glContent() {
+  return `
+  <div class="space-y-5">
+    <!-- Coverage limits -->
+    <div class="grid grid-cols-3 gap-4">
+      <div class="field-group"><label>Occurrence Limit</label><input type="text" value="$1,000,000" /></div>
+      <div class="field-group"><label>General Aggregate</label><input type="text" value="$2,000,000" /></div>
+      <div class="field-group"><label>Products / Comp Ops</label><input type="text" value="$2,000,000" /></div>
+      <div class="field-group"><label>Personal & Adv Injury</label><input type="text" value="$1,000,000" /></div>
+      <div class="field-group"><label>Medical Payments</label><input type="text" value="$5,000" /></div>
+      <div class="field-group"><label>Deductible</label><input type="text" value="$0" /></div>
+    </div>
+    <div class="flex flex-wrap gap-5 pt-2 border-t border-slate-100">
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> Additional Insured Required</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> Primary / Non-Contributory</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> Written Contract for Timber</label>
+    </div>
+
+    <!-- Class Codes -->
+    <div class="sub-section">
+      <div class="flex items-center justify-between mb-3">
+        <p class="sub-section-title">Class Codes</p>
+        <button onclick="addClassCodeRow()" class="text-xs text-blue-600 font-medium hover:text-blue-700">+ Add Code</button>
+      </div>
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-slate-200 text-left">
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase w-32">Class Code</th>
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase">Description</th>
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase w-32">Exposure</th>
+          <th class="pb-2 w-6"></th>
+        </tr></thead>
+        <tbody id="classcode-tbody">
+          <tr class="border-b border-slate-100 hover:bg-white">
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" value="97047" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" value="Logging — All Operations" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" value="$2,400,000" /></td>
+            <td class="py-1.5"><button onclick="this.closest('tr').remove()" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>
+          </tr>
+          <tr class="border-b border-slate-100 hover:bg-white">
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" value="99004" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" value="Timber Hauling" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" value="$850,000" /></td>
+            <td class="py-1.5"><button onclick="this.closest('tr').remove()" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Underwriting questions -->
+    <div class="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+      <div class="field-group"><label>Line Verification Responsibility</label>
+        <select><option>Insured</option><option>Sub-Contract Logger</option><option>Sub-Contract Forester</option><option>Timber Dealer</option></select>
+      </div>
+      <div class="field-group"><label>Employees in Woods</label><input type="number" value="8" /></div>
+      <div class="field-group col-span-2"><label>Fire Protection Description</label><textarea rows="2" placeholder="Describe fire protection measures..."></textarea></div>
+    </div>
+
+    <!-- Endorsements -->
+    <div class="sub-section">
+      <p class="sub-section-title">Endorsements &amp; Modifiers</p>
+      <div class="grid grid-cols-3 gap-x-6 gap-y-4">
+        <div class="field-group"><label>Additional Insured — Individual (qty)</label><input type="number" value="0" min="0" /></div>
+        <div class="field-group"><label>Additional Insured — Blanket</label>
+          <select><option value="N">No</option><option value="Y">Yes</option></select></div>
+        <div class="field-group"><label>Waiver of Subrogation — Individual (qty)</label><input type="number" value="0" min="0" /></div>
+        <div class="field-group"><label>Waiver of Subrogation — Blanket</label>
+          <select><option value="N">No</option><option value="Y">Yes</option></select></div>
+        <div class="field-group"><label>Logging &amp; Lumbering Endorsement</label>
+          <select><option value="N">No</option><option value="Y">Yes</option></select></div>
+        <div class="field-group"><label>Schedule Rating Modification (%)</label>
+          <input type="number" value="0" min="-25" max="25" step="1" /></div>
+        <div class="field-group"><label>TRIA</label>
+          <select><option value="N">No</option><option value="Y">Yes</option></select></div>
+      </div>
+    </div>
+
+    ${lossHistoryBlock('gl')}
+  </div>`;
+}
+
+function addClassCodeRow() {
+  const tbody = document.getElementById('classcode-tbody');
+  const tr = document.createElement('tr');
+  tr.className = 'border-b border-slate-100 hover:bg-white';
+  tr.innerHTML = `
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" placeholder="Code" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" placeholder="Description" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-full" placeholder="$0" /></td>
+    <td class="py-1.5"><button onclick="this.closest('tr').remove()" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>`;
+  tbody.appendChild(tr);
+}
+
+// ─── IM ───────────────────────────────────────────────────────────────────────
+function imContent() {
+  const equip = [
+    ['2021 Tigercat 870C Feller Buncher','2021','Tigercat','870C','TC870-12345','$1,000','$385,000'],
+    ['2019 Prentice 2384 Knuckleboom',   '2019','Prentice','2384','PR2384-98765','$500','$95,000'],
+  ];
+  return `
+  <div class="space-y-5">
+    <div class="sub-section">
+      <div class="flex items-center justify-between mb-3">
+        <p class="sub-section-title">Equipment Schedule</p>
+        <button onclick="addEquipRow()" class="text-xs text-blue-600 font-medium hover:text-blue-700">+ Add Item</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-max">
+          <thead><tr class="border-b border-slate-200 text-left">
+            <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Description</th>
+            <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Year</th>
+            <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Make</th>
+            <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Model</th>
+            <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Serial #</th>
+            <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Deductible</th>
+            <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Stated Amount</th>
+            <th class="pb-2"></th>
+          </tr></thead>
+          <tbody id="equip-tbody">
+            ${equip.map(([d,y,mk,mo,s,ded,v]) => `
+            <tr class="border-b border-slate-100 hover:bg-white">
+              <td class="py-1.5 pr-2"><input type="text" class="table-row-input" style="width:150px" value="${d}" /></td>
+              <td class="py-1.5 pr-2"><input type="number" class="table-row-input w-14" value="${y}" /></td>
+              <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-24" value="${mk}" /></td>
+              <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-24" value="${mo}" /></td>
+              <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-28" value="${s}" /></td>
+              <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" value="${ded}" /></td>
+              <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-28" value="${v}" /></td>
+              <td class="py-1.5"><button onclick="this.closest('tr').remove()" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="field-group"><label>Number of Chainsaws</label><input type="number" value="4" /></div>
+      <div class="field-group"><label>Cleaning Method</label>
+        <select><option>Pressure Washer</option><option>Compressed Air</option><option>Third-Party Service</option><option>Other</option></select>
+      </div>
+      <div class="field-group"><label>Belly Pan Cleaning Frequency</label><input type="text" placeholder="e.g. Daily" /></div>
+      <div class="field-group"><label>Storage Location</label><input type="text" /></div>
+      <div class="field-group"><label>Overnight Security Measures</label><input type="text" /></div>
+    </div>
+    <div class="flex flex-wrap gap-5 pt-2 border-t border-slate-100">
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> Newly Acquired Equipment</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> Debris Removal</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> Rental Reimbursement</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> Towing / Storage / Recovery</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> TRIA</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> All Equipment Has Fire Extinguisher</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> Auto Fire Suppression</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> Fire Systems Maintained</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> Waterborne Exposure</label>
+    </div>
+
+    ${lossHistoryBlock('im')}
+  </div>`;
+}
+
+function addEquipRow() {
+  const tbody = document.getElementById('equip-tbody');
+  const tr = document.createElement('tr');
+  tr.className = 'border-b border-slate-100 hover:bg-white';
+  tr.innerHTML = `
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input" style="width:150px" placeholder="Description" /></td>
+    <td class="py-1.5 pr-2"><input type="number" class="table-row-input w-14" placeholder="Year" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-24" placeholder="Make" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-24" placeholder="Model" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-28" placeholder="Serial #" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" placeholder="$0" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-28" placeholder="$0" /></td>
+    <td class="py-1.5"><button onclick="this.closest('tr').remove()" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>`;
+  tbody.appendChild(tr);
+}
+
+// ─── CA SHARED HELPERS ────────────────────────────────────────────────────────
+const autoFillCols = `
+  <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Weight Class</th>
+  <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Use</th>
+  <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Radius</th>
+  <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Secondary</th>`;
+const autoFillCells = (cc) => {
+  const d = CLASS_CODES[cc] || {};
+  return `
+    <td class="py-1.5 pr-2 text-xs text-slate-500 cc-weight">${d.weight||'—'}</td>
+    <td class="py-1.5 pr-2 text-xs text-slate-500 cc-use">${d.use||'—'}</td>
+    <td class="py-1.5 pr-2 text-xs text-slate-500 cc-radius">${d.radius||'—'}</td>
+    <td class="py-1.5 pr-2 text-xs text-slate-500 cc-secondary">${d.secondary||'—'}</td>`;
+};
+const blankAutoFillCells = `
+    <td class="py-1.5 pr-2 text-xs text-slate-400 cc-weight">—</td>
+    <td class="py-1.5 pr-2 text-xs text-slate-400 cc-use">—</td>
+    <td class="py-1.5 pr-2 text-xs text-slate-400 cc-radius">—</td>
+    <td class="py-1.5 pr-2 text-xs text-slate-400 cc-secondary">—</td>`;
+
+function vehicleScheduleBlock(suffix, includePhysDamage) {
+  const vehicles = [
+    ['2022','Kenworth','T800','1XKWD40X9NJ123456','OR','40491','$185,000','$2,500'],
+    ['2020','Peterbilt','379','1XP5DB9X4LN987654','OR','40491','$155,000','$2,500'],
+  ];
+  const pdH = includePhysDamage ? `
+    <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Stated Amount</th>
+    <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Deductible</th>` : '';
+  const pdC = (sa,ded) => includePhysDamage ? `
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-28" value="${sa}" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" value="${ded}" /></td>` : '';
+  const pdNew = includePhysDamage ? `
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-28" placeholder="$0" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" placeholder="$0" /></td>` : '';
+
+  return `
+  <div class="sub-section">
+    <div class="flex items-center justify-between mb-3">
+      <p class="sub-section-title">Vehicle Schedule</p>
+      <button onclick="addVehicleRow('${suffix}',${includePhysDamage})" class="text-xs text-blue-600 font-medium hover:text-blue-700">+ Add Vehicle</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-max">
+        <thead><tr class="border-b border-slate-200 text-left">
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Year</th>
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Make</th>
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Model</th>
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">VIN</th>
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">State</th>
+          <th class="pb-2 text-xs font-semibold text-slate-400 uppercase pr-2">Class Code</th>
+          ${autoFillCols}
+          ${pdH}
+          <th class="pb-2"></th>
+        </tr></thead>
+        <tbody id="vehicle-tbody-${suffix}">
+          ${vehicles.map(([y,mk,mo,vin,st,cc,sa,ded]) => `
+          <tr class="border-b border-slate-100 hover:bg-white">
+            <td class="py-1.5 pr-2"><input type="number" class="table-row-input w-14" value="${y}" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-24" value="${mk}" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" value="${mo}" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-40" value="${vin}" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-12" value="${st}" /></td>
+            <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" value="${cc}" oninput="lookupClassCode(this)" /></td>
+            ${autoFillCells(cc)}
+            ${pdC(sa,ded)}
+            <td class="py-1.5"><button onclick="this.closest('tr').remove()" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-slate-400 mt-2">Weight Class, Use, Radius, and Secondary Class auto-fill when a valid class code is entered.</p>
+  </div>`;
+}
+
+function addVehicleRow(suffix, includePhysDamage) {
+  const tbody = document.getElementById(`vehicle-tbody-${suffix}`);
+  const tr = document.createElement('tr');
+  tr.className = 'border-b border-slate-100 hover:bg-white';
+  const pdNew = includePhysDamage ? `
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-28" placeholder="$0" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" placeholder="$0" /></td>` : '';
+  tr.innerHTML = `
+    <td class="py-1.5 pr-2"><input type="number" class="table-row-input w-14" placeholder="Year" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-24" placeholder="Make" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" placeholder="Model" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-40" placeholder="VIN" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-12" placeholder="ST" /></td>
+    <td class="py-1.5 pr-2"><input type="text" class="table-row-input w-20" placeholder="Code" oninput="lookupClassCode(this)" /></td>
+    ${blankAutoFillCells}
+    ${pdNew}
+    <td class="py-1.5"><button onclick="this.closest('tr').remove()" class="text-slate-300 hover:text-red-400 text-lg leading-none">&times;</button></td>`;
+  tbody.appendChild(tr);
+}
+
+// ─── CA LIABILITY ─────────────────────────────────────────────────────────────
+function caLiabilityContent() {
+  return `
+  <div class="space-y-5">
+    <div class="grid grid-cols-3 gap-4">
+      <div class="field-group"><label>Liability Limit</label><input type="text" value="$1,000,000 CSL" /></div>
+      <div class="field-group"><label>UM / UIM Limit</label><input type="text" value="$1,000,000" /></div>
+      <div class="field-group"><label>Medical Payments</label><input type="text" value="$5,000" /></div>
+      <div class="field-group"><label>Fleet Size</label><input type="number" value="12" /></div>
+      <div class="field-group"><label>Radius of Operations</label><input type="text" placeholder="e.g. 250 mi" /></div>
+      <div class="field-group"><label>Garaging Zip</label><input type="text" placeholder="97401" /></div>
+    </div>
+    <div class="flex gap-5 pt-2 border-t border-slate-100">
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> Hired Auto</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> Non-Owned Auto</label>
+    </div>
+
+    ${vehicleScheduleBlock('cal', false)}
+    ${driverScheduleBlock('cal')}
+    ${lossHistoryBlock('cal')}
+  </div>`;
+}
+
+// ─── CA PHYSICAL DAMAGE ───────────────────────────────────────────────────────
+function caPhysDamageContent() {
+  return `
+  <div class="space-y-5">
+    <div class="grid grid-cols-3 gap-4">
+      <div class="field-group"><label>Fleet Size</label><input type="number" value="12" /></div>
+      <div class="field-group"><label>Radius of Operations</label><input type="text" placeholder="e.g. 250 mi" /></div>
+      <div class="field-group"><label>Garaging Zip</label><input type="text" placeholder="97401" /></div>
+    </div>
+
+    ${vehicleScheduleBlock('capd', true)}
+    ${driverScheduleBlock('capd')}
+    ${lossHistoryBlock('capd')}
+  </div>`;
+}
+
+// ─── DRIVER SCHEDULE ─────────────────────────────────────────────────────────
+function driverScheduleBlock(suffix) {
+  return `
+  <div class="sub-section">
+    <div class="flex items-center justify-between mb-3">
+      <p class="sub-section-title">Driver Schedule</p>
+      <button class="text-xs text-blue-600 font-medium hover:text-blue-700">+ Add Driver</button>
+    </div>
+    <div class="border border-slate-200 rounded-lg overflow-hidden">
+      <div class="bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 border-b border-slate-200 flex items-center justify-between">
+        <span>James Harmon — OR1234567</span>
+        <div class="flex gap-1">
+          ${['Driver Info','Additional Info','Notes'].map((t,i) => `
+            <button onclick="switchDriverTab('${suffix}',${i})" id="dtab-${suffix}-${i}"
+              class="px-3 py-1 text-xs rounded-md font-medium transition ${i===0?'bg-white text-blue-600 shadow-sm border border-slate-200':'text-slate-500 hover:text-slate-700'}">${t}</button>`).join('')}
+        </div>
+      </div>
+      <div id="driver-tab-${suffix}-0" class="p-4 grid grid-cols-3 gap-3">
+        <div class="field-group"><label>License #</label><input type="text" value="OR1234567" /></div>
+        <div class="field-group"><label>First Name</label><input type="text" value="James" /></div>
+        <div class="field-group"><label>Last Name</label><input type="text" value="Harmon" /></div>
+        <div class="field-group"><label>Date of Birth</label><input type="text" value="1978-03-15" /></div>
+        <div class="field-group"><label>License Class</label><input type="text" value="CDL-A" /></div>
+        <div class="field-group"><label>State</label><input type="text" value="OR" /></div>
+      </div>
+      <div id="driver-tab-${suffix}-1" class="p-4 grid grid-cols-3 gap-3 hidden">
+        <div class="field-group"><label>Driver Status</label><select><option>Active</option><option>Inactive</option></select></div>
+        <div class="field-group"><label>Full or Part Time</label><select><option>Full Time</option><option>Part Time</option></select></div>
+        <div class="field-group"><label>Points</label><input type="number" value="0" /></div>
+        <div class="field-group"><label>MVR Date</label><input type="text" placeholder="YYYY-MM-DD" /></div>
+        <div class="field-group"><label>License Expiration</label><input type="text" placeholder="YYYY-MM-DD" /></div>
+        <div class="field-group"><label>Medical Expiration</label><input type="text" placeholder="YYYY-MM-DD" /></div>
+      </div>
+      <div id="driver-tab-${suffix}-2" class="p-4 hidden">
+        <div class="field-group"><label>Comments / Notes</label><textarea rows="2" placeholder="Additional notes..."></textarea></div>
+        <div class="flex gap-4 mt-3">
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" /> Furnished Car</label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> Copy on Renewal</label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" class="accent-blue-600" checked /> CDL Driver</label>
+        </div>
+      </div>
+    </div>
+    <p class="text-xs text-slate-400 mt-2">+ 1 more driver — click to expand</p>
+  </div>`;
+}
+
+function switchDriverTab(suffix, idx) {
+  [0,1,2].forEach(i => {
+    document.getElementById(`driver-tab-${suffix}-${i}`).classList.toggle('hidden', i !== idx);
+    const btn = document.getElementById(`dtab-${suffix}-${i}`);
+    if (i === idx) { btn.classList.add('bg-white','text-blue-600','shadow-sm','border','border-slate-200'); btn.classList.remove('text-slate-500'); }
+    else { btn.classList.remove('bg-white','text-blue-600','shadow-sm','border','border-slate-200'); btn.classList.add('text-slate-500'); }
+  });
+}
+
+// ─── CLASS CODE LOOKUP ───────────────────────────────────────────────────────
+const CLASS_CODES = {
+  '1129':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '1191':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '1229':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '1291':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '1429':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '1479':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Dump/Transit Mix'},
+  '1491':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '1529':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '1591':{'weight':'Light Truck (≤10k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '2491':{'weight':'Light Truck (≤10k lbs)','use':'Retail','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '3191':{'weight':'Light Truck (≤10k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '3229':{'weight':'Light Truck (≤10k lbs)','use':'Commercial','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '3491':{'weight':'Light Truck (≤10k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '7381':{'weight':'Light Truck (≤10k lbs)','use':'Unknown (7)','radius':'Long Distance (>200 mi)','fleet':'Non-Fleet','secondary':'Contractors'},
+  '7391':{'weight':'Light Truck (≤10k lbs)','use':'Unknown (7)','radius':'Long Distance (>200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '7398':{'weight':'Light Truck (≤10k lbs)','use':'Unknown (7)','radius':'Long Distance (>200 mi)','fleet':'Non-Fleet','secondary':'NOS – Special'},
+  '21129':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '21191':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '21229':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '21291':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '21429':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '21491':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '21529':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '21591':{'weight':'Medium Truck (10–20k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '23129':{'weight':'Medium Truck (10–20k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '23191':{'weight':'Medium Truck (10–20k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '23429':{'weight':'Medium Truck (10–20k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '23491':{'weight':'Medium Truck (10–20k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '31129':{'weight':'Heavy Truck (20–45k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '31191':{'weight':'Heavy Truck (20–45k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '31229':{'weight':'Heavy Truck (20–45k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '31429':{'weight':'Heavy Truck (20–45k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '31479':{'weight':'Heavy Truck (20–45k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Dump/Transit Mix'},
+  '31491':{'weight':'Heavy Truck (20–45k lbs)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '31591':{'weight':'Heavy Truck (20–45k lbs)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '33129':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '33179':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Dump/Transit Mix'},
+  '33191':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '33229':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '33329':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Long Distance (>200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '33391':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Long Distance (>200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '33429':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '33479':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Dump/Transit Mix'},
+  '33491':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '33529':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '33591':{'weight':'Heavy Truck (20–45k lbs)','use':'Commercial','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '34129':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (4)','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '34191':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (4)','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '34229':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (4)','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '34291':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (4)','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '34429':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (4)','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '34491':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (4)','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '34529':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (4)','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '36129':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (6)','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '36191':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (6)','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '36229':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (6)','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '36429':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (6)','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '36491':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (6)','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '36591':{'weight':'Heavy Truck (20–45k lbs)','use':'Unknown (6)','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '40129':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '40179':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Dump/Transit Mix'},
+  '40191':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '40229':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '40291':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '40429':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '40479':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Dump/Transit Mix'},
+  '40491':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '40591':{'weight':'Extra-Heavy Truck (>45k lbs)','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '50121':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – Common Carrier'},
+  '50129':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '50191':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '50229':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '50291':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '50329':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Long Distance (>200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '50429':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '50491':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '50529':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '50591':{'weight':'Truck-Tractor (>45k lbs GCW)','use':'Service','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '67121':{'weight':'Semitrailer','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – Common Carrier'},
+  '67129':{'weight':'Semitrailer','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '67191':{'weight':'Semitrailer','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '67229':{'weight':'Semitrailer','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '67291':{'weight':'Semitrailer','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '67329':{'weight':'Semitrailer','use':'N/A','radius':'Long Distance (>200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '67429':{'weight':'Semitrailer','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '67491':{'weight':'Semitrailer','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '67529':{'weight':'Semitrailer','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '67591':{'weight':'Semitrailer','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '67629':{'weight':'Semitrailer','use':'N/A','radius':'Long Distance (>200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '68129':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '68191':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '68229':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Truckers – All Other'},
+  '68291':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Non-Fleet','secondary':'Logging'},
+  '68429':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '68491':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+  '68529':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Truckers – All Other'},
+  '68591':{'weight':'Trailer (>2k lbs)','use':'N/A','radius':'Intermediate (51–200 mi)','fleet':'Fleet','secondary':'Logging'},
+  '69491':{'weight':'Service/Utility Trailer (≤2k lbs)','use':'N/A','radius':'Local (≤50 mi)','fleet':'Fleet','secondary':'Logging'},
+};
+
+function lookupClassCode(input) {
+  const row = input.closest('tr');
+  const code = input.value.trim();
+  const cc = CLASS_CODES[code];
+  const set = (cls, val) => { const el = row.querySelector(cls); if (el) { el.textContent = val; el.classList.toggle('text-slate-400', !val || val === '—'); } };
+  if (cc) {
+    set('.cc-weight', cc.weight);
+    set('.cc-use', cc.use);
+    set('.cc-radius', cc.radius);
+    set('.cc-secondary', cc.secondary);
+    input.classList.remove('border-b-red-400');
+    input.classList.add('border-b-emerald-400');
+  } else {
+    set('.cc-weight', code ? '?' : '—');
+    set('.cc-use', '—'); set('.cc-radius', '—'); set('.cc-secondary', '—');
+    input.classList.toggle('border-b-red-400', code.length > 0);
+    input.classList.remove('border-b-emerald-400');
+  }
+}
+
+// ─── CONDITIONALS ─────────────────────────────────────────────────────────────
+function bindConditionals() {
+  const toggle = document.getElementById('nonlog-toggle');
+  const knob = document.getElementById('nonlog-knob');
+  const fields = document.getElementById('nonlog-fields');
+  if (!toggle) return;
+  let on = false;
+  toggle.addEventListener('click', () => {
+    on = !on;
+    toggle.style.background = on ? '#2563eb' : '';
+    knob.style.transform = on ? 'translateX(20px)' : 'translateX(4px)';
+    fields.classList.toggle('hidden', !on);
+    if (on) fields.classList.add('grid');
+  });
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+renderStepper();
+renderStep();
+renderQuoteSection();
+// seed totals for the first open accordion (GL is open by default)
+setTimeout(() => ['gl','im','cal','capd'].forEach(updateLossTotals), 0);
+</script>
+</body>
+</html>
