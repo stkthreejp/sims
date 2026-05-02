@@ -63,6 +63,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<FeeAuditLog> FeeAuditLogs => Set<FeeAuditLog>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
+    public DbSet<Receipt> Receipts => Set<Receipt>();
+    public DbSet<CashApplication> CashApplications => Set<CashApplication>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

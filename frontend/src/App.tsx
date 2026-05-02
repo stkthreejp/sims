@@ -33,6 +33,8 @@ import { HolidayCalendarAdminPage } from '@/pages/admin/HolidayCalendarAdminPage
 import { EscalationRulesAdminPage } from '@/pages/admin/EscalationRulesAdminPage'
 import { FeesAdminPage } from '@/pages/admin/FeesAdminPage'
 import { InvoicesPage } from '@/pages/billing/InvoicesPage'
+import { ReceiptsPage } from '@/pages/billing/ReceiptsPage'
+import { CashApplicationPage } from '@/pages/billing/CashApplicationPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -93,6 +95,8 @@ export default function App() {
             <Route path="/admin/escalation-rules" element={<EscalationRulesAdminPage />} />
             <Route path="/admin/fees" element={<FeesAdminPage />} />
             <Route path="/billing/invoices" element={<InvoicesPage />} />
+            <Route path="/billing/receipts" element={<ReceiptsPage />} />
+            <Route path="/billing/cash-application" element={<CashApplicationPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

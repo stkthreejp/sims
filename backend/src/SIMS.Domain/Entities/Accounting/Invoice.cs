@@ -12,7 +12,8 @@ public class Invoice
     public decimal TotalFees { get; set; }
     public decimal TotalAmount { get; set; }
     public Guid LedgerTransactionId { get; set; }
-    public string Status { get; set; } = "Posted";  // 'Posted'|'Voided'
+    public decimal ClearedAmount { get; set; } = 0;
+    public string Status { get; set; } = "Posted";  // 'Posted'|'PartiallyPaid'|'Paid'|'Voided'
     public Guid CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

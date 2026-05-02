@@ -15,6 +15,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(e => e.GrossPremium).HasColumnType("numeric(19,4)");
         builder.Property(e => e.TotalFees).HasColumnType("numeric(19,4)");
         builder.Property(e => e.TotalAmount).HasColumnType("numeric(19,4)");
+        builder.Property(e => e.ClearedAmount).HasColumnType("numeric(19,4)").HasDefaultValue(0m);
 
         builder.HasMany(e => e.Lines)
             .WithOne(l => l.Invoice)
