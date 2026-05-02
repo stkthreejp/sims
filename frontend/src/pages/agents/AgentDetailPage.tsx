@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, MapPin, Phone, Mail,
-  Star, Building2, ChevronDown, ChevronUp, UserCircle,
+  Star, Building2, ChevronDown, ChevronUp, UserCircle, Percent, BanknoteIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { agentsApi } from '@/api/agents.api'
@@ -13,6 +13,24 @@ import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
+import { getAgentCommissions, createAgentCommission, disableAgentCommission } from '@/api/agentCommissions.api'
+import type { AgentCommission } from '@/types/agentCommission.types'
+
+// ─── Commission constants ──────────────────────────────────────────────────────
+
+const LOB_OPTIONS = [
+  { value: '', label: 'All Lines (default fallback)' },
+  { value: 'GeneralLiability', label: 'General Liability' },
+  { value: 'Property', label: 'Property' },
+  { value: 'CommercialAuto', label: 'Commercial Auto' },
+  { value: 'BusinessOwners', label: 'Business Owners' },
+  { value: 'WorkersCompensation', label: 'Workers Compensation' },
+  { value: 'ProfessionalLiability', label: 'Professional Liability' },
+  { value: 'Umbrella', label: 'Umbrella' },
+  { value: 'Cyber', label: 'Cyber' },
+  { value: 'ExcessLiability', label: 'Excess Liability' },
+  { value: 'Other', label: 'Other' },
+]
 
 // ─── Location form state ───────────────────────────────────────────────────────
 
@@ -296,9 +314,20 @@ export function AgentDetailPage() {
   const [editingContact, setEditingContact] = useState<{ locationId: string; contactId: string } | null>(null)
   const [editContactForm, setEditContactForm] = useState<ContactFormData>(emptyContactForm())
 
+  // Commission state
+  const [showAddCommission, setShowAddCommission] = useState(false)
+  const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '', rate: '', effectiveDate: '' })
+  const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
+
   const { data: agent, isLoading } = useQuery({
     queryKey: ['agents', id],
     queryFn: () => agentsApi.getById(id!),
+    enabled: !!id,
+  })
+
+  const { data: commissions = [] } = useQuery({
+    queryKey: ['agent-commissions', id],
+    queryFn: () => getAgentCommissions(id!),
     enabled: !!id,
   })
 
@@ -407,6 +436,41 @@ export function AgentDetailPage() {
     },
     onError: () => toast.error('Failed to delete contact'),
   })
+
+  // ─── Commission mutations ────────────────────────────────────────────────────
+
+  const addCommissionMutation = useMutation({
+    mutationFn: () => createAgentCommission(id!, {
+      lineOfBusiness: commissionForm.lineOfBusiness || null,
+      commissionRate: parseFloat(commissionForm.rate) / 100,
+      effectiveDate: commissionForm.effectiveDate,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agent-commissions', id] })
+      setShowAddCommission(false)
+      setCommissionForm({ lineOfBusiness: '', rate: '', effectiveDate: '' })
+      toast.success('Commission rate added')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const disableCommissionMutation = useMutation({
+    mutationFn: (commId: number) => disableAgentCommission(id!, commId, { disabledDate: null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agent-commissions', id] })
+      toast.success('Commission rate disabled')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const toggleLob = (key: string) => {
+    setExpandedLobs((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -602,6 +666,190 @@ export function AgentDetailPage() {
       {/* Documents */}
       <div className="bg-white border rounded-lg p-5">
         <DocumentsSection entityType="Agent" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
+      </div>
+
+      {/* Commission Schedules */}
+      <div className="bg-white border rounded-lg p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <Percent className="h-4 w-4 text-slate-400" />
+            Commission Schedules
+          </h2>
+          {!showAddCommission && (
+            <button
+              onClick={() => setShowAddCommission(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Rate
+            </button>
+          )}
+        </div>
+
+        {/* Add commission form */}
+        {showAddCommission && (
+          <div className="mb-4 p-3 border border-blue-200 rounded-lg bg-blue-50/40">
+            <p className="text-xs font-medium text-slate-600 mb-2">New Commission Rate</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
+                <select
+                  value={commissionForm.lineOfBusiness}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value })}
+                  className="w-full border rounded px-2 py-1.5 text-sm bg-white"
+                >
+                  {LOB_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Rate (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={commissionForm.rate}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, rate: e.target.value })}
+                  placeholder="e.g. 15"
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
+                <input
+                  type="date"
+                  value={commissionForm.effectiveDate}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, effectiveDate: e.target.value })}
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => {
+                  if (!commissionForm.rate || !commissionForm.effectiveDate) {
+                    toast.error('Rate and effective date are required')
+                    return
+                  }
+                  addCommissionMutation.mutate()
+                }}
+                disabled={addCommissionMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" /> Save Rate
+              </button>
+              <button
+                onClick={() => { setShowAddCommission(false); setCommissionForm({ lineOfBusiness: '', rate: '', effectiveDate: '' }) }}
+                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+              >
+                <X className="h-3.5 w-3.5" /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {commissions.length === 0 && !showAddCommission ? (
+          <div className="text-center py-6 border border-dashed rounded-lg">
+            <BanknoteIcon className="h-7 w-7 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No commission rates configured.</p>
+            <button onClick={() => setShowAddCommission(true)} className="mt-2 text-sm text-blue-600 hover:underline">
+              Add the first rate
+            </button>
+          </div>
+        ) : (
+          (() => {
+            const byLob = commissions.reduce<Record<string, AgentCommission[]>>((acc, c) => {
+              const key = c.lineOfBusiness ?? '__all__'
+              if (!acc[key]) acc[key] = []
+              acc[key].push(c)
+              return acc
+            }, {})
+
+            return (
+              <div className="divide-y">
+                {Object.entries(byLob).map(([lobKey, rows]) => {
+                  const label = lobKey === '__all__' ? 'All Lines (default)' : (rows[0].lineOfBusinessLabel ?? lobKey)
+                  const active = rows.find((r) => r.isActive)
+                  const isExpanded = expandedLobs.has(lobKey)
+
+                  return (
+                    <div key={lobKey} className="py-2">
+                      <div
+                        className="flex items-center justify-between cursor-pointer hover:bg-slate-50 rounded px-2 py-1"
+                        onClick={() => toggleLob(lobKey)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
+                          <span className="text-sm font-medium text-slate-700">{label}</span>
+                          {active && (
+                            <span className="text-sm text-slate-900 font-semibold">
+                              {(active.commissionRate * 100).toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {active ? (
+                            <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">Inactive</span>
+                          )}
+                          <span className="text-xs text-slate-400">{rows.length} {rows.length === 1 ? 'version' : 'versions'}</span>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="mt-1 ml-6">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-slate-500">
+                                <th className="text-left py-1 font-medium">Rate</th>
+                                <th className="text-left py-1 font-medium">Effective</th>
+                                <th className="text-left py-1 font-medium">Disabled</th>
+                                <th className="text-left py-1 font-medium">Status</th>
+                                <th />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {rows.map((r) => (
+                                <tr key={r.id}>
+                                  <td className="py-1.5 font-medium text-slate-800">{(r.commissionRate * 100).toFixed(2)}%</td>
+                                  <td className="py-1.5 text-slate-600">{r.effectiveDate}</td>
+                                  <td className="py-1.5 text-slate-600">{r.disabledDate ?? '—'}</td>
+                                  <td className="py-1.5">
+                                    {r.isActive ? (
+                                      <span className="px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Active</span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Disabled</span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5 text-right">
+                                    {r.isActive && (
+                                      <button
+                                        onClick={() => {
+                                          if (confirm('Disable this commission rate?'))
+                                            disableCommissionMutation.mutate(r.id)
+                                        }}
+                                        className="text-slate-400 hover:text-red-600 px-1"
+                                        title="Disable"
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()
+        )}
       </div>
 
       {/* Offices & Contacts section */}

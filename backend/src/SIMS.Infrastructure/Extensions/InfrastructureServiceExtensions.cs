@@ -67,6 +67,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IFeeAdminService, FeeAdminService>();
         services.AddScoped<ILedgerService, LedgerService>();
         services.AddScoped<ICarrierCommissionService, CarrierCommissionService>();
+        services.AddScoped<IAgentCommissionService, AgentCommissionService>();
         services.AddScoped<IInvoicingService, InvoicingService>();
         services.AddScoped<IReceiptsService, ReceiptsService>();
         services.AddScoped<ICashApplicationService, CashApplicationService>();

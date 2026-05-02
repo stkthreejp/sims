@@ -10,6 +10,7 @@ public class Invoice
     public DateOnly InvoiceDate { get; set; }
     public decimal GrossPremium { get; set; }
     public decimal CommissionAmount { get; set; } = 0;
+    public decimal AgentCommissionAmount { get; set; } = 0;
     public decimal TotalFees { get; set; }
     public decimal TotalAmount { get; set; }
     public Guid LedgerTransactionId { get; set; }
