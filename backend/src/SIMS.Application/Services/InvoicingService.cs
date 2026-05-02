@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
 using DomainInvoiceLine = SIMS.Domain.Entities.Accounting.InvoiceLine;
 
@@ -86,6 +87,48 @@ public class InvoicingService : IInvoicingService
 
         invoice.LedgerTransactionId = txnId;
         await db.SaveChangesAsync(ct);
+
+        // Create carrier payable for the gross premium
+        if (invoice.GrossPremium > 0)
+        {
+            Guid? carrierId = null;
+            string payeeName = "Carrier";
+
+            if (invoice.PolicyTransactionId.HasValue)
+            {
+                var resolvedCarrierId = await db.Set<PolicyTransaction>()
+                    .Where(pt => pt.Id == invoice.PolicyTransactionId.Value)
+                    .Select(pt => (Guid?)pt.Quote.CarrierId)
+                    .FirstOrDefaultAsync(ct);
+
+                if (resolvedCarrierId.HasValue)
+                {
+                    carrierId = resolvedCarrierId;
+                    var name = await db.Set<Carrier>()
+                        .Where(c => c.Id == resolvedCarrierId.Value)
+                        .Select(c => c.Name)
+                        .FirstOrDefaultAsync(ct);
+                    if (name != null) payeeName = name;
+                }
+            }
+
+            db.Set<Payable>().Add(new Payable
+            {
+                TenantId = 1,
+                InvoiceId = invoice.Id,
+                CarrierId = carrierId,
+                PayeeName = payeeName,
+                GlAccountId = carrierApAccount.Id,
+                Amount = invoice.GrossPremium,
+                PaidAmount = 0,
+                InvoiceDate = invoice.InvoiceDate,
+                DueDate = invoice.InvoiceDate.AddDays(30),
+                Status = "Open",
+                CreatedBy = userId,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync(ct);
+        }
 
         return Result<InvoiceDetailDto>.Success(await LoadDetailAsync(invoice.Id, ct));
     }

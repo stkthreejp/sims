@@ -128,6 +128,44 @@ public class LedgerService : ILedgerService
         return txnId;
     }
 
+    public async Task<Guid> PostDisbursementAsync(
+        Disbursement disbursement,
+        int trustAccountId,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var db = Db;
+        var txnId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var effectiveDate = disbursement.PaymentDate;
+
+        var rows = new List<LedgerTransaction>();
+        foreach (var line in disbursement.Lines)
+        {
+            rows.Add(new LedgerTransaction
+            {
+                TransactionId = txnId, EffectiveDate = effectiveDate,
+                AccountId = line.Payable.GlAccountId, Debit = line.Amount, Credit = 0,
+                SourceType = "Disbursement", SourceId = disbursement.Id,
+                Memo = $"{disbursement.DisbursementNumber} — {line.Payable.Invoice.InvoiceNumber}",
+                CreatedBy = userId, PostedAt = now
+            });
+            rows.Add(new LedgerTransaction
+            {
+                TransactionId = txnId, EffectiveDate = effectiveDate,
+                AccountId = trustAccountId, Debit = 0, Credit = line.Amount,
+                SourceType = "Disbursement", SourceId = disbursement.Id,
+                Memo = $"{disbursement.DisbursementNumber} — {disbursement.PayeeName}",
+                CreatedBy = userId, PostedAt = now
+            });
+        }
+
+        AssertBalanced(rows);
+        db.Set<LedgerTransaction>().AddRange(rows);
+        await db.SaveChangesAsync(ct);
+        return txnId;
+    }
+
     public async Task<Guid> PostDistributionSweepAsync(
         CashMovementInstruction instruction,
         int trustAccountId,

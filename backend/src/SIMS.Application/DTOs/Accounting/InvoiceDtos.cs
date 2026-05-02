@@ -13,7 +13,7 @@ public record CreateInvoiceRequest(
     string? LicenseType,
     int LocationCount = 1,
     int VehicleCount = 1,
-    long? PolicyTransactionId = null
+    Guid? PolicyTransactionId = null
 );
 
 public record InvoiceSummaryDto(

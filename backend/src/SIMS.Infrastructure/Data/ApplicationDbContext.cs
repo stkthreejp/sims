@@ -67,6 +67,9 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<CashApplication> CashApplications => Set<CashApplication>();
     public DbSet<CashMovementInstruction> CashMovementInstructions => Set<CashMovementInstruction>();
     public DbSet<CashDistributionBatch> CashDistributionBatches => Set<CashDistributionBatch>();
+    public DbSet<Payable> Payables => Set<Payable>();
+    public DbSet<Disbursement> Disbursements => Set<Disbursement>();
+    public DbSet<DisbursementLine> DisbursementLines => Set<DisbursementLine>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

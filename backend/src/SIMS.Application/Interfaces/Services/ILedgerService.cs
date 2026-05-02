@@ -19,6 +19,17 @@ public interface ILedgerService
         Guid userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Posts a single balanced JE for a disbursement (one JE covers all lines):
+    ///   Per line: DR line.Payable.GlAccountId (clear the AP)
+    ///   Per line: CR trustAccountId (reduce trust cash)
+    /// </summary>
+    Task<Guid> PostDisbursementAsync(
+        Disbursement disbursementWithLines,
+        int trustAccountId,
+        Guid userId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Posts the sweep JE for a single distribution instruction:
     ///   DR instruction.DistributionGlAccountId (clear the payable liability)
     ///   CR trustAccountId (reduce trust cash)

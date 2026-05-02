@@ -70,6 +70,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IReceiptsService, ReceiptsService>();
         services.AddScoped<ICashApplicationService, CashApplicationService>();
         services.AddScoped<ICashDistributionService, CashDistributionService>();
+        services.AddScoped<IDisbursementService, DisbursementService>();
         services.AddScoped<IWireSheetPdfService, WireSheetPdfService>();
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();

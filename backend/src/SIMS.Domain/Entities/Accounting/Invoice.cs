@@ -5,7 +5,7 @@ public class Invoice
     public long Id { get; set; }
     public int TenantId { get; set; } = 1;
     public string InvoiceNumber { get; set; } = string.Empty;
-    public long? PolicyTransactionId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
     public DateOnly EffectiveDate { get; set; }
     public DateOnly InvoiceDate { get; set; }
     public decimal GrossPremium { get; set; }
