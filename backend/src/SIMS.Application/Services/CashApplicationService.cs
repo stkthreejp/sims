@@ -10,12 +10,14 @@ public class CashApplicationService : ICashApplicationService
 {
     private readonly IServiceProvider _sp;
     private readonly ILedgerService _ledger;
+    private readonly ICashDistributionService _dist;
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
-    public CashApplicationService(IServiceProvider sp, ILedgerService ledger)
+    public CashApplicationService(IServiceProvider sp, ILedgerService ledger, ICashDistributionService dist)
     {
         _sp = sp;
         _ledger = ledger;
+        _dist = dist;
     }
 
     public async Task<IReadOnlyList<OpenInvoiceDto>> GetOpenInvoicesAsync(CancellationToken ct = default)
@@ -64,6 +66,7 @@ public class CashApplicationService : ICashApplicationService
 
         var invoiceIds = req.Lines.Select(l => l.InvoiceId).ToList();
         var invoices = await db.Set<Invoice>()
+            .Include(i => i.Lines)
             .Where(i => invoiceIds.Contains(i.Id))
             .ToDictionaryAsync(i => i.Id, ct);
 
@@ -131,6 +134,16 @@ public class CashApplicationService : ICashApplicationService
             : "PartiallyApplied";
 
         await db.SaveChangesAsync(ct);
+
+        // Generate distribution instructions for each payable invoice line
+        var trustAccount = await db.Set<LedgerAccount>()
+            .FirstOrDefaultAsync(a => a.InternalCode == "1100" && a.TenantId == 1, ct);
+        if (trustAccount != null)
+        {
+            foreach (var app in newApplications)
+                await _dist.GenerateInstructionsForApplicationAsync(
+                    app, invoices[app.InvoiceId], trustAccount.Id, userId, ct);
+        }
 
         // Reload for response
         var updatedReceipt = await db.Set<Receipt>()

@@ -35,6 +35,7 @@ import { FeesAdminPage } from '@/pages/admin/FeesAdminPage'
 import { InvoicesPage } from '@/pages/billing/InvoicesPage'
 import { ReceiptsPage } from '@/pages/billing/ReceiptsPage'
 import { CashApplicationPage } from '@/pages/billing/CashApplicationPage'
+import { CashDistributionPage } from '@/pages/billing/CashDistributionPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -97,6 +98,7 @@ export default function App() {
             <Route path="/billing/invoices" element={<InvoicesPage />} />
             <Route path="/billing/receipts" element={<ReceiptsPage />} />
             <Route path="/billing/cash-application" element={<CashApplicationPage />} />
+            <Route path="/billing/cash-distribution" element={<CashDistributionPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

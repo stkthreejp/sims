@@ -128,6 +128,40 @@ public class LedgerService : ILedgerService
         return txnId;
     }
 
+    public async Task<Guid> PostDistributionSweepAsync(
+        CashMovementInstruction instruction,
+        int trustAccountId,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var db = Db;
+        var txnId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var rows = new List<LedgerTransaction>
+        {
+            // DR: payable liability (clears the balance owed to payee)
+            new() {
+                TransactionId = txnId, EffectiveDate = DateOnly.FromDateTime(now),
+                AccountId = instruction.DistributionGlAccountId, Debit = instruction.Amount, Credit = 0,
+                SourceType = "Distribution", SourceId = instruction.Id,
+                Memo = $"Wire sweep — instruction {instruction.Id}", CreatedBy = userId, PostedAt = now
+            },
+            // CR: Trust Account (cash leaves trust)
+            new() {
+                TransactionId = txnId, EffectiveDate = DateOnly.FromDateTime(now),
+                AccountId = trustAccountId, Debit = 0, Credit = instruction.Amount,
+                SourceType = "Distribution", SourceId = instruction.Id,
+                Memo = $"Wire sweep — instruction {instruction.Id}", CreatedBy = userId, PostedAt = now
+            }
+        };
+
+        AssertBalanced(rows);
+        db.Set<LedgerTransaction>().AddRange(rows);
+        await db.SaveChangesAsync(ct);
+        return txnId;
+    }
+
     private static void AssertBalanced(List<LedgerTransaction> rows)
     {
         var dr = rows.Sum(r => r.Debit);

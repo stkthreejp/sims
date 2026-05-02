@@ -17,4 +17,15 @@ public interface ILedgerService
         decimal grossApplied, decimal commissionAmount,
         int unappliedCashAccountId, int commissionExpenseAccountId, int arAccountId,
         Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts the sweep JE for a single distribution instruction:
+    ///   DR instruction.DistributionGlAccountId (clear the payable liability)
+    ///   CR trustAccountId (reduce trust cash)
+    /// </summary>
+    Task<Guid> PostDistributionSweepAsync(
+        CashMovementInstruction instruction,
+        int trustAccountId,
+        Guid userId,
+        CancellationToken ct = default);
 }

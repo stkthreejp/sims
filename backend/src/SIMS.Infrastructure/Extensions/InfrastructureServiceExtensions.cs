@@ -1,5 +1,6 @@
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Services;
+using SIMS.Infrastructure.Services;
 using SIMS.Domain.Entities;
 using SIMS.Infrastructure.Data;
 using SIMS.Infrastructure.Services;
@@ -68,6 +69,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IInvoicingService, InvoicingService>();
         services.AddScoped<IReceiptsService, ReceiptsService>();
         services.AddScoped<ICashApplicationService, CashApplicationService>();
+        services.AddScoped<ICashDistributionService, CashDistributionService>();
+        services.AddScoped<IWireSheetPdfService, WireSheetPdfService>();
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
