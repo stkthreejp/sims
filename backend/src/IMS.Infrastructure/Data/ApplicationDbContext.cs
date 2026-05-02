@@ -38,6 +38,15 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<SubmissionGLClassification> SubmissionGLClassifications => Set<SubmissionGLClassification>();
     public DbSet<SubmissionIMCoverages> SubmissionIMCoverages => Set<SubmissionIMCoverages>();
     public DbSet<SubmissionEquipment> SubmissionEquipment => Set<SubmissionEquipment>();
+    public DbSet<TaskType> TaskTypes => Set<TaskType>();
+    public DbSet<TaskInstance> TaskInstances => Set<TaskInstance>();
+    public DbSet<SystemEvent> SystemEvents => Set<SystemEvent>();
+    public DbSet<WorkflowTemplate> WorkflowTemplates => Set<WorkflowTemplate>();
+    public DbSet<WorkflowStep> WorkflowSteps => Set<WorkflowStep>();
+    public DbSet<HolidayCalendar> HolidayCalendar => Set<HolidayCalendar>();
+    public DbSet<UserDelegation> UserDelegations => Set<UserDelegation>();
+    public DbSet<EscalationRule> EscalationRules => Set<EscalationRule>();
+    public DbSet<TaskAuditEntry> TaskAuditEntries => Set<TaskAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -80,6 +89,14 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<SubmissionGLClassification>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionIMCoverages>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionEquipment>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<TaskType>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<TaskInstance>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SystemEvent>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<WorkflowTemplate>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<WorkflowStep>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<HolidayCalendar>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<UserDelegation>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<EscalationRule>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()
