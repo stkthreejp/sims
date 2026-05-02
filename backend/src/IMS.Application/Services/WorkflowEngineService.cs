@@ -140,6 +140,67 @@ public class WorkflowEngineService : IWorkflowEngineService
         await Db.SaveChangesAsync();
     }
 
+    public async Task FireStepCompletedAsync(
+        Guid completedStepId,
+        TaskEntityType entityType,
+        Guid entityId,
+        Dictionary<string, object> context)
+    {
+        var dependentSteps = await Db.Set<WorkflowStep>()
+            .Where(s => s.DependsOnStepId == completedStepId)
+            .Include(s => s.TaskType)
+            .OrderBy(s => s.StepOrder)
+            .ToListAsync();
+
+        if (dependentSteps.Count == 0)
+            return;
+
+        var dateContext = BuildDateContext(context);
+        var now = DateTime.UtcNow;
+        var newInstances = new List<TaskInstance>();
+        var auditEntries  = new List<TaskAuditEntry>();
+
+        foreach (var step in dependentSteps)
+        {
+            if (!EvaluateCondition(step.TriggerCondition, context))
+                continue;
+
+            var instance = new TaskInstance
+            {
+                TaskTypeId             = step.TaskTypeId,
+                WorkflowStepId         = step.Id,
+                EntityType             = entityType,
+                EntityId               = entityId,
+                AssignedUserId         = ResolveAssignedUser(step.TaskType.AssignedRoleTemplate, context),
+                AssignedRoleExpression = step.TaskType.AssignedRoleTemplate,
+                Status                 = TaskInstanceStatus.Open,
+                Priority               = step.TaskType.DefaultPriority,
+                DueDate                = await ResolveDueDateAsync(step.TaskType.DueDateFormula, dateContext, now),
+                CreatedAt              = now,
+                UpdatedAt              = now,
+            };
+            newInstances.Add(instance);
+            auditEntries.Add(new TaskAuditEntry
+            {
+                Action    = TaskAuditAction.Created,
+                Timestamp = now,
+                Notes     = $"Created by WorkflowEngine: dependent step of {completedStepId}",
+            });
+        }
+
+        if (newInstances.Count == 0)
+            return;
+
+        Db.Set<TaskInstance>().AddRange(newInstances);
+        await Db.SaveChangesAsync();
+
+        for (var i = 0; i < newInstances.Count; i++)
+            auditEntries[i].TaskInstanceId = newInstances[i].Id;
+
+        Db.Set<TaskAuditEntry>().AddRange(auditEntries);
+        await Db.SaveChangesAsync();
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>

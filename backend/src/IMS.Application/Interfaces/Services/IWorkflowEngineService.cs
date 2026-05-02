@@ -22,4 +22,14 @@ public interface IWorkflowEngineService
         TaskEntityType entityType,
         Guid entityId,
         Dictionary<string, object> context);
+
+    /// <summary>
+    /// Called when a TaskInstance is closed. Creates TaskInstances for all
+    /// WorkflowSteps whose DependsOnStepId equals <paramref name="completedStepId"/>.
+    /// </summary>
+    Task FireStepCompletedAsync(
+        Guid completedStepId,
+        TaskEntityType entityType,
+        Guid entityId,
+        Dictionary<string, object> context);
 }
