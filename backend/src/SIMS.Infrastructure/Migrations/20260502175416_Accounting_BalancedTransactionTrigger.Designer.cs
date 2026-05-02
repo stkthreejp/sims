@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIMS.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SIMS.Infrastructure.Data;
 namespace SIMS.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260502175416_Accounting_BalancedTransactionTrigger")]
+    partial class Accounting_BalancedTransactionTrigger
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -169,297 +172,6 @@ namespace SIMS.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("accounting_periods", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeAuditLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ChangeType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime>("EditedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EditedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<long>("FeeRuleVersionId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("FieldChanges")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FeeRuleVersionId");
-
-                    b.ToTable("fee_audit_log", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeDefinition", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("CalculationOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("FeeCategory")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("IsTaxable")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("LedgerAccountId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LedgerAccountId");
-
-                    b.HasIndex("TenantId", "Code")
-                        .IsUnique();
-
-                    b.ToTable("fee_definitions", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeePremiumBracket", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("FeeRuleVersionId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("PercentRate")
-                        .HasColumnType("numeric(9,6)");
-
-                    b.Property<decimal>("TierFrom")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<decimal?>("TierTo")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FeeRuleVersionId", "TierFrom")
-                        .IsUnique();
-
-                    b.ToTable("fee_premium_brackets", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeRuleVersion", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<bool>("ApplyAutomatically")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("CalcType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("City")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("Commissionable")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("CompanyId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateOnly?>("DisabledDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly>("EffectiveDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("ExcludeOnEndorsements")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("ExcludeTerrorism")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("ExcludeWhenNotFiling")
-                        .HasColumnType("boolean");
-
-                    b.Property<long>("FeeDefinitionId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal?>("FlatAmount")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<bool>("FullyEarned")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("FullyEarnedDays")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("InstallmentBehavior")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime?>("LastEditedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LastEditedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LicenseType")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("LineOfBusiness")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal?>("MaxAmount")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<decimal?>("MaxPercent")
-                        .HasColumnType("numeric(9,6)");
-
-                    b.Property<decimal?>("MinimumAmount")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<bool>("MultiplyByLocations")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("MultiplyByVehicles")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<int?>("OfficeId")
-                        .HasColumnType("integer");
-
-                    b.Property<long?>("PayablePayeeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("PayableRouting")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<bool>("PercentOfNet")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal?>("PercentRate")
-                        .HasColumnType("numeric(9,6)");
-
-                    b.Property<decimal?>("PremiumMaxThreshold")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<decimal?>("PremiumMinThreshold")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<string>("PremiumThresholdBasis")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int?>("ProducerId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RoundingMode")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<bool>("SendToAccounting")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("SplitByParticipation")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("StateCode")
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PayablePayeeId");
-
-                    b.HasIndex("FeeDefinitionId", "StateCode", "EffectiveDate")
-                        .HasDatabaseName("ix_fee_rule_lookup");
-
-                    b.ToTable("fee_rule_versions", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeStateTaxability", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("FeeDefinitionId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("IsTaxable")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("StateCode")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FeeDefinitionId", "StateCode")
-                        .IsUnique();
-
-                    b.ToTable("fee_state_taxability", (string)null);
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.Accounting.GlAccountMap", b =>
@@ -2769,68 +2481,6 @@ namespace SIMS.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeAuditLog", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Accounting.FeeRuleVersion", "FeeRuleVersion")
-                        .WithMany("AuditLogs")
-                        .HasForeignKey("FeeRuleVersionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("FeeRuleVersion");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeDefinition", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Accounting.LedgerAccount", "LedgerAccount")
-                        .WithMany()
-                        .HasForeignKey("LedgerAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("LedgerAccount");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeePremiumBracket", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Accounting.FeeRuleVersion", "FeeRuleVersion")
-                        .WithMany("PremiumBrackets")
-                        .HasForeignKey("FeeRuleVersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("FeeRuleVersion");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeRuleVersion", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Accounting.FeeDefinition", "FeeDefinition")
-                        .WithMany("RuleVersions")
-                        .HasForeignKey("FeeDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SIMS.Domain.Entities.Accounting.Payee", "PayablePayee")
-                        .WithMany()
-                        .HasForeignKey("PayablePayeeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("FeeDefinition");
-
-                    b.Navigation("PayablePayee");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeStateTaxability", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Accounting.FeeDefinition", "FeeDefinition")
-                        .WithMany("StateTaxabilities")
-                        .HasForeignKey("FeeDefinitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("FeeDefinition");
-                });
-
             modelBuilder.Entity("SIMS.Domain.Entities.Accounting.GlAccountMap", b =>
                 {
                     b.HasOne("SIMS.Domain.Entities.Accounting.LedgerAccount", "LedgerAccount")
@@ -3348,20 +2998,6 @@ namespace SIMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("TriggerEvent");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeDefinition", b =>
-                {
-                    b.Navigation("RuleVersions");
-
-                    b.Navigation("StateTaxabilities");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.FeeRuleVersion", b =>
-                {
-                    b.Navigation("AuditLogs");
-
-                    b.Navigation("PremiumBrackets");
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.Accounting.JournalEntryRollup", b =>

@@ -1,4 +1,5 @@
 using SIMS.Domain.Entities;
+using SIMS.Domain.Entities.Accounting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +48,19 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<UserDelegation> UserDelegations => Set<UserDelegation>();
     public DbSet<EscalationRule> EscalationRules => Set<EscalationRule>();
     public DbSet<TaskAuditEntry> TaskAuditEntries => Set<TaskAuditEntry>();
+
+    // Accounting
+    public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
+    public DbSet<LedgerTransaction> LedgerTransactions => Set<LedgerTransaction>();
+    public DbSet<GlAccountMap> GlAccountMaps => Set<GlAccountMap>();
+    public DbSet<Payee> Payees => Set<Payee>();
+    public DbSet<JournalEntryRollup> JournalEntryRollups => Set<JournalEntryRollup>();
+    public DbSet<AccountingPeriod> AccountingPeriods => Set<AccountingPeriod>();
+    public DbSet<FeeDefinition> FeeDefinitions => Set<FeeDefinition>();
+    public DbSet<FeeRuleVersion> FeeRuleVersions => Set<FeeRuleVersion>();
+    public DbSet<FeeStateTaxability> FeeStateTaxabilities => Set<FeeStateTaxability>();
+    public DbSet<FeePremiumBracket> FeePremiumBrackets => Set<FeePremiumBracket>();
+    public DbSet<FeeAuditLog> FeeAuditLogs => Set<FeeAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -113,6 +127,13 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
 
     private void UpdateTimestamps()
     {
+        foreach (var entry in ChangeTracker.Entries<LedgerTransaction>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+                throw new InvalidOperationException(
+                    "LedgerTransaction rows are immutable. Use a reversing entry.");
+        }
+
         var entries = ChangeTracker.Entries<BaseEntity>()
             .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified);
 

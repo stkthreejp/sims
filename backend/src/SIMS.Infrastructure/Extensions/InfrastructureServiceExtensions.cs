@@ -62,6 +62,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ISystemEventService, SystemEventService>();
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
         services.AddScoped<IEscalationRuleService, EscalationRuleService>();
+        services.AddScoped<IFeeCalculationService, FeeCalculationService>();
+        services.AddScoped<IFeeAdminService, FeeAdminService>();
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
