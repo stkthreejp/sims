@@ -13,6 +13,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(e => e.InvoiceNumber).HasMaxLength(50).IsRequired();
         builder.Property(e => e.Status).HasMaxLength(20).IsRequired();
         builder.Property(e => e.GrossPremium).HasColumnType("numeric(19,4)");
+        builder.Property(e => e.CommissionAmount).HasColumnType("numeric(19,4)").HasDefaultValue(0m);
         builder.Property(e => e.TotalFees).HasColumnType("numeric(19,4)");
         builder.Property(e => e.TotalAmount).HasColumnType("numeric(19,4)");
         builder.Property(e => e.ClearedAmount).HasColumnType("numeric(19,4)").HasDefaultValue(0m);

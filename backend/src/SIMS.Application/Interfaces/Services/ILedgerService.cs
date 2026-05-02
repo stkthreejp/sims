@@ -6,7 +6,7 @@ public interface ILedgerService
 {
     Task<Guid> PostInvoiceAsync(
         Invoice invoice, int arAccountId, int carrierApAccountId,
-        Guid userId, CancellationToken ct = default);
+        int commissionAccountId, Guid userId, CancellationToken ct = default);
 
     Task<Guid> PostReceiptAsync(
         Receipt receipt, int trustAccountId, int unappliedCashAccountId,

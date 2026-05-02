@@ -9,6 +9,7 @@ public class Invoice
     public DateOnly EffectiveDate { get; set; }
     public DateOnly InvoiceDate { get; set; }
     public decimal GrossPremium { get; set; }
+    public decimal CommissionAmount { get; set; } = 0;
     public decimal TotalFees { get; set; }
     public decimal TotalAmount { get; set; }
     public Guid LedgerTransactionId { get; set; }

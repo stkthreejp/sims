@@ -13,14 +13,17 @@ public class InvoicingService : IInvoicingService
     private readonly IServiceProvider _sp;
     private readonly IFeeCalculationService _feeCalc;
     private readonly ILedgerService _ledger;
+    private readonly ICarrierCommissionService _commissions;
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
-    public InvoicingService(IServiceProvider sp, IFeeCalculationService feeCalc, ILedgerService ledger)
+    public InvoicingService(IServiceProvider sp, IFeeCalculationService feeCalc,
+        ILedgerService ledger, ICarrierCommissionService commissions)
     {
         _sp = sp;
         _feeCalc = feeCalc;
         _ledger = ledger;
+        _commissions = commissions;
     }
 
     public async Task<Result<InvoiceDetailDto>> BindAsync(
@@ -40,12 +43,45 @@ public class InvoicingService : IInvoicingService
             .FirstOrDefaultAsync(a => a.InternalCode == "1200" && a.TenantId == 1, ct);
         var carrierApAccount = await db.Set<LedgerAccount>()
             .FirstOrDefaultAsync(a => a.InternalCode == "2100" && a.TenantId == 1, ct);
+        var commissionAccount = await db.Set<LedgerAccount>()
+            .FirstOrDefaultAsync(a => a.InternalCode == "4100" && a.TenantId == 1, ct);
 
-        if (arAccount == null || carrierApAccount == null)
+        if (arAccount == null || carrierApAccount == null || commissionAccount == null)
             return Result<InvoiceDetailDto>.Failure("MISSING_GL_ACCOUNTS",
-                "Required GL accounts (1200 AR, 2100 Carrier AP) not found");
+                "Required GL accounts (1200 AR, 2100 Carrier AP, 4100 Commission) not found");
 
+        // Resolve carrier before building invoice so commission can be computed
+        Guid? carrierId = null;
+        string payeeName = "Carrier";
+
+        if (req.PolicyTransactionId.HasValue)
+        {
+            var resolvedCarrierId = await db.Set<PolicyTransaction>()
+                .Where(pt => pt.Id == req.PolicyTransactionId.Value)
+                .Select(pt => (Guid?)pt.Quote.CarrierId)
+                .FirstOrDefaultAsync(ct);
+
+            if (resolvedCarrierId.HasValue)
+            {
+                carrierId = resolvedCarrierId;
+                var name = await db.Set<Carrier>()
+                    .Where(c => c.Id == resolvedCarrierId.Value)
+                    .Select(c => c.Name)
+                    .FirstOrDefaultAsync(ct);
+                if (name != null) payeeName = name;
+            }
+        }
+
+        // Look up commission rate for this carrier + LOB
         var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        decimal commissionAmount = 0;
+        if (carrierId.HasValue && req.GrossPremium > 0)
+        {
+            var rate = await _commissions.GetActiveRateAsync(carrierId.Value, req.LineOfBusiness, invoiceDate, ct);
+            if (rate.HasValue)
+                commissionAmount = Math.Round(req.GrossPremium * rate.Value, 4);
+        }
+
         var seq = await db.Set<Invoice>()
             .CountAsync(i => i.TenantId == 1 && i.InvoiceDate.Year == invoiceDate.Year, ct) + 1;
         var invoiceNumber = $"INV-{invoiceDate.Year}-{seq:D5}";
@@ -60,6 +96,7 @@ public class InvoicingService : IInvoicingService
             EffectiveDate = req.EffectiveDate,
             InvoiceDate = invoiceDate,
             GrossPremium = req.GrossPremium,
+            CommissionAmount = commissionAmount,
             TotalFees = totalFees,
             TotalAmount = totalAmount,
             Status = "Posted",
@@ -83,35 +120,14 @@ public class InvoicingService : IInvoicingService
         await db.SaveChangesAsync(ct);
 
         var txnId = await _ledger.PostInvoiceAsync(
-            invoice, arAccount.Id, carrierApAccount.Id, userId, ct);
+            invoice, arAccount.Id, carrierApAccount.Id, commissionAccount.Id, userId, ct);
 
         invoice.LedgerTransactionId = txnId;
         await db.SaveChangesAsync(ct);
 
-        // Create carrier payable for the gross premium
+        // Carrier payable is net of commission (SMM retains commission before remitting)
         if (invoice.GrossPremium > 0)
         {
-            Guid? carrierId = null;
-            string payeeName = "Carrier";
-
-            if (invoice.PolicyTransactionId.HasValue)
-            {
-                var resolvedCarrierId = await db.Set<PolicyTransaction>()
-                    .Where(pt => pt.Id == invoice.PolicyTransactionId.Value)
-                    .Select(pt => (Guid?)pt.Quote.CarrierId)
-                    .FirstOrDefaultAsync(ct);
-
-                if (resolvedCarrierId.HasValue)
-                {
-                    carrierId = resolvedCarrierId;
-                    var name = await db.Set<Carrier>()
-                        .Where(c => c.Id == resolvedCarrierId.Value)
-                        .Select(c => c.Name)
-                        .FirstOrDefaultAsync(ct);
-                    if (name != null) payeeName = name;
-                }
-            }
-
             db.Set<Payable>().Add(new Payable
             {
                 TenantId = 1,
@@ -119,7 +135,7 @@ public class InvoicingService : IInvoicingService
                 CarrierId = carrierId,
                 PayeeName = payeeName,
                 GlAccountId = carrierApAccount.Id,
-                Amount = invoice.GrossPremium,
+                Amount = invoice.GrossPremium - commissionAmount,
                 PaidAmount = 0,
                 InvoiceDate = invoice.InvoiceDate,
                 DueDate = invoice.InvoiceDate.AddDays(30),

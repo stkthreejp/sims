@@ -21,6 +21,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Carrier> Carriers => Set<Carrier>();
     public DbSet<CarrierContact> CarrierContacts => Set<CarrierContact>();
     public DbSet<CarrierLineOfBusiness> CarrierLinesOfBusiness => Set<CarrierLineOfBusiness>();
+    public DbSet<CarrierCommission> CarrierCommissions => Set<CarrierCommission>();
     public DbSet<Insured> Insureds => Set<Insured>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<Quote> Quotes => Set<Quote>();

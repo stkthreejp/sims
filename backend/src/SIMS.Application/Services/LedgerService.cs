@@ -13,7 +13,7 @@ public class LedgerService : ILedgerService
 
     public async Task<Guid> PostInvoiceAsync(
         Invoice invoice, int arAccountId, int carrierApAccountId,
-        Guid userId, CancellationToken ct = default)
+        int commissionAccountId, Guid userId, CancellationToken ct = default)
     {
         var db = Db;
         var txnId = Guid.NewGuid();
@@ -29,13 +29,26 @@ public class LedgerService : ILedgerService
             Memo = $"Invoice {invoice.InvoiceNumber}", CreatedBy = userId, PostedAt = now
         });
 
+        // Carrier AP is net of commission (SMM retains commission before remitting)
+        var carrierApAmount = invoice.GrossPremium - invoice.CommissionAmount;
         rows.Add(new LedgerTransaction
         {
             TransactionId = txnId, EffectiveDate = invoice.EffectiveDate,
-            AccountId = carrierApAccountId, Debit = 0, Credit = invoice.GrossPremium,
+            AccountId = carrierApAccountId, Debit = 0, Credit = carrierApAmount,
             SourceType = "Invoice", SourceId = invoice.Id,
-            Memo = $"Gross premium — {invoice.InvoiceNumber}", CreatedBy = userId, PostedAt = now
+            Memo = $"Gross premium (net of commission) — {invoice.InvoiceNumber}", CreatedBy = userId, PostedAt = now
         });
+
+        if (invoice.CommissionAmount > 0)
+        {
+            rows.Add(new LedgerTransaction
+            {
+                TransactionId = txnId, EffectiveDate = invoice.EffectiveDate,
+                AccountId = commissionAccountId, Debit = 0, Credit = invoice.CommissionAmount,
+                SourceType = "Invoice", SourceId = invoice.Id,
+                Memo = $"Commission revenue — {invoice.InvoiceNumber}", CreatedBy = userId, PostedAt = now
+            });
+        }
 
         foreach (var line in invoice.Lines)
         {

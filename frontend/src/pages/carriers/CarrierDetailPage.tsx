@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, Phone, Mail,
-  Star, UserCircle, Globe, MapPin,
+  Star, UserCircle, Globe, MapPin, Percent, BanknoteIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
@@ -15,6 +15,12 @@ import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
+import {
+  getCarrierCommissions,
+  createCarrierCommission,
+  disableCarrierCommission,
+} from '@/api/carrierCommissions.api'
+import type { CarrierCommission } from '@/types/carrierCommission.types'
 
 // ─── Contact form ──────────────────────────────────────────────────────────────
 
@@ -162,10 +168,44 @@ export function CarrierDetailPage() {
   const [editingContactId, setEditingContactId] = useState<string | null>(null)
   const [editContactForm, setEditContactForm] = useState<ContactFormData>(emptyContactForm())
 
+  const [showAddCommission, setShowAddCommission] = useState(false)
+  const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '' as string, commissionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+  const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
+
   const { data: carrier, isLoading } = useQuery({
     queryKey: ['carriers', id],
     queryFn: () => carriersApi.getById(id!),
     enabled: !!id,
+  })
+
+  const { data: commissions = [] } = useQuery({
+    queryKey: ['carrier-commissions', id],
+    queryFn: () => getCarrierCommissions(id!),
+    enabled: !!id,
+  })
+
+  const addCommissionMutation = useMutation({
+    mutationFn: () => createCarrierCommission(id!, {
+      lineOfBusiness: commissionForm.lineOfBusiness || null,
+      commissionRate: parseFloat(commissionForm.commissionRate) / 100,
+      effectiveDate: commissionForm.effectiveDate,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carrier-commissions', id] })
+      setShowAddCommission(false)
+      setCommissionForm({ lineOfBusiness: '', commissionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+      toast.success('Commission rate added')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const disableCommissionMutation = useMutation({
+    mutationFn: (commissionId: number) => disableCarrierCommission(id!, commissionId, { disabledDate: null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carrier-commissions', id] })
+      toast.success('Commission rate disabled')
+    },
+    onError: (err: Error) => toast.error(err.message),
   })
 
   // ─── Info mutations ──────────────────────────────────────────────────────────
@@ -431,6 +471,198 @@ export function CarrierDetailPage() {
       {/* Documents */}
       <div className="bg-white border rounded-lg p-5">
         <DocumentsSection entityType="Carrier" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
+      </div>
+
+      {/* Commission Schedules */}
+      <div className="bg-white border rounded-lg p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <Percent className="h-4 w-4 text-slate-400" />
+            Commission Schedules
+          </h2>
+          {!showAddCommission && (
+            <button
+              onClick={() => setShowAddCommission(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Rate
+            </button>
+          )}
+        </div>
+
+        {/* Add commission form */}
+        {showAddCommission && (
+          <div className="bg-slate-50 border rounded-lg p-4 space-y-3">
+            <p className="text-sm font-medium text-slate-700">New Commission Rate</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
+                <select
+                  value={commissionForm.lineOfBusiness}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value })}
+                  className="w-full border rounded px-2 py-1.5 text-sm bg-white"
+                >
+                  <option value="">All Lines (default)</option>
+                  {ALL_LOBS.map((lob) => (
+                    <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Commission Rate %</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={commissionForm.commissionRate}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, commissionRate: e.target.value })}
+                    placeholder="e.g. 12.5"
+                    className="w-full border rounded px-2 py-1.5 text-sm pr-6"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
+                <input
+                  type="date"
+                  value={commissionForm.effectiveDate}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, effectiveDate: e.target.value })}
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const rate = parseFloat(commissionForm.commissionRate)
+                  if (isNaN(rate) || rate < 0 || rate > 100) { toast.error('Enter a valid rate between 0 and 100'); return }
+                  if (!commissionForm.effectiveDate) { toast.error('Effective date is required'); return }
+                  addCommissionMutation.mutate()
+                }}
+                disabled={addCommissionMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" /> Save
+              </button>
+              <button
+                onClick={() => setShowAddCommission(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+              >
+                <X className="h-3.5 w-3.5" /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Commission table grouped by LOB */}
+        {commissions.length === 0 && !showAddCommission ? (
+          <div className="text-center py-6 border border-dashed rounded-lg">
+            <BanknoteIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No commission rates configured.</p>
+            <button onClick={() => setShowAddCommission(true)} className="mt-2 text-sm text-blue-600 hover:underline">
+              Add the first rate
+            </button>
+          </div>
+        ) : (
+          (() => {
+            // Group by LOB (null → "All Lines")
+            const grouped = commissions.reduce<Record<string, CarrierCommission[]>>((acc, c) => {
+              const key = c.lineOfBusiness ?? '__all__'
+              if (!acc[key]) acc[key] = []
+              acc[key].push(c)
+              return acc
+            }, {})
+
+            const sortedKeys = Object.keys(grouped).sort((a, b) => {
+              if (a === '__all__') return 1
+              if (b === '__all__') return -1
+              return (LOB_LABELS[a as PolicyLineOfBusiness] ?? a).localeCompare(LOB_LABELS[b as PolicyLineOfBusiness] ?? b)
+            })
+
+            return (
+              <div className="border rounded-lg overflow-hidden divide-y">
+                {sortedKeys.map((key) => {
+                  const rows = grouped[key]
+                  const activeRow = rows.find((r) => r.isActive)
+                  const lobLabel = key === '__all__' ? 'All Lines (default)' : (LOB_LABELS[key as PolicyLineOfBusiness] ?? key)
+                  const isExpanded = expandedLobs.has(key)
+
+                  return (
+                    <div key={key}>
+                      <div
+                        className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 cursor-pointer"
+                        onClick={() => setExpandedLobs((prev) => { const next = new Set(prev); isExpanded ? next.delete(key) : next.add(key); return next })}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-slate-800">{lobLabel}</span>
+                          {activeRow ? (
+                            <span className="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-2 py-0.5">
+                              {(activeRow.commissionRate * 100).toFixed(2)}%
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">no active rate</span>
+                          )}
+                          {activeRow && (
+                            <span className="text-xs text-slate-400">eff. {activeRow.effectiveDate}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">{rows.length} version{rows.length !== 1 ? 's' : ''}</span>
+                          <span className="text-xs text-slate-400">{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="bg-slate-50 border-t">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-left text-slate-500 border-b">
+                                <th className="px-4 py-2 font-medium">Rate</th>
+                                <th className="px-4 py-2 font-medium">Effective</th>
+                                <th className="px-4 py-2 font-medium">Disabled</th>
+                                <th className="px-4 py-2 font-medium">Status</th>
+                                <th className="px-4 py-2" />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {rows.map((r) => (
+                                <tr key={r.id} className="hover:bg-white">
+                                  <td className="px-4 py-2 font-semibold text-slate-800">{(r.commissionRate * 100).toFixed(2)}%</td>
+                                  <td className="px-4 py-2 text-slate-600">{r.effectiveDate}</td>
+                                  <td className="px-4 py-2 text-slate-500">{r.disabledDate ?? '—'}</td>
+                                  <td className="px-4 py-2">
+                                    {r.isActive ? (
+                                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">Active</span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">Disabled</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-right">
+                                    {r.isActive && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); if (confirm('Disable this commission rate?')) disableCommissionMutation.mutate(r.id) }}
+                                        className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                                      >
+                                        Disable
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()
+        )}
       </div>
 
       {/* Contacts section */}
