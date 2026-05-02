@@ -61,6 +61,7 @@ public static class InfrastructureServiceExtensions
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
+        services.AddHostedService<TaskEscalationWorker>();
 
         return services;
     }
