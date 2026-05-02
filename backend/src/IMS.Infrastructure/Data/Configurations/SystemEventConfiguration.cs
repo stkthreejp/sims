@@ -12,7 +12,6 @@ public class SystemEventConfiguration : IEntityTypeConfiguration<SystemEvent>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.EventName).IsRequired().HasMaxLength(200);
         builder.Property(e => e.Description).HasMaxLength(1000);
-
         builder.HasIndex(e => e.EventName).IsUnique();
     }
 }

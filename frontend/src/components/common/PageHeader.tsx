@@ -1,17 +1,27 @@
 interface PageHeaderProps {
   title: string
+  subtitle?: string
   description?: string
+  action?: React.ReactNode
   actions?: React.ReactNode
 }
 
-export function PageHeader({ title, description, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, description, action, actions }: PageHeaderProps) {
+  const sub = subtitle ?? description
+  const right = action ?? actions
   return (
-    <div className="flex items-start justify-between mb-6">
+    <div className="flex items-start justify-between" style={{ marginBottom: 18 }}>
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
-        {description && <p className="text-sm text-slate-500 mt-0.5">{description}</p>}
+        <h1 style={{ margin: 0, fontSize: 'var(--fs-xl)', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
+          {title}
+        </h1>
+        {sub && (
+          <p style={{ margin: '3px 0 0', fontSize: 'var(--fs-body)', color: 'var(--ink-3)' }}>
+            {sub}
+          </p>
+        )}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {right && <div className="flex items-center gap-2">{right}</div>}
     </div>
   )
 }

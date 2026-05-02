@@ -11,10 +11,15 @@ namespace IMS.Application.Services;
 public class SubmissionService : ISubmissionService
 {
     private readonly IServiceProvider _sp;
+    private readonly IWorkflowEngineService _workflowEngine;
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
 
-    public SubmissionService(IServiceProvider sp) => _sp = sp;
+    public SubmissionService(IServiceProvider sp, IWorkflowEngineService workflowEngine)
+    {
+        _sp = sp;
+        _workflowEngine = workflowEngine;
+    }
 
     public async Task<PagedResult<SubmissionListItemDto>> GetAllAsync(QueryParameters query)
     {
@@ -107,6 +112,12 @@ public class SubmissionService : ISubmissionService
         await Db.Entry(submission).Reference(s => s.Agent).LoadAsync();
         await Db.Entry(submission).Reference(s => s.Underwriter).LoadAsync();
 
+        await _workflowEngine.FireEventAsync(
+            "submission.created",
+            TaskEntityType.Submission,
+            submission.Id,
+            BuildSubmissionContext(submission));
+
         return Result<SubmissionDto>.Success(MapToDto(submission));
     }
 
@@ -122,6 +133,8 @@ public class SubmissionService : ISubmissionService
 
         if (submission == null) return Result<SubmissionDto>.Failure("NOT_FOUND", "Submission not found.");
 
+        var previousStatus = submission.Status;
+
         submission.AgentId = dto.AgentId;
         submission.UnderwriterId = dto.UnderwriterId;
         submission.AssistantUWId = dto.AssistantUWId;
@@ -136,6 +149,49 @@ public class SubmissionService : ISubmissionService
         await Db.Entry(submission).Reference(s => s.Agent).LoadAsync();
         await Db.Entry(submission).Reference(s => s.Underwriter).LoadAsync();
         await Db.Entry(submission).Reference(s => s.AssistantUW).LoadAsync();
+
+        // Fire workflow event on status transitions
+        if (dto.Status != previousStatus)
+        {
+            var eventName = dto.Status switch
+            {
+                SubmissionStatus.InProgress => "submission.status.inprogress",
+                SubmissionStatus.Quoted     => "submission.status.quoted",
+                SubmissionStatus.Bound      => "submission.status.bound",
+                SubmissionStatus.Declined   => "submission.status.declined",
+                SubmissionStatus.Withdrawn  => "submission.status.withdrawn",
+                _                           => null
+            };
+
+            if (eventName != null)
+                await _workflowEngine.FireEventAsync(
+                    eventName,
+                    TaskEntityType.Submission,
+                    submission.Id,
+                    BuildSubmissionContext(submission));
+        }
+
+        return Result<SubmissionDto>.Success(MapToDto(submission));
+    }
+
+    public async Task<Result<SubmissionDto>> SetLinesOfBusinessAsync(Guid id, List<string> lobs)
+    {
+        var submission = await Db.Set<Submission>()
+            .Include(s => s.Insured)
+            .Include(s => s.Agent)
+            .Include(s => s.Underwriter)
+            .Include(s => s.AssistantUW)
+            .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
+            .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+
+        if (submission == null)
+            return Result<SubmissionDto>.Failure("NOT_FOUND", "Submission not found.");
+
+        submission.LinesOfBusiness = lobs.Count > 0
+            ? JsonSerializer.Serialize(lobs.Distinct().ToList())
+            : null;
+        submission.UpdatedAt = DateTime.UtcNow;
+        await Db.SaveChangesAsync();
 
         return Result<SubmissionDto>.Success(MapToDto(submission));
     }
@@ -154,6 +210,20 @@ public class SubmissionService : ISubmissionService
         submission.DeletedAt = DateTime.UtcNow;
         await Db.SaveChangesAsync();
         return Result.Success();
+    }
+
+    private static Dictionary<string, object> BuildSubmissionContext(Submission s)
+    {
+        var ctx = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["UnderwriterId"] = s.UnderwriterId,
+            ["Status"]        = s.Status.ToString(),
+        };
+        if (s.AssistantUWId.HasValue) ctx["AssistantUWId"] = s.AssistantUWId.Value;
+        if (s.AgentId.HasValue)       ctx["AgentId"]       = s.AgentId.Value;
+        if (s.EffectiveDate.HasValue)  ctx["EffectiveDate"] = s.EffectiveDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        if (s.ExpirationDate.HasValue) ctx["ExpirationDate"] = s.ExpirationDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        return ctx;
     }
 
     private async Task<string> GenerateSubmissionNumberAsync()
@@ -196,9 +266,10 @@ public class SubmissionService : ISubmissionService
         EffectiveDate = s.EffectiveDate,
         ExpirationDate = s.ExpirationDate,
         Status = s.Status,
-        LinesOfBusiness = s.LinesOfBusiness != null
-            ? JsonSerializer.Deserialize<List<string>>(s.LinesOfBusiness) ?? []
-            : [],
+        DescriptionOfOperations = s.DescriptionOfOperations,
+        LinesOfBusiness = string.IsNullOrWhiteSpace(s.LinesOfBusiness)
+            ? []
+            : JsonSerializer.Deserialize<List<string>>(s.LinesOfBusiness) ?? [],
         QuoteCount = s.Quotes?.Count ?? 0,
         CreatedAt = s.CreatedAt
     };

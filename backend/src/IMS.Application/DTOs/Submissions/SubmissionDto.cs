@@ -19,6 +19,7 @@ public class SubmissionDto
     public DateOnly? ExpirationDate { get; set; }
     public SubmissionStatus Status { get; set; }
     public string? DescriptionOfOperations { get; set; }
+    /// <summary>Detected/manually-set lines of business for this submission (e.g. ["CommercialAuto","GeneralLiability"]).</summary>
     public List<string> LinesOfBusiness { get; set; } = [];
     public int QuoteCount { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -95,11 +95,22 @@ public class GeminiExtractionService : IGeminiExtractionService
 
                     if (detectedLobs.Count == 0)
                     {
-                        // Fall back to user-supplied hint or generic
-                        var fallback = !string.IsNullOrWhiteSpace(lineOfBusinessHint) ? lineOfBusinessHint : "Other";
-                        _logger.LogInformation("No LOBs detected in {FileName} — falling back to {Fallback}", attachment.FileName, fallback);
-                        var data = await ExtractWithPromptAsync(bytes, mimeType, GetPromptForLob(fallback), attachment.FileName, ct);
-                        if (data != null) Accumulate(resultsByLob, fallback, data);
+                        if (!string.IsNullOrWhiteSpace(lineOfBusinessHint))
+                        {
+                            // User told us the LOB — use the targeted prompt
+                            _logger.LogInformation("No LOBs detected in {FileName} — using hint {Hint}", attachment.FileName, lineOfBusinessHint);
+                            var data = await ExtractWithPromptAsync(bytes, mimeType, GetPromptForLob(lineOfBusinessHint), attachment.FileName, ct);
+                            if (data != null) Accumulate(resultsByLob, lineOfBusinessHint, data);
+                        }
+                        else
+                        {
+                            // No hint and no detection — run generic extraction but signal the caller
+                            // by using an empty string as the LOB key so InboundEmailService can set
+                            // extractionStatus = "DetectionFailed" and prompt the user.
+                            _logger.LogInformation("No LOBs detected in {FileName} and no hint — using generic prompt (detection failed)", attachment.FileName);
+                            var data = await ExtractWithPromptAsync(bytes, mimeType, GenericPrompt, attachment.FileName, ct);
+                            if (data != null) Accumulate(resultsByLob, "", data);
+                        }
                     }
                     else
                     {

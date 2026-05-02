@@ -10,10 +10,15 @@ namespace IMS.Application.Services;
 public class QuoteService : IQuoteService
 {
     private readonly IServiceProvider _sp;
+    private readonly IWorkflowEngineService _workflowEngine;
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
 
-    public QuoteService(IServiceProvider sp) => _sp = sp;
+    public QuoteService(IServiceProvider sp, IWorkflowEngineService workflowEngine)
+    {
+        _sp = sp;
+        _workflowEngine = workflowEngine;
+    }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query)
     {
@@ -167,6 +172,12 @@ public class QuoteService : IQuoteService
         await Db.Entry(quote).Reference(qt => qt.Submission).LoadAsync();
         await Db.Entry(quote).Reference(qt => qt.Carrier).LoadAsync();
 
+        await _workflowEngine.FireEventAsync(
+            "quote.created",
+            TaskEntityType.Policy,
+            quote.Id,
+            BuildQuoteContext(quote));
+
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
 
@@ -179,6 +190,8 @@ public class QuoteService : IQuoteService
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot edit a bound policy.");
+
+        var previousStatus = quote.Status;
 
         quote.CarrierId = dto.CarrierId;
         quote.LineOfBusiness = dto.LineOfBusiness;
@@ -199,6 +212,26 @@ public class QuoteService : IQuoteService
 
         if (quote.CarrierId != dto.CarrierId)
             await Db.Entry(quote).Reference(qt => qt.Carrier).LoadAsync();
+
+        if (dto.Status != previousStatus)
+        {
+            var eventName = dto.Status switch
+            {
+                QuoteStatus.Submitted => "quote.status.submitted",
+                QuoteStatus.Quoted    => "quote.status.quoted",
+                QuoteStatus.Declined  => "quote.status.declined",
+                QuoteStatus.Cancelled => "quote.status.cancelled",
+                QuoteStatus.Expired   => "quote.status.expired",
+                _                     => null
+            };
+
+            if (eventName != null)
+                await _workflowEngine.FireEventAsync(
+                    eventName,
+                    TaskEntityType.Policy,
+                    quote.Id,
+                    BuildQuoteContext(quote));
+        }
 
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
@@ -230,6 +263,13 @@ public class QuoteService : IQuoteService
             submission.Status = SubmissionStatus.Bound;
 
         await Db.SaveChangesAsync();
+
+        await _workflowEngine.FireEventAsync(
+            "quote.status.bound",
+            TaskEntityType.Policy,
+            quote.Id,
+            BuildQuoteContext(quote));
+
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
 
@@ -244,6 +284,27 @@ public class QuoteService : IQuoteService
         quote.DeletedAt = DateTime.UtcNow;
         await Db.SaveChangesAsync();
         return Result.Success();
+    }
+
+    private static Dictionary<string, object> BuildQuoteContext(Quote qt)
+    {
+        var ctx = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Status"]       = qt.Status.ToString(),
+            ["SubmissionId"] = qt.SubmissionId,
+            ["CarrierId"]    = qt.CarrierId,
+        };
+        ctx["EffectiveDate"]  = qt.EffectiveDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        ctx["ExpirationDate"] = qt.ExpirationDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        if (qt.BoundDate.HasValue)
+            ctx["BoundDate"] = qt.BoundDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        if (qt.Submission != null)
+        {
+            ctx["UnderwriterId"] = qt.Submission.UnderwriterId;
+            if (qt.Submission.AssistantUWId.HasValue)
+                ctx["AssistantUWId"] = qt.Submission.AssistantUWId.Value;
+        }
+        return ctx;
     }
 
     private async Task<string> GenerateQuoteNumberAsync()

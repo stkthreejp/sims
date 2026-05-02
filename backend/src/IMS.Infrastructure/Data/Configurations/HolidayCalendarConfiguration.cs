@@ -11,7 +11,6 @@ public class HolidayCalendarConfiguration : IEntityTypeConfiguration<HolidayCale
         builder.ToTable("holiday_calendar");
         builder.HasKey(h => h.Id);
         builder.Property(h => h.Name).IsRequired().HasMaxLength(200);
-
         builder.HasIndex(h => h.Date).IsUnique();
     }
 }

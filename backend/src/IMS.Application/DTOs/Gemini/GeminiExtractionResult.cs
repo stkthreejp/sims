@@ -19,11 +19,20 @@ public class GeminiExtractionResult
     public ExtractedIMCoverages? IMCoverages { get; set; }
     public List<ExtractedEquipment> Equipment { get; set; } = [];
 
-    public static IEnumerable<string> InferLinesOfBusiness(GeminiExtractionResult data)
+    /// <summary>
+    /// Infers likely lines of business from the data that was actually extracted.
+    /// Used as a fallback when Gemini's detection pass returns no LOBs.
+    /// </summary>
+    public static List<string> InferLinesOfBusiness(GeminiExtractionResult data)
     {
-        if (data.Vehicles.Count > 0 || data.Drivers.Count > 0) yield return "CommercialAuto";
-        if (data.GLCoverages != null || data.GLClassifications.Count > 0) yield return "GeneralLiability";
-        if (data.IMCoverages != null || data.Equipment.Count > 0) yield return "InlandMarine";
+        var lobs = new List<string>();
+        if (data.Drivers.Count > 0 || data.Vehicles.Count > 0 || data.Supplemental != null)
+            lobs.Add("CommercialAuto");
+        if (data.GLCoverages != null || data.GLClassifications.Count > 0)
+            lobs.Add("GeneralLiability");
+        if (data.IMCoverages != null || data.Equipment.Count > 0)
+            lobs.Add("InlandMarine");
+        return lobs;
     }
 
     public static void MergeInto(GeminiExtractionResult target, GeminiExtractionResult source)

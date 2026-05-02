@@ -14,7 +14,6 @@ public class TaskAuditEntryConfiguration : IEntityTypeConfiguration<TaskAuditEnt
         builder.Property(a => a.OldValue).HasMaxLength(2000);
         builder.Property(a => a.NewValue).HasMaxLength(2000);
         builder.Property(a => a.Notes).HasMaxLength(2000);
-
         builder.HasIndex(a => a.TaskInstanceId);
         builder.HasIndex(a => a.Timestamp);
     }

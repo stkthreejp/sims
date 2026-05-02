@@ -7,6 +7,11 @@ using System.Security.Claims;
 
 namespace IMS.API.Controllers;
 
+public class SetLinesOfBusinessRequest
+{
+    public List<string> LinesOfBusiness { get; set; } = [];
+}
+
 [ApiController]
 [Route("api/v1/submissions")]
 [Authorize]
@@ -45,6 +50,13 @@ public class SubmissionsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] SubmissionUpdateDto dto)
     {
         var result = await _submissionService.UpdateAsync(id, dto);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPatch("{id:guid}/lines-of-business")]
+    public async Task<IActionResult> SetLinesOfBusiness(Guid id, [FromBody] SetLinesOfBusinessRequest request)
+    {
+        var result = await _submissionService.SetLinesOfBusinessAsync(id, request.LinesOfBusiness);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

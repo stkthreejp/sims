@@ -55,6 +55,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IGeminiExtractionService, GeminiExtractionService>();
         services.AddScoped<ITaskTypeService, TaskTypeService>();
         services.AddScoped<IDueDateFormulaService, DueDateFormulaService>();
+        services.AddScoped<IWorkflowEngineService, WorkflowEngineService>();
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
 

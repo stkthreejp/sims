@@ -7,13 +7,13 @@ import { SUBMISSION_STATUS_LABELS, type SubmissionStatus } from '@/types/submiss
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 
-const STATUS_COLORS: Record<SubmissionStatus, string> = {
-  New: 'bg-slate-100 text-slate-600',
-  InProgress: 'bg-blue-100 text-blue-700',
-  Quoted: 'bg-yellow-100 text-yellow-700',
-  Bound: 'bg-green-100 text-green-700',
-  Declined: 'bg-red-100 text-red-700',
-  Withdrawn: 'bg-slate-100 text-slate-500',
+const STATUS_PILL: Record<SubmissionStatus, { background: string; color: string }> = {
+  New:        { background: 'var(--pill-draft-bg)',    color: 'var(--pill-draft-fg)' },
+  InProgress: { background: 'var(--pill-inprog-bg)',   color: 'var(--pill-inprog-fg)' },
+  Quoted:     { background: 'var(--pill-quoted-bg)',   color: 'var(--pill-quoted-fg)' },
+  Bound:      { background: 'var(--pill-bound-bg)',    color: 'var(--pill-bound-fg)' },
+  Declined:   { background: 'var(--pill-declined-bg)', color: 'var(--pill-declined-fg)' },
+  Withdrawn:  { background: 'var(--pill-draft-bg)',    color: 'var(--pill-draft-fg)' },
 }
 
 export function SubmissionsPage() {
@@ -89,7 +89,21 @@ export function SubmissionsPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-600">{s.quoteCount}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[s.status]}`}>
+                    <span
+                      style={{
+                        ...STATUS_PILL[s.status],
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '3px 9px',
+                        borderRadius: 'var(--r-pill)',
+                        fontSize: 'var(--fs-sm)',
+                        fontWeight: 600,
+                        letterSpacing: '0.005em',
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', opacity: 0.85 }} />
                       {SUBMISSION_STATUS_LABELS[s.status]}
                     </span>
                   </td>
