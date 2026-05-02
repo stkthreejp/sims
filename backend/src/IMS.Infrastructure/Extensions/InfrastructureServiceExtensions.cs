@@ -58,6 +58,10 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IWorkflowEngineService, WorkflowEngineService>();
         services.AddScoped<ITaskInstanceService, TaskInstanceService>();
         services.AddScoped<ITaskNotificationService, TaskNotificationService>();
+        services.AddScoped<IWorkflowTemplateService, WorkflowTemplateService>();
+        services.AddScoped<ISystemEventService, SystemEventService>();
+        services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
+        services.AddScoped<IEscalationRuleService, EscalationRuleService>();
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();

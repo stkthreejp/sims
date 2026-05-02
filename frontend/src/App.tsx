@@ -26,6 +26,11 @@ import { DocumentLibraryPage } from '@/pages/documents/DocumentLibraryPage'
 import { TemplateEditorPage } from '@/pages/documents/TemplateEditorPage'
 import { InboxPage } from '@/pages/inbox/InboxPage'
 import { InboxDetailPage } from '@/pages/inbox/InboxDetailPage'
+import { TaskQueuePage } from '@/pages/tasks/TaskQueuePage'
+import { TaskTypesAdminPage } from '@/pages/admin/TaskTypesAdminPage'
+import { WorkflowsAdminPage } from '@/pages/admin/WorkflowsAdminPage'
+import { HolidayCalendarAdminPage } from '@/pages/admin/HolidayCalendarAdminPage'
+import { EscalationRulesAdminPage } from '@/pages/admin/EscalationRulesAdminPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -77,6 +82,13 @@ export default function App() {
             <Route path="/document-library" element={<DocumentLibraryPage />} />
             <Route path="/document-library/new" element={<TemplateEditorPage />} />
             <Route path="/document-library/:id" element={<TemplateEditorPage />} />
+
+            <Route path="/tasks" element={<TaskQueuePage />} />
+
+            <Route path="/admin/task-types" element={<TaskTypesAdminPage />} />
+            <Route path="/admin/workflows" element={<WorkflowsAdminPage />} />
+            <Route path="/admin/holiday-calendar" element={<HolidayCalendarAdminPage />} />
+            <Route path="/admin/escalation-rules" element={<EscalationRulesAdminPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

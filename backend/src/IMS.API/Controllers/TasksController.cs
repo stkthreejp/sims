@@ -48,4 +48,11 @@ public class TasksController : ControllerBase
         var result = await _tasks.ReassignAsync(id, dto.NewUserId, CurrentUserId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
+
+    [HttpGet("{id:guid}/audit")]
+    public async Task<IActionResult> GetAudit(Guid id)
+    {
+        var result = await _tasks.GetAuditAsync(id);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
+    }
 }

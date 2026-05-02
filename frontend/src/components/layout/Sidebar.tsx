@@ -1,83 +1,85 @@
 import { NavLink } from 'react-router-dom'
-import {
-  LayoutDashboard, Users, FileText, Building2,
-  ShieldCheck, UserCheck, LayoutTemplate, Inbox,
-} from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 
 const navItems = [
-  { to: '/dashboard',        label: 'Dashboard',   icon: LayoutDashboard },
-  { to: '/inbox',            label: 'Inbox',        icon: Inbox,          roles: ['Underwriter', 'Admin'] },
-  { to: '/submissions',      label: 'Submissions',  icon: FileText },
-  { to: '/insureds',         label: 'Insureds',     icon: Building2 },
-  { to: '/policies',         label: 'Policies',     icon: FileText },
-  { to: '/carriers',         label: 'Carriers',     icon: ShieldCheck,    adminOnly: true },
-  { to: '/agents',           label: 'Agents',       icon: UserCheck,      adminOnly: true },
-  { to: '/users',            label: 'Users',        icon: Users,          adminOnly: true },
-  { to: '/document-library', label: 'Doc Library',  icon: LayoutTemplate, adminOnly: true },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/inbox', label: 'Inbox', icon: Inbox, roles: ['Underwriter', 'Admin'] },
+  { to: '/tasks', label: 'My Tasks', icon: CheckSquare },
+  { to: '/insureds', label: 'Insureds', icon: Building2 },
+  { to: '/policies', label: 'Policies', icon: FileText },
+  { to: '/carriers', label: 'Carriers', icon: ShieldCheck, adminOnly: true },
+  { to: '/agents', label: 'Agents', icon: UserCheck, adminOnly: true },
+  { to: '/users', label: 'Users', icon: Users, adminOnly: true },
+  { to: '/document-library', label: 'Doc Library', icon: LayoutTemplate, adminOnly: true },
+]
+
+const adminTaskItems = [
+  { to: '/admin/task-types', label: 'Task Types', icon: ListChecks },
+  { to: '/admin/workflows', label: 'Workflows', icon: GitMerge },
+  { to: '/admin/holiday-calendar', label: 'Holidays', icon: Calendar },
+  { to: '/admin/escalation-rules', label: 'Escalation', icon: AlertOctagon },
 ]
 
 export function Sidebar() {
   const hasRole = useAuthStore((s) => s.hasRole)
+  const isAdmin = hasRole('Admin')
 
   return (
-    <>
-      <style>{`
-        .sims-nav-link {
-          display: flex; align-items: center; gap: 10px;
-          padding: 7px 10px; border-radius: 7px;
-          color: var(--ink-2); font-size: 13px; font-weight: 500;
-          text-decoration: none; transition: background 0.1s;
-        }
-        .sims-nav-link:hover { background: var(--hover); }
-        .sims-nav-link.active {
-          background: var(--accent-soft); color: var(--accent-ink); font-weight: 600;
-        }
-        .sims-nav-link .sims-nav-icon { color: var(--ink-3); }
-        .sims-nav-link.active .sims-nav-icon { color: var(--accent); }
-      `}</style>
+    <aside className="w-56 bg-slate-900 flex flex-col shrink-0">
+      <div className="px-4 py-4 border-b border-slate-700 flex justify-center">
+        <img src="/logo.png" alt="Specialty Market Managers" className="h-10 w-auto brightness-0 invert" />
+      </div>
 
-      <aside
-        className="flex flex-col shrink-0"
-        style={{
-          width: 'var(--sidebar-w)',
-          background: 'var(--surface)',
-          borderRight: '1px solid var(--line)',
-          padding: '16px 12px',
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-        }}
-      >
-        {/* Brand */}
-        <div
-          className="flex items-center gap-2"
-          style={{ padding: '6px 10px 18px', fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--ink)' }}
-        >
-          <span style={{ width: 26, height: 26, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <img src="/smm-symbol.png" alt="SMM" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          </span>
-          SIMS
-        </div>
+      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
+        {navItems.map(({ to, label, icon: Icon, adminOnly, roles }) => {
+          if (adminOnly && !isAdmin) return null
+          if (roles && !roles.some((r) => hasRole(r))) return null
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                )
+              }
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </NavLink>
+          )
+        })}
 
-        {/* Nav */}
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {navItems.map(({ to, label, icon: Icon, adminOnly, roles }) => {
-            if (adminOnly && !hasRole('Admin')) return null
-            if (roles && !roles.some((r) => hasRole(r))) return null
-            return (
+        {isAdmin && (
+          <>
+            <div className="px-3 pt-4 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Task Engine
+            </div>
+            {adminTaskItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
-                className={({ isActive }) => `sims-nav-link${isActive ? ' active' : ''}`}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  )
+                }
               >
-                <Icon className="sims-nav-icon" style={{ width: 15, height: 15, flexShrink: 0 }} />
+                <Icon className="h-4 w-4 shrink-0" />
                 {label}
               </NavLink>
-            )
-          })}
-        </nav>
-      </aside>
-    </>
+            ))}
+          </>
+        )}
+      </nav>
+    </aside>
   )
 }

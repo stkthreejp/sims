@@ -209,6 +209,36 @@ public class TaskInstanceService : ITaskInstanceService
         await Db.SaveChangesAsync();
     }
 
+    public async Task<Result<IEnumerable<TaskAuditEntryDto>>> GetAuditAsync(Guid id)
+    {
+        var exists = await Db.Set<TaskInstance>().AnyAsync(t => t.Id == id);
+        if (!exists) return Result<IEnumerable<TaskAuditEntryDto>>.Failure("NOT_FOUND", "Task not found.");
+
+        var entries = await Db.Set<TaskAuditEntry>()
+            .Where(a => a.TaskInstanceId == id)
+            .OrderByDescending(a => a.Timestamp)
+            .ToListAsync();
+
+        var userIds = entries.Where(a => a.UserId.HasValue).Select(a => a.UserId!.Value).Distinct().ToList();
+        var users = userIds.Count > 0
+            ? await Db.Set<User>().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.FullName)
+            : new Dictionary<Guid, string>();
+
+        var dtos = entries.Select(a => new TaskAuditEntryDto
+        {
+            Id        = a.Id,
+            UserId    = a.UserId,
+            UserName  = a.UserId.HasValue && users.TryGetValue(a.UserId.Value, out var n) ? n : null,
+            Action    = a.Action,
+            OldValue  = a.OldValue,
+            NewValue  = a.NewValue,
+            Notes     = a.Notes,
+            Timestamp = a.Timestamp,
+        });
+
+        return Result<IEnumerable<TaskAuditEntryDto>>.Success(dtos);
+    }
+
     // ── Context builder ───────────────────────────────────────────────────────
 
     private async Task<Dictionary<string, object>> BuildEntityContextAsync(TaskEntityType type, Guid entityId)

@@ -12,4 +12,5 @@ public interface ITaskInstanceService
     Task<Result<TaskInstanceDto>> UpdateStatusAsync(Guid id, TaskInstanceStatus newStatus, Guid actorUserId, string? notes);
     Task<Result<TaskInstanceDto>> ReassignAsync(Guid id, Guid newUserId, Guid actorUserId);
     Task CancelByEntityAsync(TaskEntityType type, Guid entityId);
+    Task<Result<IEnumerable<TaskAuditEntryDto>>> GetAuditAsync(Guid id);
 }
