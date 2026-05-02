@@ -1,0 +1,142 @@
+namespace SIMS.Application.DTOs.Gemini;
+
+/// <summary>Extraction result for a single line of business, as returned by GeminiExtractionService.</summary>
+public record GeminiLobExtraction(string LineOfBusiness, GeminiExtractionResult Data);
+
+public class GeminiExtractionResult
+{
+    public string? DescriptionOfOperations { get; set; }
+    public string? Dba { get; set; }
+    public string? EntityType { get; set; }
+    public int? YearsInBusiness { get; set; }
+    public List<ExtractedDriver> Drivers { get; set; } = [];
+    public List<ExtractedVehicle> Vehicles { get; set; } = [];
+    public List<ExtractedLocation> Locations { get; set; } = [];
+    public List<ExtractedPriorCarrier> PriorCarriers { get; set; } = [];
+    public ExtractedSupplemental? Supplemental { get; set; }
+    public ExtractedGLCoverages? GLCoverages { get; set; }
+    public List<ExtractedGLClassification> GLClassifications { get; set; } = [];
+    public ExtractedIMCoverages? IMCoverages { get; set; }
+    public List<ExtractedEquipment> Equipment { get; set; } = [];
+
+    /// <summary>
+    /// Infers likely lines of business from the data that was actually extracted.
+    /// Used as a fallback when Gemini's detection pass returns no LOBs.
+    /// </summary>
+    public static List<string> InferLinesOfBusiness(GeminiExtractionResult data)
+    {
+        var lobs = new List<string>();
+        if (data.Drivers.Count > 0 || data.Vehicles.Count > 0 || data.Supplemental != null)
+            lobs.Add("CommercialAuto");
+        if (data.GLCoverages != null || data.GLClassifications.Count > 0)
+            lobs.Add("GeneralLiability");
+        if (data.IMCoverages != null || data.Equipment.Count > 0)
+            lobs.Add("InlandMarine");
+        return lobs;
+    }
+
+    public static void MergeInto(GeminiExtractionResult target, GeminiExtractionResult source)
+    {
+        target.DescriptionOfOperations ??= source.DescriptionOfOperations;
+        target.Dba ??= source.Dba;
+        target.EntityType ??= source.EntityType;
+        target.YearsInBusiness ??= source.YearsInBusiness;
+        target.Drivers.AddRange(source.Drivers);
+        target.Vehicles.AddRange(source.Vehicles);
+        target.Locations.AddRange(source.Locations);
+        target.PriorCarriers.AddRange(source.PriorCarriers);
+        target.Supplemental ??= source.Supplemental;
+        target.GLCoverages ??= source.GLCoverages;
+        target.GLClassifications.AddRange(source.GLClassifications);
+        target.IMCoverages ??= source.IMCoverages;
+        target.Equipment.AddRange(source.Equipment);
+    }
+}
+
+public class ExtractedDriver
+{
+    public int? DriverNumber { get; set; }
+    public string? Name { get; set; }
+    public string? DateOfBirth { get; set; }   // YYYY-MM-DD
+    public string? LicenseNumber { get; set; }
+    public string? LicenseState { get; set; }  // 2-letter
+    public string? DateHired { get; set; }     // YYYY-MM-DD
+}
+
+public class ExtractedVehicle
+{
+    public int? UnitNumber { get; set; }
+    public int? Year { get; set; }
+    public string? Make { get; set; }
+    public string? Model { get; set; }
+    public string? Vin { get; set; }
+    public int? Gvw { get; set; }
+    public string? VehicleClass { get; set; }  // Truck | Tractor | Trailer
+    public string? GaragingZip { get; set; }
+    public string? Radius { get; set; }        // Local | Intermediate
+}
+
+public class ExtractedLocation
+{
+    public int? LocationNumber { get; set; }
+    public string? Address { get; set; }
+    public string? ZipCode { get; set; }
+}
+
+public class ExtractedPriorCarrier
+{
+    public string? LineOfBusiness { get; set; }
+    public string? CarrierName { get; set; }
+    public string? PolicyNumber { get; set; }
+    public string? ExpirationDate { get; set; } // YYYY-MM-DD
+    public decimal? Premium { get; set; }
+}
+
+public class ExtractedSupplemental
+{
+    public List<string> CommoditiesHauled { get; set; } = [];
+    public List<string> TerminalLocations { get; set; } = [];
+    public List<string> FilingsRequired { get; set; } = [];
+    public bool SafetyProgramInPlace { get; set; }
+    public bool OwnerOperator { get; set; }
+}
+
+public class ExtractedGLCoverages
+{
+    public decimal? GeneralAggregate { get; set; }
+    public decimal? ProductsCompletedOps { get; set; }
+    public decimal? EachOccurrence { get; set; }
+    public decimal? PersonalAndAdvInjury { get; set; }
+    public decimal? DamageToRentedPremises { get; set; }
+    public decimal? MedicalExpense { get; set; }
+    public decimal? TotalSubcontractorCost { get; set; }
+}
+
+public class ExtractedGLClassification
+{
+    public int? LocationNumber { get; set; }
+    public string? ClassCode { get; set; }
+    public string? Description { get; set; }
+    public string? PremiumBasis { get; set; }
+    public decimal? Exposure { get; set; }
+}
+
+public class ExtractedIMCoverages
+{
+    public decimal? ScheduledEquipmentTotalLimit { get; set; }
+    public decimal? UnscheduledEquipmentLimit { get; set; }
+    public decimal? MaximumValueAnyOneItem { get; set; }
+    public decimal? Deductible { get; set; }
+    public decimal? CoinsurancePercentage { get; set; }
+}
+
+public class ExtractedEquipment
+{
+    public int? ItemNumber { get; set; }
+    public int? Year { get; set; }
+    public string? Make { get; set; }
+    public string? Model { get; set; }
+    public string? Description { get; set; }
+    public string? SerialNumber { get; set; }
+    public decimal? Value { get; set; }
+}

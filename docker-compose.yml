@@ -19,14 +19,14 @@ services:
   api:
     build:
       context: ./backend
-      dockerfile: src/IMS.API/Dockerfile
+      dockerfile: src/SIMS.API/Dockerfile
     restart: unless-stopped
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=db;Database=ims_db;Username=ims_user;Password=${POSTGRES_PASSWORD}
       - Jwt__Key=${JWT_SECRET_KEY}
-      - Jwt__Issuer=IMS-API
-      - Jwt__Audience=IMS-Client
+      - Jwt__Issuer=SIMS-API
+      - Jwt__Audience=SIMS-Client
       - Jwt__AccessTokenExpiryMinutes=15
       - Jwt__RefreshTokenExpiryDays=7
       - Storage__AttachmentsPath=/app/attachments

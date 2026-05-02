@@ -1,4 +1,4 @@
-# IMS — Insurance Management System
+# SIMS — SMM Insurance Management System
 
 ## Stack
 - **Backend:** ASP.NET Core 8, Entity Framework Core, PostgreSQL, Azure Blob Storage
@@ -9,12 +9,12 @@
 
 ## Project layout
 ```
-IMS/
+SIMS/
 ├── backend/src/
-│   ├── IMS.API/          # ASP.NET Web API entry point
-│   ├── IMS.Application/  # Business logic / CQRS
-│   ├── IMS.Infrastructure/ # EF Core, migrations, blob storage
-│   └── IMS.Domain/       # Entities, value objects
+│   ├── SIMS.API/          # ASP.NET Web API entry point
+│   ├── SIMS.Application/  # Business logic / CQRS
+│   ├── SIMS.Infrastructure/ # EF Core, migrations, blob storage
+│   └── SIMS.Domain/       # Entities, value objects
 ├── frontend/src/
 │   ├── pages/            # React pages
 │   └── components/       # Shared components
@@ -26,8 +26,8 @@ IMS/
 ```bash
 # Backend
 cd backend && dotnet build
-~/.dotnet/tools/dotnet-ef migrations add <Name> --project src/IMS.Infrastructure --startup-project src/IMS.API
-~/.dotnet/tools/dotnet-ef database update --project src/IMS.Infrastructure --startup-project src/IMS.API
+~/.dotnet/tools/dotnet-ef migrations add <Name> --project src/SIMS.Infrastructure --startup-project src/SIMS.API
+~/.dotnet/tools/dotnet-ef database update --project src/SIMS.Infrastructure --startup-project src/SIMS.API
 
 # Frontend
 cd frontend && npm run dev
@@ -39,5 +39,5 @@ This is a solo developer project. **Commit directly to `main`** — do not creat
 
 ## Dev server startup
 Use the backend_ms.log and frontend_ms.log files in the root to check server status.
-Backend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\IMS\backend_ms.log' -Tail 20"`
-Frontend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\IMS\frontend_ms.log' -Tail 15"`
+Backend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\backend_ms.log' -Tail 20"`
+Frontend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\frontend_ms.log' -Tail 15"`

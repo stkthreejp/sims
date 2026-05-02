@@ -8,9 +8,9 @@ backend/tests/*/obj/
 .vs/
 
 # Secrets — never commit real config
-backend/src/IMS.API/appsettings.json
-backend/src/IMS.API/appsettings.Production.json
-backend/src/IMS.API/appsettings.Development.json
+backend/src/SIMS.API/appsettings.json
+backend/src/SIMS.API/appsettings.Production.json
+backend/src/SIMS.API/appsettings.Development.json
 
 # Node / Frontend
 frontend/node_modules/
