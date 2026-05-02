@@ -57,8 +57,10 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IDueDateFormulaService, DueDateFormulaService>();
         services.AddScoped<IWorkflowEngineService, WorkflowEngineService>();
         services.AddScoped<ITaskInstanceService, TaskInstanceService>();
+        services.AddScoped<ITaskNotificationService, TaskNotificationService>();
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
+        services.AddHostedService<TaskNotificationWorker>();
 
         return services;
     }
