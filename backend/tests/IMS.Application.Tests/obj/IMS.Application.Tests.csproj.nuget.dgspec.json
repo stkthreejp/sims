@@ -1,0 +1,286 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\tests\\IMS.Application.Tests\\IMS.Application.Tests.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Application\\IMS.Application.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Application\\IMS.Application.csproj",
+        "projectName": "IMS.Application",
+        "projectPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Application\\IMS.Application.csproj",
+        "packagesPath": "C:\\Users\\JeremiahPODonovan\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Application\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\JeremiahPODonovan\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Domain\\IMS.Domain.csproj": {
+                "projectPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Domain\\IMS.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "FluentValidation": {
+              "target": "Package",
+              "version": "[11.11.0, )"
+            },
+            "FluentValidation.DependencyInjectionExtensions": {
+              "target": "Package",
+              "version": "[11.11.0, )"
+            },
+            "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Microsoft.IdentityModel.Protocols.OpenIdConnect": {
+              "target": "Package",
+              "version": "[8.4.0, )"
+            },
+            "Microsoft.IdentityModel.Tokens": {
+              "target": "Package",
+              "version": "[8.4.0, )"
+            },
+            "System.IdentityModel.Tokens.Jwt": {
+              "target": "Package",
+              "version": "[8.4.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Domain\\IMS.Domain.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Domain\\IMS.Domain.csproj",
+        "projectName": "IMS.Domain",
+        "projectPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Domain\\IMS.Domain.csproj",
+        "packagesPath": "C:\\Users\\JeremiahPODonovan\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Domain\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\JeremiahPODonovan\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\tests\\IMS.Application.Tests\\IMS.Application.Tests.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\tests\\IMS.Application.Tests\\IMS.Application.Tests.csproj",
+        "projectName": "IMS.Application.Tests",
+        "projectPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\tests\\IMS.Application.Tests\\IMS.Application.Tests.csproj",
+        "packagesPath": "C:\\Users\\JeremiahPODonovan\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\tests\\IMS.Application.Tests\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\JeremiahPODonovan\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Application\\IMS.Application.csproj": {
+                "projectPath": "C:\\Users\\JeremiahPODonovan\\IMS\\.claude\\worktrees\\great-banzai-3b17f2\\backend\\src\\IMS.Application\\IMS.Application.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.NET.Test.Sdk": {
+              "target": "Package",
+              "version": "[17.9.0, )"
+            },
+            "xunit": {
+              "target": "Package",
+              "version": "[2.9.0, )"
+            },
+            "xunit.runner.visualstudio": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.5.7, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.25, 8.0.25]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
