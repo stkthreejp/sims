@@ -64,6 +64,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IEscalationRuleService, EscalationRuleService>();
         services.AddScoped<IFeeCalculationService, FeeCalculationService>();
         services.AddScoped<IFeeAdminService, FeeAdminService>();
+        services.AddScoped<ILedgerService, LedgerService>();
+        services.AddScoped<IInvoicingService, InvoicingService>();
         services.AddHttpClient("gemini");
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();

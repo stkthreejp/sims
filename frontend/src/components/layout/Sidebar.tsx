@@ -70,6 +70,16 @@ export function Sidebar() {
               <Receipt className="h-4 w-4 shrink-0" />
               Fee Rules
             </NavLink>
+            <NavLink
+              to="/billing/invoices"
+              className={({ isActive }) =>
+                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
+              }
+            >
+              <Receipt className="h-4 w-4 shrink-0" />
+              Invoices
+            </NavLink>
             <div className="px-3 pt-4 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               Task Engine
             </div>

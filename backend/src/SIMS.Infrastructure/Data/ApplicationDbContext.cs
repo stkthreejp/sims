@@ -61,6 +61,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<FeeStateTaxability> FeeStateTaxabilities => Set<FeeStateTaxability>();
     public DbSet<FeePremiumBracket> FeePremiumBrackets => Set<FeePremiumBracket>();
     public DbSet<FeeAuditLog> FeeAuditLogs => Set<FeeAuditLog>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

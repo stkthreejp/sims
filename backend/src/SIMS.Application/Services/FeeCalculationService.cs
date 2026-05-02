@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities.Accounting;
+using InvoiceLine = SIMS.Application.DTOs.Accounting.InvoiceLine;
 
 namespace SIMS.Application.Services;
 
@@ -119,7 +120,8 @@ public class FeeCalculationService : IFeeCalculationService
                 Amount: raw,
                 IsTaxable: effectivelyTaxable,
                 PayableRouting: rule.PayableRouting,
-                PayablePayeeId: rule.PayablePayeeId
+                PayablePayeeId: rule.PayablePayeeId,
+                LedgerAccountId: def.LedgerAccountId
             );
 
             lines.Add(line);

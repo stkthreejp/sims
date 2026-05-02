@@ -23,7 +23,8 @@ public record InvoiceLine(
     decimal Amount,
     bool IsTaxable,
     string? PayableRouting,   // 'NotPayable'|'Company'|'Entity'
-    long? PayablePayeeId
+    long? PayablePayeeId,
+    int LedgerAccountId
 );
 
 public record FeeCalculationResult(IReadOnlyList<InvoiceLine> Lines);
