@@ -1,0 +1,107 @@
+import type { PolicyLineOfBusiness } from './quote.types'
+
+export type PolicyStatus = 'Active' | 'Renewed' | 'NonRenewed' | 'Expired' | 'Cancelled'
+export type PolicyTransactionStatus = 'Pending' | 'Issued'
+export type TransactionType = 'NewBusiness' | 'Endorsement' | 'Renewal' | 'Cancellation' | 'Reinstatement' | 'Audit'
+
+export const POLICY_STATUS_LABELS: Record<PolicyStatus, string> = {
+  Active: 'Active',
+  Renewed: 'Renewed',
+  NonRenewed: 'Non-Renewed',
+  Expired: 'Expired',
+  Cancelled: 'Cancelled',
+}
+
+export const POLICY_STATUS_COLORS: Record<PolicyStatus, string> = {
+  Active: 'bg-green-100 text-green-700',
+  Renewed: 'bg-blue-100 text-blue-700',
+  NonRenewed: 'bg-orange-100 text-orange-700',
+  Expired: 'bg-slate-100 text-slate-600',
+  Cancelled: 'bg-red-100 text-red-700',
+}
+
+export interface PolicyListItem {
+  id: string
+  policyNumber: string
+  submissionId: string
+  insuredName: string
+  carrierName: string
+  lineOfBusiness: PolicyLineOfBusiness
+  effectiveDate: string
+  expirationDate: string
+  totalPremium: number
+  status: PolicyStatus
+  boundDate: string
+  createdAt: string
+}
+
+export interface PolicyTransaction {
+  id: string
+  policyId: string
+  transactionType: TransactionType
+  status: PolicyTransactionStatus
+  transactionNumber: string
+  effectiveDate: string
+  endorsementDescription: string | null
+  priorPolicyId: string | null
+  cancellationReason: string | null
+  cancellationMethod: string | null
+  premiumChange: number
+  newTotalPremium: number
+  processedByName: string
+  processedAt: string
+  notes: string | null
+}
+
+export interface Policy {
+  id: string
+  policyNumber: string
+  submissionId: string
+  submissionNumber: string
+  insuredId: string
+  insuredName: string
+  carrierId: string
+  carrierName: string
+  lineOfBusiness: PolicyLineOfBusiness
+  effectiveDate: string
+  expirationDate: string
+  premiumAmount: number
+  taxesAndFees: number
+  totalPremium: number
+  status: PolicyStatus
+  boundDate: string
+  issuedDate: string | null
+  cancelledDate: string | null
+  nonRenewedDate: string | null
+  boundQuoteId: string
+  carrierCommissionRate: number
+  smmRetentionRate: number
+  agentCommissionRate: number
+  carrierCommissionAmount: number
+  smmRetentionAmount: number
+  agentCommissionAmount: number
+  coverageDescription: string | null
+  deductible: number | null
+  limit: number | null
+  uninsuredMotoristLimit: number | null
+  medicalPaymentsLimit: number | null
+  transactions: PolicyTransaction[]
+  createdAt: string
+}
+
+export interface CreateEndorsement {
+  effectiveDate: string
+  premiumChange: number
+  endorsementDescription?: string
+  notes?: string
+}
+
+export interface IssueEndorsement {
+  effectiveDate?: string
+  premiumChange?: number
+}
+
+export interface NonRenewPolicy {
+  nonRenewedDate: string
+  reason?: string
+}

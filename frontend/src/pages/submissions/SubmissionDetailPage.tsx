@@ -51,6 +51,9 @@ type QuoteForm = {
   limit: string
   uninsuredMotoristLimit: string
   medicalPaymentsLimit: string
+  companyId: string
+  producerId: string
+  isFilingState: boolean
 }
 
 const emptyQuoteForm = (): QuoteForm => ({
@@ -58,6 +61,7 @@ const emptyQuoteForm = (): QuoteForm => ({
   premiumAmount: '', taxesAndFees: '0',
   coverageDescription: '', deductible: '', limit: '',
   uninsuredMotoristLimit: '', medicalPaymentsLimit: '',
+  companyId: '', producerId: '', isFilingState: false,
 })
 
 export function SubmissionDetailPage() {
@@ -337,6 +341,9 @@ export function SubmissionDetailPage() {
       limit: quoteForm.limit ? parseFloat(quoteForm.limit) : undefined,
       uninsuredMotoristLimit: quoteForm.uninsuredMotoristLimit ? parseFloat(quoteForm.uninsuredMotoristLimit) : undefined,
       medicalPaymentsLimit: quoteForm.medicalPaymentsLimit ? parseFloat(quoteForm.medicalPaymentsLimit) : undefined,
+      companyId: quoteForm.companyId ? parseInt(quoteForm.companyId) : undefined,
+      producerId: quoteForm.producerId ? parseInt(quoteForm.producerId) : undefined,
+      isFilingState: quoteForm.isFilingState,
     })
   }
 
@@ -603,6 +610,24 @@ export function SubmissionDetailPage() {
                   </div>
                 </>
               )}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Company ID</label>
+                <input type="number" value={quoteForm.companyId} onChange={setQF('companyId')} placeholder="Optional" className="w-full border rounded px-2 py-1.5" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Producer ID</label>
+                <input type="number" value={quoteForm.producerId} onChange={setQF('producerId')} placeholder="Optional" className="w-full border rounded px-2 py-1.5" />
+              </div>
+              <div className="flex items-center gap-2 pt-4">
+                <input
+                  type="checkbox"
+                  id="isFilingState"
+                  checked={quoteForm.isFilingState}
+                  onChange={(e) => setQuoteForm((prev) => ({ ...prev, isFilingState: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <label htmlFor="isFilingState" className="text-xs font-medium text-slate-600">Filing State</label>
+              </div>
             </div>
             <div className="flex gap-2">
               <button onClick={handleCreateQuote} disabled={createQuoteMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">

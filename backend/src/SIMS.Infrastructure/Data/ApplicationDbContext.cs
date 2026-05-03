@@ -26,6 +26,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Insured> Insureds => Set<Insured>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<Quote> Quotes => Set<Quote>();
+    public DbSet<Policy> Policies => Set<Policy>();
     public DbSet<PolicyTransaction> PolicyTransactions => Set<PolicyTransaction>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
@@ -104,6 +105,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Insured>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Submission>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Quote>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<Policy>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransaction>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Note>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);

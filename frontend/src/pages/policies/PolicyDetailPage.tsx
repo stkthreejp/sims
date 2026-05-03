@@ -3,9 +3,10 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText } from 'lucide-react'
 import { toast } from 'sonner'
-import { quotesApi } from '@/api/quotes.api'
+import { policiesApi } from '@/api/policies.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { LOB_LABELS, QUOTE_STATUS_LABELS } from '@/types/quote.types'
+import { LOB_LABELS } from '@/types/quote.types'
+import { POLICY_STATUS_LABELS, POLICY_STATUS_COLORS } from '@/types/policy.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -26,20 +27,20 @@ export function PolicyDetailPage() {
   const [editBody, setEditBody] = useState('')
 
   const { data: policy, isLoading } = useQuery({
-    queryKey: ['quotes', id],
-    queryFn: () => quotesApi.getById(id!),
+    queryKey: ['policies', id],
+    queryFn: () => policiesApi.getById(id!),
   })
 
   const { data: notes = [] } = useQuery({
-    queryKey: ['quotes', id, 'notes'],
-    queryFn: () => quotesApi.getNotes(id!),
+    queryKey: ['policies', id, 'notes'],
+    queryFn: () => policiesApi.getNotes(id!),
     enabled: !!id,
   })
 
   const createNoteMutation = useMutation({
-    mutationFn: () => quotesApi.createNote(id!, { subject: noteSubject || undefined, body: noteBody }),
+    mutationFn: () => policiesApi.createNote(id!, { subject: noteSubject || undefined, body: noteBody }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['quotes', id, 'notes'] })
+      qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] })
       setNoteSubject('')
       setNoteBody('')
       setShowNoteForm(false)
@@ -49,9 +50,9 @@ export function PolicyDetailPage() {
   })
 
   const updateNoteMutation = useMutation({
-    mutationFn: (note: Note) => quotesApi.updateNote(id!, note.id, { subject: editSubject || undefined, body: editBody }),
+    mutationFn: (note: Note) => policiesApi.updateNote(id!, note.id, { subject: editSubject || undefined, body: editBody }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['quotes', id, 'notes'] })
+      qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] })
       setEditingNote(null)
       toast.success('Note updated')
     },
@@ -59,17 +60,17 @@ export function PolicyDetailPage() {
   })
 
   const deleteNoteMutation = useMutation({
-    mutationFn: (noteId: string) => quotesApi.deleteNote(id!, noteId),
+    mutationFn: (noteId: string) => policiesApi.deleteNote(id!, noteId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['quotes', id, 'notes'] })
+      qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] })
       toast.success('Note deleted')
     },
     onError: () => toast.error('Failed to delete note'),
   })
 
   const togglePinMutation = useMutation({
-    mutationFn: (noteId: string) => quotesApi.togglePinNote(id!, noteId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['quotes', id, 'notes'] }),
+    mutationFn: (noteId: string) => policiesApi.togglePinNote(id!, noteId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] }),
   })
 
   const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canCreatePolicies } = usePermissions()
@@ -89,13 +90,13 @@ export function PolicyDetailPage() {
         <span>/</span>
         <Link to={`/submissions/${policy.submissionId}`} className="hover:text-slate-900">{policy.submissionNumber}</Link>
         <span>/</span>
-        <span className="text-slate-700">{policy.policyNumber ?? policy.quoteNumber}</span>
+        <span className="text-slate-700">{policy.policyNumber}</span>
       </div>
 
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">{policy.policyNumber ?? policy.quoteNumber}</h1>
+          <h1 className="text-xl font-semibold text-slate-900">{policy.policyNumber}</h1>
           <p className="text-sm text-slate-500 mt-0.5">{policy.insuredName} · {policy.carrierName}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -107,8 +108,8 @@ export function PolicyDetailPage() {
               <FileText className="h-3.5 w-3.5" /> Generate Document
             </button>
           )}
-          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-            {QUOTE_STATUS_LABELS[policy.status]}
+          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${POLICY_STATUS_COLORS[policy.status]}`}>
+            {POLICY_STATUS_LABELS[policy.status]}
           </span>
         </div>
       </div>
@@ -152,9 +153,39 @@ export function PolicyDetailPage() {
           <p className="font-medium">{formatCurrency(policy.totalPremium)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Commission</p>
-          <p className="font-medium">{formatCurrency(policy.commissionAmount)} ({(policy.commissionRate * 100).toFixed(1)}%)</p>
+          <p className="text-xs text-slate-500 mb-0.5">Agent Commission</p>
+          <p className="font-medium">{formatCurrency(policy.agentCommissionAmount)} ({(policy.agentCommissionRate * 100).toFixed(1)}%)</p>
         </div>
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">Carrier Commission</p>
+          <p className="font-medium">{formatCurrency(policy.carrierCommissionAmount)} ({(policy.carrierCommissionRate * 100).toFixed(1)}%)</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">SMM Retention</p>
+          <p className="font-medium">{formatCurrency(policy.smmRetentionAmount)} ({(policy.smmRetentionRate * 100).toFixed(1)}%)</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">Bound Date</p>
+          <p className="font-medium">{new Date(policy.boundDate).toLocaleDateString()}</p>
+        </div>
+        {policy.issuedDate && (
+          <div>
+            <p className="text-xs text-slate-500 mb-0.5">Issued Date</p>
+            <p className="font-medium">{new Date(policy.issuedDate).toLocaleDateString()}</p>
+          </div>
+        )}
+        {policy.nonRenewedDate && (
+          <div>
+            <p className="text-xs text-slate-500 mb-0.5">Non-Renewed Date</p>
+            <p className="font-medium">{new Date(policy.nonRenewedDate).toLocaleDateString()}</p>
+          </div>
+        )}
+        {policy.cancelledDate && (
+          <div>
+            <p className="text-xs text-slate-500 mb-0.5">Cancelled Date</p>
+            <p className="font-medium">{new Date(policy.cancelledDate).toLocaleDateString()}</p>
+          </div>
+        )}
         {policy.limit != null && (
           <div>
             <p className="text-xs text-slate-500 mb-0.5">Limit</p>
@@ -167,12 +198,6 @@ export function PolicyDetailPage() {
             <p className="font-medium">{formatCurrency(policy.deductible)}</p>
           </div>
         )}
-        {policy.boundDate && (
-          <div>
-            <p className="text-xs text-slate-500 mb-0.5">Bound Date</p>
-            <p className="font-medium">{new Date(policy.boundDate).toLocaleDateString()}</p>
-          </div>
-        )}
         {policy.coverageDescription && (
           <div className="col-span-2 md:col-span-4">
             <p className="text-xs text-slate-500 mb-0.5">Coverage Description</p>
@@ -180,6 +205,51 @@ export function PolicyDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Transactions */}
+      {policy.transactions.length > 0 && (
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <div className="px-5 py-4 border-b">
+            <h2 className="text-sm font-semibold text-slate-900">Transaction History</h2>
+          </div>
+          <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Txn #</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Type</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Effective</th>
+                <th className="px-5 py-2 text-right text-xs font-semibold text-slate-500 uppercase">Premium Δ</th>
+                <th className="px-5 py-2 text-right text-xs font-semibold text-slate-500 uppercase">New Total</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Processed By</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {policy.transactions.map((t) => (
+                <tr key={t.id} className="hover:bg-slate-50">
+                  <td className="px-5 py-2.5 font-mono text-xs text-slate-600">{t.transactionNumber}</td>
+                  <td className="px-5 py-2.5 text-slate-700">{t.transactionType}</td>
+                  <td className="px-5 py-2.5">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                      t.status === 'Issued' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="px-5 py-2.5 text-slate-500">{new Date(t.effectiveDate).toLocaleDateString()}</td>
+                  <td className="px-5 py-2.5 text-right">
+                    <span className={t.premiumChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      {t.premiumChange >= 0 ? '+' : ''}{formatCurrency(t.premiumChange)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-2.5 text-right font-medium text-slate-700">{formatCurrency(t.newTotalPremium)}</td>
+                  <td className="px-5 py-2.5 text-slate-500">{t.processedByName}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Notes */}
@@ -297,7 +367,6 @@ export function PolicyDetailPage() {
             ))}
           </div>
         </div>
-
       </div>
 
       {/* Documents */}

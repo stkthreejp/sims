@@ -95,6 +95,9 @@ export interface Quote {
   limit: number | null
   uninsuredMotoristLimit: number | null
   medicalPaymentsLimit: number | null
+  companyId: number | null
+  producerId: number | null
+  isFilingState: boolean
   createdAt: string
 }
 
@@ -111,6 +114,9 @@ export interface QuoteCreate {
   limit?: number
   uninsuredMotoristLimit?: number
   medicalPaymentsLimit?: number
+  companyId?: number
+  producerId?: number
+  isFilingState?: boolean
 }
 
 export interface QuoteUpdate extends QuoteCreate {

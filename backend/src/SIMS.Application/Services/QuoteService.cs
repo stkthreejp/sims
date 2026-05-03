@@ -1,4 +1,5 @@
 using SIMS.Application.Common;
+using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
@@ -52,43 +53,6 @@ public class QuoteService : IQuoteService
         q = query.SortDir.ToLower() == "asc"
             ? q.OrderBy(qt => qt.CreatedAt)
             : q.OrderByDescending(qt => qt.CreatedAt);
-
-        var items = await q
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .ToListAsync();
-
-        return new PagedResult<QuoteListItemDto>
-        {
-            Items = items.Select(MapToListItemDto),
-            TotalCount = total,
-            Page = query.Page,
-            PageSize = query.PageSize
-        };
-    }
-
-    public async Task<PagedResult<QuoteListItemDto>> GetAllPoliciesAsync(QueryParameters query)
-    {
-        var q = Db.Set<Quote>()
-            .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
-            .Include(qt => qt.Carrier)
-            .Where(qt => !qt.IsDeleted && qt.Status == QuoteStatus.Bound)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var search = query.Search.ToLower();
-            q = q.Where(qt =>
-                (qt.PolicyNumber != null && qt.PolicyNumber.ToLower().Contains(search)) ||
-                qt.Submission.Insured.DisplayName.ToLower().Contains(search) ||
-                qt.Carrier.Name.ToLower().Contains(search));
-        }
-
-        var total = await q.CountAsync();
-
-        q = query.SortDir.ToLower() == "asc"
-            ? q.OrderBy(qt => qt.BoundDate)
-            : q.OrderByDescending(qt => qt.BoundDate);
 
         var items = await q
             .Skip((query.Page - 1) * query.PageSize)
@@ -178,6 +142,9 @@ public class QuoteService : IQuoteService
             CarrierCommissionRate = carrierRates?.CommissionRate ?? 0,
             SMMRetentionRate = carrierRates?.SMMRetentionRate ?? 0,
             AgentCommissionRate = agentRate ?? 0,
+            CompanyId = dto.CompanyId,
+            ProducerId = dto.ProducerId ?? submission.ProducerId,
+            IsFilingState = dto.IsFilingState,
             CoverageDescription = dto.CoverageDescription,
             Deductible = dto.Deductible,
             Limit = dto.Limit,
@@ -277,7 +244,9 @@ public class QuoteService : IQuoteService
     public async Task<Result<QuoteDto>> BindAsync(Guid id, QuoteBindDto dto, Guid userId)
     {
         var quote = await Db.Set<Quote>()
-            .Include(qt => qt.Submission)
+            .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
+            .Include(qt => qt.Submission).ThenInclude(s => s.Locations)
+            .Include(qt => qt.Submission).ThenInclude(s => s.Vehicles)
             .Include(qt => qt.Carrier)
             .FirstOrDefaultAsync(qt => qt.Id == id && !qt.IsDeleted);
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
@@ -293,13 +262,69 @@ public class QuoteService : IQuoteService
         quote.ExpirationDate = dto.ExpirationDate;
         quote.UpdatedAt = DateTime.UtcNow;
 
-        var submission = await Db.Set<Submission>()
-            .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
-            .FirstOrDefaultAsync(s => s.Id == quote.SubmissionId);
-        if (submission != null && submission.Quotes.All(qt => qt.Status == QuoteStatus.Bound || qt.Id == id))
+        // Create the Policy record
+        var policy = new Policy
+        {
+            PolicyNumber = policyNumber,
+            SubmissionId = quote.SubmissionId,
+            BoundQuoteId = quote.Id,
+            CarrierId = quote.CarrierId,
+            LineOfBusiness = quote.LineOfBusiness,
+            EffectiveDate = dto.EffectiveDate,
+            ExpirationDate = dto.ExpirationDate,
+            PremiumAmount = quote.PremiumAmount,
+            TaxesAndFees = quote.TaxesAndFees,
+            TotalPremium = quote.TotalPremium,
+            Status = PolicyStatus.Active,
+            BoundDate = dto.BoundDate,
+        };
+        Db.Set<Policy>().Add(policy);
+
+        // Update submission status if all quotes are now bound
+        var submission = quote.Submission;
+        var otherQuotes = await Db.Set<Quote>()
+            .Where(qt => qt.SubmissionId == quote.SubmissionId && !qt.IsDeleted && qt.Id != id)
+            .ToListAsync();
+        if (submission != null && otherQuotes.All(qt => qt.Status == QuoteStatus.Bound))
             submission.Status = SubmissionStatus.Bound;
 
         await Db.SaveChangesAsync();
+
+        // NewBusiness transaction
+        var txnNumber = await GenerateTransactionNumberAsync();
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            TransactionType = TransactionType.NewBusiness,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = txnNumber,
+            EffectiveDate = dto.EffectiveDate,
+            PremiumChange = quote.TotalPremium,
+            NewTotalPremium = quote.TotalPremium,
+            ProcessedById = userId,
+            ProcessedAt = DateTime.UtcNow,
+        };
+        Db.Set<PolicyTransaction>().Add(transaction);
+        await Db.SaveChangesAsync();
+
+        // Auto-create invoice
+        var invoicing = (IInvoicingService)_sp.GetService(typeof(IInvoicingService))!;
+        var invoiceReq = new CreateInvoiceRequest(
+            EffectiveDate: dto.EffectiveDate,
+            GrossPremium: quote.PremiumAmount,
+            StateCode: quote.Submission?.Insured?.State ?? "",
+            IsEndorsement: false,
+            IsFilingState: quote.IsFilingState,
+            CompanyId: quote.CompanyId,
+            ProducerId: quote.ProducerId,
+            LineOfBusiness: quote.LineOfBusiness.ToString(),
+            City: null,
+            LicenseType: null,
+            LocationCount: quote.Submission?.Locations?.Count(l => !l.IsDeleted) ?? 1,
+            VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
+            PolicyTransactionId: transaction.Id
+        );
+        await invoicing.BindAsync(invoiceReq, userId);
 
         await _workflowEngine.FireEventAsync(
             "quote.status.bound",
@@ -422,9 +447,19 @@ public class QuoteService : IQuoteService
     {
         var year = DateTime.UtcNow.Year;
         var prefix = $"POL-{year}-";
-        var count = await Db.Set<Quote>()
+        var count = await Db.Set<Policy>()
             .IgnoreQueryFilters()
-            .CountAsync(q => q.PolicyNumber != null && q.PolicyNumber.StartsWith(prefix));
+            .CountAsync(p => p.PolicyNumber.StartsWith(prefix));
+        return $"{prefix}{(count + 1):D5}";
+    }
+
+    private async Task<string> GenerateTransactionNumberAsync()
+    {
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"TXN-{year}-";
+        var count = await Db.Set<PolicyTransaction>()
+            .IgnoreQueryFilters()
+            .CountAsync(t => t.TransactionNumber.StartsWith(prefix));
         return $"{prefix}{(count + 1):D5}";
     }
 
@@ -491,6 +526,9 @@ public class QuoteService : IQuoteService
                 SMMRetentionAmount = Math.Round(premium * effectiveSMM, 2),
                 AgentCommissionAmount = Math.Round(premium * effectiveAgent, 2),
             } : null,
+            CompanyId = qt.CompanyId,
+            ProducerId = qt.ProducerId,
+            IsFilingState = qt.IsFilingState,
             CoverageDescription = qt.CoverageDescription,
             Deductible = qt.Deductible,
             Limit = qt.Limit,

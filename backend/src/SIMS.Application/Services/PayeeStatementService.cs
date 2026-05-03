@@ -216,10 +216,10 @@ public class PayeeStatementService : IPayeeStatementService
             from il in db.Set<InvoiceLineEntity>()
             join inv in db.Set<Invoice>() on il.InvoiceId equals inv.Id
             join pt in db.Set<PolicyTransaction>() on (Guid?)inv.PolicyTransactionId equals (Guid?)pt.Id
-            join q in db.Set<Quote>() on pt.QuoteId equals q.Id
+            join pol in db.Set<Policy>() on pt.PolicyId equals pol.Id
             where il.Amount == line.Amount
                 && il.PayableRouting == "Entity"
-                && q.PolicyNumber == line.PolicyNumber
+                && pol.PolicyNumber == line.PolicyNumber
                 && !db.Set<PayeeStatementLine>().Any(psl =>
                     psl.Id != line.Id
                     && psl.MatchedInvoiceLineId == il.Id

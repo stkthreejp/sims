@@ -47,13 +47,17 @@ public class Quote : BaseEntity
     public decimal? UninsuredMotoristLimit { get; set; }
     public decimal? MedicalPaymentsLimit { get; set; }
 
+    // Fee calculation scope — carried to invoice on bind
+    public int? CompanyId { get; set; }
+    public int? ProducerId { get; set; }
+    public bool IsFilingState { get; set; }
+
     public Guid CreatedById { get; set; }
 
     // Navigation
     public Submission Submission { get; set; } = null!;
     public Carrier Carrier { get; set; } = null!;
     public User CreatedBy { get; set; } = null!;
-    public ICollection<PolicyTransaction> Transactions { get; set; } = new List<PolicyTransaction>();
     public ICollection<Note> Notes { get; set; } = new List<Note>();
     public ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
 

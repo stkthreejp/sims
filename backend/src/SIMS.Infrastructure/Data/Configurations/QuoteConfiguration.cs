@@ -13,7 +13,6 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.QuoteNumber).IsRequired().HasMaxLength(50);
         builder.HasIndex(q => q.QuoteNumber).IsUnique();
         builder.Property(q => q.PolicyNumber).HasMaxLength(50);
-        builder.HasIndex(q => q.PolicyNumber).IsUnique();
 
         builder.Property(q => q.PremiumAmount).HasPrecision(18, 2);
         builder.Property(q => q.TaxesAndFees).HasPrecision(18, 2);
@@ -43,5 +42,8 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
 
         builder.HasOne(q => q.CreatedBy).WithMany()
             .HasForeignKey(q => q.CreatedById).OnDelete(DeleteBehavior.Restrict);
+
+        // PolicyNumber unique index allows nulls
+        builder.HasIndex(q => q.PolicyNumber).IsUnique().HasFilter("policy_number IS NOT NULL");
     }
 }

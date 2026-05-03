@@ -6,7 +6,6 @@ namespace SIMS.Application.Interfaces.Services;
 public interface IQuoteService
 {
     Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query);
-    Task<PagedResult<QuoteListItemDto>> GetAllPoliciesAsync(QueryParameters query);
     Task<IEnumerable<QuoteListItemDto>> GetBySubmissionAsync(Guid submissionId);
     Task<IEnumerable<QuoteListItemDto>> GetBoundByInsuredAsync(Guid insuredId);
     Task<Result<QuoteDto>> GetByIdAsync(Guid id);

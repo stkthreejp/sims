@@ -58,14 +58,14 @@ public class InvoicingService : IInvoicingService
         if (req.PolicyTransactionId.HasValue)
         {
             var txn = await db.Set<PolicyTransaction>()
-                .Include(pt => pt.Quote)
+                .Include(pt => pt.Policy).ThenInclude(p => p.BoundQuote)
                 .Where(pt => pt.Id == req.PolicyTransactionId.Value)
                 .FirstOrDefaultAsync(ct);
 
             if (txn != null)
             {
-                quote = txn.Quote;
-                carrierId = quote?.CarrierId;
+                quote = txn.Policy?.BoundQuote;
+                carrierId = txn.Policy?.CarrierId;
                 if (carrierId.HasValue)
                 {
                     var name = await db.Set<Carrier>()

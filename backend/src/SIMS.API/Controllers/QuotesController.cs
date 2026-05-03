@@ -22,17 +22,9 @@ public class QuotesController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] QueryParameters query)
         => Ok(await _quoteService.GetAllAsync(query));
 
-    [HttpGet("policies")]
-    public async Task<IActionResult> GetAllPolicies([FromQuery] QueryParameters query)
-        => Ok(await _quoteService.GetAllPoliciesAsync(query));
-
     [HttpGet("by-submission/{submissionId:guid}")]
     public async Task<IActionResult> GetBySubmission(Guid submissionId)
         => Ok(await _quoteService.GetBySubmissionAsync(submissionId));
-
-    [HttpGet("bound-by-insured/{insuredId:guid}")]
-    public async Task<IActionResult> GetBoundByInsured(Guid insuredId)
-        => Ok(await _quoteService.GetBoundByInsuredAsync(insuredId));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)

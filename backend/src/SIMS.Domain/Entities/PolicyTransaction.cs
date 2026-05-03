@@ -4,16 +4,17 @@ namespace SIMS.Domain.Entities;
 
 public class PolicyTransaction : BaseEntity
 {
-    public Guid QuoteId { get; set; }
+    public Guid PolicyId { get; set; }
     public TransactionType TransactionType { get; set; }
+    public PolicyTransactionStatus Status { get; set; } = PolicyTransactionStatus.Issued;
     public string TransactionNumber { get; set; } = string.Empty;
     public DateOnly EffectiveDate { get; set; }
 
     // Endorsement
     public string? EndorsementDescription { get; set; }
 
-    // Renewal
-    public Guid? RenewalQuoteId { get; set; }
+    // Renewal — points to the prior policy this transaction renews from
+    public Guid? PriorPolicyId { get; set; }
 
     // Cancellation
     public string? CancellationReason { get; set; }
@@ -28,7 +29,7 @@ public class PolicyTransaction : BaseEntity
     public string? Notes { get; set; }
 
     // Navigation
-    public Quote Quote { get; set; } = null!;
+    public Policy Policy { get; set; } = null!;
     public User ProcessedBy { get; set; } = null!;
-    public Quote? RenewalQuote { get; set; }
+    public Policy? PriorPolicy { get; set; }
 }

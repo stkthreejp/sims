@@ -5,14 +5,14 @@ import { Edit, Trash2, Plus, ArrowLeft, Download, Mail, Copy, ExternalLink } fro
 import { toast } from 'sonner'
 import { insuredsApi } from '@/api/insureds.api'
 import { submissionsApi } from '@/api/submissions.api'
-import { quotesApi } from '@/api/quotes.api'
+import { policiesApi } from '@/api/policies.api'
 import { queryClient } from '@/lib/queryClient'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus } from '@/types/submission.types'
 import { LOB_LABELS } from '@/types/quote.types'
+import { POLICY_STATUS_LABELS, type PolicyListItem } from '@/types/policy.types'
 import { usePermissions } from '@/hooks/usePermissions'
-import type { QuoteListItem } from '@/types/quote.types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -146,14 +146,14 @@ function LobChip({ label }: { label: string }) {
 
 // ─── policy rows  ────────────────────────────────────────────────────────────
 
-function policyPill(q: QuoteListItem) {
-  const days = daysUntil(q.expirationDate)
-  if (q.status === 'Bound' && days > 30) return { label: 'Active', bg: 'var(--good-bg)', fg: 'var(--good-fg)' }
-  if (q.status === 'Bound' && days >= 0) return { label: 'Expiring', bg: 'var(--warn-bg)', fg: 'var(--warn-fg)' }
-  return { label: 'Expired', bg: 'var(--pill-draft-bg)', fg: 'var(--pill-draft-fg)' }
+function policyPill(p: PolicyListItem) {
+  const days = daysUntil(p.expirationDate)
+  if (p.status === 'Active' && days > 30) return { label: 'Active', bg: 'var(--good-bg)', fg: 'var(--good-fg)' }
+  if (p.status === 'Active' && days >= 0) return { label: 'Expiring', bg: 'var(--warn-bg)', fg: 'var(--warn-fg)' }
+  return { label: POLICY_STATUS_LABELS[p.status], bg: 'var(--pill-draft-bg)', fg: 'var(--pill-draft-fg)' }
 }
 
-function PolicyTable({ policies }: { policies: QuoteListItem[] }) {
+function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
       <thead>
@@ -171,7 +171,7 @@ function PolicyTable({ policies }: { policies: QuoteListItem[] }) {
           const pill = policyPill(p)
           return (
             <tr key={p.id} className="id-tr" onClick={() => window.location.href = `/policies/${p.id}`}>
-              <td className="id-td"><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{p.policyNumber ?? p.quoteNumber}</span></td>
+              <td className="id-td"><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{p.policyNumber}</span></td>
               <td className="id-td"><LobChip label={LOB_LABELS[p.lineOfBusiness]} /></td>
               <td className="id-td" style={{ color: 'var(--ink-2)' }}>{p.carrierName}</td>
               <td className="id-td">
@@ -254,8 +254,8 @@ export function InsuredDetailPage() {
   })
 
   const { data: policies = [] } = useQuery({
-    queryKey: ['quotes', 'bound-by-insured', id],
-    queryFn: () => quotesApi.getBoundByInsured(id!),
+    queryKey: ['policies', 'by-insured', id],
+    queryFn: () => policiesApi.getByInsured(id!),
     enabled: !!id,
   })
 

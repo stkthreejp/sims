@@ -15,6 +15,7 @@ public class Submission : BaseEntity
     public string? DescriptionOfOperations { get; set; }
     /// <summary>JSON-serialized array of PolicyLineOfBusiness values detected/set for this submission.</summary>
     public string? LinesOfBusiness { get; set; }
+    public int? ProducerId { get; set; }
     public Guid CreatedById { get; set; }
 
     // Navigation

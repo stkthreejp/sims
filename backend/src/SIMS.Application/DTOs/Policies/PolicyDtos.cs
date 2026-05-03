@@ -1,0 +1,101 @@
+using SIMS.Domain.Enums;
+
+namespace SIMS.Application.DTOs.Policies;
+
+public class PolicyListItemDto
+{
+    public Guid Id { get; set; }
+    public string PolicyNumber { get; set; } = string.Empty;
+    public Guid SubmissionId { get; set; }
+    public string InsuredName { get; set; } = string.Empty;
+    public string CarrierName { get; set; } = string.Empty;
+    public PolicyLineOfBusiness LineOfBusiness { get; set; }
+    public DateOnly EffectiveDate { get; set; }
+    public DateOnly ExpirationDate { get; set; }
+    public decimal TotalPremium { get; set; }
+    public PolicyStatus Status { get; set; }
+    public DateOnly BoundDate { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class PolicyDto
+{
+    public Guid Id { get; set; }
+    public string PolicyNumber { get; set; } = string.Empty;
+    public Guid SubmissionId { get; set; }
+    public string SubmissionNumber { get; set; } = string.Empty;
+    public Guid InsuredId { get; set; }
+    public string InsuredName { get; set; } = string.Empty;
+    public Guid CarrierId { get; set; }
+    public string CarrierName { get; set; } = string.Empty;
+    public PolicyLineOfBusiness LineOfBusiness { get; set; }
+    public DateOnly EffectiveDate { get; set; }
+    public DateOnly ExpirationDate { get; set; }
+    public decimal PremiumAmount { get; set; }
+    public decimal TaxesAndFees { get; set; }
+    public decimal TotalPremium { get; set; }
+    public PolicyStatus Status { get; set; }
+    public DateOnly BoundDate { get; set; }
+    public DateOnly? IssuedDate { get; set; }
+    public DateOnly? CancelledDate { get; set; }
+    public DateOnly? NonRenewedDate { get; set; }
+    public Guid BoundQuoteId { get; set; }
+
+    // Commission from the bound quote (effective rates)
+    public decimal CarrierCommissionRate { get; set; }
+    public decimal SMMRetentionRate { get; set; }
+    public decimal AgentCommissionRate { get; set; }
+    public decimal CarrierCommissionAmount { get; set; }
+    public decimal SMMRetentionAmount { get; set; }
+    public decimal AgentCommissionAmount { get; set; }
+
+    // Coverage from the bound quote
+    public string? CoverageDescription { get; set; }
+    public decimal? Deductible { get; set; }
+    public decimal? Limit { get; set; }
+    public decimal? UninsuredMotoristLimit { get; set; }
+    public decimal? MedicalPaymentsLimit { get; set; }
+
+    public IList<PolicyTransactionDto> Transactions { get; set; } = new List<PolicyTransactionDto>();
+    public DateTime CreatedAt { get; set; }
+}
+
+public class PolicyTransactionDto
+{
+    public Guid Id { get; set; }
+    public Guid PolicyId { get; set; }
+    public TransactionType TransactionType { get; set; }
+    public PolicyTransactionStatus Status { get; set; }
+    public string TransactionNumber { get; set; } = string.Empty;
+    public DateOnly EffectiveDate { get; set; }
+    public string? EndorsementDescription { get; set; }
+    public Guid? PriorPolicyId { get; set; }
+    public string? CancellationReason { get; set; }
+    public string? CancellationMethod { get; set; }
+    public decimal PremiumChange { get; set; }
+    public decimal NewTotalPremium { get; set; }
+    public string ProcessedByName { get; set; } = string.Empty;
+    public DateTime ProcessedAt { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class CreateEndorsementDto
+{
+    public DateOnly EffectiveDate { get; set; }
+    public decimal PremiumChange { get; set; }
+    public string? EndorsementDescription { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class IssueEndorsementDto
+{
+    // Allows overriding on issue — both optional
+    public DateOnly? EffectiveDate { get; set; }
+    public decimal? PremiumChange { get; set; }
+}
+
+public class NonRenewPolicyDto
+{
+    public DateOnly NonRenewedDate { get; set; }
+    public string? Reason { get; set; }
+}

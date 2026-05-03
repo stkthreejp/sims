@@ -37,6 +37,10 @@ public class QuoteDto
     // Commission give-back override
     public CommissionOverrideDto? CommissionOverride { get; set; }
 
+    public int? CompanyId { get; set; }
+    public int? ProducerId { get; set; }
+    public bool IsFilingState { get; set; }
+
     public string? CoverageDescription { get; set; }
     public decimal? Deductible { get; set; }
     public decimal? Limit { get; set; }
@@ -86,6 +90,10 @@ public class QuoteCreateDto
     public DateOnly ExpirationDate { get; set; }
     public decimal PremiumAmount { get; set; }
     public decimal TaxesAndFees { get; set; }
+    public int? CompanyId { get; set; }
+    public int? ProducerId { get; set; }
+    public bool IsFilingState { get; set; }
+
     public string? CoverageDescription { get; set; }
     public decimal? Deductible { get; set; }
     public decimal? Limit { get; set; }

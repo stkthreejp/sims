@@ -19,13 +19,13 @@ public class PolicyTransactionConfiguration : IEntityTypeConfiguration<PolicyTra
         builder.Property(t => t.EndorsementDescription).HasMaxLength(2000);
         builder.Property(t => t.Notes).HasMaxLength(2000);
 
-        builder.HasOne(t => t.Quote).WithMany(q => q.Transactions)
-            .HasForeignKey(t => t.QuoteId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(t => t.Policy).WithMany(p => p.Transactions)
+            .HasForeignKey(t => t.PolicyId).OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(t => t.ProcessedBy).WithMany()
             .HasForeignKey(t => t.ProcessedById).OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(t => t.RenewalQuote).WithMany()
-            .HasForeignKey(t => t.RenewalQuoteId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasOne(t => t.PriorPolicy).WithMany()
+            .HasForeignKey(t => t.PriorPolicyId).OnDelete(DeleteBehavior.SetNull);
     }
 }

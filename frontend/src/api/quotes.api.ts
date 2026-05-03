@@ -6,14 +6,8 @@ export const quotesApi = {
   getAll: (params: QueryParameters) =>
     apiClient.get<PagedResult<QuoteListItem>>('/quotes', { params }).then((r) => r.data),
 
-  getAllPolicies: (params: QueryParameters) =>
-    apiClient.get<PagedResult<QuoteListItem>>('/quotes/policies', { params }).then((r) => r.data),
-
   getBySubmission: (submissionId: string) =>
     apiClient.get<QuoteListItem[]>(`/quotes/by-submission/${submissionId}`).then((r) => r.data),
-
-  getBoundByInsured: (insuredId: string) =>
-    apiClient.get<QuoteListItem[]>(`/quotes/bound-by-insured/${insuredId}`).then((r) => r.data),
 
   getById: (id: string) =>
     apiClient.get<Quote>(`/quotes/${id}`).then((r) => r.data),

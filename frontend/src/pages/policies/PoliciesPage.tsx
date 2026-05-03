@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
-import { quotesApi } from '@/api/quotes.api'
+import { policiesApi } from '@/api/policies.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
+import { POLICY_STATUS_LABELS, POLICY_STATUS_COLORS } from '@/types/policy.types'
 import { formatCurrency } from '@/lib/utils'
 
 export function PoliciesPage() {
@@ -14,7 +15,7 @@ export function PoliciesPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['policies', { page, search }],
-    queryFn: () => quotesApi.getAllPolicies({ page, pageSize: 25, search }),
+    queryFn: () => policiesApi.getAll({ page, pageSize: 25, search }),
   })
 
   return (
@@ -42,16 +43,17 @@ export function PoliciesPage() {
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">LOB</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Effective</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Expiration</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Premium</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading && (
-              <tr><td colSpan={7} className="py-12 text-center"><LoadingSpinner /></td></tr>
+              <tr><td colSpan={8} className="py-12 text-center"><LoadingSpinner /></td></tr>
             )}
             {!isLoading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                <td colSpan={8} className="py-12 text-center text-slate-400 text-sm">
                   No bound policies yet.
                 </td>
               </tr>
@@ -68,6 +70,11 @@ export function PoliciesPage() {
                 <td className="px-5 py-3 text-slate-500">{LOB_LABELS[p.lineOfBusiness]}</td>
                 <td className="px-5 py-3 text-slate-500">{new Date(p.effectiveDate).toLocaleDateString()}</td>
                 <td className="px-5 py-3 text-slate-500">{new Date(p.expirationDate).toLocaleDateString()}</td>
+                <td className="px-5 py-3">
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${POLICY_STATUS_COLORS[p.status]}`}>
+                    {POLICY_STATUS_LABELS[p.status]}
+                  </span>
+                </td>
                 <td className="px-5 py-3 text-right font-medium text-slate-700">{formatCurrency(p.totalPremium)}</td>
               </tr>
             ))}
