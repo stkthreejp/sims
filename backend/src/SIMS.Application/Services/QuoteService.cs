@@ -3,6 +3,7 @@ using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -261,6 +262,19 @@ public class QuoteService : IQuoteService
         quote.EffectiveDate = dto.EffectiveDate;
         quote.ExpirationDate = dto.ExpirationDate;
         quote.UpdatedAt = DateTime.UtcNow;
+
+        // Lock the latest rating snapshot, if one exists. Once locked, the rating
+        // engine won't replace it, the UI shows it as read-only, and any future
+        // re-rating produces a NEW snapshot rather than mutating this one.
+        var latestSnapshot = await Db.Set<QuoteRatingSnapshot>()
+            .Where(s => s.QuoteId == quote.Id && !s.IsDeleted)
+            .OrderByDescending(s => s.RatedAt)
+            .FirstOrDefaultAsync();
+        if (latestSnapshot != null)
+        {
+            latestSnapshot.IsBoundSnapshot = true;
+            latestSnapshot.UpdatedAt = DateTime.UtcNow;
+        }
 
         // Create the Policy record
         var policy = new Policy
