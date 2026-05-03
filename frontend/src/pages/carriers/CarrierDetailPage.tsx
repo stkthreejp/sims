@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
 import type { CarrierContact, CarrierContactInput, CarrierUpdate } from '@/types/carrier.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
-import { LOB_LABELS, ALL_LOBS } from '@/types/quote.types'
+import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
@@ -125,7 +125,7 @@ function LobCheckboxes({ selected, onChange }: { selected: PolicyLineOfBusiness[
     onChange(selected.includes(lob) ? selected.filter((l) => l !== lob) : [...selected, lob])
   return (
     <div className="grid grid-cols-2 gap-1.5">
-      {ALL_LOBS.map((lob) => (
+      {ACTIVE_LOBS.map((lob) => (
         <label key={lob} className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" checked={selected.includes(lob)} onChange={() => toggle(lob)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
           {LOB_LABELS[lob]}
@@ -504,7 +504,7 @@ export function CarrierDetailPage() {
                   className="w-full border rounded px-2 py-1.5 text-sm bg-white"
                 >
                   <option value="">All Lines (default)</option>
-                  {ALL_LOBS.map((lob) => (
+                  {ACTIVE_LOBS.map((lob) => (
                     <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
                   ))}
                 </select>

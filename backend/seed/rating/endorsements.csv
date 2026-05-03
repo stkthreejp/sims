@@ -1,0 +1,6 @@
+code,name,charge_type,amount,notes
+newly_acquired_equipment,Newly Acquired Equipment,flat,500.0,
+debris_removal,Debris Removal,flat,250.0,
+rental_reimbursement,Rental Reimbursement,flat,250.0,
+towing_storage_recovery,Towing Storage Recovery,flat,250.0,
+tria,TRIA,pct_subtotal,0.01,Applied to IM premium + other endorsements sub-total

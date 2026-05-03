@@ -27,7 +27,7 @@ public class GeminiExtractionResult
     {
         var lobs = new List<string>();
         if (data.Drivers.Count > 0 || data.Vehicles.Count > 0 || data.Supplemental != null)
-            lobs.Add("CommercialAuto");
+            lobs.Add("AutoLiability");
         if (data.GLCoverages != null || data.GLClassifications.Count > 0)
             lobs.Add("GeneralLiability");
         if (data.IMCoverages != null || data.Equipment.Count > 0)

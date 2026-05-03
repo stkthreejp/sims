@@ -21,8 +21,7 @@ public class GeminiExtractionService : IGeminiExtractionService
     // LOBs Gemini is allowed to return from the detection prompt
     private static readonly HashSet<string> KnownLobs = new(StringComparer.OrdinalIgnoreCase)
     {
-        "CommercialAuto", "GeneralLiability", "InlandMarine", "Property",
-        "WorkersCompensation", "BusinessOwners", "ProfessionalLiability", "Umbrella",
+        "GeneralLiability", "InlandMarine", "AutoLiability", "AutoPhysicalDamage",
     };
 
     public GeminiExtractionService(
@@ -75,7 +74,7 @@ public class GeminiExtractionService : IGeminiExtractionService
                 // Determine the LOB(s) to extract for this attachment
                 var knownLob = attachment.DocumentType switch
                 {
-                    EmailAttachmentDocumentType.Acord125 => "CommercialAuto",
+                    EmailAttachmentDocumentType.Acord125 => "AutoLiability",
                     EmailAttachmentDocumentType.Acord126 => "GeneralLiability",
                     EmailAttachmentDocumentType.ScheduleOfValues => "InlandMarine",
                     _ => null,
@@ -294,9 +293,9 @@ public class GeminiExtractionService : IGeminiExtractionService
 
     private static string GetPromptForLob(string lob) => lob switch
     {
-        "CommercialAuto" => CommercialAutoPrompt,
+        "AutoLiability" or "AutoPhysicalDamage" => CommercialAutoPrompt,
         "GeneralLiability" => GeneralLiabilityPrompt,
-        "InlandMarine" or "Property" => InlandMarinePrompt,
+        "InlandMarine" => InlandMarinePrompt,
         _ => GenericPrompt,
     };
 
@@ -308,14 +307,10 @@ public class GeminiExtractionService : IGeminiExtractionService
         Identify all lines of insurance business that this document contains applications or schedules for.
         Return ONLY valid JSON with this exact schema: {"linesOfBusiness": ["..."]}
         Use ONLY these exact string values — include all that apply:
-        "CommercialAuto"         — commercial auto application (ACORD 125 or similar)
         "GeneralLiability"       — general liability application (ACORD 126 or similar)
         "InlandMarine"           — inland marine or equipment schedule / statement of values
-        "Property"               — commercial property application
-        "WorkersCompensation"    — workers compensation application
-        "BusinessOwners"         — business owners policy (BOP) application
-        "ProfessionalLiability"  — professional liability or E&O application
-        "Umbrella"               — umbrella or excess liability application
+        "AutoLiability"          — commercial auto liability application (ACORD 125 or similar)
+        "AutoPhysicalDamage"     — commercial auto physical damage / comprehensive and collision coverage
         Return an empty array [] if the document is NOT an insurance application (e.g. loss run, dec page, certificate).
         """;
 
@@ -331,7 +326,7 @@ public class GeminiExtractionService : IGeminiExtractionService
           "drivers": [{"driverNumber":number,"name":"string","dateOfBirth":"YYYY-MM-DD or null","licenseNumber":"string or null","licenseState":"2-letter or null","dateHired":"YYYY-MM-DD or null"}],
           "vehicles": [{"unitNumber":number,"year":number or null,"make":"string or null","model":"string or null","vin":"string or null","gvw":number or null,"vehicleClass":"Truck|Tractor|Trailer or null","garagingZip":"string or null","radius":"Local|Intermediate or null"}],
           "locations": [],
-          "priorCarriers": [{"lineOfBusiness":"CommercialAuto","carrierName":"string","policyNumber":"string or null","expirationDate":"YYYY-MM-DD or null","premium":number or null}],
+          "priorCarriers": [{"lineOfBusiness":"AutoLiability","carrierName":"string","policyNumber":"string or null","expirationDate":"YYYY-MM-DD or null","premium":number or null}],
           "supplemental": {"commoditiesHauled":["string"],"terminalLocations":["string"],"filingsRequired":["string"],"safetyProgramInPlace":true,"ownerOperator":false},
           "glCoverages": null,
           "glClassifications": [],

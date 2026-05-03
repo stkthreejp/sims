@@ -9,7 +9,7 @@ import { insuredsApi } from '@/api/insureds.api'
 import { format } from 'date-fns'
 import type { EmailAttachmentDocumentType } from '@/types/inboundEmail.types'
 import type { InsuredListItem } from '@/types/insured.types'
-import { LOB_LABELS, ALL_LOBS, type PolicyLineOfBusiness } from '@/types/quote.types'
+import { LOB_LABELS, ACTIVE_LOBS, type PolicyLineOfBusiness } from '@/types/quote.types'
 
 const DOC_TYPE_LABELS: Record<EmailAttachmentDocumentType, string> = {
   Unknown: 'Unknown',
@@ -373,7 +373,7 @@ export function InboxDetailPage() {
                             onChange={(e) => setSelectedLob(e.target.value as PolicyLineOfBusiness)}
                             className="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                           >
-                            {ALL_LOBS.map(lob => (
+                            {ACTIVE_LOBS.map(lob => (
                               <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
                             ))}
                           </select>
@@ -392,7 +392,7 @@ export function InboxDetailPage() {
                           className="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                         >
                           <option value="">Optional hint (helps if AI can't detect)</option>
-                          {ALL_LOBS.map(lob => (
+                          {ACTIVE_LOBS.map(lob => (
                             <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
                           ))}
                         </select>

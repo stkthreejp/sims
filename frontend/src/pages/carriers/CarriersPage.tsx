@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
 import { queryClient } from '@/lib/queryClient'
 import { PageHeader } from '@/components/common/PageHeader'
-import { LOB_LABELS, ALL_LOBS } from '@/types/quote.types'
+import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
 import type { CarrierCreate } from '@/types/carrier.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 
@@ -17,7 +17,7 @@ function LobCheckboxes({ selected, onChange }: { selected: PolicyLineOfBusiness[
     onChange(selected.includes(lob) ? selected.filter((l) => l !== lob) : [...selected, lob])
   return (
     <div className="grid grid-cols-2 gap-1.5">
-      {ALL_LOBS.map((lob) => (
+      {ACTIVE_LOBS.map((lob) => (
         <label key={lob} className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" checked={selected.includes(lob)} onChange={() => toggle(lob)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
           {LOB_LABELS[lob]}

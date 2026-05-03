@@ -13,8 +13,13 @@ namespace SIMS.API.Controllers;
 public class QuotesController : ControllerBase
 {
     private readonly IQuoteService _quoteService;
+    private readonly IRatingEngineService _ratingEngine;
 
-    public QuotesController(IQuoteService quoteService) => _quoteService = quoteService;
+    public QuotesController(IQuoteService quoteService, IRatingEngineService ratingEngine)
+    {
+        _quoteService = quoteService;
+        _ratingEngine = ratingEngine;
+    }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -45,6 +50,13 @@ public class QuotesController : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] QuoteUpdateDto dto)
     {
         var result = await _quoteService.UpdateAsync(id, dto);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/rate")]
+    public async Task<IActionResult> Rate(Guid id, [FromBody] RateQuoteRequest request)
+    {
+        var result = await _ratingEngine.RateAsync(id, request, CurrentUserId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

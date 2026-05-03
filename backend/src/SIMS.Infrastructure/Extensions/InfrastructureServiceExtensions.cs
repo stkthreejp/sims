@@ -48,6 +48,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<IQuoteService, QuoteService>();
         services.AddScoped<IPolicyService, PolicyService>();
+        services.AddScoped<IRatingEngineService, RatingEngineService>();
         services.AddScoped<INoteService, NoteService>();
         services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
         services.AddScoped<IAttachmentService, AttachmentService>();

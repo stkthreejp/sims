@@ -1,5 +1,6 @@
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Entities.Rating;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -51,6 +52,18 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<UserDelegation> UserDelegations => Set<UserDelegation>();
     public DbSet<EscalationRule> EscalationRules => Set<EscalationRule>();
     public DbSet<TaskAuditEntry> TaskAuditEntries => Set<TaskAuditEntry>();
+
+    // Rating
+    public DbSet<EquipmentType> EquipmentTypes => Set<EquipmentType>();
+    public DbSet<Territory> Territories => Set<Territory>();
+    public DbSet<RatingPlan> RatingPlans => Set<RatingPlan>();
+    public DbSet<RatingPlanVersion> RatingPlanVersions => Set<RatingPlanVersion>();
+    public DbSet<CarrierRatingAssignment> CarrierRatingAssignments => Set<CarrierRatingAssignment>();
+    public DbSet<FactorTable> FactorTables => Set<FactorTable>();
+    public DbSet<FactorRow> FactorRows => Set<FactorRow>();
+    public DbSet<EligibilityRule> EligibilityRules => Set<EligibilityRule>();
+    public DbSet<QuoteRatingSnapshot> QuoteRatingSnapshots => Set<QuoteRatingSnapshot>();
+    public DbSet<QuoteRatingLine> QuoteRatingLines => Set<QuoteRatingLine>();
 
     // Accounting
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();

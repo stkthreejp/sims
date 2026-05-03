@@ -1,0 +1,13 @@
+equipment_type_id,name,accepted
+1,Skidder,ACCEPTED
+2,Loader,ACCEPTED
+3,Dozer,ACCEPTED
+4,Fellerbuncher/Cutter,ACCEPTED
+5,Delimber,ACCEPTED
+6,Chipper,ACCEPTED
+7,Misc Tools,ACCEPTED
+8,Yard Equipment,ACCEPTED
+9,Tub Grinder,ACCEPTED
+10,Excavator,ACCEPTED
+11,Skid Steer,ACCEPTED
+12,Grader,ACCEPTED

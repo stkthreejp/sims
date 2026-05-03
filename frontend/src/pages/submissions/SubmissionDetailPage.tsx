@@ -13,7 +13,7 @@ import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate } from '@/types/submission.types'
-import { LOB_LABELS, ALL_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
+import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -212,7 +212,9 @@ export function SubmissionDetailPage() {
   }, [supplemental])
 
   const selectedCarrier = carriers.find((c) => c.id === quoteForm.carrierId)
-  const availableLobs = selectedCarrier ? selectedCarrier.linesOfBusiness : ALL_LOBS
+  const availableLobs = selectedCarrier
+    ? selectedCarrier.linesOfBusiness.filter((l) => ACTIVE_LOBS.includes(l))
+    : ACTIVE_LOBS
 
   const createQuoteMutation = useMutation({
     mutationFn: (data: QuoteCreate) => quotesApi.create(data),
@@ -416,7 +418,7 @@ export function SubmissionDetailPage() {
                 className="border border-amber-300 rounded px-2 py-1 text-xs bg-white text-amber-900"
               >
                 <option value="">— Select LOB hint (optional) —</option>
-                {ALL_LOBS.map((l) => <option key={l} value={l}>{LOB_LABELS[l]}</option>)}
+                {ACTIVE_LOBS.map((l) => <option key={l} value={l}>{LOB_LABELS[l]}</option>)}
               </select>
             )}
             <button
@@ -522,7 +524,7 @@ export function SubmissionDetailPage() {
             </span>
           ))}
           {/* Add LOB dropdown */}
-          {ALL_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).length > 0 && (
+          {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).length > 0 && (
             <select
               value=""
               onChange={(e) => {
@@ -533,7 +535,7 @@ export function SubmissionDetailPage() {
               className="text-xs border border-dashed border-slate-300 rounded-full px-2.5 py-1 text-slate-500 hover:border-blue-400 hover:text-blue-600 bg-white disabled:opacity-50 cursor-pointer"
             >
               <option value="">+ Add LOB</option>
-              {ALL_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).map((l) => (
+              {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).map((l) => (
                 <option key={l} value={l}>{LOB_LABELS[l]}</option>
               ))}
             </select>
