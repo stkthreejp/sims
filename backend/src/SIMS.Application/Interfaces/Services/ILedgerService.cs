@@ -40,4 +40,17 @@ public interface ILedgerService
         int trustAccountId,
         Guid userId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates mirror-image reversal rows for every LedgerTransaction in the given group (TransactionId).
+    /// Original rows get PostingStatus='Voided' + VoidedByTransactionId set.
+    /// New rows get PostingStatus='Reversal' + ReversesTransactionId set.
+    /// Returns the new reversal TransactionId.
+    /// </summary>
+    Task<Guid> ReverseTransactionGroupAsync(
+        Guid transactionId,
+        string voidReason,
+        Guid userId,
+        DateOnly effectiveDate,
+        CancellationToken ct = default);
 }

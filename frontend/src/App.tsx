@@ -38,6 +38,7 @@ import { CashApplicationPage } from '@/pages/billing/CashApplicationPage'
 import { CashDistributionPage } from '@/pages/billing/CashDistributionPage'
 import { DisbursementsPage } from '@/pages/billing/DisbursementsPage'
 import { StatementReconciliationPage } from '@/pages/billing/StatementReconciliationPage'
+import { ActivityPage } from '@/pages/billing/ActivityPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -103,6 +104,7 @@ export default function App() {
             <Route path="/billing/cash-distribution" element={<CashDistributionPage />} />
             <Route path="/billing/disbursements" element={<DisbursementsPage />} />
             <Route path="/billing/statement-reconciliation" element={<StatementReconciliationPage />} />
+            <Route path="/billing/activity" element={<ActivityPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

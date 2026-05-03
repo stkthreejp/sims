@@ -73,6 +73,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICashApplicationService, CashApplicationService>();
         services.AddScoped<ICashDistributionService, CashDistributionService>();
         services.AddScoped<IDisbursementService, DisbursementService>();
+        services.AddScoped<IVoidService, VoidService>();
+        services.AddScoped<IActivityService, ActivityService>();
         services.AddScoped<IPayeeStatementService, PayeeStatementService>();
         services.AddScoped<IWireSheetPdfService, WireSheetPdfService>();
         services.AddHttpClient("gemini");

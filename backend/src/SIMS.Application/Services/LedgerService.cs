@@ -227,6 +227,59 @@ public class LedgerService : ILedgerService
         return txnId;
     }
 
+    public async Task<Guid> ReverseTransactionGroupAsync(
+        Guid transactionId,
+        string voidReason,
+        Guid userId,
+        DateOnly effectiveDate,
+        CancellationToken ct = default)
+    {
+        var db = Db;
+        var originals = await db.Set<LedgerTransaction>()
+            .Where(t => t.TransactionId == transactionId && t.PostingStatus == "Posted")
+            .ToListAsync(ct);
+
+        if (originals.Count == 0)
+            throw new InvalidOperationException($"No posted rows found for TransactionId {transactionId}");
+
+        var reversalId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var reversals = originals.Select(orig => new LedgerTransaction
+        {
+            TransactionId = reversalId,
+            EffectiveDate = effectiveDate,
+            AccountId = orig.AccountId,
+            Debit = orig.Credit,   // swap debit/credit
+            Credit = orig.Debit,
+            SourceType = orig.SourceType,
+            SourceId = orig.SourceId,
+            Memo = $"VOID: {orig.Memo}",
+            CreatedBy = userId,
+            PostedAt = now,
+            PostingStatus = "Reversal",
+            ReversesTransactionId = transactionId,
+            VoidReason = voidReason,
+            VoidedAt = now,
+            VoidedBy = userId,
+        }).ToList();
+
+        AssertBalanced(reversals);
+
+        foreach (var orig in originals)
+        {
+            orig.PostingStatus = "Voided";
+            orig.VoidedByTransactionId = reversalId;
+            orig.VoidedAt = now;
+            orig.VoidedBy = userId;
+            orig.VoidReason = voidReason;
+        }
+
+        db.Set<LedgerTransaction>().AddRange(reversals);
+        await db.SaveChangesAsync(ct);
+        return reversalId;
+    }
+
     private static void AssertBalanced(List<LedgerTransaction> rows)
     {
         var dr = rows.Sum(r => r.Debit);
