@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 
 const navItems = [
@@ -22,163 +21,115 @@ const adminTaskItems = [
   { to: '/admin/escalation-rules', label: 'Escalation', icon: AlertOctagon },
 ]
 
+const accountingItems = [
+  { to: '/admin/fees', label: 'Fee Rules', icon: Receipt },
+  { to: '/billing/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/billing/receipts', label: 'Receipts', icon: Banknote },
+  { to: '/billing/cash-application', label: 'Cash Application', icon: ArrowLeftRight },
+  { to: '/billing/cash-distribution', label: 'Cash Distribution', icon: Landmark },
+  { to: '/billing/disbursements', label: 'Disbursements', icon: Wallet },
+  { to: '/billing/statement-reconciliation', label: 'Statement Recon', icon: FileInput },
+  { to: '/billing/activity', label: 'Activity', icon: Activity },
+  { to: '/billing/period-close', label: 'Period Close', icon: CalendarCheck },
+  { to: '/billing/sync-health', label: 'Sync Health', icon: Wifi },
+]
+
+function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
+  return (
+    <NavLink
+      to={to}
+      style={({ isActive }) => ({
+        display: 'flex',
+        alignItems: 'center',
+        gap: 9,
+        padding: '6px 10px',
+        borderRadius: 'var(--r-sm)',
+        fontSize: 12.5,
+        fontWeight: isActive ? 600 : 500,
+        color: isActive ? 'var(--accent-ink)' : 'var(--ink-3)',
+        background: isActive ? 'var(--accent-soft)' : 'transparent',
+        textDecoration: 'none',
+        transition: 'background .1s, color .1s',
+      })}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLElement
+        if (!el.getAttribute('aria-current')) {
+          el.style.background = 'var(--hover)'
+          el.style.color = 'var(--ink)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLElement
+        if (!el.getAttribute('aria-current')) {
+          el.style.background = 'transparent'
+          el.style.color = 'var(--ink-3)'
+        }
+      }}
+    >
+      <Icon style={{ width: 14, height: 14, flexShrink: 0, opacity: .85 }} />
+      {label}
+    </NavLink>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      padding: '14px 10px 4px',
+      fontSize: 9.5,
+      fontWeight: 700,
+      letterSpacing: '.07em',
+      textTransform: 'uppercase',
+      color: 'var(--ink-4)',
+    }}>
+      {children}
+    </div>
+  )
+}
+
 export function Sidebar() {
   const hasRole = useAuthStore((s) => s.hasRole)
   const isAdmin = hasRole('Admin')
 
   return (
-    <aside className="w-56 bg-slate-900 flex flex-col shrink-0">
-      <div className="px-4 py-4 border-b border-slate-700 flex justify-center">
-        <img src="/logo.png" alt="Specialty Market Managers" className="h-10 w-auto brightness-0 invert" />
+    <aside style={{
+      width: 'var(--sidebar-w)',
+      background: 'var(--surface)',
+      borderRight: '1px solid var(--line)',
+      display: 'flex',
+      flexDirection: 'column',
+      flexShrink: 0,
+    }}>
+      {/* Logo */}
+      <div style={{
+        padding: '14px 16px',
+        borderBottom: '1px solid var(--line)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: 'var(--topbar-h)',
+      }}>
+        <img src="/logo.png" alt="Specialty Market Managers" style={{ height: 32, width: 'auto' }} />
       </div>
 
-      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ to, label, icon: Icon, adminOnly, roles }) => {
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {navItems.map(({ to, label, icon, adminOnly, roles }) => {
           if (adminOnly && !isAdmin) return null
           if (roles && !roles.some((r) => hasRole(r))) return null
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                )
-              }
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </NavLink>
-          )
+          return <NavItem key={to} to={to} label={label} icon={icon} />
         })}
 
         {isAdmin && (
           <>
-            <div className="px-3 pt-4 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Accounting
-            </div>
-            <NavLink
-              to="/admin/fees"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <Receipt className="h-4 w-4 shrink-0" />
-              Fee Rules
-            </NavLink>
-            <NavLink
-              to="/billing/invoices"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <Receipt className="h-4 w-4 shrink-0" />
-              Invoices
-            </NavLink>
-            <NavLink
-              to="/billing/receipts"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <Banknote className="h-4 w-4 shrink-0" />
-              Receipts
-            </NavLink>
-            <NavLink
-              to="/billing/cash-application"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <ArrowLeftRight className="h-4 w-4 shrink-0" />
-              Cash Application
-            </NavLink>
-            <NavLink
-              to="/billing/cash-distribution"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <Landmark className="h-4 w-4 shrink-0" />
-              Cash Distribution
-            </NavLink>
-            <NavLink
-              to="/billing/disbursements"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <Wallet className="h-4 w-4 shrink-0" />
-              Disbursements
-            </NavLink>
-            <NavLink
-              to="/billing/statement-reconciliation"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <FileInput className="h-4 w-4 shrink-0" />
-              Statement Recon
-            </NavLink>
-            <NavLink
-              to="/billing/activity"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <Activity className="h-4 w-4 shrink-0" />
-              Activity
-            </NavLink>
-            <NavLink
-              to="/billing/period-close"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <CalendarCheck className="h-4 w-4 shrink-0" />
-              Period Close
-            </NavLink>
-            <NavLink
-              to="/billing/sync-health"
-              className={({ isActive }) =>
-                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
-              }
-            >
-              <Wifi className="h-4 w-4 shrink-0" />
-              Sync Health
-            </NavLink>
-            <div className="px-3 pt-4 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Task Engine
-            </div>
-            {adminTaskItems.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  )
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-              </NavLink>
+            <SectionLabel>Accounting</SectionLabel>
+            {accountingItems.map(({ to, label, icon }) => (
+              <NavItem key={to} to={to} label={label} icon={icon} />
+            ))}
+
+            <SectionLabel>Task Engine</SectionLabel>
+            {adminTaskItems.map(({ to, label, icon }) => (
+              <NavItem key={to} to={to} label={label} icon={icon} />
             ))}
           </>
         )}
