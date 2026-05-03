@@ -6,4 +6,5 @@ namespace SIMS.Application.Interfaces.Services;
 public interface IRatingEngineService
 {
     Task<Result<RatingResultDto>> RateAsync(Guid quoteId, RateQuoteRequest request, Guid ratedById);
+    Task<Result<RatingResultDto>> GetLatestSnapshotAsync(Guid quoteId);
 }

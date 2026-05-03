@@ -169,6 +169,36 @@ export interface Note {
   updatedAt: string
 }
 
+// Rating engine
+
+export interface RateQuoteRequest {
+  scheduleModifier: number
+  scheduleModifierReason?: string
+}
+
+export interface RatingLine {
+  exposureRef: string
+  linePremium: number
+  inputs: string         // JSON-encoded; safe-parse client-side
+  factorsApplied: string // JSON-encoded
+}
+
+export interface RatingResult {
+  snapshotId: string
+  manualPremium: number
+  scheduleModifier: number
+  scheduleModifierReason: string | null
+  grandTotalPremium: number
+  ratedAt: string
+  ratedById: string
+  ratedByName: string | null
+  isBoundSnapshot: boolean
+  scheduleMin: number
+  scheduleMax: number
+  minimumPremium: number | null
+  lines: RatingLine[]
+}
+
 export interface Attachment {
   id: string
   quoteId: string

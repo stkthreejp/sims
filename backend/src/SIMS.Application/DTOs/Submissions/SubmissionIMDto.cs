@@ -32,6 +32,13 @@ public class SubmissionEquipmentDto
     public string? Description { get; set; }
     public string? SerialNumber { get; set; }
     public decimal? Value { get; set; }
+
+    // IM rating inputs
+    public Guid? EquipmentTypeId { get; set; }
+    public string? TerritoryCode { get; set; }
+    public decimal? Deductible { get; set; }      // null = "10% ACV" tier
+    public string? SettlementBasis { get; set; }  // "ACV" | "RCV"
+
     public DateTime CreatedAt { get; set; }
 }
 
@@ -44,6 +51,12 @@ public class SubmissionEquipmentCreateDto
     public string? Description { get; set; }
     public string? SerialNumber { get; set; }
     public decimal? Value { get; set; }
+
+    // IM rating inputs
+    public Guid? EquipmentTypeId { get; set; }
+    public string? TerritoryCode { get; set; }
+    public decimal? Deductible { get; set; }      // null = "10% ACV" tier
+    public string? SettlementBasis { get; set; }  // "ACV" | "RCV"
 }
 
 public class SubmissionEquipmentUpdateDto : SubmissionEquipmentCreateDto { }

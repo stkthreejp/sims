@@ -62,12 +62,19 @@ public class SubmissionIMController : ControllerBase
         if (!await _db.Submissions.AnyAsync(s => s.Id == submissionId))
             return NotFound(new { ErrorMessage = "Submission not found." });
 
+        var validation = await ValidateRatingFieldsAsync(dto);
+        if (validation is not null) return BadRequest(new { ErrorMessage = validation });
+
         var e = new SubmissionEquipment
         {
             SubmissionId = submissionId,
             ItemNumber = dto.ItemNumber, Year = dto.Year, Make = dto.Make,
             Model = dto.Model, Description = dto.Description,
             SerialNumber = dto.SerialNumber, Value = dto.Value,
+            EquipmentTypeId = dto.EquipmentTypeId,
+            TerritoryCode = dto.TerritoryCode,
+            Deductible = dto.Deductible,
+            SettlementBasis = dto.SettlementBasis,
         };
         _db.SubmissionEquipment.Add(e);
         await _db.SaveChangesAsync();
@@ -79,11 +86,42 @@ public class SubmissionIMController : ControllerBase
     {
         var e = await _db.SubmissionEquipment.FirstOrDefaultAsync(x => x.Id == id && x.SubmissionId == submissionId);
         if (e == null) return NotFound();
+
+        var validation = await ValidateRatingFieldsAsync(dto);
+        if (validation is not null) return BadRequest(new { ErrorMessage = validation });
+
         e.ItemNumber = dto.ItemNumber; e.Year = dto.Year; e.Make = dto.Make;
         e.Model = dto.Model; e.Description = dto.Description;
         e.SerialNumber = dto.SerialNumber; e.Value = dto.Value;
+        e.EquipmentTypeId = dto.EquipmentTypeId;
+        e.TerritoryCode = dto.TerritoryCode;
+        e.Deductible = dto.Deductible;
+        e.SettlementBasis = dto.SettlementBasis;
         await _db.SaveChangesAsync();
         return Ok(MapEquipmentToDto(e));
+    }
+
+    // Allowed deductible tiers (null is also valid — represents the "10% ACV" tier).
+    private static readonly decimal[] AllowedDeductibles = new[] { 2500m, 5000m, 10000m, 25000m };
+    private static readonly string[] AllowedSettlementBases = new[] { "ACV", "RCV" };
+
+    private async Task<string?> ValidateRatingFieldsAsync(SubmissionEquipmentCreateDto dto)
+    {
+        if (dto.EquipmentTypeId.HasValue)
+        {
+            var exists = await _db.EquipmentTypes.AnyAsync(t => t.Id == dto.EquipmentTypeId.Value);
+            if (!exists) return "Equipment type not found.";
+        }
+        if (dto.Deductible.HasValue && !AllowedDeductibles.Contains(dto.Deductible.Value))
+            return $"Deductible must be one of {string.Join(", ", AllowedDeductibles)} or null (10% ACV).";
+        if (!string.IsNullOrEmpty(dto.SettlementBasis) && !AllowedSettlementBases.Contains(dto.SettlementBasis))
+            return "SettlementBasis must be 'ACV' or 'RCV'.";
+        if (!string.IsNullOrEmpty(dto.TerritoryCode))
+        {
+            var exists = await _db.Territories.AnyAsync(t => t.TerritoryNumber.ToString() == dto.TerritoryCode);
+            if (!exists) return "Territory not found.";
+        }
+        return null;
     }
 
     [HttpDelete("equipment/{id:guid}")]
@@ -110,6 +148,9 @@ public class SubmissionIMController : ControllerBase
     {
         Id = e.Id, SubmissionId = e.SubmissionId, ItemNumber = e.ItemNumber,
         Year = e.Year, Make = e.Make, Model = e.Model, Description = e.Description,
-        SerialNumber = e.SerialNumber, Value = e.Value, CreatedAt = e.CreatedAt,
+        SerialNumber = e.SerialNumber, Value = e.Value,
+        EquipmentTypeId = e.EquipmentTypeId, TerritoryCode = e.TerritoryCode,
+        Deductible = e.Deductible, SettlementBasis = e.SettlementBasis,
+        CreatedAt = e.CreatedAt,
     };
 }

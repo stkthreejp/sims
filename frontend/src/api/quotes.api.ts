@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment } from '@/types/quote.types'
+import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const quotesApi = {
@@ -23,6 +23,18 @@ export const quotesApi = {
 
   commissionOverride: (id: string, data: CommissionOverrideRequest) =>
     apiClient.post<Quote>(`/quotes/${id}/commission-override`, data).then((r) => r.data),
+
+  rate: (id: string, data: RateQuoteRequest) =>
+    apiClient.post<RatingResult>(`/quotes/${id}/rate`, data).then((r) => r.data),
+
+  // Returns null when no snapshot exists yet (404 from API).
+  getRatingSnapshot: (id: string) =>
+    apiClient.get<RatingResult>(`/quotes/${id}/rating-snapshot`)
+      .then((r) => r.data)
+      .catch((err) => {
+        if (err?.response?.status === 404) return null
+        throw err
+      }),
 
   delete: (id: string) =>
     apiClient.delete(`/quotes/${id}`),

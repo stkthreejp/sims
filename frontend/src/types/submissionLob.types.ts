@@ -158,6 +158,22 @@ export interface SubmissionIMCoveragesUpsert {
   coinsurancePercentage?: number
 }
 
+// 4 fixed deductible tiers + null sentinel for "10% ACV". Stored on
+// SubmissionEquipment.deductible (number for the dollar tiers, null for 10% ACV).
+export const IM_DEDUCTIBLE_TIERS = [
+  { value: 2500, label: '$2,500' },
+  { value: 5000, label: '$5,000' },
+  { value: 10000, label: '$10,000' },
+  { value: 25000, label: '$25,000' },
+  { value: null, label: '10% ACV' },
+] as const
+
+export type SettlementBasis = 'ACV' | 'RCV'
+export const SETTLEMENT_BASIS_LABELS: Record<SettlementBasis, string> = {
+  ACV: 'Actual Cash Value (ACV)',
+  RCV: 'Replacement Cost (RCV)',
+}
+
 export interface SubmissionEquipment {
   id: string
   submissionId: string
@@ -168,6 +184,11 @@ export interface SubmissionEquipment {
   description: string | null
   serialNumber: string | null
   value: number | null
+  // IM rating inputs
+  equipmentTypeId: string | null
+  territoryCode: string | null
+  deductible: number | null         // dollar tier; null means "10% ACV"
+  settlementBasis: SettlementBasis | null
   createdAt: string
 }
 
@@ -179,6 +200,25 @@ export interface SubmissionEquipmentCreate {
   description?: string
   serialNumber?: string
   value?: number
+  equipmentTypeId?: string | null
+  territoryCode?: string | null
+  deductible?: number | null
+  settlementBasis?: SettlementBasis | null
+}
+
+// IM-specific reference data
+export interface IMEquipmentType {
+  id: string
+  typeNumber: number
+  name: string
+}
+
+export interface IMTerritory {
+  id: string
+  territoryNumber: number
+  code: string         // string form of territoryNumber, used as the FK on equipment
+  states: string       // CSV like "AL,AR,FL,GA,LA,MS,OK,SC,TX"
+  modifier: number
 }
 
 export interface SubmissionSupplemental {

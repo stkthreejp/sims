@@ -18,6 +18,8 @@ import type {
   SubmissionIMCoveragesUpsert,
   SubmissionEquipment,
   SubmissionEquipmentCreate,
+  IMEquipmentType,
+  IMTerritory,
 } from '@/types/submissionLob.types'
 
 const base = (submissionId: string) => `/submissions/${submissionId}`
@@ -94,6 +96,13 @@ export const submissionIMApi = {
     apiClient.put<SubmissionEquipment>(`${base(submissionId)}/im/equipment/${id}`, dto).then((r) => r.data),
   deleteEquipment: (submissionId: string, id: string) =>
     apiClient.delete(`${base(submissionId)}/im/equipment/${id}`),
+}
+
+export const imLookupsApi = {
+  getEquipmentTypes: () =>
+    apiClient.get<IMEquipmentType[]>('/im/equipment-types').then((r) => r.data),
+  getTerritories: () =>
+    apiClient.get<IMTerritory[]>('/im/territories').then((r) => r.data),
 }
 
 export const submissionSupplementalApi = {

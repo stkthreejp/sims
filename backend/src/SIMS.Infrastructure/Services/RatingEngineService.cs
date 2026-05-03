@@ -42,6 +42,10 @@ public class RatingEngineService : IRatingEngineService
 
         var modifier = Math.Clamp(request.ScheduleModifier, version.ScheduleMin, version.ScheduleMax);
 
+        // A schedule modifier other than 1.00 must be justified.
+        if (modifier != 1.0m && string.IsNullOrWhiteSpace(request.ScheduleModifierReason))
+            return Result<RatingResultDto>.Failure("REASON_REQUIRED", "A reason is required when applying a schedule modifier other than 1.00.");
+
         var acceptedTypeIds = version.EligibilityRules
             .Where(r => r.Accepted)
             .Select(r => r.EquipmentTypeId)
@@ -141,20 +145,58 @@ public class RatingEngineService : IRatingEngineService
 
         await _db.SaveChangesAsync();
 
-        return Result<RatingResultDto>.Success(new RatingResultDto
-        {
-            SnapshotId = snapshot.Id,
-            ManualPremium = manualPremium,
-            ScheduleModifier = modifier,
-            GrandTotalPremium = grandTotal,
-            Lines = lines.Select(l => new RatingLineDto
+        var ratedByName = await _db.Users
+            .Where(u => u.Id == ratedById)
+            .Select(u => u.FirstName + " " + u.LastName)
+            .FirstOrDefaultAsync();
+
+        return Result<RatingResultDto>.Success(MapSnapshotToDto(snapshot, version, ratedByName));
+    }
+
+    public async Task<Result<RatingResultDto>> GetLatestSnapshotAsync(Guid quoteId)
+    {
+        var snapshot = await _db.QuoteRatingSnapshots
+            .Include(s => s.Lines)
+            .Include(s => s.RatingPlanVersion)
+            .Where(s => s.QuoteId == quoteId)
+            .OrderByDescending(s => s.RatedAt)
+            .FirstOrDefaultAsync();
+
+        if (snapshot is null)
+            return Result<RatingResultDto>.Failure("NOT_FOUND", "No rating snapshot for this quote.");
+
+        var ratedByName = await _db.Users
+            .Where(u => u.Id == snapshot.RatedById)
+            .Select(u => u.FirstName + " " + u.LastName)
+            .FirstOrDefaultAsync();
+
+        return Result<RatingResultDto>.Success(MapSnapshotToDto(snapshot, snapshot.RatingPlanVersion, ratedByName));
+    }
+
+    private static RatingResultDto MapSnapshotToDto(QuoteRatingSnapshot s, RatingPlanVersion v, string? ratedByName) => new()
+    {
+        SnapshotId = s.Id,
+        ManualPremium = s.ManualPremium,
+        ScheduleModifier = s.ScheduleModifier,
+        ScheduleModifierReason = s.ScheduleModifierReason,
+        GrandTotalPremium = s.GrandTotalPremium,
+        RatedAt = s.RatedAt,
+        RatedById = s.RatedById,
+        RatedByName = ratedByName,
+        IsBoundSnapshot = s.IsBoundSnapshot,
+        ScheduleMin = v.ScheduleMin,
+        ScheduleMax = v.ScheduleMax,
+        MinimumPremium = v.MinimumPremium,
+        Lines = s.Lines
+            .OrderBy(l => l.ExposureRef)
+            .Select(l => new RatingLineDto
             {
                 ExposureRef = l.ExposureRef,
                 LinePremium = l.LinePremium,
+                Inputs = l.Inputs,
                 FactorsApplied = l.FactorsApplied,
             }).ToList(),
-        });
-    }
+    };
 
     private static decimal? LookupFactor(FactorTable table, Dictionary<string, string> dims)
         => table.Rows.FirstOrDefault(r => dims.All(kv =>

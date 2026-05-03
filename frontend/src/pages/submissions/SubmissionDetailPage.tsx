@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight, RefreshCw, AlertTriangle, TrendingDown } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight, RefreshCw, AlertTriangle, TrendingDown, Calculator } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
 import { inboundEmailsApi } from '@/api/inboundEmails.api'
@@ -9,12 +9,14 @@ import { quotesApi } from '@/api/quotes.api'
 import { carriersApi } from '@/api/carriers.api'
 import { usersApi } from '@/api/users.api'
 import { agentsApi } from '@/api/agents.api'
-import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi, submissionGLApi, submissionIMApi } from '@/api/submissionLob.api'
-import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS } from '@/types/submissionLob.types'
-import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius } from '@/types/submissionLob.types'
+import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
+import { insuredsApi } from '@/api/insureds.api'
+import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
 import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
@@ -118,9 +120,13 @@ export function SubmissionDetailPage() {
   const [overrideMode, setOverrideMode] = useState<'dollar' | 'rate'>('dollar')
   const [overrideInput, setOverrideInput] = useState('')
 
+  // Per-quote rating panel toggle (only one open at a time, like the override panel)
+  const [ratingOpenForQuoteId, setRatingOpenForQuoteId] = useState<string | null>(null)
+
   // LOB section open/close
   const [driversOpen, setDriversOpen] = useState(false)
   const [vehiclesOpen, setVehiclesOpen] = useState(false)
+  const [equipmentOpen, setEquipmentOpen] = useState(false)
   const [priorCarriersOpen, setPriorCarriersOpen] = useState(false)
   const [supplementalOpen, setSupplementalOpen] = useState(false)
 
@@ -141,6 +147,12 @@ export function SubmissionDetailPage() {
   const [showCarrierForm, setShowCarrierForm] = useState(false)
   const [carrierForm, setCarrierForm] = useState<SubmissionPriorCarrierCreate>(emptyCarrierForm())
   const [editingCarrierId, setEditingCarrierId] = useState<string | null>(null)
+
+  // Equipment form state
+  const emptyEquipmentForm = (): SubmissionEquipmentCreate => ({ itemNumber: 1 })
+  const [showEquipmentForm, setShowEquipmentForm] = useState(false)
+  const [equipmentForm, setEquipmentForm] = useState<SubmissionEquipmentCreate>(emptyEquipmentForm())
+  const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null)
 
   // Supplemental form state
   const emptySupplementalForm = (): SubmissionSupplementalUpsert => ({ commoditiesHauled: [], terminalLocations: [], safetyProgramInPlace: false, filingsRequired: [], ownerOperator: false })
@@ -198,6 +210,43 @@ export function SubmissionDetailPage() {
     queryFn: () => submissionIMApi.getCoverages(id!),
     enabled: !!id,
   })
+
+  const { data: equipment = [] } = useQuery({
+    queryKey: ['submission-equipment', id],
+    queryFn: () => submissionIMApi.getEquipment(id!),
+    enabled: !!id && equipmentOpen,
+  })
+
+  const { data: imEquipmentTypes = [] } = useQuery({
+    queryKey: ['im-equipment-types'],
+    queryFn: () => imLookupsApi.getEquipmentTypes(),
+    enabled: equipmentOpen,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: imTerritories = [] } = useQuery({
+    queryKey: ['im-territories'],
+    queryFn: () => imLookupsApi.getTerritories(),
+    enabled: equipmentOpen,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Insured fetched only to derive a default territory from the insured's state
+  // when the user opens the Add Equipment form.
+  const { data: insured } = useQuery({
+    queryKey: ['insured', submission?.insuredId],
+    queryFn: () => insuredsApi.getById(submission!.insuredId),
+    enabled: !!submission?.insuredId && equipmentOpen,
+  })
+
+  const defaultTerritoryCode = (() => {
+    const state = insured?.state?.trim().toUpperCase()
+    if (!state || imTerritories.length === 0) return undefined
+    const match = imTerritories.find((t) =>
+      t.states.split(',').map((s) => s.trim().toUpperCase()).includes(state),
+    )
+    return match?.code
+  })()
 
   useEffect(() => {
     if (supplemental) {
@@ -312,6 +361,24 @@ export function SubmissionDetailPage() {
   const deletePriorCarrierMutation = useMutation({
     mutationFn: (cId: string) => submissionPriorCarriersApi.delete(id!, cId),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] }); toast.success('Prior carrier removed') },
+  })
+
+  // Equipment mutations
+  const saveEquipmentMutation = useMutation({
+    mutationFn: (dto: SubmissionEquipmentCreate) =>
+      editingEquipmentId
+        ? submissionIMApi.updateEquipment(id!, editingEquipmentId, dto)
+        : submissionIMApi.createEquipment(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-equipment', id] })
+      setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null)
+      toast.success('Equipment saved')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to save equipment'),
+  })
+  const deleteEquipmentMutation = useMutation({
+    mutationFn: (eId: string) => submissionIMApi.deleteEquipment(id!, eId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-equipment', id] }); toast.success('Equipment removed') },
   })
 
   // Supplemental mutation
@@ -682,6 +749,13 @@ export function SubmissionDetailPage() {
                         <TrendingDown className="h-3.5 w-3.5" /> Reduce Commission
                       </button>
                     )}
+                    <button
+                      onClick={() => setRatingOpenForQuoteId((cur) => cur === q.id ? null : q.id)}
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded border ${ratingOpenForQuoteId === q.id ? 'bg-blue-600 text-white border-blue-600' : 'text-blue-700 border-blue-300 hover:bg-blue-50'}`}
+                      title="Calculate premium with the rating engine"
+                    >
+                      <Calculator className="h-3.5 w-3.5" /> Rating
+                    </button>
                     {q.status !== 'Bound' && q.status !== 'Cancelled' && q.status !== 'Expired' && (
                       <button
                         onClick={() => {
@@ -773,6 +847,15 @@ export function SubmissionDetailPage() {
                       </button>
                     </div>
                   </div>
+                )}
+
+                {/* Rating panel */}
+                {ratingOpenForQuoteId === q.id && (
+                  <QuoteRatingPanel
+                    quoteId={q.id}
+                    submissionId={q.submissionId}
+                    isBound={q.status === 'Bound'}
+                  />
                 )}
 
                 {/* Inline bind form */}
@@ -1105,6 +1188,179 @@ export function SubmissionDetailPage() {
               <div className="px-5 py-3 border-t">
                 <button onClick={() => { setShowCarrierForm(true); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null) }} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
                   <Plus className="h-3.5 w-3.5" /> Add Prior Carrier
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Equipment (Inland Marine schedule) */}
+      <div className="bg-white border rounded-lg">
+        <button
+          onClick={() => setEquipmentOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+        >
+          <span>Equipment ({equipmentOpen ? equipment.length : '…'})</span>
+          {equipmentOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        </button>
+        {equipmentOpen && (
+          <div className="border-t">
+            {showEquipmentForm && (
+              <div className="px-5 py-4 bg-slate-50 border-b space-y-3 text-sm">
+                <h3 className="font-medium text-slate-700">{editingEquipmentId ? 'Edit Equipment' : 'Add Equipment'}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Item #</label>
+                    <input type="number" value={equipmentForm.itemNumber} onChange={(e) => setEquipmentForm((f) => ({ ...f, itemNumber: parseInt(e.target.value) || 1 }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Year</label>
+                    <input type="number" value={equipmentForm.year ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, year: parseInt(e.target.value) || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Make</label>
+                    <input value={equipmentForm.make ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, make: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Model</label>
+                    <input value={equipmentForm.model ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, model: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+                    <input value={equipmentForm.description ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, description: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Serial #</label>
+                    <input value={equipmentForm.serialNumber ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, serialNumber: e.target.value || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Stated Value</label>
+                    <input type="number" value={equipmentForm.value ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, value: parseFloat(e.target.value) || undefined }))} className="w-full border rounded px-2 py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Equipment Type *</label>
+                    <select value={equipmentForm.equipmentTypeId ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, equipmentTypeId: e.target.value || null }))} className="w-full border rounded px-2 py-1.5">
+                      <option value="">— Select —</option>
+                      {imEquipmentTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Deductible *</label>
+                    <select
+                      value={equipmentForm.deductible === null ? '10ACV' : equipmentForm.deductible !== undefined ? String(equipmentForm.deductible) : ''}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setEquipmentForm((f) => ({ ...f, deductible: v === '' ? undefined : v === '10ACV' ? null : Number(v) }))
+                      }}
+                      className="w-full border rounded px-2 py-1.5"
+                    >
+                      <option value="">— Select —</option>
+                      {IM_DEDUCTIBLE_TIERS.map((t) => (
+                        <option key={t.label} value={t.value === null ? '10ACV' : String(t.value)}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Settlement Basis</label>
+                    <select value={equipmentForm.settlementBasis ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, settlementBasis: (e.target.value as SettlementBasis) || null }))} className="w-full border rounded px-2 py-1.5">
+                      <option value="">— Select —</option>
+                      {(Object.keys(SETTLEMENT_BASIS_LABELS) as SettlementBasis[]).map((k) => <option key={k} value={k}>{SETTLEMENT_BASIS_LABELS[k]}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Territory</label>
+                    <select value={equipmentForm.territoryCode ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, territoryCode: e.target.value || null }))} className="w-full border rounded px-2 py-1.5">
+                      <option value="">— Select —</option>
+                      {imTerritories.map((t) => <option key={t.id} value={t.code}>Terr {t.code} ({t.states})</option>)}
+                    </select>
+                    {!editingEquipmentId && defaultTerritoryCode && !equipmentForm.territoryCode && (
+                      <p className="text-xs text-slate-500 mt-1">Default for insured state: Terr {defaultTerritoryCode}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => saveEquipmentMutation.mutate(equipmentForm)} disabled={saveEquipmentMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">
+                    <Check className="h-3.5 w-3.5" /> Save
+                  </button>
+                  <button onClick={() => { setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null) }} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-white">
+                    <X className="h-3.5 w-3.5" /> Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {equipment.length === 0 && !showEquipmentForm ? (
+              <p className="text-sm text-slate-400 px-5 py-6 text-center">No equipment scheduled yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+                  <tr>
+                    <th className="px-5 py-2 text-left">Item</th>
+                    <th className="px-5 py-2 text-left">Year / Make / Model</th>
+                    <th className="px-5 py-2 text-left">Type</th>
+                    <th className="px-5 py-2 text-right">Value</th>
+                    <th className="px-5 py-2 text-left">Ded.</th>
+                    <th className="px-5 py-2 text-left">Sett.</th>
+                    <th className="px-5 py-2 text-left">Terr.</th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {equipment.map((eq) => {
+                    const type = imEquipmentTypes.find((t) => t.id === eq.equipmentTypeId)
+                    const dedLabel = eq.deductible === null
+                      ? '10% ACV'
+                      : eq.deductible !== null && eq.deductible !== undefined
+                        ? `$${eq.deductible.toLocaleString()}`
+                        : '—'
+                    return (
+                      <tr key={eq.id} className="hover:bg-slate-50">
+                        <td className="px-5 py-2">{eq.itemNumber}</td>
+                        <td className="px-5 py-2 font-medium">{[eq.year, eq.make, eq.model].filter(Boolean).join(' ') || '—'}</td>
+                        <td className="px-5 py-2 text-slate-500">{type?.name ?? '—'}</td>
+                        <td className="px-5 py-2 text-right">{eq.value != null ? `$${eq.value.toLocaleString()}` : '—'}</td>
+                        <td className="px-5 py-2 text-slate-500">{dedLabel}</td>
+                        <td className="px-5 py-2 text-slate-500">{eq.settlementBasis ?? '—'}</td>
+                        <td className="px-5 py-2 text-slate-500">{eq.territoryCode ?? '—'}</td>
+                        <td className="px-2 py-2">
+                          <div className="flex gap-1">
+                            <button onClick={() => {
+                              setEquipmentForm({
+                                itemNumber: eq.itemNumber,
+                                year: eq.year ?? undefined,
+                                make: eq.make ?? undefined,
+                                model: eq.model ?? undefined,
+                                description: eq.description ?? undefined,
+                                serialNumber: eq.serialNumber ?? undefined,
+                                value: eq.value ?? undefined,
+                                equipmentTypeId: eq.equipmentTypeId,
+                                territoryCode: eq.territoryCode,
+                                deductible: eq.deductible,
+                                settlementBasis: eq.settlementBasis,
+                              })
+                              setEditingEquipmentId(eq.id)
+                              setShowEquipmentForm(true)
+                            }} className="p-1 text-slate-400 hover:text-blue-600 rounded"><Pencil className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => { if (confirm('Remove equipment item?')) deleteEquipmentMutation.mutate(eq.id) }} className="p-1 text-slate-400 hover:text-red-600 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+            {!showEquipmentForm && (
+              <div className="px-5 py-3 border-t">
+                <button onClick={() => {
+                  setShowEquipmentForm(true)
+                  setEquipmentForm({
+                    itemNumber: (equipment.at(-1)?.itemNumber ?? 0) + 1,
+                    territoryCode: defaultTerritoryCode ?? null,
+                  })
+                  setEditingEquipmentId(null)
+                }} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                  <Plus className="h-3.5 w-3.5" /> Add Equipment
                 </button>
               </div>
             )}

@@ -60,6 +60,15 @@ public class QuotesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("{id:guid}/rating-snapshot")]
+    public async Task<IActionResult> GetRatingSnapshot(Guid id)
+    {
+        var result = await _ratingEngine.GetLatestSnapshotAsync(id);
+        if (!result.IsSuccess && result.ErrorCode == "NOT_FOUND")
+            return NotFound(new { result.ErrorCode, result.ErrorMessage });
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("{id:guid}/bind")]
     public async Task<IActionResult> Bind(Guid id, [FromBody] QuoteBindDto dto)
     {
