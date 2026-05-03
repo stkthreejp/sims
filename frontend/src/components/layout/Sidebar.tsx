@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 
@@ -139,6 +139,16 @@ export function Sidebar() {
             >
               <Activity className="h-4 w-4 shrink-0" />
               Activity
+            </NavLink>
+            <NavLink
+              to="/billing/period-close"
+              className={({ isActive }) =>
+                cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white')
+              }
+            >
+              <CalendarCheck className="h-4 w-4 shrink-0" />
+              Period Close
             </NavLink>
             <div className="px-3 pt-4 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               Task Engine

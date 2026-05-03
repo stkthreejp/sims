@@ -10,12 +10,14 @@ public class VoidService : IVoidService
 {
     private readonly IServiceProvider _sp;
     private readonly ILedgerService _ledger;
+    private readonly IPeriodCloseService _periods;
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
-    public VoidService(IServiceProvider sp, ILedgerService ledger)
+    public VoidService(IServiceProvider sp, ILedgerService ledger, IPeriodCloseService periods)
     {
         _sp = sp;
         _ledger = ledger;
+        _periods = periods;
     }
 
     public async Task<VoidResultDto> VoidReceiptAsync(
@@ -42,9 +44,9 @@ public class VoidService : IVoidService
             return Fail("HAS_APPLICATIONS",
                 $"Receipt has {activeApps.Count} active cash application(s). Void those first.");
 
-        var effectiveDate = receipt.ReceivedDate;
+        var (reversalDate, resolvedReason) = await ResolveReversalDateAsync(receipt.ReceivedDate, reason ?? "Void", ct);
         var reversalId = await _ledger.ReverseTransactionGroupAsync(
-            receipt.LedgerTransactionId, reason ?? "Void", userId, effectiveDate, ct);
+            receipt.LedgerTransactionId, resolvedReason, userId, reversalDate, ct);
 
         receipt.Status = "Voided";
         await db.SaveChangesAsync(ct);
@@ -70,9 +72,9 @@ public class VoidService : IVoidService
         var priorDay = CheckPriorDay(app.Receipt.ReceivedDate, isAdmin);
         if (priorDay != null) return priorDay;
 
-        var effectiveDate = app.Receipt.ReceivedDate;
+        var (reversalDate, resolvedReason) = await ResolveReversalDateAsync(app.Receipt.ReceivedDate, reason ?? "Void", ct);
         var reversalId = await _ledger.ReverseTransactionGroupAsync(
-            app.LedgerTransactionId, reason ?? "Void", userId, effectiveDate, ct);
+            app.LedgerTransactionId, resolvedReason, userId, reversalDate, ct);
 
         // Restore receipt and invoice balances
         app.Receipt.AppliedAmount -= app.GrossApplied;
@@ -122,8 +124,9 @@ public class VoidService : IVoidService
         var priorDay = CheckPriorDay(invoice.EffectiveDate, isAdmin);
         if (priorDay != null) return priorDay;
 
+        var (reversalDate, resolvedReason) = await ResolveReversalDateAsync(invoice.EffectiveDate, reason ?? "Void", ct);
         var reversalId = await _ledger.ReverseTransactionGroupAsync(
-            invoice.LedgerTransactionId, reason ?? "Void", userId, invoice.EffectiveDate, ct);
+            invoice.LedgerTransactionId, resolvedReason, userId, reversalDate, ct);
 
         invoice.Status = "Voided";
         await db.SaveChangesAsync(ct);
@@ -152,9 +155,10 @@ public class VoidService : IVoidService
             var priorDay = CheckPriorDay(disbursement.PaymentDate, isAdmin);
             if (priorDay != null) return priorDay;
 
+            var (reversalDate, resolvedReason) = await ResolveReversalDateAsync(disbursement.PaymentDate, reason ?? "Void", ct);
             reversalId = await _ledger.ReverseTransactionGroupAsync(
-                disbursement.LedgerTransactionId.Value, reason ?? "Void", userId,
-                disbursement.PaymentDate, ct);
+                disbursement.LedgerTransactionId.Value, resolvedReason, userId,
+                reversalDate, ct);
 
             // Restore payable balances
             foreach (var line in disbursement.Lines)
@@ -185,6 +189,26 @@ public class VoidService : IVoidService
             return Fail("PRIOR_PERIOD",
                 "Prior-period voids require Admin access. Contact your administrator.");
         return null;
+    }
+
+    /// <summary>
+    /// Returns the effective date to use for the reversal. If the original date falls in a closed
+    /// period, returns today so the reversal posts into the current open period.
+    /// </summary>
+    private async Task<(DateOnly reversalDate, string reason)> ResolveReversalDateAsync(
+        DateOnly originalDate, string baseReason, CancellationToken ct)
+    {
+        var periodStatus = await _periods.GetPeriodStatusForDateAsync(originalDate, ct);
+        if (periodStatus == "Closed")
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var crossPeriodNote = $"Cross-period reversal — original in {originalDate:MMMM yyyy}";
+            var combinedReason = string.IsNullOrWhiteSpace(baseReason)
+                ? crossPeriodNote
+                : $"{baseReason} | {crossPeriodNote}";
+            return (today, combinedReason);
+        }
+        return (originalDate, baseReason ?? "Void");
     }
 
     private static bool IsVoidedApplication(DbContext db, Guid ledgerTransactionId)

@@ -73,6 +73,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICashApplicationService, CashApplicationService>();
         services.AddScoped<ICashDistributionService, CashDistributionService>();
         services.AddScoped<IDisbursementService, DisbursementService>();
+        services.AddScoped<IPeriodCloseService, PeriodCloseService>();
         services.AddScoped<IVoidService, VoidService>();
         services.AddScoped<IActivityService, ActivityService>();
         services.AddScoped<IPayeeStatementService, PayeeStatementService>();

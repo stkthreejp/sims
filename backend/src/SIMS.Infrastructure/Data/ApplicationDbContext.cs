@@ -58,6 +58,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Payee> Payees => Set<Payee>();
     public DbSet<JournalEntryRollup> JournalEntryRollups => Set<JournalEntryRollup>();
     public DbSet<AccountingPeriod> AccountingPeriods => Set<AccountingPeriod>();
+    public DbSet<PeriodCloseChecklistItem> PeriodCloseChecklist => Set<PeriodCloseChecklistItem>();
     public DbSet<FeeDefinition> FeeDefinitions => Set<FeeDefinition>();
     public DbSet<FeeRuleVersion> FeeRuleVersions => Set<FeeRuleVersion>();
     public DbSet<FeeStateTaxability> FeeStateTaxabilities => Set<FeeStateTaxability>();
