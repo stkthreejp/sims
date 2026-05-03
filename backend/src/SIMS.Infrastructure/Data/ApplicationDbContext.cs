@@ -75,6 +75,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<DisbursementLine> DisbursementLines => Set<DisbursementLine>();
     public DbSet<PayeeStatement> PayeeStatements => Set<PayeeStatement>();
     public DbSet<PayeeStatementLine> PayeeStatementLines => Set<PayeeStatementLine>();
+    public DbSet<QboOAuthToken> QboOAuthTokens => Set<QboOAuthToken>();
+    public DbSet<PendingQboSync> PendingQboSyncs => Set<PendingQboSync>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

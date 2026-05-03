@@ -1,5 +1,6 @@
 using System.Text;
 using SIMS.API.Middleware;
+using SIMS.Application.Interfaces.Services;
 using SIMS.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -83,6 +84,13 @@ var app = builder.Build();
 
 // Seed database
 await InfrastructureServiceExtensions.SeedDatabaseAsync(app.Services);
+
+// Bootstrap QBO token from config (no-op if already seeded or no credentials configured)
+using (var scope = app.Services.CreateScope())
+{
+    var qboTokenSvc = scope.ServiceProvider.GetRequiredService<IQboTokenService>();
+    await qboTokenSvc.BootstrapFromConfigAsync();
+}
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 

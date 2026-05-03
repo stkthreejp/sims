@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Rollup, RollupSummary } from '@/types/rollup.types'
+import type { Rollup, RollupSummary, QboStatus } from '@/types/rollup.types'
 
 export async function getRollups(): Promise<RollupSummary[]> {
   const { data } = await apiClient.get<RollupSummary[]>('/billing/rollups')
@@ -24,4 +24,9 @@ export async function resyncRollup(id: number): Promise<Rollup> {
 export async function getRollupDownloadUrl(id: number): Promise<string> {
   const { data } = await apiClient.get<{ url: string }>(`/billing/rollups/${id}/download-url`)
   return data.url
+}
+
+export async function getQboStatus(): Promise<QboStatus> {
+  const { data } = await apiClient.get<QboStatus>('/billing/qbo/status')
+  return data
 }

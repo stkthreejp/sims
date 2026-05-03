@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Download, RefreshCw, Play, CheckCircle2, XCircle, Clock, AlertCircle, FileText,
+  Wifi, WifiOff, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getRollups, triggerRollup, resyncRollup, getRollupDownloadUrl } from '@/api/rollup.api'
+import { getRollups, triggerRollup, resyncRollup, getRollupDownloadUrl, getQboStatus } from '@/api/rollup.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
-import type { RollupSummary } from '@/types/rollup.types'
+import type { RollupSummary, PendingQboSync } from '@/types/rollup.types'
 import { useAuthStore } from '@/store/authStore'
 
 const MONTH_NAMES = [
@@ -21,10 +22,11 @@ const fmtDateTime = (s: string) =>
 
 function StatusBadge({ status }: { status: RollupSummary['status'] }) {
   const cfg: Record<string, { cls: string; icon: React.ReactNode }> = {
-    Pending: { cls: 'bg-yellow-100 text-yellow-700', icon: <Clock className="h-3 w-3" /> },
-    Exported: { cls: 'bg-green-100 text-green-800', icon: <CheckCircle2 className="h-3 w-3" /> },
-    Posted: { cls: 'bg-blue-100 text-blue-700', icon: <CheckCircle2 className="h-3 w-3" /> },
-    Failed: { cls: 'bg-red-100 text-red-600', icon: <XCircle className="h-3 w-3" /> },
+    Pending:   { cls: 'bg-yellow-100 text-yellow-700',  icon: <Clock className="h-3 w-3" /> },
+    Exported:  { cls: 'bg-green-100 text-green-800',    icon: <CheckCircle2 className="h-3 w-3" /> },
+    Posted:    { cls: 'bg-blue-100 text-blue-700',      icon: <CheckCircle2 className="h-3 w-3" /> },
+    Failed:    { cls: 'bg-red-100 text-red-600',        icon: <XCircle className="h-3 w-3" /> },
+    Divergent: { cls: 'bg-orange-100 text-orange-700',  icon: <AlertTriangle className="h-3 w-3" /> },
   }
   const { cls, icon } = cfg[status] ?? { cls: 'bg-gray-100 text-gray-600', icon: null }
   return (
@@ -44,13 +46,86 @@ function DriverBadge({ type }: { type: string }) {
   )
 }
 
+// ---------- QBO Status Card ----------
+
+function QboStatusCard({ connected, pending }: { connected: boolean; pending: PendingQboSync[] }) {
+  const activePending = pending.filter(p => p.status !== 'Done')
+  const failedCount = pending.filter(p => p.status === 'Failed').length
+  const retryingCount = pending.filter(p => p.status === 'Retrying' || p.status === 'Pending').length
+
+  return (
+    <div className={`border rounded-lg px-5 py-4 ${
+      failedCount > 0 ? 'bg-red-50 border-red-200' :
+      retryingCount > 0 ? 'bg-yellow-50 border-yellow-200' :
+      connected ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+    }`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {connected
+            ? <Wifi className="h-4 w-4 text-green-600" />
+            : <WifiOff className="h-4 w-4 text-gray-400" />}
+          <span className="text-sm font-semibold text-gray-800">QuickBooks Online</span>
+        </div>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+          connected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+        }`}>
+          {connected ? 'Connected' : 'Not Connected'}
+        </span>
+      </div>
+
+      {connected && activePending.length === 0 && (
+        <p className="text-xs text-green-700">All syncs up to date</p>
+      )}
+
+      {activePending.length > 0 && (
+        <div className="mt-1">
+          <p className="text-xs font-medium text-gray-600 mb-2">
+            Pending sync queue ({activePending.length})
+          </p>
+          <div className="space-y-1">
+            {activePending.map(sync => (
+              <div key={sync.id} className="flex items-center justify-between text-xs bg-white rounded border border-gray-100 px-2 py-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">{sync.period}</span>
+                  <span className={`px-1.5 py-0.5 rounded font-medium ${
+                    sync.status === 'Failed'   ? 'bg-red-100 text-red-600' :
+                    sync.status === 'Retrying' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>{sync.status}</span>
+                  <span className="text-gray-400">attempt {sync.attemptCount}/6</span>
+                </div>
+                {sync.nextRetryAt && (
+                  <span className="text-gray-400">retry {fmtDateTime(sync.nextRetryAt)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+          {activePending.some(p => p.lastError) && (
+            <div className="mt-2 flex items-start gap-1.5 text-xs text-red-600">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+              <span className="truncate">{activePending.find(p => p.lastError)?.lastError}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!connected && (
+        <p className="text-xs text-gray-500 mt-1">
+          Configure OAuth credentials in <code className="bg-gray-100 px-1 rounded">appsettings.json</code> to enable QBO sync.
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ---------- Trigger Modal ----------
 
 interface TriggerModalProps {
   onClose: () => void
+  qboConnected: boolean
 }
 
-function TriggerModal({ onClose }: TriggerModalProps) {
+function TriggerModal({ onClose, qboConnected }: TriggerModalProps) {
   const qc = useQueryClient()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
@@ -62,6 +137,7 @@ function TriggerModal({ onClose }: TriggerModalProps) {
     onSuccess: (r) => {
       toast.success(`Rollup created: ${r.transactionCount} transaction(s), ${r.lineCount} lines`)
       qc.invalidateQueries({ queryKey: ['rollups'] })
+      qc.invalidateQueries({ queryKey: ['qbo-status'] })
       onClose()
     },
     onError: (e: Error) => toast.error(e.message),
@@ -104,26 +180,30 @@ function TriggerModal({ onClose }: TriggerModalProps) {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Driver</label>
             <div className="flex gap-2">
-              {['CSV', 'QBO'].map((d) => (
+              {[
+                { key: 'CSV', label: 'CSV Download', disabled: false },
+                { key: 'QBO', label: qboConnected ? 'QuickBooks' : 'QuickBooks (not connected)', disabled: !qboConnected },
+              ].map(({ key, label, disabled }) => (
                 <button
-                  key={d}
-                  onClick={() => setDriver(d)}
+                  key={key}
+                  onClick={() => !disabled && setDriver(key)}
                   className={`flex-1 px-3 py-2 rounded-md text-sm font-medium border transition-colors ${
-                    driver === d
+                    driver === key
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  } ${d === 'QBO' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  disabled={d === 'QBO'}
-                  title={d === 'QBO' ? 'QBO credentials not yet configured' : undefined}
+                  } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={disabled}
+                  title={disabled ? 'QBO not connected — configure OAuth credentials first' : undefined}
                 >
-                  {d === 'QBO' ? 'QuickBooks (soon)' : 'CSV Download'}
+                  {label}
                 </button>
               ))}
             </div>
           </div>
           <p className="text-xs text-gray-400">
-            All unrolled posted transactions in this period will be grouped into a balanced CSV
-            and uploaded to Azure Blob. Existing rollups for this period are not affected.
+            {driver === 'CSV'
+              ? 'All unrolled posted transactions in this period will be grouped into a balanced CSV and uploaded to Azure Blob.'
+              : 'Each transaction group will be posted directly to QuickBooks Online as a JournalEntry.'}
           </p>
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
@@ -155,6 +235,7 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
     onSuccess: () => {
       toast.success('Resync complete')
       qc.invalidateQueries({ queryKey: ['rollups'] })
+      qc.invalidateQueries({ queryKey: ['qbo-status'] })
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -198,7 +279,13 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
           </div>
         )}
         {rollup.externalId && (
-          <span className="text-xs font-mono text-gray-500">QBO: {rollup.externalId}</span>
+          <span className="text-xs font-mono text-gray-500">QBO: {rollup.externalId.split(',')[0]}{rollup.externalId.includes(',') ? '…' : ''}</span>
+        )}
+        {rollup.status === 'Divergent' && (
+          <div className="flex items-center gap-1 text-xs text-orange-600">
+            <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+            QBO divergence detected
+          </div>
         )}
       </td>
       <td className="px-4 py-3">
@@ -242,9 +329,16 @@ export function SyncHealthPage() {
     queryFn: getRollups,
   })
 
+  const { data: qboStatus } = useQuery({
+    queryKey: ['qbo-status'],
+    queryFn: getQboStatus,
+    staleTime: 30_000,
+  })
+
   const pendingCount = rollups.filter(r => r.status === 'Pending').length
   const failedCount = rollups.filter(r => r.status === 'Failed').length
   const exportedCount = rollups.filter(r => r.status === 'Exported' || r.status === 'Posted').length
+  const divergentCount = rollups.filter(r => r.status === 'Divergent').length
 
   return (
     <div className="p-6">
@@ -268,7 +362,7 @@ export function SyncHealthPage() {
       />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg px-5 py-4">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Rollups</p>
           <p className="text-2xl font-semibold text-gray-900 mt-1">{rollups.length}</p>
@@ -283,7 +377,20 @@ export function SyncHealthPage() {
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Exported</p>
           <p className="text-2xl font-semibold text-green-700 mt-1">{exportedCount}</p>
         </div>
+        <div className={`border rounded-lg px-5 py-4 ${divergentCount > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200'}`}>
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Divergent</p>
+          <p className={`text-2xl font-semibold mt-1 ${divergentCount > 0 ? 'text-orange-700' : 'text-gray-900'}`}>
+            {divergentCount}
+          </p>
+        </div>
       </div>
+
+      {/* QBO connection status */}
+      {qboStatus && (
+        <div className="mb-6">
+          <QboStatusCard connected={qboStatus.connected} pending={qboStatus.pending} />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner /></div>
@@ -316,23 +423,12 @@ export function SyncHealthPage() {
         </div>
       )}
 
-      {/* QB placeholder card */}
-      <div className="mt-6 border border-dashed border-gray-300 rounded-lg px-6 py-5 bg-gray-50">
-        <div className="flex items-start gap-3">
-          <div className="bg-indigo-100 rounded-md p-2 mt-0.5">
-            <RefreshCw className="h-4 w-4 text-indigo-600" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-800">QuickBooks Online — Phase 8b</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Real-time bidirectional sync, pending retry queue, and divergence detection will appear here
-              once QBO OAuth credentials are configured.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {showTrigger && <TriggerModal onClose={() => setShowTrigger(false)} />}
+      {showTrigger && (
+        <TriggerModal
+          onClose={() => setShowTrigger(false)}
+          qboConnected={qboStatus?.connected ?? false}
+        />
+      )}
     </div>
   )
 }

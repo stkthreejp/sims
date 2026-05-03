@@ -1,6 +1,7 @@
+using Microsoft.Extensions.Options;
+using SIMS.Application.Configuration;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Services;
-using SIMS.Infrastructure.Services;
 using SIMS.Domain.Entities;
 using SIMS.Infrastructure.Data;
 using SIMS.Infrastructure.Services;
@@ -73,7 +74,12 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICashApplicationService, CashApplicationService>();
         services.AddScoped<ICashDistributionService, CashDistributionService>();
         services.AddScoped<IDisbursementService, DisbursementService>();
+        // QBO
+        services.Configure<QboSettings>(configuration.GetSection("Qbo"));
+        services.AddScoped<IQboTokenService, QboTokenService>();
+        services.AddScoped<IQboApiClient, QboApiClient>();
         services.AddScoped<IJournalDriver, CsvJournalDriver>();
+        services.AddScoped<IJournalDriver, QboJournalDriver>();
         services.AddScoped<IRollupService, RollupService>();
         services.AddScoped<IPeriodCloseService, PeriodCloseService>();
         services.AddScoped<IVoidService, VoidService>();
@@ -81,9 +87,12 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IPayeeStatementService, PayeeStatementService>();
         services.AddScoped<IWireSheetPdfService, WireSheetPdfService>();
         services.AddHttpClient("gemini");
+        services.AddHttpClient("qbo_oauth");
+        services.AddHttpClient("qbo_api");
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
         services.AddHostedService<TaskEscalationWorker>();
+        services.AddHostedService<QboSyncRetryWorker>();
 
         return services;
     }
