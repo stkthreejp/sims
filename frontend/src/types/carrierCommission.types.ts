@@ -3,6 +3,7 @@ export interface CarrierCommission {
   lineOfBusiness: string | null
   lineOfBusinessLabel: string | null
   commissionRate: number
+  smmRetentionRate: number
   effectiveDate: string
   disabledDate: string | null
   isActive: boolean
@@ -12,6 +13,7 @@ export interface CarrierCommission {
 export interface CreateCarrierCommissionRequest {
   lineOfBusiness: string | null
   commissionRate: number
+  smmRetentionRate: number
   effectiveDate: string
 }
 

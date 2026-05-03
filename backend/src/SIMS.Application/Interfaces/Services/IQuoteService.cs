@@ -13,5 +13,6 @@ public interface IQuoteService
     Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById);
     Task<Result<QuoteDto>> UpdateAsync(Guid id, QuoteUpdateDto dto);
     Task<Result<QuoteDto>> BindAsync(Guid id, QuoteBindDto dto, Guid userId);
+    Task<Result<QuoteDto>> ApplyCommissionOverrideAsync(Guid id, CommissionOverrideRequest req, Guid userId);
     Task<Result> DeleteAsync(Guid id);
 }

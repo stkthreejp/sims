@@ -72,6 +72,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Payable> Payables => Set<Payable>();
     public DbSet<Disbursement> Disbursements => Set<Disbursement>();
     public DbSet<DisbursementLine> DisbursementLines => Set<DisbursementLine>();
+    public DbSet<PayeeStatement> PayeeStatements => Set<PayeeStatement>();
+    public DbSet<PayeeStatementLine> PayeeStatementLines => Set<PayeeStatementLine>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

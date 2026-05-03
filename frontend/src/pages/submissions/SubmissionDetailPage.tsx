@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight, RefreshCw, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight, RefreshCw, AlertTriangle, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
 import { inboundEmailsApi } from '@/api/inboundEmails.api'
@@ -13,7 +13,7 @@ import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate } from '@/types/submission.types'
-import { LOB_LABELS, ALL_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind } from '@/types/quote.types'
+import { LOB_LABELS, ALL_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -46,7 +46,6 @@ type QuoteForm = {
   expirationDate: string
   premiumAmount: string
   taxesAndFees: string
-  commissionRate: string
   coverageDescription: string
   deductible: string
   limit: string
@@ -56,7 +55,7 @@ type QuoteForm = {
 
 const emptyQuoteForm = (): QuoteForm => ({
   carrierId: '', lineOfBusiness: '', effectiveDate: '', expirationDate: '',
-  premiumAmount: '', taxesAndFees: '0', commissionRate: '0',
+  premiumAmount: '', taxesAndFees: '0',
   coverageDescription: '', deductible: '', limit: '',
   uninsuredMotoristLimit: '', medicalPaymentsLimit: '',
 })
@@ -109,6 +108,11 @@ export function SubmissionDetailPage() {
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
   const [bindingQuoteId, setBindingQuoteId] = useState<string | null>(null)
   const [bindForm, setBindForm] = useState({ boundDate: '', effectiveDate: '', expirationDate: '' })
+
+  // Commission give-back override modal state
+  const [overrideQuoteId, setOverrideQuoteId] = useState<string | null>(null)
+  const [overrideMode, setOverrideMode] = useState<'dollar' | 'rate'>('dollar')
+  const [overrideInput, setOverrideInput] = useState('')
 
   // LOB section open/close
   const [driversOpen, setDriversOpen] = useState(false)
@@ -238,6 +242,18 @@ export function SubmissionDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to bind quote'),
   })
 
+  const commissionOverrideMutation = useMutation({
+    mutationFn: ({ quoteId, data }: { quoteId: string; data: CommissionOverrideRequest }) =>
+      quotesApi.commissionOverride(quoteId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', id] })
+      setOverrideQuoteId(null)
+      setOverrideInput('')
+      toast.success('Commission give-back applied — premium updated')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to apply commission override'),
+  })
+
   // Driver mutations
   const saveDriverMutation = useMutation({
     mutationFn: (dto: SubmissionDriverCreate) =>
@@ -316,7 +332,6 @@ export function SubmissionDetailPage() {
       expirationDate: quoteForm.expirationDate,
       premiumAmount: parseFloat(quoteForm.premiumAmount) || 0,
       taxesAndFees: parseFloat(quoteForm.taxesAndFees) || 0,
-      commissionRate: parseFloat(quoteForm.commissionRate) || 0,
       coverageDescription: quoteForm.coverageDescription || undefined,
       deductible: quoteForm.deductible ? parseFloat(quoteForm.deductible) : undefined,
       limit: quoteForm.limit ? parseFloat(quoteForm.limit) : undefined,
@@ -569,10 +584,6 @@ export function SubmissionDetailPage() {
                 <input type="number" value={quoteForm.taxesAndFees} onChange={setQF('taxesAndFees')} placeholder="0.00" className="w-full border rounded px-2 py-1.5" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Commission Rate</label>
-                <input type="number" value={quoteForm.commissionRate} onChange={setQF('commissionRate')} placeholder="0.00" step="0.01" className="w-full border rounded px-2 py-1.5" />
-              </div>
-              <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Limit</label>
                 <input type="number" value={quoteForm.limit} onChange={setQF('limit')} placeholder="Optional" className="w-full border rounded px-2 py-1.5" />
               </div>
@@ -627,7 +638,23 @@ export function SubmissionDetailPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 ml-4">
-                    <span className="text-sm font-medium text-slate-700">{formatCurrency(q.totalPremium)}</span>
+                    <div className="text-right">
+                      <span className="text-sm font-medium text-slate-700">{formatCurrency(q.totalPremium)}</span>
+                      {q.hasCommissionOverride && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                          <TrendingDown className="h-3 w-3" /> Commission Override
+                        </span>
+                      )}
+                    </div>
+                    {q.status !== 'Bound' && q.status !== 'Cancelled' && q.status !== 'Expired' && canCreatePolicies && !q.hasCommissionOverride && (
+                      <button
+                        onClick={() => { setOverrideQuoteId(q.id); setOverrideMode('dollar'); setOverrideInput('') }}
+                        className="flex items-center gap-1 text-xs text-amber-700 border border-amber-300 px-2 py-1 rounded hover:bg-amber-50"
+                        title="Reduce agent commission to lower premium"
+                      >
+                        <TrendingDown className="h-3.5 w-3.5" /> Reduce Commission
+                      </button>
+                    )}
                     {q.status !== 'Bound' && q.status !== 'Cancelled' && q.status !== 'Expired' && (
                       <button
                         onClick={() => {
@@ -654,6 +681,72 @@ export function SubmissionDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Commission give-back override panel */}
+                {overrideQuoteId === q.id && (
+                  <div className="px-5 py-4 bg-amber-50 border-t border-amber-100 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4 text-amber-700" />
+                      <p className="text-xs font-semibold text-amber-800">Reduce Agent Commission — lower premium for competitive pricing</p>
+                    </div>
+                    <p className="text-xs text-amber-700">
+                      Carrier net and SMM commission are unchanged. Agent gives back part of their commission, reducing the total premium.
+                      Rates are locked for this policy term; renewal starts fresh from schedules.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex rounded border border-amber-200 overflow-hidden text-xs">
+                        <button
+                          onClick={() => setOverrideMode('dollar')}
+                          className={`px-3 py-1.5 ${overrideMode === 'dollar' ? 'bg-amber-600 text-white' : 'bg-white text-amber-700 hover:bg-amber-50'}`}
+                        >
+                          $ Give-Back Amount
+                        </button>
+                        <button
+                          onClick={() => setOverrideMode('rate')}
+                          className={`px-3 py-1.5 ${overrideMode === 'rate' ? 'bg-amber-600 text-white' : 'bg-white text-amber-700 hover:bg-amber-50'}`}
+                        >
+                          % New Agent Rate
+                        </button>
+                      </div>
+                      <div className="relative w-40">
+                        <input
+                          type="number"
+                          min="0"
+                          step={overrideMode === 'dollar' ? '1' : '0.01'}
+                          value={overrideInput}
+                          onChange={(e) => setOverrideInput(e.target.value)}
+                          placeholder={overrideMode === 'dollar' ? 'e.g. 500' : 'e.g. 8.5'}
+                          className="w-full border border-amber-300 rounded px-2 py-1.5 text-sm bg-white pr-8"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+                          {overrideMode === 'dollar' ? '$' : '%'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const val = parseFloat(overrideInput)
+                          if (isNaN(val) || val <= 0) { toast.error('Enter a valid amount'); return }
+                          const data: CommissionOverrideRequest = overrideMode === 'dollar'
+                            ? { givebackAmount: val }
+                            : { newAgentRate: val / 100 }
+                          commissionOverrideMutation.mutate({ quoteId: q.id, data })
+                        }}
+                        disabled={commissionOverrideMutation.isPending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded text-sm hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Apply Give-Back
+                      </button>
+                      <button
+                        onClick={() => setOverrideQuoteId(null)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-white"
+                      >
+                        <X className="h-3.5 w-3.5" /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Inline bind form */}
                 {bindingQuoteId === q.id && (

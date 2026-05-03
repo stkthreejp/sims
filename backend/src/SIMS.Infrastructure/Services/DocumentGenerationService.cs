@@ -211,8 +211,10 @@ public class DocumentGenerationService : IDocumentGenerationService
         d["TotalPremium"] = quote.TotalPremium.ToString("C");
         d["NetPremium"] = quote.PremiumAmount.ToString("C");
         d["TaxesAndFees"] = quote.TaxesAndFees.ToString("C");
-        d["CommissionRate"] = $"{quote.CommissionRate:0.##}%";
-        d["CommissionAmount"] = quote.CommissionAmount.ToString("C");
+        d["CommissionRate"] = $"{quote.EffectiveCarrierRate * 100:0.##}%";
+        d["SMMRetentionRate"] = $"{quote.EffectiveSMMRate * 100:0.##}%";
+        d["AgentCommissionRate"] = $"{quote.EffectiveAgentRate * 100:0.##}%";
+        d["CommissionAmount"] = (quote.PremiumAmount * quote.EffectiveCarrierRate).ToString("C");
         d["Deductible"] = quote.Deductible?.ToString("C") ?? string.Empty;
         d["CoverageLimit"] = quote.Limit?.ToString("C") ?? string.Empty;
         d["CoverageDescription"] = quote.CoverageDescription ?? string.Empty;

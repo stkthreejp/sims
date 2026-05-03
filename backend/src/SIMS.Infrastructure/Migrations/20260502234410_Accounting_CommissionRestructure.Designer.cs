@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIMS.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SIMS.Infrastructure.Data;
 namespace SIMS.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260502234410_Accounting_CommissionRestructure")]
+    partial class Accounting_CommissionRestructure
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1163,111 +1166,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("payees", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.PayeeStatement", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("ApLedgerAccountId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("BlobPath")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PayeeName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("ReferenceNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateOnly>("StatementDate")
-                        .HasColumnType("date");
-
-                    b.Property<decimal>("StatementTotal")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApLedgerAccountId");
-
-                    b.HasIndex("StatementDate");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("payee_statements", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.PayeeStatementLine", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric(19,4)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("MatchStatus")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<long?>("MatchedInvoiceLineId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("PayeeStatementId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("PolicyNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid?>("ReconciliationTransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StateCode")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MatchStatus");
-
-                    b.HasIndex("MatchedInvoiceLineId");
-
-                    b.HasIndex("PayeeStatementId");
-
-                    b.ToTable("payee_statement_lines", (string)null);
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.Accounting.Receipt", b =>
@@ -3719,35 +3617,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("Invoice");
                 });
 
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.PayeeStatement", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Accounting.LedgerAccount", "ApLedgerAccount")
-                        .WithMany()
-                        .HasForeignKey("ApLedgerAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ApLedgerAccount");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.PayeeStatementLine", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Accounting.InvoiceLine", "MatchedInvoiceLine")
-                        .WithMany()
-                        .HasForeignKey("MatchedInvoiceLineId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SIMS.Domain.Entities.Accounting.PayeeStatement", "Statement")
-                        .WithMany("Lines")
-                        .HasForeignKey("PayeeStatementId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MatchedInvoiceLine");
-
-                    b.Navigation("Statement");
-                });
-
             modelBuilder.Entity("SIMS.Domain.Entities.AgentCommission", b =>
                 {
                     b.HasOne("SIMS.Domain.Entities.Agent", "Agent")
@@ -4294,11 +4163,6 @@ namespace SIMS.Infrastructure.Migrations
             modelBuilder.Entity("SIMS.Domain.Entities.Accounting.Payable", b =>
                 {
                     b.Navigation("DisbursementLines");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.Accounting.PayeeStatement", b =>
-                {
-                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.Accounting.Receipt", b =>

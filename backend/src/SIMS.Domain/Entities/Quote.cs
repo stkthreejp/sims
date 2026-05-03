@@ -24,8 +24,19 @@ public class Quote : BaseEntity
     public decimal PremiumAmount { get; set; }
     public decimal TaxesAndFees { get; set; }
     public decimal TotalPremium { get; set; }
-    public decimal CommissionRate { get; set; }
-    public decimal CommissionAmount { get; set; }
+
+    // Commission rates — auto-populated from schedules at quote creation
+    public decimal CarrierCommissionRate { get; set; }  // total commission from carrier
+    public decimal SMMRetentionRate { get; set; }        // portion SMM keeps
+    public decimal AgentCommissionRate { get; set; }     // agent's rate
+
+    // Commission give-back override — set pre-bind by UW/Admin, locked at bind
+    // When set, these rates replace the above for all endorsements this policy term
+    public decimal? CommissionOverrideCarrierRate { get; set; }
+    public decimal? CommissionOverrideSMMRate { get; set; }
+    public decimal? CommissionOverrideAgentRate { get; set; }
+    public Guid? CommissionOverrideBy { get; set; }
+    public DateTime? CommissionOverrideAt { get; set; }
 
     // Coverage details
     public string? CoverageDescription { get; set; }
@@ -45,4 +56,10 @@ public class Quote : BaseEntity
     public ICollection<PolicyTransaction> Transactions { get; set; } = new List<PolicyTransaction>();
     public ICollection<Note> Notes { get; set; } = new List<Note>();
     public ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
+
+    // Effective rates for this term — override takes precedence when set
+    public decimal EffectiveCarrierRate => CommissionOverrideCarrierRate ?? CarrierCommissionRate;
+    public decimal EffectiveSMMRate => CommissionOverrideSMMRate ?? SMMRetentionRate;
+    public decimal EffectiveAgentRate => CommissionOverrideAgentRate ?? AgentCommissionRate;
+    public bool HasCommissionOverride => CommissionOverrideCarrierRate.HasValue;
 }

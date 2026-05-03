@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, Note, Attachment } from '@/types/quote.types'
+import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const quotesApi = {
@@ -26,6 +26,9 @@ export const quotesApi = {
 
   bind: (id: string, data: QuoteBind) =>
     apiClient.post<Quote>(`/quotes/${id}/bind`, data).then((r) => r.data),
+
+  commissionOverride: (id: string, data: CommissionOverrideRequest) =>
+    apiClient.post<Quote>(`/quotes/${id}/commission-override`, data).then((r) => r.data),
 
   delete: (id: string) =>
     apiClient.delete(`/quotes/${id}`),

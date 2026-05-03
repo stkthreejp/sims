@@ -9,6 +9,6 @@ public interface ICarrierCommissionService
     Task<Result<CarrierCommissionDto>> CreateAsync(Guid carrierId, CreateCarrierCommissionRequest req, Guid userId, CancellationToken ct = default);
     Task<Result<CarrierCommissionDto>> DisableAsync(long id, DateOnly? disabledDate, CancellationToken ct = default);
 
-    // Used by InvoicingService at invoice time
-    Task<decimal?> GetActiveRateAsync(Guid carrierId, string? lineOfBusiness, DateOnly asOfDate, CancellationToken ct = default);
+    // Returns both the total carrier commission rate and the SMM retention rate
+    Task<CarrierCommissionRates?> GetActiveRatesAsync(Guid carrierId, string? lineOfBusiness, DateOnly asOfDate, CancellationToken ct = default);
 }

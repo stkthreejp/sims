@@ -45,7 +45,19 @@ export interface QuoteListItem {
   effectiveDate: string
   expirationDate: string
   totalPremium: number
+  hasCommissionOverride: boolean
   createdAt: string
+}
+
+export interface CommissionOverride {
+  carrierRate: number
+  smmRate: number
+  agentRate: number
+  overrideBy: string
+  overrideAt: string
+  carrierCommissionAmount: number
+  smmRetentionAmount: number
+  agentCommissionAmount: number
 }
 
 export interface Quote {
@@ -68,8 +80,16 @@ export interface Quote {
   premiumAmount: number
   taxesAndFees: number
   totalPremium: number
-  commissionRate: number
-  commissionAmount: number
+  // Commission rates from schedules (stamped at quote creation)
+  carrierCommissionRate: number
+  smmRetentionRate: number
+  agentCommissionRate: number
+  // Computed dollar amounts
+  carrierCommissionAmount: number
+  smmRetentionAmount: number
+  agentCommissionAmount: number
+  // Give-back override (set pre-bind by UW/Admin)
+  commissionOverride: CommissionOverride | null
   coverageDescription: string | null
   deductible: number | null
   limit: number | null
@@ -86,7 +106,6 @@ export interface QuoteCreate {
   expirationDate: string
   premiumAmount: number
   taxesAndFees: number
-  commissionRate: number
   coverageDescription?: string
   deductible?: number
   limit?: number
@@ -102,6 +121,11 @@ export interface QuoteBind {
   boundDate: string
   effectiveDate: string
   expirationDate: string
+}
+
+export interface CommissionOverrideRequest {
+  givebackAmount?: number   // dollar amount agent gives back
+  newAgentRate?: number     // new agent rate as decimal (e.g. 0.08 for 8%)
 }
 
 export interface Note {

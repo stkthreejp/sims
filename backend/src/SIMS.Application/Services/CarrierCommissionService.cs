@@ -44,6 +44,9 @@ public class CarrierCommissionService : ICarrierCommissionService
         if (req.CommissionRate < 0 || req.CommissionRate > 1)
             return Result<CarrierCommissionDto>.Failure("INVALID_RATE", "Commission rate must be between 0 and 1 (e.g. 0.15 for 15%)");
 
+        if (req.SMMRetentionRate < 0 || req.SMMRetentionRate > req.CommissionRate)
+            return Result<CarrierCommissionDto>.Failure("INVALID_SMM_RATE", "SMM retention rate must be between 0 and the total commission rate");
+
         var db = Db;
 
         var duplicate = await db.Set<CarrierCommission>()
@@ -59,6 +62,7 @@ public class CarrierCommissionService : ICarrierCommissionService
             CarrierId = carrierId,
             LineOfBusiness = req.LineOfBusiness,
             CommissionRate = req.CommissionRate,
+            SMMRetentionRate = req.SMMRetentionRate,
             EffectiveDate = req.EffectiveDate,
             CreatedBy = userId,
         };
@@ -86,7 +90,7 @@ public class CarrierCommissionService : ICarrierCommissionService
         return Result<CarrierCommissionDto>.Success(ToDto(entry));
     }
 
-    public async Task<decimal?> GetActiveRateAsync(
+    public async Task<CarrierCommissionRates?> GetActiveRatesAsync(
         Guid carrierId, string? lineOfBusiness, DateOnly asOfDate, CancellationToken ct = default)
     {
         var candidates = await Db.Set<CarrierCommission>()
@@ -102,14 +106,15 @@ public class CarrierCommissionService : ICarrierCommissionService
             .OrderByDescending(c => c.EffectiveDate)
             .FirstOrDefault();
 
-        if (specific != null) return specific.CommissionRate;
+        if (specific != null)
+            return new CarrierCommissionRates(specific.CommissionRate, specific.SMMRetentionRate);
 
         var fallback = candidates
             .Where(c => c.LineOfBusiness == null)
             .OrderByDescending(c => c.EffectiveDate)
             .FirstOrDefault();
 
-        return fallback?.CommissionRate;
+        return fallback == null ? null : new CarrierCommissionRates(fallback.CommissionRate, fallback.SMMRetentionRate);
     }
 
     private static CarrierCommissionDto ToDto(CarrierCommission c) => new(
@@ -117,6 +122,7 @@ public class CarrierCommissionService : ICarrierCommissionService
         c.LineOfBusiness,
         c.LineOfBusiness != null && LobLabels.TryGetValue(c.LineOfBusiness, out var label) ? label : null,
         c.CommissionRate,
+        c.SMMRetentionRate,
         c.EffectiveDate,
         c.DisabledDate,
         c.DisabledDate == null || c.DisabledDate > DateOnly.FromDateTime(DateTime.UtcNow),

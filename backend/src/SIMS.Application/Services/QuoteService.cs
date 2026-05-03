@@ -11,13 +11,22 @@ public class QuoteService : IQuoteService
 {
     private readonly IServiceProvider _sp;
     private readonly IWorkflowEngineService _workflowEngine;
+    private readonly ICarrierCommissionService _carrierCommissions;
+    private readonly IAgentCommissionService _agentCommissions;
+
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
 
-    public QuoteService(IServiceProvider sp, IWorkflowEngineService workflowEngine)
+    public QuoteService(
+        IServiceProvider sp,
+        IWorkflowEngineService workflowEngine,
+        ICarrierCommissionService carrierCommissions,
+        IAgentCommissionService agentCommissions)
     {
         _sp = sp;
         _workflowEngine = workflowEngine;
+        _carrierCommissions = carrierCommissions;
+        _agentCommissions = agentCommissions;
     }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query)
@@ -143,9 +152,17 @@ public class QuoteService : IQuoteService
         if (carrier == null)
             return Result<QuoteDto>.Failure("INVALID_CARRIER", "Carrier not found or inactive.");
 
+        // Look up commission rates from setup tables
+        var asOfDate = dto.EffectiveDate;
+        var lobKey = dto.LineOfBusiness.ToString();
+
+        var carrierRates = await _carrierCommissions.GetActiveRatesAsync(dto.CarrierId, lobKey, asOfDate);
+        var agentRate = submission.AgentId.HasValue
+            ? await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate)
+            : null;
+
         var quoteNumber = await GenerateQuoteNumberAsync();
         var total = dto.PremiumAmount + dto.TaxesAndFees;
-        var commission = Math.Round(dto.PremiumAmount * dto.CommissionRate, 2);
 
         var quote = new Quote
         {
@@ -158,11 +175,14 @@ public class QuoteService : IQuoteService
             PremiumAmount = dto.PremiumAmount,
             TaxesAndFees = dto.TaxesAndFees,
             TotalPremium = total,
-            CommissionRate = dto.CommissionRate,
-            CommissionAmount = commission,
+            CarrierCommissionRate = carrierRates?.CommissionRate ?? 0,
+            SMMRetentionRate = carrierRates?.SMMRetentionRate ?? 0,
+            AgentCommissionRate = agentRate ?? 0,
             CoverageDescription = dto.CoverageDescription,
             Deductible = dto.Deductible,
             Limit = dto.Limit,
+            UninsuredMotoristLimit = dto.UninsuredMotoristLimit,
+            MedicalPaymentsLimit = dto.MedicalPaymentsLimit,
             CreatedById = createdById
         };
 
@@ -192,6 +212,7 @@ public class QuoteService : IQuoteService
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot edit a bound policy.");
 
         var previousStatus = quote.Status;
+        var lobChanged = quote.CarrierId != dto.CarrierId || quote.LineOfBusiness != dto.LineOfBusiness;
 
         quote.CarrierId = dto.CarrierId;
         quote.LineOfBusiness = dto.LineOfBusiness;
@@ -200,13 +221,30 @@ public class QuoteService : IQuoteService
         quote.PremiumAmount = dto.PremiumAmount;
         quote.TaxesAndFees = dto.TaxesAndFees;
         quote.TotalPremium = dto.PremiumAmount + dto.TaxesAndFees;
-        quote.CommissionRate = dto.CommissionRate;
-        quote.CommissionAmount = Math.Round(dto.PremiumAmount * dto.CommissionRate, 2);
         quote.CoverageDescription = dto.CoverageDescription;
         quote.Deductible = dto.Deductible;
         quote.Limit = dto.Limit;
+        quote.UninsuredMotoristLimit = dto.UninsuredMotoristLimit;
+        quote.MedicalPaymentsLimit = dto.MedicalPaymentsLimit;
         quote.Status = dto.Status;
         quote.UpdatedAt = DateTime.UtcNow;
+
+        // Re-look up commission rates if carrier or LOB changed
+        if (lobChanged)
+        {
+            var lobKey = dto.LineOfBusiness.ToString();
+            var asOfDate = dto.EffectiveDate;
+            var carrierRates = await _carrierCommissions.GetActiveRatesAsync(dto.CarrierId, lobKey, asOfDate);
+            quote.CarrierCommissionRate = carrierRates?.CommissionRate ?? 0;
+            quote.SMMRetentionRate = carrierRates?.SMMRetentionRate ?? 0;
+
+            var submission = await Db.Set<Submission>().FirstOrDefaultAsync(s => s.Id == quote.SubmissionId);
+            if (submission?.AgentId.HasValue == true)
+            {
+                var agentRate = await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate);
+                quote.AgentCommissionRate = agentRate ?? 0;
+            }
+        }
 
         await Db.SaveChangesAsync();
 
@@ -255,7 +293,6 @@ public class QuoteService : IQuoteService
         quote.ExpirationDate = dto.ExpirationDate;
         quote.UpdatedAt = DateTime.UtcNow;
 
-        // Update submission status if all quotes are bound
         var submission = await Db.Set<Submission>()
             .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
             .FirstOrDefaultAsync(s => s.Id == quote.SubmissionId);
@@ -269,6 +306,70 @@ public class QuoteService : IQuoteService
             TaskEntityType.Policy,
             quote.Id,
             BuildQuoteContext(quote));
+
+        return Result<QuoteDto>.Success(MapToDto(quote));
+    }
+
+    public async Task<Result<QuoteDto>> ApplyCommissionOverrideAsync(
+        Guid id, CommissionOverrideRequest req, Guid userId)
+    {
+        var quote = await Db.Set<Quote>()
+            .Include(qt => qt.Submission)
+            .Include(qt => qt.Carrier)
+            .FirstOrDefaultAsync(qt => qt.Id == id && !qt.IsDeleted);
+        if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
+        if (quote.Status == QuoteStatus.Bound)
+            return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot modify commission on a bound policy.");
+
+        if (req.GivebackAmount == null && req.NewAgentRate == null)
+            return Result<QuoteDto>.Failure("INVALID_REQUEST", "Provide either a giveback amount or a new agent rate.");
+        if (req.GivebackAmount != null && req.NewAgentRate != null)
+            return Result<QuoteDto>.Failure("INVALID_REQUEST", "Provide either a giveback amount or a new agent rate, not both.");
+
+        var oldPremium = quote.PremiumAmount;
+        var oldAgentDollars = Math.Round(oldPremium * quote.AgentCommissionRate, 4);
+        var oldCarrierDollars = Math.Round(oldPremium * quote.CarrierCommissionRate, 4);
+        var oldSMMDollars = Math.Round(oldPremium * quote.SMMRetentionRate, 4);
+
+        decimal givebackAmount;
+        if (req.GivebackAmount.HasValue)
+        {
+            givebackAmount = req.GivebackAmount.Value;
+        }
+        else
+        {
+            // Apply new rate to old premium to determine new agent dollar amount
+            var newAgentDollars = Math.Round(oldPremium * req.NewAgentRate!.Value, 4);
+            givebackAmount = oldAgentDollars - newAgentDollars;
+        }
+
+        if (givebackAmount <= 0)
+            return Result<QuoteDto>.Failure("INVALID_GIVEBACK", "Giveback amount must reduce the agent commission.");
+        if (givebackAmount >= oldAgentDollars)
+            return Result<QuoteDto>.Failure("INVALID_GIVEBACK", "Giveback amount cannot exceed the agent's full commission.");
+
+        var newPremium = oldPremium - givebackAmount;
+        if (newPremium <= 0)
+            return Result<QuoteDto>.Failure("INVALID_GIVEBACK", "Resulting premium would be zero or negative.");
+
+        // Recalculate all rates on the new premium (dollar amounts for carrier + SMM unchanged)
+        var newCarrierRate = newPremium > 0 ? Math.Round(oldCarrierDollars / newPremium, 6) : 0;
+        var newSMMRate = newPremium > 0 ? Math.Round(oldSMMDollars / newPremium, 6) : 0;
+        var newAgentRate = newPremium > 0 ? Math.Round((oldAgentDollars - givebackAmount) / newPremium, 6) : 0;
+
+        // Update premium on the quote
+        quote.PremiumAmount = Math.Round(newPremium, 2);
+        quote.TotalPremium = Math.Round(newPremium + quote.TaxesAndFees, 2);
+
+        // Lock the override rates
+        quote.CommissionOverrideCarrierRate = newCarrierRate;
+        quote.CommissionOverrideSMMRate = newSMMRate;
+        quote.CommissionOverrideAgentRate = newAgentRate;
+        quote.CommissionOverrideBy = userId;
+        quote.CommissionOverrideAt = DateTime.UtcNow;
+        quote.UpdatedAt = DateTime.UtcNow;
+
+        await Db.SaveChangesAsync();
 
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
@@ -341,35 +442,61 @@ public class QuoteService : IQuoteService
         EffectiveDate = qt.EffectiveDate,
         ExpirationDate = qt.ExpirationDate,
         TotalPremium = qt.TotalPremium,
+        HasCommissionOverride = qt.HasCommissionOverride,
         CreatedAt = qt.CreatedAt
     };
 
-    private static QuoteDto MapToDto(Quote qt) => new()
+    private static QuoteDto MapToDto(Quote qt)
     {
-        Id = qt.Id,
-        QuoteNumber = qt.QuoteNumber,
-        SubmissionId = qt.SubmissionId,
-        SubmissionNumber = qt.Submission?.SubmissionNumber ?? "",
-        InsuredId = qt.Submission?.InsuredId ?? Guid.Empty,
-        InsuredName = qt.Submission?.Insured?.DisplayName ?? "",
-        CarrierId = qt.CarrierId,
-        CarrierName = qt.Carrier?.Name ?? "",
-        LineOfBusiness = qt.LineOfBusiness,
-        Status = qt.Status,
-        PolicyNumber = qt.PolicyNumber,
-        BoundDate = qt.BoundDate,
-        IssuedDate = qt.IssuedDate,
-        CancelledDate = qt.CancelledDate,
-        EffectiveDate = qt.EffectiveDate,
-        ExpirationDate = qt.ExpirationDate,
-        PremiumAmount = qt.PremiumAmount,
-        TaxesAndFees = qt.TaxesAndFees,
-        TotalPremium = qt.TotalPremium,
-        CommissionRate = qt.CommissionRate,
-        CommissionAmount = qt.CommissionAmount,
-        CoverageDescription = qt.CoverageDescription,
-        Deductible = qt.Deductible,
-        Limit = qt.Limit,
-        CreatedAt = qt.CreatedAt
-    };
+        var premium = qt.PremiumAmount;
+        var effectiveCarrier = qt.EffectiveCarrierRate;
+        var effectiveSMM = qt.EffectiveSMMRate;
+        var effectiveAgent = qt.EffectiveAgentRate;
+
+        return new QuoteDto
+        {
+            Id = qt.Id,
+            QuoteNumber = qt.QuoteNumber,
+            SubmissionId = qt.SubmissionId,
+            SubmissionNumber = qt.Submission?.SubmissionNumber ?? "",
+            InsuredId = qt.Submission?.InsuredId ?? Guid.Empty,
+            InsuredName = qt.Submission?.Insured?.DisplayName ?? "",
+            CarrierId = qt.CarrierId,
+            CarrierName = qt.Carrier?.Name ?? "",
+            LineOfBusiness = qt.LineOfBusiness,
+            Status = qt.Status,
+            PolicyNumber = qt.PolicyNumber,
+            BoundDate = qt.BoundDate,
+            IssuedDate = qt.IssuedDate,
+            CancelledDate = qt.CancelledDate,
+            EffectiveDate = qt.EffectiveDate,
+            ExpirationDate = qt.ExpirationDate,
+            PremiumAmount = qt.PremiumAmount,
+            TaxesAndFees = qt.TaxesAndFees,
+            TotalPremium = qt.TotalPremium,
+            CarrierCommissionRate = qt.CarrierCommissionRate,
+            SMMRetentionRate = qt.SMMRetentionRate,
+            AgentCommissionRate = qt.AgentCommissionRate,
+            CarrierCommissionAmount = Math.Round(premium * qt.CarrierCommissionRate, 2),
+            SMMRetentionAmount = Math.Round(premium * qt.SMMRetentionRate, 2),
+            AgentCommissionAmount = Math.Round(premium * qt.AgentCommissionRate, 2),
+            CommissionOverride = qt.HasCommissionOverride ? new CommissionOverrideDto
+            {
+                CarrierRate = qt.CommissionOverrideCarrierRate!.Value,
+                SMMRate = qt.CommissionOverrideSMMRate!.Value,
+                AgentRate = qt.CommissionOverrideAgentRate!.Value,
+                OverrideBy = qt.CommissionOverrideBy!.Value,
+                OverrideAt = qt.CommissionOverrideAt!.Value,
+                CarrierCommissionAmount = Math.Round(premium * effectiveCarrier, 2),
+                SMMRetentionAmount = Math.Round(premium * effectiveSMM, 2),
+                AgentCommissionAmount = Math.Round(premium * effectiveAgent, 2),
+            } : null,
+            CoverageDescription = qt.CoverageDescription,
+            Deductible = qt.Deductible,
+            Limit = qt.Limit,
+            UninsuredMotoristLimit = qt.UninsuredMotoristLimit,
+            MedicalPaymentsLimit = qt.MedicalPaymentsLimit,
+            CreatedAt = qt.CreatedAt
+        };
+    }
 }

@@ -13,20 +13,14 @@ public class InvoicingService : IInvoicingService
     private readonly IServiceProvider _sp;
     private readonly IFeeCalculationService _feeCalc;
     private readonly ILedgerService _ledger;
-    private readonly ICarrierCommissionService _commissions;
-    private readonly IAgentCommissionService _agentCommissions;
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
-    public InvoicingService(IServiceProvider sp, IFeeCalculationService feeCalc,
-        ILedgerService ledger, ICarrierCommissionService commissions,
-        IAgentCommissionService agentCommissions)
+    public InvoicingService(IServiceProvider sp, IFeeCalculationService feeCalc, ILedgerService ledger)
     {
         _sp = sp;
         _feeCalc = feeCalc;
         _ledger = ledger;
-        _commissions = commissions;
-        _agentCommissions = agentCommissions;
     }
 
     public async Task<Result<InvoiceDetailDto>> BindAsync(
@@ -55,56 +49,51 @@ public class InvoicingService : IInvoicingService
             return Result<InvoiceDetailDto>.Failure("MISSING_GL_ACCOUNTS",
                 "Required GL accounts (1200 AR, 2100 Carrier AP, 4100 Commission Revenue, 5100 Commission Expense) not found");
 
-        // Resolve carrier before building invoice so commission can be computed
+        // Resolve carrier name for payable
         Guid? carrierId = null;
         string payeeName = "Carrier";
 
+        // Load quote for commission rates (rates are stamped at quote creation; override rates take precedence)
+        Quote? quote = null;
         if (req.PolicyTransactionId.HasValue)
         {
-            var resolvedCarrierId = await db.Set<PolicyTransaction>()
+            var txn = await db.Set<PolicyTransaction>()
+                .Include(pt => pt.Quote)
                 .Where(pt => pt.Id == req.PolicyTransactionId.Value)
-                .Select(pt => (Guid?)pt.Quote.CarrierId)
                 .FirstOrDefaultAsync(ct);
 
-            if (resolvedCarrierId.HasValue)
+            if (txn != null)
             {
-                carrierId = resolvedCarrierId;
-                var name = await db.Set<Carrier>()
-                    .Where(c => c.Id == resolvedCarrierId.Value)
-                    .Select(c => c.Name)
-                    .FirstOrDefaultAsync(ct);
-                if (name != null) payeeName = name;
+                quote = txn.Quote;
+                carrierId = quote?.CarrierId;
+                if (carrierId.HasValue)
+                {
+                    var name = await db.Set<Carrier>()
+                        .Where(c => c.Id == carrierId.Value)
+                        .Select(c => c.Name)
+                        .FirstOrDefaultAsync(ct);
+                    if (name != null) payeeName = name;
+                }
             }
         }
 
-        // Resolve agent via PolicyTransaction → Quote → Submission → AgentId
-        Guid? agentId = null;
-        if (req.PolicyTransactionId.HasValue)
+        // Use rates from the quote (override rates if a give-back was applied, otherwise schedule rates)
+        decimal grossForCommission = req.GrossPremium;
+        decimal carrierCommRate = 0;
+        decimal smmRetentionRate = 0;
+        decimal agentCommRate = 0;
+
+        if (quote != null)
         {
-            agentId = await db.Set<PolicyTransaction>()
-                .Where(pt => pt.Id == req.PolicyTransactionId.Value)
-                .Select(pt => pt.Quote.Submission.AgentId)
-                .FirstOrDefaultAsync(ct);
+            carrierCommRate = quote.EffectiveCarrierRate;
+            smmRetentionRate = quote.EffectiveSMMRate;
+            agentCommRate = quote.EffectiveAgentRate;
         }
 
-        // Look up commission rates for this carrier + LOB and agent + LOB
+        decimal commissionAmount = Math.Round(grossForCommission * carrierCommRate, 4);
+        decimal agentCommissionAmount = Math.Round(grossForCommission * agentCommRate, 4);
+
         var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
-        decimal commissionAmount = 0;
-        if (carrierId.HasValue && req.GrossPremium > 0)
-        {
-            var rate = await _commissions.GetActiveRateAsync(carrierId.Value, req.LineOfBusiness, invoiceDate, ct);
-            if (rate.HasValue)
-                commissionAmount = Math.Round(req.GrossPremium * rate.Value, 4);
-        }
-
-        decimal agentCommissionAmount = 0;
-        if (agentId.HasValue && req.GrossPremium > 0)
-        {
-            var agentRate = await _agentCommissions.GetActiveRateAsync(agentId.Value, req.LineOfBusiness, invoiceDate, ct);
-            if (agentRate.HasValue)
-                agentCommissionAmount = Math.Round(req.GrossPremium * agentRate.Value, 4);
-        }
-
         var seq = await db.Set<Invoice>()
             .CountAsync(i => i.TenantId == 1 && i.InvoiceDate.Year == invoiceDate.Year, ct) + 1;
         var invoiceNumber = $"INV-{invoiceDate.Year}-{seq:D5}";
@@ -150,7 +139,7 @@ public class InvoicingService : IInvoicingService
         invoice.LedgerTransactionId = txnId;
         await db.SaveChangesAsync(ct);
 
-        // Carrier payable is net of commission (SMM retains commission before remitting)
+        // Carrier payable is net of total carrier commission (SMM retains commission before remitting)
         if (invoice.GrossPremium > 0)
         {
             db.Set<Payable>().Add(new Payable

@@ -169,7 +169,7 @@ export function CarrierDetailPage() {
   const [editContactForm, setEditContactForm] = useState<ContactFormData>(emptyContactForm())
 
   const [showAddCommission, setShowAddCommission] = useState(false)
-  const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '' as string, commissionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+  const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '' as string, commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
 
   const { data: carrier, isLoading } = useQuery({
@@ -188,12 +188,13 @@ export function CarrierDetailPage() {
     mutationFn: () => createCarrierCommission(id!, {
       lineOfBusiness: commissionForm.lineOfBusiness || null,
       commissionRate: parseFloat(commissionForm.commissionRate) / 100,
+      smmRetentionRate: parseFloat(commissionForm.smmRetentionRate) / 100,
       effectiveDate: commissionForm.effectiveDate,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['carrier-commissions', id] })
       setShowAddCommission(false)
-      setCommissionForm({ lineOfBusiness: '', commissionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+      setCommissionForm({ lineOfBusiness: '', commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
       toast.success('Commission rate added')
     },
     onError: (err: Error) => toast.error(err.message),
@@ -494,7 +495,7 @@ export function CarrierDetailPage() {
         {showAddCommission && (
           <div className="bg-slate-50 border rounded-lg p-4 space-y-3">
             <p className="text-sm font-medium text-slate-700">New Commission Rate</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
                 <select
@@ -509,7 +510,7 @@ export function CarrierDetailPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Commission Rate %</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Total Commission %</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -518,11 +519,29 @@ export function CarrierDetailPage() {
                     step="0.01"
                     value={commissionForm.commissionRate}
                     onChange={(e) => setCommissionForm({ ...commissionForm, commissionRate: e.target.value })}
-                    placeholder="e.g. 12.5"
+                    placeholder="e.g. 15"
                     className="w-full border rounded px-2 py-1.5 text-sm pr-6"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
                 </div>
+                <p className="text-xs text-slate-400 mt-0.5">What carrier pays SMM total</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">SMM Retention %</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max={commissionForm.commissionRate || '100'}
+                    step="0.01"
+                    value={commissionForm.smmRetentionRate}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, smmRetentionRate: e.target.value })}
+                    placeholder="e.g. 5"
+                    className="w-full border rounded px-2 py-1.5 text-sm pr-6"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">Portion SMM keeps</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
@@ -538,7 +557,9 @@ export function CarrierDetailPage() {
               <button
                 onClick={() => {
                   const rate = parseFloat(commissionForm.commissionRate)
-                  if (isNaN(rate) || rate < 0 || rate > 100) { toast.error('Enter a valid rate between 0 and 100'); return }
+                  const smmRate = parseFloat(commissionForm.smmRetentionRate)
+                  if (isNaN(rate) || rate < 0 || rate > 100) { toast.error('Enter a valid total commission rate between 0 and 100'); return }
+                  if (isNaN(smmRate) || smmRate < 0 || smmRate > rate) { toast.error('SMM retention must be between 0 and the total commission rate'); return }
                   if (!commissionForm.effectiveDate) { toast.error('Effective date is required'); return }
                   addCommissionMutation.mutate()
                 }}
@@ -600,7 +621,7 @@ export function CarrierDetailPage() {
                           <span className="text-sm font-medium text-slate-800">{lobLabel}</span>
                           {activeRow ? (
                             <span className="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-2 py-0.5">
-                              {(activeRow.commissionRate * 100).toFixed(2)}%
+                              {(activeRow.commissionRate * 100).toFixed(2)}% total · {(activeRow.smmRetentionRate * 100).toFixed(2)}% SMM
                             </span>
                           ) : (
                             <span className="text-xs text-slate-400 italic">no active rate</span>
@@ -620,7 +641,8 @@ export function CarrierDetailPage() {
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="text-left text-slate-500 border-b">
-                                <th className="px-4 py-2 font-medium">Rate</th>
+                                <th className="px-4 py-2 font-medium">Total Rate</th>
+                                <th className="px-4 py-2 font-medium">SMM Retention</th>
                                 <th className="px-4 py-2 font-medium">Effective</th>
                                 <th className="px-4 py-2 font-medium">Disabled</th>
                                 <th className="px-4 py-2 font-medium">Status</th>
@@ -631,6 +653,7 @@ export function CarrierDetailPage() {
                               {rows.map((r) => (
                                 <tr key={r.id} className="hover:bg-white">
                                   <td className="px-4 py-2 font-semibold text-slate-800">{(r.commissionRate * 100).toFixed(2)}%</td>
+                                  <td className="px-4 py-2 text-slate-700">{(r.smmRetentionRate * 100).toFixed(2)}%</td>
                                   <td className="px-4 py-2 text-slate-600">{r.effectiveDate}</td>
                                   <td className="px-4 py-2 text-slate-500">{r.disabledDate ?? '—'}</td>
                                   <td className="px-4 py-2">

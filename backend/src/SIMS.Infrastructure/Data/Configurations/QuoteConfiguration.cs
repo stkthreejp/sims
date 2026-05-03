@@ -18,12 +18,22 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.PremiumAmount).HasPrecision(18, 2);
         builder.Property(q => q.TaxesAndFees).HasPrecision(18, 2);
         builder.Property(q => q.TotalPremium).HasPrecision(18, 2);
-        builder.Property(q => q.CommissionRate).HasPrecision(5, 4);
-        builder.Property(q => q.CommissionAmount).HasPrecision(18, 2);
+        builder.Property(q => q.CarrierCommissionRate).HasPrecision(8, 6);
+        builder.Property(q => q.SMMRetentionRate).HasPrecision(8, 6);
+        builder.Property(q => q.AgentCommissionRate).HasPrecision(8, 6);
+        builder.Property(q => q.CommissionOverrideCarrierRate).HasPrecision(8, 6);
+        builder.Property(q => q.CommissionOverrideSMMRate).HasPrecision(8, 6);
+        builder.Property(q => q.CommissionOverrideAgentRate).HasPrecision(8, 6);
         builder.Property(q => q.Deductible).HasPrecision(18, 2);
         builder.Property(q => q.Limit).HasPrecision(18, 2);
         builder.Property(q => q.UninsuredMotoristLimit).HasPrecision(18, 2);
         builder.Property(q => q.MedicalPaymentsLimit).HasPrecision(18, 2);
+
+        // Computed helper properties — not mapped to columns
+        builder.Ignore(q => q.EffectiveCarrierRate);
+        builder.Ignore(q => q.EffectiveSMMRate);
+        builder.Ignore(q => q.EffectiveAgentRate);
+        builder.Ignore(q => q.HasCommissionOverride);
 
         builder.HasOne(q => q.Submission).WithMany(s => s.Quotes)
             .HasForeignKey(q => q.SubmissionId).OnDelete(DeleteBehavior.Restrict);

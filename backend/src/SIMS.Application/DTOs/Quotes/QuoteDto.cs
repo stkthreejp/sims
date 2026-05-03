@@ -23,14 +23,40 @@ public class QuoteDto
     public decimal PremiumAmount { get; set; }
     public decimal TaxesAndFees { get; set; }
     public decimal TotalPremium { get; set; }
-    public decimal CommissionRate { get; set; }
-    public decimal CommissionAmount { get; set; }
+
+    // Commission rates from schedules
+    public decimal CarrierCommissionRate { get; set; }
+    public decimal SMMRetentionRate { get; set; }
+    public decimal AgentCommissionRate { get; set; }
+
+    // Computed dollar amounts (rate × premium)
+    public decimal CarrierCommissionAmount { get; set; }
+    public decimal SMMRetentionAmount { get; set; }
+    public decimal AgentCommissionAmount { get; set; }
+
+    // Commission give-back override
+    public CommissionOverrideDto? CommissionOverride { get; set; }
+
     public string? CoverageDescription { get; set; }
     public decimal? Deductible { get; set; }
     public decimal? Limit { get; set; }
     public decimal? UninsuredMotoristLimit { get; set; }
     public decimal? MedicalPaymentsLimit { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+public class CommissionOverrideDto
+{
+    public decimal CarrierRate { get; set; }
+    public decimal SMMRate { get; set; }
+    public decimal AgentRate { get; set; }
+    public Guid OverrideBy { get; set; }
+    public DateTime OverrideAt { get; set; }
+
+    // Computed dollar amounts at the overridden rates
+    public decimal CarrierCommissionAmount { get; set; }
+    public decimal SMMRetentionAmount { get; set; }
+    public decimal AgentCommissionAmount { get; set; }
 }
 
 public class QuoteListItemDto
@@ -47,6 +73,7 @@ public class QuoteListItemDto
     public DateOnly EffectiveDate { get; set; }
     public DateOnly ExpirationDate { get; set; }
     public decimal TotalPremium { get; set; }
+    public bool HasCommissionOverride { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -59,7 +86,6 @@ public class QuoteCreateDto
     public DateOnly ExpirationDate { get; set; }
     public decimal PremiumAmount { get; set; }
     public decimal TaxesAndFees { get; set; }
-    public decimal CommissionRate { get; set; }
     public string? CoverageDescription { get; set; }
     public decimal? Deductible { get; set; }
     public decimal? Limit { get; set; }
@@ -77,4 +103,11 @@ public class QuoteBindDto
     public DateOnly BoundDate { get; set; }
     public DateOnly EffectiveDate { get; set; }
     public DateOnly ExpirationDate { get; set; }
+}
+
+public class CommissionOverrideRequest
+{
+    // Exactly one of these must be provided
+    public decimal? GivebackAmount { get; set; }   // dollar amount agent gives back
+    public decimal? NewAgentRate { get; set; }      // new agent rate as decimal (e.g. 0.08)
 }
