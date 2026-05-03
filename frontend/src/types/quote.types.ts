@@ -1,9 +1,25 @@
-export type PolicyLineOfBusiness = 'GeneralLiability' | 'Property' | 'CommercialAuto' | 'BusinessOwners' | 'WorkersCompensation' | 'ProfessionalLiability' | 'Umbrella' | 'Cyber' | 'ExcessLiability' | 'Other'
+export type PolicyLineOfBusiness =
+  | 'GeneralLiability'
+  | 'InlandMarine'
+  | 'AutoLiability'
+  | 'AutoPhysicalDamage'
+  | 'Property'
+  | 'CommercialAuto'
+  | 'BusinessOwners'
+  | 'WorkersCompensation'
+  | 'ProfessionalLiability'
+  | 'Umbrella'
+  | 'Cyber'
+  | 'ExcessLiability'
+  | 'Other'
 export type QuoteStatus = 'Draft' | 'Submitted' | 'Quoted' | 'Bound' | 'Declined' | 'Cancelled' | 'Expired'
 export type TransactionType = 'NewBusiness' | 'Endorsement' | 'Renewal' | 'Cancellation' | 'Reinstatement' | 'Audit'
 
 export const LOB_LABELS: Record<PolicyLineOfBusiness, string> = {
   GeneralLiability: 'General Liability',
+  InlandMarine: 'Inland Marine',
+  AutoLiability: 'Auto Liability',
+  AutoPhysicalDamage: 'Auto Physical Damage',
   Property: 'Property',
   CommercialAuto: 'Commercial Auto',
   BusinessOwners: 'Business Owners (BOP)',
@@ -15,8 +31,15 @@ export const LOB_LABELS: Record<PolicyLineOfBusiness, string> = {
   Other: 'Other',
 }
 
+// Active lines SMM writes today. Use this in pickers / filters for new records.
+export const ACTIVE_LOBS: PolicyLineOfBusiness[] = [
+  'GeneralLiability', 'InlandMarine', 'AutoLiability', 'AutoPhysicalDamage',
+]
+
+// All values, including deprecated ones — only use when displaying historical data.
 export const ALL_LOBS: PolicyLineOfBusiness[] = [
-  'GeneralLiability', 'Property', 'CommercialAuto', 'BusinessOwners',
+  'GeneralLiability', 'InlandMarine', 'AutoLiability', 'AutoPhysicalDamage',
+  'Property', 'CommercialAuto', 'BusinessOwners',
   'WorkersCompensation', 'ProfessionalLiability', 'Umbrella', 'Cyber',
   'ExcessLiability', 'Other',
 ]
