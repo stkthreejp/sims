@@ -40,6 +40,7 @@ import { DisbursementsPage } from '@/pages/billing/DisbursementsPage'
 import { StatementReconciliationPage } from '@/pages/billing/StatementReconciliationPage'
 import { ActivityPage } from '@/pages/billing/ActivityPage'
 import { PeriodClosePage } from '@/pages/billing/PeriodClosePage'
+import { SyncHealthPage } from '@/pages/billing/SyncHealthPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -107,6 +108,7 @@ export default function App() {
             <Route path="/billing/statement-reconciliation" element={<StatementReconciliationPage />} />
             <Route path="/billing/activity" element={<ActivityPage />} />
             <Route path="/billing/period-close" element={<PeriodClosePage />} />
+            <Route path="/billing/sync-health" element={<SyncHealthPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
