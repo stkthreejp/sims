@@ -5,8 +5,9 @@ using SIMS.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddSimsKeyVault();
 
 // Register Syncfusion community license
 Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
