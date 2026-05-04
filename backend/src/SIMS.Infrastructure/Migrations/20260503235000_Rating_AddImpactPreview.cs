@@ -31,7 +31,7 @@ namespace SIMS.Infrastructure.Migrations
                     CONSTRAINT FK_impact_previews_versions FOREIGN KEY (rating_plan_version_id)
                         REFERENCES rating_plan_versions (id) ON DELETE CASCADE,
                     CONSTRAINT FK_impact_previews_users FOREIGN KEY (computed_by_id)
-                        REFERENCES users (id) ON DELETE RESTRICT
+                        REFERENCES users (""Id"") ON DELETE RESTRICT
                 );
                 CREATE INDEX IF NOT EXISTS IX_impact_previews_version_id
                     ON rating_plan_version_impact_previews (rating_plan_version_id);

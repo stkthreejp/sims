@@ -34,17 +34,17 @@ namespace SIMS.Infrastructure.Migrations
                 column: "LastEditedById");
 
             migrationBuilder.AddForeignKey(
-                name: "FK_rating_plan_versions_AspNetUsers_CreatedById",
+                name: "FK_rating_plan_versions_users_CreatedById",
                 table: "rating_plan_versions",
                 column: "CreatedById",
-                principalTable: "AspNetUsers",
+                principalTable: "users",
                 principalColumn: "Id");
 
             migrationBuilder.AddForeignKey(
-                name: "FK_rating_plan_versions_AspNetUsers_LastEditedById",
+                name: "FK_rating_plan_versions_users_LastEditedById",
                 table: "rating_plan_versions",
                 column: "LastEditedById",
-                principalTable: "AspNetUsers",
+                principalTable: "users",
                 principalColumn: "Id");
         }
 
@@ -52,11 +52,11 @@ namespace SIMS.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(
-                name: "FK_rating_plan_versions_AspNetUsers_CreatedById",
+                name: "FK_rating_plan_versions_users_CreatedById",
                 table: "rating_plan_versions");
 
             migrationBuilder.DropForeignKey(
-                name: "FK_rating_plan_versions_AspNetUsers_LastEditedById",
+                name: "FK_rating_plan_versions_users_LastEditedById",
                 table: "rating_plan_versions");
 
             migrationBuilder.DropIndex(
