@@ -27,12 +27,12 @@ export function formatPhoneInput(raw: string): string {
 
 /** react-hook-form compatible validators */
 export const rhfValidators = {
-  email: (v: string) =>
+  email: (v: string | undefined) =>
     !v || isValidEmail(v) || 'Enter a valid email address',
 
-  phone: (v: string) =>
+  phone: (v: string | undefined) =>
     !v || isValidPhone(v) || 'Enter a valid 10-digit phone number',
 
-  zip: (v: string) =>
+  zip: (v: string | undefined) =>
     !v || isValidZip(v) || 'Enter a valid ZIP code (e.g. 78701 or 78701-1234)',
 }
