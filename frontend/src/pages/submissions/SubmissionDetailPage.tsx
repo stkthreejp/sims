@@ -756,6 +756,13 @@ export function SubmissionDetailPage() {
                     >
                       <Calculator className="h-3.5 w-3.5" /> Rating
                     </button>
+                    <Link
+                      to={`/quotes/${q.id}/writeup`}
+                      className="flex items-center gap-1 text-xs text-purple-700 border border-purple-300 px-2 py-1 rounded hover:bg-purple-50"
+                      title="Open UW writeup"
+                    >
+                      <FileText className="h-3.5 w-3.5" /> UW Writeup
+                    </Link>
                     {q.status !== 'Bound' && q.status !== 'Cancelled' && q.status !== 'Expired' && (
                       <button
                         onClick={() => {
