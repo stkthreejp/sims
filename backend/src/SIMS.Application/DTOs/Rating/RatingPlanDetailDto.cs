@@ -62,6 +62,75 @@ public class RatingPlanVersionDetailDto
     public Guid? PromotedById { get; set; }
     public Guid? CreatedById { get; set; }
     public Guid? LastEditedById { get; set; }
+    public DateTime? ImpactPreviewComputedAt { get; set; }
+}
+
+// ─── Mutating DTOs ────────────────────────────────────────────────────────────
+
+public class CreateRatingPlanVersionDto
+{
+    public DateOnly EffectiveDate { get; set; }
+    public Guid? CloneFromVersionId { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class UpdateVersionMetaDto
+{
+    public DateOnly EffectiveDate { get; set; }
+    public string? Notes { get; set; }
+    public decimal ScheduleMin { get; set; }
+    public decimal ScheduleMax { get; set; }
+    public decimal? MinimumPremium { get; set; }
+}
+
+public class FactorRowInputDto
+{
+    public Dictionary<string, string> DimensionValues { get; set; } = [];
+    public decimal Factor { get; set; }
+}
+
+public class UpdateFactorTableDto
+{
+    public List<FactorRowInputDto> Rows { get; set; } = [];
+}
+
+// ─── Impact preview ───────────────────────────────────────────────────────────
+
+public class RatingImpactPreviewDto
+{
+    public DateTime ComputedAt { get; set; }
+    public int QuoteCount { get; set; }
+    public decimal TotalCurrentPremium { get; set; }
+    public decimal TotalNewPremium { get; set; }
+    public decimal TotalDeltaPct { get; set; }
+    public int QuotesUp { get; set; }
+    public int QuotesDown { get; set; }
+    public int QuotesFlat { get; set; }
+    public List<DistributionBucketDto> DistributionBuckets { get; set; } = [];
+    public List<TopMoverDto> TopMovers { get; set; } = [];
+}
+
+public class DistributionBucketDto
+{
+    public string RangeLabel { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+
+public class TopMoverDto
+{
+    public Guid QuoteId { get; set; }
+    public string QuoteNumber { get; set; } = string.Empty;
+    public string InsuredName { get; set; } = string.Empty;
+    public decimal CurrentPremium { get; set; }
+    public decimal NewPremium { get; set; }
+    public decimal DeltaPct { get; set; }
+}
+
+public class CsvImportResultDto
+{
+    public List<string> TablesUpdated { get; set; } = [];
+    public Dictionary<string, int> RowCountByTable { get; set; } = [];
+    public List<string> Warnings { get; set; } = [];
 }
 
 // ─── Factors ─────────────────────────────────────────────────────────────────

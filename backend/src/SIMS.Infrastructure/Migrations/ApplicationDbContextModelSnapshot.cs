@@ -2948,6 +2948,70 @@ namespace SIMS.Infrastructure.Migrations
                     b.ToTable("quote_rating_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("SIMS.Domain.Entities.Rating.RatingPlanVersionImpactPreview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ComputedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PreviewJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("QuoteCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuotesDown")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuotesFlat")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuotesUp")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RatingPlanVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalCurrentPremium")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalDeltaPct")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("TotalNewPremium")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComputedById");
+
+                    b.HasIndex("RatingPlanVersionId");
+
+                    b.ToTable("rating_plan_version_impact_previews", (string)null);
+                });
+
             modelBuilder.Entity("SIMS.Domain.Entities.Rating.RatingPlan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4838,6 +4902,25 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("Quote");
 
                     b.Navigation("RatedBy");
+
+                    b.Navigation("RatingPlanVersion");
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.Rating.RatingPlanVersionImpactPreview", b =>
+                {
+                    b.HasOne("SIMS.Domain.Entities.User", "ComputedBy")
+                        .WithMany()
+                        .HasForeignKey("ComputedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIMS.Domain.Entities.Rating.RatingPlanVersion", "RatingPlanVersion")
+                        .WithMany()
+                        .HasForeignKey("RatingPlanVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ComputedBy");
 
                     b.Navigation("RatingPlanVersion");
                 });

@@ -10,6 +10,11 @@ import type {
   RatingPlanVersionDetail,
   FactorTable,
   EligibilityRule,
+  CreateRatingPlanVersionDto,
+  UpdateVersionMetaDto,
+  UpdateFactorTableDto,
+  RatingImpactPreview,
+  CsvImportResult,
 } from '@/types/rating.types'
 
 export const ratingApi = {
@@ -58,4 +63,27 @@ export const ratingApi = {
 
   retireVersion: (id: string) =>
     apiClient.post(`/rating-plan-versions/${id}/retire`).then((r) => r.data),
+
+  createVersion: (planId: string, dto: CreateRatingPlanVersionDto) =>
+    apiClient.post<{ versionId: string; versionNumber: number }>(`/rating-plans/${planId}/versions`, dto).then((r) => r.data),
+
+  updateVersionMeta: (id: string, dto: UpdateVersionMetaDto) =>
+    apiClient.put(`/rating-plan-versions/${id}`, dto).then((r) => r.data),
+
+  updateFactorTable: (versionId: string, tableCode: string, dto: UpdateFactorTableDto) =>
+    apiClient.put(`/rating-plan-versions/${versionId}/factors/${tableCode}`, dto).then((r) => r.data),
+
+  importCsv: (versionId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiClient.post<CsvImportResult>(`/rating-plan-versions/${versionId}/import-csv`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data)
+  },
+
+  computeImpactPreview: (versionId: string) =>
+    apiClient.post<RatingImpactPreview>(`/rating-plan-versions/${versionId}/preview-impact`).then((r) => r.data),
+
+  getImpactPreview: (versionId: string) =>
+    apiClient.get<RatingImpactPreview>(`/rating-plan-versions/${versionId}/preview-impact`).then((r) => r.data),
 }

@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CheckCircle, XCircle, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle, XCircle, Users, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -23,10 +24,114 @@ function EffectiveRange({ v }: { v: RatingPlanVersionSummary }) {
   return <span>{v.effectiveDate}</span>
 }
 
+function CreateDraftModal({
+  planId,
+  planName,
+  versions,
+  onClose,
+}: {
+  planId: string
+  planName: string
+  versions: RatingPlanVersionSummary[]
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [effectiveDate, setEffectiveDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  )
+  const [cloneFrom, setCloneFrom] = useState<string>('none')
+  const [notes, setNotes] = useState('')
+
+  const cloneablVersions = versions.filter((v) => v.status === 'Active' || v.status === 'Retired')
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      ratingApi.createVersion(planId, {
+        effectiveDate,
+        cloneFromVersionId: cloneFrom !== 'none' ? cloneFrom : null,
+        notes: notes.trim() || null,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['rating-plan', planId] })
+      qc.invalidateQueries({ queryKey: ['rating-plans'] })
+      toast.success(`Draft v${data.versionNumber} created`)
+      onClose()
+    },
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.errorMessage ?? 'Failed to create draft'),
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+        <h2 className="text-base font-semibold text-slate-900">Create Draft Version — {planName}</h2>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
+            <input
+              type="date"
+              value={effectiveDate}
+              onChange={(e) => setEffectiveDate(e.target.value)}
+              className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          {cloneablVersions.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Clone factor tables from</label>
+              <select
+                value={cloneFrom}
+                onChange={(e) => setCloneFrom(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+              >
+                <option value="none">— blank (no factor tables) —</option>
+                {cloneablVersions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    v{v.versionNumber} ({v.status}, {v.effectiveDate})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="What changed in this version?"
+              className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-sm border rounded hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => createMutation.mutate()}
+            disabled={!effectiveDate || createMutation.isPending}
+            className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {createMutation.isPending ? 'Creating…' : 'Create Draft'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function AdminRatingPlanDetailPage() {
   const { planId } = useParams<{ planId: string }>()
   const qc = useQueryClient()
   const currentUserId = useAuthStore((s) => s.user?.id)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   const { data: plan, isLoading } = useQuery({
     queryKey: ['rating-plan', planId],
@@ -58,9 +163,19 @@ export function AdminRatingPlanDetailPage() {
   if (!plan) return <div className="p-6 text-sm text-slate-500">Plan not found.</div>
 
   const activeVersion = plan.versions.find((v) => v.status === 'Active')
+  const hasDraft = plan.versions.some((v) => v.status === 'Draft')
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
+      {showCreateModal && (
+        <CreateDraftModal
+          planId={plan.id}
+          planName={plan.name}
+          versions={plan.versions}
+          onClose={() => setShowCreateModal(false)}
+        />
+      )}
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-500">
         <Link to="/admin/rating" className="hover:text-slate-700 flex items-center gap-1">
@@ -83,15 +198,39 @@ export function AdminRatingPlanDetailPage() {
               <span className="font-mono text-xs text-slate-400">{plan.formulaKey}</span>
             </div>
           </div>
+
+          {!hasDraft && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              <Plus className="h-3.5 w-3.5" /> New Draft Version
+            </button>
+          )}
         </div>
       </div>
 
       {/* Versions timeline */}
       <div className="bg-white border rounded-lg p-5 space-y-4">
-        <h2 className="text-base font-semibold text-slate-800">Versions</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-800">Versions</h2>
+          {hasDraft && (
+            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+              Draft exists — complete or retire it to create another
+            </span>
+          )}
+        </div>
 
         {plan.versions.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-4">No versions yet.</p>
+          <div className="text-center py-8 border border-dashed rounded-lg">
+            <p className="text-sm text-slate-400">No versions yet.</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="mt-2 text-xs text-blue-600 hover:underline"
+            >
+              Create the first draft
+            </button>
+          </div>
         ) : (
           <div className="space-y-3">
             {plan.versions.map((v) => (

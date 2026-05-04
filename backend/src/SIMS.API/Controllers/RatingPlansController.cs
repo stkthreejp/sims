@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public class RatingPlansController : ControllerBase
     };
 
     private readonly ApplicationDbContext _db;
+    private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     public RatingPlansController(ApplicationDbContext db) => _db = db;
 
@@ -158,5 +160,81 @@ public class RatingPlansController : ControllerBase
         };
 
         return Ok(dto);
+    }
+
+    [HttpPost("{planId:guid}/versions")]
+    public async Task<IActionResult> CreateVersion(Guid planId, [FromBody] CreateRatingPlanVersionDto dto, CancellationToken ct)
+    {
+        var plan = await _db.RatingPlans.FirstOrDefaultAsync(p => p.Id == planId && !p.IsDeleted, ct);
+        if (plan == null) return NotFound();
+
+        var hasDraft = await _db.RatingPlanVersions.AnyAsync(
+            v => v.RatingPlanId == planId && !v.IsDeleted && v.Status == PlanStatus.Draft, ct);
+        if (hasDraft)
+            return Conflict(new { ErrorCode = "DRAFT_EXISTS", ErrorMessage = "This plan already has a Draft version. Complete or retire it first." });
+
+        var nextNumber = await _db.RatingPlanVersions
+            .Where(v => v.RatingPlanId == planId && !v.IsDeleted)
+            .MaxAsync(v => (int?)v.VersionNumber, ct) ?? 0;
+        nextNumber++;
+
+        var version = new RatingPlanVersion
+        {
+            RatingPlanId = planId,
+            VersionNumber = nextNumber,
+            EffectiveDate = dto.EffectiveDate,
+            Status = PlanStatus.Draft,
+            Notes = dto.Notes,
+            CreatedById = CurrentUserId,
+        };
+
+        if (dto.CloneFromVersionId.HasValue)
+        {
+            var source = await _db.RatingPlanVersions
+                .Where(v => v.Id == dto.CloneFromVersionId && !v.IsDeleted && v.RatingPlanId == planId)
+                .Include(v => v.FactorTables).ThenInclude(t => t.Rows)
+                .Include(v => v.EligibilityRules)
+                .FirstOrDefaultAsync(ct);
+
+            if (source == null)
+                return BadRequest(new { ErrorCode = "INVALID_CLONE_SOURCE", ErrorMessage = "Clone source version not found." });
+
+            version.ScheduleMin = source.ScheduleMin;
+            version.ScheduleMax = source.ScheduleMax;
+            version.MinimumPremium = source.MinimumPremium;
+
+            foreach (var srcTable in source.FactorTables)
+            {
+                var newTable = new FactorTable
+                {
+                    Code = srcTable.Code,
+                    DimensionNames = srcTable.DimensionNames.ToArray(),
+                    ValueSemantics = srcTable.ValueSemantics,
+                };
+                foreach (var r in srcTable.Rows)
+                {
+                    newTable.Rows.Add(new FactorRow
+                    {
+                        DimensionValues = new Dictionary<string, string>(r.DimensionValues),
+                        Factor = r.Factor,
+                    });
+                }
+                version.FactorTables.Add(newTable);
+            }
+
+            foreach (var rule in source.EligibilityRules)
+            {
+                version.EligibilityRules.Add(new EligibilityRule
+                {
+                    EquipmentTypeId = rule.EquipmentTypeId,
+                    Accepted = rule.Accepted,
+                });
+            }
+        }
+
+        _db.RatingPlanVersions.Add(version);
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new { versionId = version.Id, versionNumber = version.VersionNumber });
     }
 }

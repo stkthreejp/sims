@@ -88,6 +88,67 @@ export interface RatingPlanVersionDetail {
   promotedById: string | null
   createdById: string | null
   lastEditedById: string | null
+  impactPreviewComputedAt: string | null
+}
+
+// ─── Mutating DTOs ────────────────────────────────────────────────────────────
+
+export interface CreateRatingPlanVersionDto {
+  effectiveDate: string
+  cloneFromVersionId?: string | null
+  notes?: string | null
+}
+
+export interface UpdateVersionMetaDto {
+  effectiveDate: string
+  notes: string | null
+  scheduleMin: number
+  scheduleMax: number
+  minimumPremium: number | null
+}
+
+export interface FactorRowInputDto {
+  dimensionValues: Record<string, string>
+  factor: number
+}
+
+export interface UpdateFactorTableDto {
+  rows: FactorRowInputDto[]
+}
+
+// ─── Impact preview ───────────────────────────────────────────────────────────
+
+export interface DistributionBucket {
+  rangeLabel: string
+  count: number
+}
+
+export interface TopMover {
+  quoteId: string
+  quoteNumber: string
+  insuredName: string
+  currentPremium: number
+  newPremium: number
+  deltaPct: number
+}
+
+export interface RatingImpactPreview {
+  computedAt: string
+  quoteCount: number
+  totalCurrentPremium: number
+  totalNewPremium: number
+  totalDeltaPct: number
+  quotesUp: number
+  quotesDown: number
+  quotesFlat: number
+  distributionBuckets: DistributionBucket[]
+  topMovers: TopMover[]
+}
+
+export interface CsvImportResult {
+  tablesUpdated: string[]
+  rowCountByTable: Record<string, number>
+  warnings: string[]
 }
 
 // ─── Factor tables ────────────────────────────────────────────────────────────
