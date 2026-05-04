@@ -28,6 +28,10 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.UninsuredMotoristLimit).HasPrecision(18, 2);
         builder.Property(q => q.MedicalPaymentsLimit).HasPrecision(18, 2);
 
+        builder.Property(q => q.CompanyId).HasColumnName("company_id");
+        builder.Property(q => q.ProducerId).HasColumnName("producer_id");
+        builder.Property(q => q.IsFilingState).HasColumnName("is_filing_state");
+
         // Computed helper properties — not mapped to columns
         builder.Ignore(q => q.EffectiveCarrierRate);
         builder.Ignore(q => q.EffectiveSMMRate);
