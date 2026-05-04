@@ -89,6 +89,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IPayeeStatementService, PayeeStatementService>();
         services.AddScoped<IWireSheetPdfService, WireSheetPdfService>();
         services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<ICarrierRatingAssignmentService, CarrierRatingAssignmentService>();
         services.AddHttpClient("gemini");
         services.AddHttpClient("qbo_oauth");
         services.AddHttpClient("qbo_api");

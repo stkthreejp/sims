@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, Phone, Mail,
-  Star, UserCircle, Globe, MapPin, Percent, BanknoteIcon,
+  Star, UserCircle, Globe, MapPin, Percent, BanknoteIcon, ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
@@ -21,6 +21,8 @@ import {
   disableCarrierCommission,
 } from '@/api/carrierCommissions.api'
 import type { CarrierCommission } from '@/types/carrierCommission.types'
+import { ratingApi } from '@/api/rating.api'
+import type { CarrierRatingAssignment, RatingPlanVersionPicker } from '@/types/rating.types'
 
 // ─── Contact form ──────────────────────────────────────────────────────────────
 
@@ -172,6 +174,12 @@ export function CarrierDetailPage() {
   const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '' as string, commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
 
+  // Rating plan assignment state
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
+  const [ratingForm, setRatingForm] = useState<{ lineOfBusiness: PolicyLineOfBusiness | ''; ratingPlanVersionId: string }>({ lineOfBusiness: '', ratingPlanVersionId: '' })
+  const [ratingPickerLob, setRatingPickerLob] = useState<PolicyLineOfBusiness | null>(null)
+
   const { data: carrier, isLoading } = useQuery({
     queryKey: ['carriers', id],
     queryFn: () => carriersApi.getById(id!),
@@ -208,6 +216,89 @@ export function CarrierDetailPage() {
     },
     onError: (err: Error) => toast.error(err.message),
   })
+
+  // ─── Rating plan queries + mutations ────────────────────────────────────────
+
+  const { data: ratingAssignments = [] } = useQuery({
+    queryKey: ['carrier-rating-assignments', id],
+    queryFn: () => ratingApi.getAssignments(id!),
+    enabled: !!id,
+  })
+
+  const { data: ratingVersionPicker = [] } = useQuery<RatingPlanVersionPicker[]>({
+    queryKey: ['rating-plan-versions', ratingPickerLob],
+    queryFn: () => ratingApi.getVersionsForLob(ratingPickerLob!),
+    enabled: !!ratingPickerLob,
+  })
+
+  const createAssignmentMutation = useMutation({
+    mutationFn: () => ratingApi.createAssignment({
+      carrierId: id!,
+      lineOfBusiness: ratingForm.lineOfBusiness as PolicyLineOfBusiness,
+      ratingPlanVersionId: ratingForm.ratingPlanVersionId,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carrier-rating-assignments', id] })
+      setShowRatingModal(false)
+      setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+      setRatingPickerLob(null)
+      toast.success('Rating plan assigned')
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to assign rating plan'),
+  })
+
+  const updateAssignmentMutation = useMutation({
+    mutationFn: () => ratingApi.updateAssignment(editingAssignmentId!, { ratingPlanVersionId: ratingForm.ratingPlanVersionId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carrier-rating-assignments', id] })
+      setShowRatingModal(false)
+      setEditingAssignmentId(null)
+      setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+      setRatingPickerLob(null)
+      toast.success('Rating plan updated')
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to update rating plan'),
+  })
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: (assignmentId: string) => ratingApi.deleteAssignment(assignmentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carrier-rating-assignments', id] })
+      toast.success('Rating plan assignment removed')
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to remove assignment'),
+  })
+
+  const openAddRatingModal = () => {
+    setEditingAssignmentId(null)
+    setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+    setRatingPickerLob(null)
+    setShowRatingModal(true)
+  }
+
+  const openEditRatingModal = (assignment: CarrierRatingAssignment) => {
+    setEditingAssignmentId(assignment.id)
+    setRatingForm({ lineOfBusiness: assignment.lineOfBusiness, ratingPlanVersionId: assignment.ratingPlanVersionId })
+    setRatingPickerLob(assignment.lineOfBusiness)
+    setShowRatingModal(true)
+  }
+
+  const closeRatingModal = () => {
+    setShowRatingModal(false)
+    setEditingAssignmentId(null)
+    setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+    setRatingPickerLob(null)
+  }
+
+  const saveRatingAssignment = () => {
+    if (!ratingForm.lineOfBusiness) { toast.error('Select a line of business'); return }
+    if (!ratingForm.ratingPlanVersionId) { toast.error('Select a rating plan version'); return }
+    if (editingAssignmentId) {
+      updateAssignmentMutation.mutate()
+    } else {
+      createAssignmentMutation.mutate()
+    }
+  }
 
   // ─── Info mutations ──────────────────────────────────────────────────────────
 
@@ -687,6 +778,147 @@ export function CarrierDetailPage() {
           })()
         )}
       </div>
+
+      {/* Rating Plans */}
+      <div className="bg-white border rounded-lg p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-slate-400" />
+            Rating Plans
+          </h2>
+          <button
+            onClick={openAddRatingModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          >
+            <Plus className="h-3.5 w-3.5" /> Assign Rating Plan
+          </button>
+        </div>
+
+        {ratingAssignments.length === 0 ? (
+          <div className="text-center py-6 border border-dashed rounded-lg">
+            <ShieldCheck className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No rating plans assigned.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Quotes for this carrier won't rate until a plan is assigned.</p>
+            <button onClick={openAddRatingModal} className="mt-2 text-sm text-blue-600 hover:underline">
+              Assign the first plan
+            </button>
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b bg-slate-50">
+                  <th className="px-4 py-2 font-medium">Line of Business</th>
+                  <th className="px-4 py-2 font-medium">Plan</th>
+                  <th className="px-4 py-2 font-medium">Version</th>
+                  <th className="px-4 py-2 font-medium">Effective Date</th>
+                  <th className="px-4 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {ratingAssignments.map((a) => (
+                  <tr key={a.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-slate-700">{a.lineOfBusinessLabel}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{a.planName}</td>
+                    <td className="px-4 py-3 text-slate-600">v{a.versionNumber}</td>
+                    <td className="px-4 py-3 text-slate-600">{a.effectiveDate}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEditRatingModal(a)}
+                          className="p-1 text-slate-400 hover:text-blue-600 rounded"
+                          title="Edit assignment"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove the ${a.lineOfBusinessLabel} rating plan assignment?`))
+                              deleteAssignmentMutation.mutate(a.id)
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded"
+                          title="Remove assignment"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Rating plan assign/edit modal */}
+      {showRatingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 className="text-base font-semibold text-slate-800">
+              {editingAssignmentId ? 'Edit Rating Plan' : 'Assign Rating Plan'}
+            </h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
+                <select
+                  value={ratingForm.lineOfBusiness}
+                  onChange={(e) => {
+                    const lob = e.target.value as PolicyLineOfBusiness
+                    setRatingForm({ lineOfBusiness: lob, ratingPlanVersionId: '' })
+                    setRatingPickerLob(lob || null)
+                  }}
+                  disabled={!!editingAssignmentId}
+                  className="w-full border rounded px-2 py-1.5 text-sm bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                >
+                  <option value="">Select a line of business…</option>
+                  {ACTIVE_LOBS.map((lob) => (
+                    <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Rating Plan Version</label>
+                <select
+                  value={ratingForm.ratingPlanVersionId}
+                  onChange={(e) => setRatingForm({ ...ratingForm, ratingPlanVersionId: e.target.value })}
+                  disabled={!ratingPickerLob}
+                  className="w-full border rounded px-2 py-1.5 text-sm bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">
+                    {ratingPickerLob
+                      ? ratingVersionPicker.length === 0 ? 'No active versions available' : 'Select a version…'
+                      : 'Select a line of business first'}
+                  </option>
+                  {ratingVersionPicker.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.planName} — v{v.versionNumber} (eff. {v.effectiveDate})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={saveRatingAssignment}
+                disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" /> Save
+              </button>
+              <button
+                onClick={closeRatingModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+              >
+                <X className="h-3.5 w-3.5" /> Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contacts section */}
       <div className="bg-white border rounded-lg p-5 space-y-4">
