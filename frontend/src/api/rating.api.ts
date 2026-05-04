@@ -15,6 +15,7 @@ import type {
   UpdateFactorTableDto,
   RatingImpactPreview,
   CsvImportResult,
+  ShadowRatingDashboard,
 } from '@/types/rating.types'
 
 export const ratingApi = {
@@ -86,4 +87,10 @@ export const ratingApi = {
 
   getImpactPreview: (versionId: string) =>
     apiClient.get<RatingImpactPreview>(`/rating-plan-versions/${versionId}/preview-impact`).then((r) => r.data),
+
+  getShadowResults: (days = 30) =>
+    apiClient.get<ShadowRatingDashboard>('/rating/shadow/results', { params: { days } }).then((r) => r.data),
+
+  getShadowStatus: () =>
+    apiClient.get<{ shadowModeEnabled: boolean }>('/rating/shadow/status').then((r) => r.data),
 }

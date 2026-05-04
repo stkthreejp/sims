@@ -194,3 +194,32 @@ export interface RatingPlanListItem {
   versionCount: number
   assignedCarrierCount: number
 }
+
+// ─── Shadow rating (Phase 5) ──────────────────────────────────────────────────
+
+export interface ShadowRatingResult {
+  id: string
+  quoteId: string
+  quoteNumber: string
+  insuredName: string
+  ratingPlanVersionId: string
+  planName: string
+  versionNumber: number
+  ratedAt: string
+  ratedById: string
+  ratedByName: string
+  shadowPremium: number
+  actualPremium: number
+  deltaAmount: number
+  deltaPct: number
+  isOutlier: boolean
+  scheduleModifier: number
+}
+
+export interface ShadowRatingDashboard {
+  shadowModeEnabled: boolean
+  days: number
+  results: ShadowRatingResult[]
+  outlierCount: number
+  totalResults: number
+}

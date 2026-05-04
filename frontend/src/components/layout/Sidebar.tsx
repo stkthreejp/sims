@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 
 const navItems = [
@@ -17,6 +17,7 @@ const navItems = [
 
 const ratingAdminItems = [
   { to: '/admin/rating', label: 'Rating Plans', icon: Sliders },
+  { to: '/admin/rating/shadow', label: 'Shadow Mode', icon: FlaskConical },
 ]
 
 const adminTaskItems = [

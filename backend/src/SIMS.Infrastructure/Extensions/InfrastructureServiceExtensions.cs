@@ -90,6 +90,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IWireSheetPdfService, WireSheetPdfService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<ICarrierRatingAssignmentService, CarrierRatingAssignmentService>();
+        services.AddScoped<IShadowRatingService, ShadowRatingService>();
         services.AddHttpClient("gemini");
         services.AddHttpClient("qbo_oauth");
         services.AddHttpClient("qbo_api");
@@ -97,6 +98,7 @@ public static class InfrastructureServiceExtensions
         services.AddHostedService<TaskNotificationWorker>();
         services.AddHostedService<TaskEscalationWorker>();
         services.AddHostedService<QboSyncRetryWorker>();
+        services.AddHostedService<ShadowRateDailyReportWorker>();
 
         return services;
     }

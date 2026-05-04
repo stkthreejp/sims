@@ -65,6 +65,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<QuoteRatingSnapshot> QuoteRatingSnapshots => Set<QuoteRatingSnapshot>();
     public DbSet<QuoteRatingLine> QuoteRatingLines => Set<QuoteRatingLine>();
     public DbSet<RatingPlanVersionImpactPreview> RatingPlanVersionImpactPreviews => Set<RatingPlanVersionImpactPreview>();
+    public DbSet<ShadowRatingResult> ShadowRatingResults => Set<ShadowRatingResult>();
 
     // Accounting
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
