@@ -1,0 +1,10 @@
+{
+  "description": "Multi-item mixed: Type 2 Loader age 4-7 + Type 6 Chipper age 4-7, different deductibles",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 2, "year": 2021, "value": 40000, "deductible": 5000 },
+    { "typeNumber": 6, "year": 2021, "value": 80000, "deductible": 10000 }
+  ]
+}

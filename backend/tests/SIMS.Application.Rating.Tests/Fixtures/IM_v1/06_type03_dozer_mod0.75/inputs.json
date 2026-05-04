@@ -1,0 +1,9 @@
+{
+  "description": "Type 3 Dozer, age 4-7, $75k stated, ded $5000, schedule modifier 0.75",
+  "effectiveYear": 2026,
+  "scheduleModifier": 0.75,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 3, "year": 2021, "value": 75000, "deductible": 5000 }
+  ]
+}

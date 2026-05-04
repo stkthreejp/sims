@@ -1,0 +1,7 @@
+{
+  "manualPremium": 5658.00,
+  "grandTotal": 5658.00,
+  "lines": [
+    { "linePremium": 5658.00, "ageBand": "4-7", "deductibleKey": "5000", "baseRate": 2.460, "deductibleFactor": 1.000 }
+  ]
+}

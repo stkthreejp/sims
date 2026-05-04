@@ -1,0 +1,9 @@
+{
+  "description": "Type 10 Excavator, age 8-11, $90k stated, ded $5000, modifier 1.00",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 10, "year": 2018, "value": 90000, "deductible": 5000 }
+  ]
+}

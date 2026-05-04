@@ -1,0 +1,9 @@
+{
+  "description": "Type 11 Skid Steer, age 4-7, $50k stated, ded $2500, modifier 1.00",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 11, "year": 2021, "value": 50000, "deductible": 2500 }
+  ]
+}

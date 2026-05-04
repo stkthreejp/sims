@@ -1,0 +1,9 @@
+{
+  "description": "Null year defaults to age band 1-3: Type 5 Delimber, $30k, ded $2500",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 5, "year": null, "value": 30000, "deductible": 2500 }
+  ]
+}

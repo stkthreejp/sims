@@ -1,0 +1,11 @@
+{
+  "description": "Multi-item: Types 1+2+3, all age 1-3, $20k each, ded $2500, modifier 1.00",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 1, "year": 2024, "value": 20000, "deductible": 2500 },
+    { "typeNumber": 2, "year": 2024, "value": 20000, "deductible": 2500 },
+    { "typeNumber": 3, "year": 2024, "value": 20000, "deductible": 2500 }
+  ]
+}

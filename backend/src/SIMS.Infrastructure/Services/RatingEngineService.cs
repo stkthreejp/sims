@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Rating;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
 using SIMS.Infrastructure.Data;
@@ -65,53 +66,50 @@ public class RatingEngineService : IRatingEngineService
         if (equipment.Count == 0)
             return Result<RatingResultDto>.Failure("NO_EQUIPMENT", "No equipment items found on this submission.");
 
-        var lines = new List<QuoteRatingLine>();
-        decimal manualPremium = 0;
-
+        // Validate items before rating
         foreach (var item in equipment)
         {
             if (item.EquipmentTypeId is null || item.EquipmentType is null)
                 return Result<RatingResultDto>.Failure("MISSING_TYPE", $"Equipment item #{item.ItemNumber} has no equipment type assigned.");
-
             if (!acceptedTypeIds.Contains(item.EquipmentTypeId.Value))
                 return Result<RatingResultDto>.Failure("INELIGIBLE", $"Equipment type '{item.EquipmentType.Name}' is not eligible under this rating plan.");
-
             if (item.Value is null or 0)
                 return Result<RatingResultDto>.Failure("MISSING_VALUE", $"Equipment item #{item.ItemNumber} has no stated value.");
+        }
 
-            var typeNum = item.EquipmentType.TypeNumber.ToString();
-            var ageBand = AgeBand(item.Year, quote.EffectiveDate.Year);
-            var dedKey = DeductibleKey(item);
+        // Delegate pure math to ImV1Formula
+        var formulaInputs = equipment.Select(item => new ImV1Formula.EquipmentInput(
+            item.EquipmentType!.TypeNumber, item.Year, item.Value!.Value, item.Deductible)).ToList();
 
-            var baseRate = LookupFactor(baseRateTable, new() { ["equipment_type"] = typeNum, ["age_band"] = ageBand });
-            if (baseRate is null)
-                return Result<RatingResultDto>.Failure("LOOKUP_FAIL", $"No base rate found for type {typeNum}, age band {ageBand}.");
+        ImV1Formula.RatingResult ratingResult;
+        try
+        {
+            ratingResult = ImV1Formula.Rate(baseRateTable, deductibleTable, formulaInputs,
+                quote.EffectiveDate.Year, modifier, version.MinimumPremium);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<RatingResultDto>.Failure("LOOKUP_FAIL", ex.Message);
+        }
 
-            var deductibleFactor = LookupFactor(deductibleTable, new() { ["equipment_type"] = typeNum, ["deductible"] = dedKey });
-            if (deductibleFactor is null)
-                return Result<RatingResultDto>.Failure("LOOKUP_FAIL", $"No deductible factor found for type {typeNum}, deductible {dedKey}.");
+        var manualPremium = ratingResult.ManualPremium;
+        var grandTotal = ratingResult.GrandTotal;
 
-            var linePremium = Math.Round(item.Value.Value / 100m * baseRate.Value * deductibleFactor.Value * modifier, 2);
-            manualPremium += linePremium;
-
-            var factors = new { base_rate = baseRate.Value, deductible_factor = deductibleFactor.Value, age_band = ageBand, deductible = dedKey };
-            var inputs = new { type = item.EquipmentType.Name, year = item.Year, value = item.Value, deductible = dedKey };
-
-            lines.Add(new QuoteRatingLine
+        var lines = equipment.Zip(ratingResult.Lines, (item, line) =>
+        {
+            var factors = new { base_rate = line.BaseRate, deductible_factor = line.DeductibleFactor, age_band = line.AgeBand, deductible = line.DeductibleKey };
+            var inputs = new { type = item.EquipmentType!.Name, year = item.Year, value = item.Value, deductible = line.DeductibleKey };
+            return new QuoteRatingLine
             {
                 Id = Guid.NewGuid(),
                 ExposureRef = $"EQ-{item.ItemNumber:D3}",
                 Inputs = JsonSerializer.Serialize(inputs),
                 FactorsApplied = JsonSerializer.Serialize(factors),
-                LinePremium = linePremium,
+                LinePremium = line.LinePremium,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-            });
-        }
-
-        var grandTotal = version.MinimumPremium.HasValue
-            ? Math.Max(manualPremium, version.MinimumPremium.Value)
-            : manualPremium;
+            };
+        }).ToList();
 
         // Replace existing non-bound snapshots for this quote
         var existing = await _db.QuoteRatingSnapshots
@@ -198,26 +196,4 @@ public class RatingEngineService : IRatingEngineService
             }).ToList(),
     };
 
-    private static decimal? LookupFactor(FactorTable table, Dictionary<string, string> dims)
-        => table.Rows.FirstOrDefault(r => dims.All(kv =>
-                r.DimensionValues.TryGetValue(kv.Key, out var v) && v == kv.Value))
-            ?.Factor;
-
-    private static string AgeBand(int? year, int effectiveYear)
-    {
-        if (year is null) return "1-3";
-        var age = effectiveYear - year.Value;
-        return age switch
-        {
-            <= 3 => "1-3",
-            <= 7 => "4-7",
-            <= 11 => "8-11",
-            _ => "12+"
-        };
-    }
-
-    private static string DeductibleKey(SubmissionEquipment item)
-        => item.Deductible.HasValue
-            ? ((int)item.Deductible.Value).ToString()
-            : "10%ACV";
 }

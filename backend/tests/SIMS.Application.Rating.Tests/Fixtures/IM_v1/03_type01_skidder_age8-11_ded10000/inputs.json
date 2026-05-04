@@ -1,0 +1,9 @@
+{
+  "description": "Type 1 Skidder, age 8-11, $30k stated, ded $10000, modifier 1.00",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 1, "year": 2018, "value": 30000, "deductible": 10000 }
+  ]
+}

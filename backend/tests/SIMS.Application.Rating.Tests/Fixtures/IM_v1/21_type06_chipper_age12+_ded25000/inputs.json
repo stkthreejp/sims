@@ -1,0 +1,9 @@
+{
+  "description": "Type 6 Chipper, age 12+, $150k stated, ded $25000, modifier 1.00",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 6, "year": 2012, "value": 150000, "deductible": 25000 }
+  ]
+}

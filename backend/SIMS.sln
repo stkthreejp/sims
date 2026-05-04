@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -15,6 +15,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SIMS.Application.Tests", "tests\SIMS.Application.Tests\SIMS.Application.Tests.csproj", "{EA412308-5909-4D70-AC6F-3EE0663D9FDC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SIMS.Application.Rating.Tests", "tests\SIMS.Application.Rating.Tests\SIMS.Application.Rating.Tests.csproj", "{040FE73A-5DC3-4824-96D4-529B56C6D712}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -86,11 +88,24 @@ Global
 		{EA412308-5909-4D70-AC6F-3EE0663D9FDC}.Release|x64.Build.0 = Release|Any CPU
 		{EA412308-5909-4D70-AC6F-3EE0663D9FDC}.Release|x86.ActiveCfg = Release|Any CPU
 		{EA412308-5909-4D70-AC6F-3EE0663D9FDC}.Release|x86.Build.0 = Release|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Debug|x64.Build.0 = Debug|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Debug|x86.Build.0 = Debug|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Release|Any CPU.Build.0 = Release|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Release|x64.ActiveCfg = Release|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Release|x64.Build.0 = Release|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Release|x86.ActiveCfg = Release|Any CPU
+		{040FE73A-5DC3-4824-96D4-529B56C6D712}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{EA412308-5909-4D70-AC6F-3EE0663D9FDC} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{040FE73A-5DC3-4824-96D4-529B56C6D712} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

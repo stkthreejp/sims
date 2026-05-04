@@ -1,0 +1,9 @@
+{
+  "description": "Type 9 Tub Grinder, age 4-7, $200k stated, ded $5000, modifier 1.15",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.15,
+  "minimumPremium": null,
+  "items": [
+    { "typeNumber": 9, "year": 2021, "value": 200000, "deductible": 5000 }
+  ]
+}

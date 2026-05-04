@@ -1,0 +1,7 @@
+{
+  "manualPremium": 502.74,
+  "grandTotal": 502.74,
+  "lines": [
+    { "linePremium": 502.74, "ageBand": "8-11", "deductibleKey": "5000", "baseRate": 0.570, "deductibleFactor": 0.980 }
+  ]
+}

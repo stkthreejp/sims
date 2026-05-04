@@ -1,0 +1,9 @@
+{
+  "description": "Minimum premium floor: computed premium $5 < floor $500, grandTotal should be $500",
+  "effectiveYear": 2026,
+  "scheduleModifier": 1.00,
+  "minimumPremium": 500,
+  "items": [
+    { "typeNumber": 2, "year": 2024, "value": 1000, "deductible": 2500 }
+  ]
+}
