@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Lock, LockOpen, RefreshCw, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronRight,
@@ -266,14 +266,17 @@ export function PeriodClosePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [periods, setPeriods] = useState<AccountingPeriod[]>([])
 
-  const { isLoading } = useQuery({
+  const { isLoading, data: periodsData } = useQuery({
     queryKey: ['periods'],
     queryFn: getPeriods,
-    onSuccess: (data: AccountingPeriod[]) => {
-      setPeriods(data)
-      if (data.length > 0 && selectedId === null) setSelectedId(data[0].id)
-    },
   })
+
+  useEffect(() => {
+    if (periodsData) {
+      setPeriods(periodsData)
+      if (periodsData.length > 0 && selectedId === null) setSelectedId(periodsData[0].id)
+    }
+  }, [periodsData])
 
   const openCurrentMutation = useMutation({
     mutationFn: () => getOrCreatePeriod(today.getFullYear(), today.getMonth() + 1),

@@ -7,6 +7,7 @@ const entityPath = (entityType: DocumentEntityType): string => {
     case 'Policy':     return 'quotes'
     case 'Carrier':    return 'carriers'
     case 'Agent':      return 'agents'
+    case 'Insured':    return 'insureds'
   }
 }
 

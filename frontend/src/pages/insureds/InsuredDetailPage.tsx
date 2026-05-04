@@ -196,7 +196,7 @@ function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
 
 // ─── submission table ────────────────────────────────────────────────────────
 
-function SubmissionTable({ subs, onNew }: { subs: ReturnType<typeof useSubmissions>; onNew: () => void }) {
+function SubmissionTable({ subs, onNew }: { subs: useSubmissions; onNew: () => void }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
       <thead>
@@ -672,7 +672,7 @@ export function InsuredDetailPage() {
               <CardH3>Documents</CardH3>
             </CardHead>
             <div style={{ padding: '16px' }}>
-              <DocumentsSection entityId={id!} entityType="insured" />
+              <DocumentsSection entityId={id!} entityType="Insured" />
             </div>
           </Card>
         )}

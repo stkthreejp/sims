@@ -1,4 +1,4 @@
-export type DocumentEntityType = 'Submission' | 'Policy' | 'Carrier' | 'Agent'
+export type DocumentEntityType = 'Submission' | 'Policy' | 'Carrier' | 'Agent' | 'Insured'
 
 export type DocumentType =
   // Submission
@@ -114,4 +114,5 @@ export const DOCUMENT_TYPES_BY_ENTITY: Record<DocumentEntityType, DocumentType[]
   Agent: [
     'License', 'EosCertificate', 'W9', 'AgencyAgreement', 'Correspondence', 'Other',
   ],
+  Insured: ['Correspondence', 'Other'],
 }
