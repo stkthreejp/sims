@@ -3,6 +3,7 @@ using SIMS.Application.DTOs.Auth;
 using SIMS.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace SIMS.API.Controllers;
 
@@ -15,6 +16,7 @@ public class AuthController : ControllerBase
     public AuthController(IAuthService authService) => _authService = authService;
 
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -23,6 +25,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("microsoft")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> LoginWithMicrosoft([FromBody] MicrosoftLoginRequestDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -31,6 +34,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequestDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";

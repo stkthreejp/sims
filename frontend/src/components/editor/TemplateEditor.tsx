@@ -11,7 +11,7 @@ import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Placeholder from '@tiptap/extension-placeholder'
 import { TagNode } from './TagNode'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   Bold, Italic, Underline as UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
   AlignJustify, List, ListOrdered, Image as ImageIcon, Table as TableIcon,
@@ -172,20 +172,26 @@ export function TemplateEditor({ content, onChange, entityType }: TemplateEditor
   // Sync content when it changes externally (e.g. after import)
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content)
+      editor.commands.setContent(content, false)
     }
-  }, [content]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [content, editor])
 
-  const insertTag = (tag: string) => {
+  const insertTag = useCallback((tag: string) => {
     editor?.chain().focus().insertContent({
       type: 'templateTag',
       attrs: { tag },
     }).run()
-  }
+  }, [editor])
 
-  const insertImage = () => {
-    const url = prompt('Enter image URL (or paste a blob URL):')
-    if (url) editor?.chain().focus().setImage({ src: url }).run()
+  const [imageModalOpen, setImageModalOpen] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
+
+  const confirmInsertImage = () => {
+    if (imageUrl.trim()) {
+      editor?.chain().focus().setImage({ src: imageUrl.trim() }).run()
+    }
+    setImageUrl('')
+    setImageModalOpen(false)
   }
 
   if (!editor) return null
@@ -275,7 +281,7 @@ export function TemplateEditor({ content, onChange, entityType }: TemplateEditor
         </ToolbarBtn>
 
         {/* Image */}
-        <ToolbarBtn onClick={insertImage} title="Insert image">
+        <ToolbarBtn onClick={() => setImageModalOpen(true)} title="Insert image">
           <ImageIcon className="h-4 w-4" />
         </ToolbarBtn>
 
@@ -300,6 +306,41 @@ export function TemplateEditor({ content, onChange, entityType }: TemplateEditor
         editor={editor}
         className="flex-1 overflow-y-auto prose prose-sm max-w-none p-6 min-h-[500px] focus-within:outline-none"
       />
+
+      {/* Image URL modal */}
+      {imageModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-base font-semibold text-slate-800">Insert Image</h2>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Image URL</label>
+              <input
+                autoFocus
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmInsertImage() }}
+                placeholder="https://… or blob:…"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={confirmInsertImage}
+                disabled={!imageUrl.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-40"
+              >
+                Insert
+              </button>
+              <button
+                onClick={() => { setImageUrl(''); setImageModalOpen(false) }}
+                className="px-4 py-2 border border-slate-300 rounded-md text-sm hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Table context toolbar */}
       {editor.isActive('table') && (

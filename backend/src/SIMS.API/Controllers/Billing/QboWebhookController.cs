@@ -106,11 +106,11 @@ public class QboWebhookController : ControllerBase
         if (string.IsNullOrEmpty(incomingSignature))
             return false;
 
-        // If verifier token is placeholder, skip verification (dev mode)
-        if (_settings.WebhookVerifierToken == "PLACEHOLDER")
+        if (string.IsNullOrEmpty(_settings.WebhookVerifierToken) ||
+            _settings.WebhookVerifierToken == "PLACEHOLDER")
         {
-            _logger.LogWarning("QBO webhook signature verification skipped — verifier token not configured");
-            return true;
+            _logger.LogError("QBO webhook received but verifier token is not configured — rejecting");
+            return false;
         }
 
         var key = Encoding.UTF8.GetBytes(_settings.WebhookVerifierToken);

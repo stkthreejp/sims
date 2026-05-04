@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using SIMS.Domain.Enums;
 
 namespace SIMS.Application.DTOs.Insureds;
@@ -31,23 +32,56 @@ public class InsuredDto
 
 public class InsuredCreateDto
 {
+    [Required]
     public InsuredType InsuredType { get; set; }
+
+    [MaxLength(100)]
     public string? FirstName { get; set; }
+
+    [MaxLength(100)]
     public string? LastName { get; set; }
+
     public DateOnly? DateOfBirth { get; set; }
+
+    [MaxLength(200)]
     public string? CompanyName { get; set; }
+
+    [MaxLength(200)]
     public string? Dba { get; set; }
+
     public BusinessEntityType? EntityType { get; set; }
+
+    [Range(0, 200)]
     public int? YearsInBusiness { get; set; }
+
+    [MaxLength(20)]
     public string? TaxId { get; set; }
+
+    [EmailAddress, MaxLength(256)]
     public string? Email { get; set; }
+
+    [Phone, MaxLength(30)]
     public string? Phone { get; set; }
+
+    [Phone, MaxLength(30)]
     public string? PhoneAlt { get; set; }
+
+    [Required, MaxLength(200)]
     public string AddressLine1 { get; set; } = string.Empty;
+
+    [MaxLength(200)]
     public string? AddressLine2 { get; set; }
+
+    [Required, MaxLength(100)]
     public string City { get; set; } = string.Empty;
+
+    [Required, StringLength(2, MinimumLength = 2)]
     public string State { get; set; } = string.Empty;
+
+    [Required, RegularExpression(@"^\d{5}(-\d{4})?$", ErrorMessage = "ZIP code must be 5 digits or ZIP+4 format.")]
     public string ZipCode { get; set; } = string.Empty;
+
+    [MaxLength(100)]
     public string? County { get; set; }
 }
 

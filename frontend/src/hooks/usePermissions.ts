@@ -1,12 +1,10 @@
+import { useShallow } from 'zustand/react/shallow'
 import { useAuthStore } from '@/store/authStore'
 
-/**
- * Returns boolean flags for every permission in the system.
- * Use these to conditionally show/hide action buttons across the UI.
- */
 export function usePermissions() {
-  const hasPermission = useAuthStore((s) => s.hasPermission)
-  const hasRole = useAuthStore((s) => s.hasRole)
+  const { hasPermission, hasRole } = useAuthStore(
+    useShallow((s) => ({ hasPermission: s.hasPermission, hasRole: s.hasRole }))
+  )
 
   const isAdmin = hasRole('Admin')
 

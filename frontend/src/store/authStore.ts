@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { UserInfo } from '@/types/auth.types'
 
 interface AuthState {
@@ -35,6 +35,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'ims-auth',
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

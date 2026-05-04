@@ -33,8 +33,10 @@ public class ExceptionHandlingMiddleware
 
         var (status, title, detail) = exception switch
         {
-            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Unauthorized", exception.Message),
-            ArgumentException => (HttpStatusCode.BadRequest, "Bad Request", exception.Message),
+            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Unauthorized", "Access denied."),
+            ArgumentException ex => (HttpStatusCode.BadRequest, "Bad Request", ex.ParamName != null
+                ? $"Invalid value for parameter '{ex.ParamName}'."
+                : "Invalid argument."),
             _ => (HttpStatusCode.InternalServerError, "Internal Server Error", "An unexpected error occurred.")
         };
 

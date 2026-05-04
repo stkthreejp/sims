@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace SIMS.Infrastructure.Extensions;
 
@@ -18,9 +20,11 @@ public static class InfrastructureServiceExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         // EF Core + PostgreSQL
-        services.AddDbContext<ApplicationDbContext>(options =>
+        services.AddSingleton<AuditInterceptor>();
+        services.AddDbContext<ApplicationDbContext>((sp, options) =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
-                npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+                npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
+                   .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
 
         // Make the generic DbContext resolve to ApplicationDbContext for services that use it
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
@@ -38,6 +42,16 @@ public static class InfrastructureServiceExtensions
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
+
+        // OIDC metadata — singleton so signing keys are fetched once and auto-refreshed
+        services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(sp =>
+        {
+            var cfg = sp.GetRequiredService<IConfiguration>();
+            var tenantId = cfg["MicrosoftAuth:TenantId"]!;
+            var metadataAddress = $"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration";
+            return new ConfigurationManager<OpenIdConnectConfiguration>(
+                metadataAddress, new OpenIdConnectConfigurationRetriever());
+        });
 
         // Application services
         services.AddScoped<IAuthService, AuthService>();

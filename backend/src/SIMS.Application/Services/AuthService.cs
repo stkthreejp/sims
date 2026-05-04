@@ -21,12 +21,18 @@ public class AuthService : IAuthService
     private readonly UserManager<User> _userManager;
     private readonly IConfiguration _config;
     private readonly IServiceProvider _sp;
+    private readonly IConfigurationManager<OpenIdConnectConfiguration> _oidcConfigManager;
 
-    public AuthService(UserManager<User> userManager, IConfiguration config, IServiceProvider sp)
+    public AuthService(
+        UserManager<User> userManager,
+        IConfiguration config,
+        IServiceProvider sp,
+        IConfigurationManager<OpenIdConnectConfiguration> oidcConfigManager)
     {
         _userManager = userManager;
         _config = config;
         _sp = sp;
+        _oidcConfigManager = oidcConfigManager;
     }
 
     public async Task<Result<LoginResponseDto>> LoginAsync(LoginRequestDto dto, string ipAddress)
@@ -83,14 +89,10 @@ public class AuthService : IAuthService
         var tenantId = _config["MicrosoftAuth:TenantId"]!;
         var clientId = _config["MicrosoftAuth:ClientId"]!;
 
-        var metadataAddress = $"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration";
-        var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
-            metadataAddress, new OpenIdConnectConfigurationRetriever());
-
         OpenIdConnectConfiguration oidcConfig;
         try
         {
-            oidcConfig = await configManager.GetConfigurationAsync();
+            oidcConfig = await _oidcConfigManager.GetConfigurationAsync(CancellationToken.None);
         }
         catch
         {
@@ -167,6 +169,7 @@ public class AuthService : IAuthService
                 FirstName = firstName,
                 LastName = lastName,
                 MustChangePassword = false,
+                Status = Domain.Enums.UserStatus.Inactive, // Admin must activate before first use
             };
 
             // Create with a random password (user will always sign in via Microsoft)
@@ -178,6 +181,9 @@ public class AuthService : IAuthService
                     string.Join(", ", createResult.Errors.Select(e => e.Description)));
 
             await _userManager.AddToRoleAsync(user, "ReadOnly");
+            return Result<LoginResponseDto>.Failure(
+                "ACCOUNT_PENDING",
+                "Your account has been created and is pending administrator approval. Please contact your system administrator.");
         }
         else
         {
@@ -229,8 +235,9 @@ public class AuthService : IAuthService
 
     public async Task<Result<LoginResponseDto>> RefreshTokenAsync(string refreshToken, string ipAddress)
     {
-        var user = _userManager.Users
-            .SingleOrDefault(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
+        var user = await _userManager.Users
+            .Include(u => u.RefreshTokens)
+            .SingleOrDefaultAsync(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
 
         if (user == null)
             return Result<LoginResponseDto>.Failure("INVALID_TOKEN", "Invalid refresh token.");
@@ -272,8 +279,9 @@ public class AuthService : IAuthService
 
     public async Task<Result> LogoutAsync(string refreshToken, string ipAddress)
     {
-        var user = _userManager.Users
-            .SingleOrDefault(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
+        var user = await _userManager.Users
+            .Include(u => u.RefreshTokens)
+            .SingleOrDefaultAsync(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
 
         if (user == null)
             return Result.Success(); // Already logged out

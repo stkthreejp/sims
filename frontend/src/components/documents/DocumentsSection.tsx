@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Upload, Trash2, Download, FileText, ChevronDown, ChevronRight,
@@ -160,12 +160,20 @@ function DocumentRow({
   canDelete: boolean
 }) {
   const [downloading, setDownloading] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   const handleDownload = async () => {
     setDownloading(true)
     try {
       const url = await attachmentsApi.getDownloadUrl(attachment.id)
-      window.open(url, '_blank')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = attachment.fileName
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
     } catch {
       toast.error('Failed to get download link')
     } finally {
@@ -190,25 +198,44 @@ function DocumentRow({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-        <button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-          title="Download"
-        >
-          {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-        </button>
-        {canDelete && (
+
+      {confirming ? (
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          <span className="text-xs text-slate-500 mr-1">Delete?</span>
           <button
-            onClick={() => { if (confirm(`Delete "${attachment.fileName}"?`)) onDelete() }}
-            className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
-            title="Delete"
+            onClick={() => { onDelete(); setConfirming(false) }}
+            className="px-2 py-1 rounded text-xs bg-red-600 text-white hover:bg-red-700"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            Yes
           </button>
-        )}
-      </div>
+          <button
+            onClick={() => setConfirming(false)}
+            className="px-2 py-1 rounded text-xs border border-slate-300 hover:bg-slate-50"
+          >
+            No
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 ml-2">
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+            title="Download"
+          >
+            {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          </button>
+          {canDelete && (
+            <button
+              onClick={() => setConfirming(true)}
+              className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
+              title="Delete"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -229,11 +256,19 @@ function DocumentZone({
   canDelete: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  const contentId = useId()
+
+  // Open the zone when files arrive after initial load
+  useEffect(() => {
+    if (defaultOpen) setOpen(true)
+  }, [defaultOpen])
 
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={contentId}
         className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors"
       >
         <div className="flex items-center gap-2">
@@ -248,7 +283,7 @@ function DocumentZone({
       </button>
 
       {open && (
-        <div className="px-2 py-1">
+        <div id={contentId} className="px-2 py-1">
           {attachments.length === 0 ? (
             <p className="text-xs text-slate-400 px-3 py-2 italic">No documents uploaded</p>
           ) : (
@@ -301,9 +336,6 @@ export function DocumentsSection({
 
   const totalCount = attachments.length
 
-  // Which zones to open by default: only those that have files
-  const hasFiles = (t: DocumentType) => grouped[t].length > 0
-
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -337,7 +369,7 @@ export function DocumentsSection({
               key={t}
               label={DOCUMENT_TYPE_LABELS[t]}
               attachments={grouped[t]}
-              defaultOpen={hasFiles(t)}
+              defaultOpen={grouped[t].length > 0}
               onDelete={(id) => deleteMutation.mutate(id)}
               canDelete={canDelete}
             />

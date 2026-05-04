@@ -13,26 +13,23 @@ namespace SIMS.Application.Services;
 
 public class InboundEmailService : IInboundEmailService
 {
-    private readonly IServiceProvider _sp;
+    private readonly Microsoft.EntityFrameworkCore.DbContext _db;
     private readonly IGeminiExtractionService _gemini;
     private readonly ILogger<InboundEmailService> _logger;
 
-    private Microsoft.EntityFrameworkCore.DbContext Db =>
-        (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
-
     public InboundEmailService(
-        IServiceProvider sp,
+        Microsoft.EntityFrameworkCore.DbContext db,
         IGeminiExtractionService gemini,
         ILogger<InboundEmailService> logger)
     {
-        _sp = sp;
+        _db = db;
         _gemini = gemini;
         _logger = logger;
     }
 
     public async Task<IEnumerable<InboundEmailListItemDto>> GetUnprocessedAsync()
     {
-        var emails = await Db.Set<InboundEmail>()
+        var emails = await _db.Set<InboundEmail>()
             .Include(e => e.Attachments.Where(a => !a.IsDeleted))
             .Where(e => !e.IsDeleted && !e.IsProcessed)
             .OrderByDescending(e => e.ReceivedAt)
@@ -43,7 +40,7 @@ public class InboundEmailService : IInboundEmailService
 
     public async Task<Result<InboundEmailDto>> GetByIdAsync(Guid id)
     {
-        var email = await Db.Set<InboundEmail>()
+        var email = await _db.Set<InboundEmail>()
             .Include(e => e.Attachments.Where(a => !a.IsDeleted))
             .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
 
@@ -55,7 +52,7 @@ public class InboundEmailService : IInboundEmailService
     public async Task<Result<CreateSubmissionFromEmailResponse>> CreateSubmissionFromEmailAsync(
         Guid emailId, Guid currentUserId, Guid? insuredId = null, List<Guid>? attachmentIds = null, string? lineOfBusiness = null)
     {
-        var email = await Db.Set<InboundEmail>()
+        var email = await _db.Set<InboundEmail>()
             .Include(e => e.Attachments.Where(a => !a.IsDeleted))
             .FirstOrDefaultAsync(e => e.Id == emailId && !e.IsDeleted);
 
@@ -69,7 +66,7 @@ public class InboundEmailService : IInboundEmailService
         Guid resolvedInsuredId;
         if (insuredId.HasValue)
         {
-            var exists = await Db.Set<Insured>().AnyAsync(i => i.Id == insuredId.Value && !i.IsDeleted);
+            var exists = await _db.Set<Insured>().AnyAsync(i => i.Id == insuredId.Value && !i.IsDeleted);
             if (!exists)
                 return Result<CreateSubmissionFromEmailResponse>.Failure("INSURED_NOT_FOUND", "Selected insured not found.");
             resolvedInsuredId = insuredId.Value;
@@ -77,8 +74,8 @@ public class InboundEmailService : IInboundEmailService
         else
         {
             var newInsured = BuildInsuredFromSender(email.FromName, email.FromAddress, currentUserId);
-            Db.Set<Insured>().Add(newInsured);
-            await Db.SaveChangesAsync();
+            _db.Set<Insured>().Add(newInsured);
+            await _db.SaveChangesAsync();
             resolvedInsuredId = newInsured.Id;
         }
 
@@ -127,7 +124,7 @@ public class InboundEmailService : IInboundEmailService
 
         var year = DateTime.UtcNow.Year;
         var prefix = $"SUB-{year}-";
-        var count = await Db.Set<Submission>()
+        var count = await _db.Set<Submission>()
             .IgnoreQueryFilters()
             .CountAsync(s => s.SubmissionNumber.StartsWith(prefix));
 
@@ -142,12 +139,12 @@ public class InboundEmailService : IInboundEmailService
                 ? JsonSerializer.Serialize(linesOfBusiness)
                 : null,
         };
-        Db.Set<Submission>().Add(submission);
+        _db.Set<Submission>().Add(submission);
 
         // Copy email attachments to the submission
         foreach (var emailAttachment in attachmentsToProcess)
         {
-            Db.Set<Attachment>().Add(new Attachment
+            _db.Set<Attachment>().Add(new Attachment
             {
                 SubmissionId = submission.Id,
                 EntityType = DocumentEntityType.Submission,
@@ -165,7 +162,7 @@ public class InboundEmailService : IInboundEmailService
         email.IsProcessed = true;
         email.ProcessedAt = DateTime.UtcNow;
 
-        await Db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
 
         // Merge all LOB extractions and apply to the single submission
         if (extractions?.Count > 0)
@@ -183,8 +180,8 @@ public class InboundEmailService : IInboundEmailService
             }
         }
 
-        await Db.Entry(submission).Reference(s => s.Insured).LoadAsync();
-        await Db.Entry(submission).Reference(s => s.Underwriter).LoadAsync();
+        await _db.Entry(submission).Reference(s => s.Insured).LoadAsync();
+        await _db.Entry(submission).Reference(s => s.Underwriter).LoadAsync();
 
         var dto = new SubmissionDto
         {
@@ -209,7 +206,7 @@ public class InboundEmailService : IInboundEmailService
 
     public async Task<Result<string>> ReExtractAsync(Guid emailId, Guid currentUserId, string? lineOfBusiness = null)
     {
-        var email = await Db.Set<InboundEmail>()
+        var email = await _db.Set<InboundEmail>()
             .Include(e => e.Attachments.Where(a => !a.IsDeleted))
             .FirstOrDefaultAsync(e => e.Id == emailId && !e.IsDeleted);
 
@@ -235,7 +232,7 @@ public class InboundEmailService : IInboundEmailService
         if (extractions == null || extractions.Count == 0)
             return Result<string>.Failure("NO_ELIGIBLE_ATTACHMENTS", "No extractable attachments found on this email.");
 
-        var submission = await Db.Set<Submission>().FindAsync(submissionId);
+        var submission = await _db.Set<Submission>().FindAsync(submissionId);
         if (submission == null)
             return Result<string>.Failure("SUBMISSION_NOT_FOUND", "Linked submission not found.");
 
@@ -283,12 +280,12 @@ public class InboundEmailService : IInboundEmailService
     {
         if (!string.IsNullOrWhiteSpace(data.DescriptionOfOperations))
         {
-            var sub = await Db.Set<Submission>().FindAsync(submissionId);
+            var sub = await _db.Set<Submission>().FindAsync(submissionId);
             if (sub != null && (replaceExisting || string.IsNullOrWhiteSpace(sub.DescriptionOfOperations)))
                 sub.DescriptionOfOperations = data.DescriptionOfOperations;
         }
 
-        var insured = await Db.Set<Insured>().FindAsync(insuredId);
+        var insured = await _db.Set<Insured>().FindAsync(insuredId);
         if (insured != null)
         {
             if (!string.IsNullOrWhiteSpace(data.Dba) && (replaceExisting || insured.Dba == null))
@@ -304,18 +301,18 @@ public class InboundEmailService : IInboundEmailService
         }
 
         // Drivers
-        var hasDrivers = await Db.Set<SubmissionDriver>().AnyAsync(d => d.SubmissionId == submissionId && !d.IsDeleted);
+        var hasDrivers = await _db.Set<SubmissionDriver>().AnyAsync(d => d.SubmissionId == submissionId && !d.IsDeleted);
         if (!hasDrivers || replaceExisting)
         {
             if (replaceExisting)
-                Db.Set<SubmissionDriver>().RemoveRange(
-                    await Db.Set<SubmissionDriver>().Where(d => d.SubmissionId == submissionId).ToListAsync());
+                _db.Set<SubmissionDriver>().RemoveRange(
+                    await _db.Set<SubmissionDriver>().Where(d => d.SubmissionId == submissionId).ToListAsync());
 
             for (var i = 0; i < data.Drivers.Count; i++)
             {
                 var d = data.Drivers[i];
                 if (string.IsNullOrWhiteSpace(d.Name)) continue;
-                Db.Set<SubmissionDriver>().Add(new SubmissionDriver
+                _db.Set<SubmissionDriver>().Add(new SubmissionDriver
                 {
                     SubmissionId = submissionId,
                     DriverNumber = d.DriverNumber ?? (i + 1),
@@ -329,17 +326,17 @@ public class InboundEmailService : IInboundEmailService
         }
 
         // Vehicles
-        var hasVehicles = await Db.Set<SubmissionVehicle>().AnyAsync(v => v.SubmissionId == submissionId && !v.IsDeleted);
+        var hasVehicles = await _db.Set<SubmissionVehicle>().AnyAsync(v => v.SubmissionId == submissionId && !v.IsDeleted);
         if (!hasVehicles || replaceExisting)
         {
             if (replaceExisting)
-                Db.Set<SubmissionVehicle>().RemoveRange(
-                    await Db.Set<SubmissionVehicle>().Where(v => v.SubmissionId == submissionId).ToListAsync());
+                _db.Set<SubmissionVehicle>().RemoveRange(
+                    await _db.Set<SubmissionVehicle>().Where(v => v.SubmissionId == submissionId).ToListAsync());
 
             for (var i = 0; i < data.Vehicles.Count; i++)
             {
                 var v = data.Vehicles[i];
-                Db.Set<SubmissionVehicle>().Add(new SubmissionVehicle
+                _db.Set<SubmissionVehicle>().Add(new SubmissionVehicle
                 {
                     SubmissionId = submissionId,
                     UnitNumber = v.UnitNumber ?? (i + 1),
@@ -356,18 +353,18 @@ public class InboundEmailService : IInboundEmailService
         }
 
         // Locations
-        var hasLocations = await Db.Set<SubmissionLocation>().AnyAsync(l => l.SubmissionId == submissionId && !l.IsDeleted);
+        var hasLocations = await _db.Set<SubmissionLocation>().AnyAsync(l => l.SubmissionId == submissionId && !l.IsDeleted);
         if (!hasLocations || replaceExisting)
         {
             if (replaceExisting)
-                Db.Set<SubmissionLocation>().RemoveRange(
-                    await Db.Set<SubmissionLocation>().Where(l => l.SubmissionId == submissionId).ToListAsync());
+                _db.Set<SubmissionLocation>().RemoveRange(
+                    await _db.Set<SubmissionLocation>().Where(l => l.SubmissionId == submissionId).ToListAsync());
 
             for (var i = 0; i < data.Locations.Count; i++)
             {
                 var l = data.Locations[i];
                 if (string.IsNullOrWhiteSpace(l.Address)) continue;
-                Db.Set<SubmissionLocation>().Add(new SubmissionLocation
+                _db.Set<SubmissionLocation>().Add(new SubmissionLocation
                 {
                     SubmissionId = submissionId,
                     LocationNumber = l.LocationNumber ?? (i + 1),
@@ -378,17 +375,17 @@ public class InboundEmailService : IInboundEmailService
         }
 
         // Prior carriers
-        var hasCarriers = await Db.Set<SubmissionPriorCarrier>().AnyAsync(p => p.SubmissionId == submissionId && !p.IsDeleted);
+        var hasCarriers = await _db.Set<SubmissionPriorCarrier>().AnyAsync(p => p.SubmissionId == submissionId && !p.IsDeleted);
         if (!hasCarriers || replaceExisting)
         {
             if (replaceExisting)
-                Db.Set<SubmissionPriorCarrier>().RemoveRange(
-                    await Db.Set<SubmissionPriorCarrier>().Where(p => p.SubmissionId == submissionId).ToListAsync());
+                _db.Set<SubmissionPriorCarrier>().RemoveRange(
+                    await _db.Set<SubmissionPriorCarrier>().Where(p => p.SubmissionId == submissionId).ToListAsync());
 
             foreach (var pc in data.PriorCarriers)
             {
                 if (string.IsNullOrWhiteSpace(pc.CarrierName)) continue;
-                Db.Set<SubmissionPriorCarrier>().Add(new SubmissionPriorCarrier
+                _db.Set<SubmissionPriorCarrier>().Add(new SubmissionPriorCarrier
                 {
                     SubmissionId = submissionId,
                     LineOfBusiness = pc.LineOfBusiness,
@@ -403,12 +400,12 @@ public class InboundEmailService : IInboundEmailService
         // Supplemental (1-to-1)
         if (data.Supplemental != null)
         {
-            var existing = await Db.Set<SubmissionSupplemental>()
+            var existing = await _db.Set<SubmissionSupplemental>()
                 .FirstOrDefaultAsync(s => s.SubmissionId == submissionId && !s.IsDeleted);
 
             if (existing == null)
             {
-                Db.Set<SubmissionSupplemental>().Add(new SubmissionSupplemental
+                _db.Set<SubmissionSupplemental>().Add(new SubmissionSupplemental
                 {
                     SubmissionId = submissionId,
                     CommoditiesHauled = Serialize(data.Supplemental.CommoditiesHauled),
@@ -431,12 +428,12 @@ public class InboundEmailService : IInboundEmailService
         // GL coverages (1-to-1)
         if (data.GLCoverages != null)
         {
-            var existing = await Db.Set<SubmissionGLCoverages>()
+            var existing = await _db.Set<SubmissionGLCoverages>()
                 .FirstOrDefaultAsync(g => g.SubmissionId == submissionId && !g.IsDeleted);
 
             if (existing == null)
             {
-                Db.Set<SubmissionGLCoverages>().Add(new SubmissionGLCoverages
+                _db.Set<SubmissionGLCoverages>().Add(new SubmissionGLCoverages
                 {
                     SubmissionId = submissionId,
                     GeneralAggregate = data.GLCoverages.GeneralAggregate,
@@ -461,18 +458,18 @@ public class InboundEmailService : IInboundEmailService
         }
 
         // GL classifications
-        var hasGLClass = await Db.Set<SubmissionGLClassification>().AnyAsync(c => c.SubmissionId == submissionId && !c.IsDeleted);
+        var hasGLClass = await _db.Set<SubmissionGLClassification>().AnyAsync(c => c.SubmissionId == submissionId && !c.IsDeleted);
         if (!hasGLClass || replaceExisting)
         {
             if (replaceExisting)
-                Db.Set<SubmissionGLClassification>().RemoveRange(
-                    await Db.Set<SubmissionGLClassification>().Where(c => c.SubmissionId == submissionId).ToListAsync());
+                _db.Set<SubmissionGLClassification>().RemoveRange(
+                    await _db.Set<SubmissionGLClassification>().Where(c => c.SubmissionId == submissionId).ToListAsync());
 
             for (var i = 0; i < data.GLClassifications.Count; i++)
             {
                 var gc = data.GLClassifications[i];
                 if (string.IsNullOrWhiteSpace(gc.ClassCode)) continue;
-                Db.Set<SubmissionGLClassification>().Add(new SubmissionGLClassification
+                _db.Set<SubmissionGLClassification>().Add(new SubmissionGLClassification
                 {
                     SubmissionId = submissionId,
                     LocationNumber = gc.LocationNumber ?? 1,
@@ -487,12 +484,12 @@ public class InboundEmailService : IInboundEmailService
         // IM coverages (1-to-1)
         if (data.IMCoverages != null)
         {
-            var existing = await Db.Set<SubmissionIMCoverages>()
+            var existing = await _db.Set<SubmissionIMCoverages>()
                 .FirstOrDefaultAsync(m => m.SubmissionId == submissionId && !m.IsDeleted);
 
             if (existing == null)
             {
-                Db.Set<SubmissionIMCoverages>().Add(new SubmissionIMCoverages
+                _db.Set<SubmissionIMCoverages>().Add(new SubmissionIMCoverages
                 {
                     SubmissionId = submissionId,
                     ScheduledEquipmentTotalLimit = data.IMCoverages.ScheduledEquipmentTotalLimit,
@@ -513,17 +510,17 @@ public class InboundEmailService : IInboundEmailService
         }
 
         // Equipment
-        var hasEquipment = await Db.Set<SubmissionEquipment>().AnyAsync(e => e.SubmissionId == submissionId && !e.IsDeleted);
+        var hasEquipment = await _db.Set<SubmissionEquipment>().AnyAsync(e => e.SubmissionId == submissionId && !e.IsDeleted);
         if (!hasEquipment || replaceExisting)
         {
             if (replaceExisting)
-                Db.Set<SubmissionEquipment>().RemoveRange(
-                    await Db.Set<SubmissionEquipment>().Where(e => e.SubmissionId == submissionId).ToListAsync());
+                _db.Set<SubmissionEquipment>().RemoveRange(
+                    await _db.Set<SubmissionEquipment>().Where(e => e.SubmissionId == submissionId).ToListAsync());
 
             for (var i = 0; i < data.Equipment.Count; i++)
             {
                 var eq = data.Equipment[i];
-                Db.Set<SubmissionEquipment>().Add(new SubmissionEquipment
+                _db.Set<SubmissionEquipment>().Add(new SubmissionEquipment
                 {
                     SubmissionId = submissionId,
                     ItemNumber = eq.ItemNumber ?? (i + 1),
@@ -537,7 +534,7 @@ public class InboundEmailService : IInboundEmailService
             }
         }
 
-        await Db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
     }
 
     private static DateOnly? ParseDate(string? s) =>

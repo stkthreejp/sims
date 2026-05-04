@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
@@ -41,6 +42,7 @@ const accountingItems = [
 ]
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
+  const [hovered, setHovered] = useState(false)
   return (
     <NavLink
       to={to}
@@ -52,25 +54,13 @@ function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: R
         borderRadius: 'var(--r-sm)',
         fontSize: 12.5,
         fontWeight: isActive ? 600 : 500,
-        color: isActive ? 'var(--accent-ink)' : 'var(--ink-3)',
-        background: isActive ? 'var(--accent-soft)' : 'transparent',
+        color: isActive ? 'var(--accent-ink)' : hovered ? 'var(--ink)' : 'var(--ink-3)',
+        background: isActive ? 'var(--accent-soft)' : hovered ? 'var(--hover)' : 'transparent',
         textDecoration: 'none',
         transition: 'background .1s, color .1s',
       })}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLElement
-        if (!el.getAttribute('aria-current')) {
-          el.style.background = 'var(--hover)'
-          el.style.color = 'var(--ink)'
-        }
-      }}
-      onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLElement
-        if (!el.getAttribute('aria-current')) {
-          el.style.background = 'transparent'
-          el.style.color = 'var(--ink-3)'
-        }
-      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <Icon style={{ width: 14, height: 14, flexShrink: 0, opacity: .85 }} />
       {label}

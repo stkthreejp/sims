@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using SIMS.Domain.Enums;
 
 namespace SIMS.Application.DTOs.Submissions;
@@ -41,12 +42,19 @@ public class SubmissionListItemDto
 
 public class SubmissionCreateDto
 {
+    [Required]
     public Guid InsuredId { get; set; }
+
     public Guid? AgentId { get; set; }
+
+    [Required]
     public Guid UnderwriterId { get; set; }
+
     public Guid? AssistantUWId { get; set; }
     public DateOnly? EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
+
+    [MaxLength(2000)]
     public string? DescriptionOfOperations { get; set; }
 }
 

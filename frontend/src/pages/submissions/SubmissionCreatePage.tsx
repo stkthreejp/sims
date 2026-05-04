@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ArrowLeft, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
 import { usersApi } from '@/api/users.api'
@@ -10,6 +10,96 @@ import { insuredsApi } from '@/api/insureds.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { SubmissionCreate } from '@/types/submission.types'
+import type { InsuredListItem } from '@/types/insured.types'
+
+// ── Insured search combobox ───────────────────────────────────────────────────
+
+function InsuredCombobox({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (id: string, name: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [selectedName, setSelectedName] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const { data: results = [], isFetching } = useQuery({
+    queryKey: ['insureds', 'search', query],
+    queryFn: () => insuredsApi.getAll({ search: query, pageSize: 10 }),
+    enabled: query.length >= 2,
+    select: (d) => d.items,
+  })
+
+  const handleSelect = (insured: InsuredListItem) => {
+    setSelectedName(insured.displayName)
+    setQuery('')
+    setOpen(false)
+    onChange(insured.id, insured.displayName)
+  }
+
+  const handleClear = () => {
+    setSelectedName('')
+    setQuery('')
+    onChange('', '')
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      {value && selectedName ? (
+        <div className="flex items-center justify-between border rounded px-3 py-2 bg-slate-50">
+          <span className="text-sm text-slate-800">{selectedName}</span>
+          <button type="button" onClick={handleClear} className="text-slate-400 hover:text-slate-600">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            placeholder="Type to search insureds…"
+            className="w-full border rounded pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {isFetching && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <LoadingSpinner />
+            </div>
+          )}
+        </div>
+      )}
+
+      {open && query.length >= 2 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {results.length === 0 && !isFetching ? (
+            <p className="text-xs text-slate-400 px-3 py-3 text-center">No insureds found</p>
+          ) : (
+            results.map((insured: InsuredListItem) => (
+              <button
+                key={insured.id}
+                type="button"
+                onMouseDown={() => handleSelect(insured)}
+                className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-blue-50"
+              >
+                <div>
+                  <p className="text-sm text-slate-800 font-medium">{insured.displayName}</p>
+                  <p className="text-xs text-slate-400">{insured.city}, {insured.state}</p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export function SubmissionCreatePage() {
   const navigate = useNavigate()
@@ -87,12 +177,10 @@ export function SubmissionCreatePage() {
 
           {!insuredIdParam && (
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-600 mb-1">Insured ID *</label>
-              <input
+              <label className="block text-xs font-medium text-slate-600 mb-1">Insured *</label>
+              <InsuredCombobox
                 value={form.insuredId}
-                onChange={set('insuredId')}
-                placeholder="Paste insured ID"
-                className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(id) => setForm((f) => ({ ...f, insuredId: id }))}
               />
             </div>
           )}

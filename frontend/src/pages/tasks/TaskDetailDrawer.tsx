@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, User, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+import {
+  X, User, Clock, CheckCircle, AlertTriangle,
+  Plus, CornerDownRight, ArrowUpDown, CheckCheck, XCircle,
+  AlertOctagon, Bell, Clock3, FileText, Sparkles,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { tasksApi } from '@/api/tasks.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -14,18 +18,18 @@ const STATUS_OPTIONS: { value: TaskInstanceStatus; label: string }[] = [
   { value: 'Cancelled',  label: 'Cancelled' },
 ]
 
-const ACTION_LABELS: Partial<Record<TaskAuditAction, string>> = {
-  Created:         '✦ Created',
-  Assigned:        '📧 Assignment email sent',
-  Reassigned:      '↪ Reassigned',
-  StatusChanged:   '↕ Status changed',
-  Completed:       '✓ Completed',
-  Cancelled:       '✗ Cancelled',
-  Escalated:       '⚠ Escalated',
-  ReminderSent:    '🔔 Reminder sent',
-  OverdueNotified: '⏰ Overdue alert sent',
-  DigestSent:      '📋 Digest sent',
-  Note:            '📝 Note',
+const ACTION_CONFIG: Partial<Record<TaskAuditAction, { icon: React.ElementType; label: string }>> = {
+  Created:         { icon: Plus,           label: 'Created' },
+  Assigned:        { icon: Bell,           label: 'Assignment email sent' },
+  Reassigned:      { icon: CornerDownRight, label: 'Reassigned' },
+  StatusChanged:   { icon: ArrowUpDown,    label: 'Status changed' },
+  Completed:       { icon: CheckCheck,     label: 'Completed' },
+  Cancelled:       { icon: XCircle,        label: 'Cancelled' },
+  Escalated:       { icon: AlertOctagon,   label: 'Escalated' },
+  ReminderSent:    { icon: Bell,           label: 'Reminder sent' },
+  OverdueNotified: { icon: Clock3,         label: 'Overdue alert sent' },
+  DigestSent:      { icon: FileText,       label: 'Digest sent' },
+  Note:            { icon: Sparkles,       label: 'Note' },
 }
 
 interface Props {
@@ -35,8 +39,16 @@ interface Props {
 }
 
 export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const qc = useQueryClient()
   const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    dialog.showModal()
+    return () => { if (dialog.open) dialog.close() }
+  }, [])
 
   const { data: task, isLoading } = useQuery({
     queryKey: ['task', taskId],
@@ -56,84 +68,92 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
   })
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
+    <dialog
+      ref={dialogRef}
+      onCancel={(e) => { e.preventDefault(); onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      className="[&::backdrop]:bg-black/20 flex flex-col bg-white shadow-xl p-0 border-0"
+      style={{
+        margin: '0 0 0 auto',
+        width: 460,
+        height: '100%',
+        maxHeight: '100%',
+        borderLeft: '1px solid var(--line)',
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
+        <h2 className="font-semibold text-slate-800 text-base">
+          {isLoading ? 'Loading…' : task?.taskTypeName}
+        </h2>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
 
-      {/* Drawer */}
-      <div
-        className="fixed right-0 top-0 h-full z-50 flex flex-col bg-white shadow-xl"
-        style={{ width: 460, borderLeft: '1px solid var(--line)' }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-semibold text-slate-800 text-base">
-            {isLoading ? 'Loading…' : task?.taskTypeName}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {isLoading ? (
-          <div className="flex-1 flex items-center justify-center"><LoadingSpinner /></div>
-        ) : !task ? (
-          <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">Task not found.</div>
-        ) : (
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-            {/* Meta */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <MetaRow icon={<User className="h-3.5 w-3.5" />} label="Assigned to" value={task.assignedUserName ?? '(unassigned)'} />
-              <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="Due" value={new Date(task.dueDate).toLocaleDateString()} accent={task.isOverdue} />
-              <MetaRow icon={<CheckCircle className="h-3.5 w-3.5" />} label="Status" value={task.status} />
-              <MetaRow icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Priority" value={task.priority} />
-              {task.escalationLevel > 0 && (
-                <MetaRow icon={<AlertTriangle className="h-3.5 w-3.5 text-orange-500" />} label="Escalation" value={`Level ${task.escalationLevel}`} accent />
-              )}
-              {task.entityType && (
-                <MetaRow icon={<></>} label="Entity" value={`${task.entityType}`} />
-              )}
-            </div>
-
-            {/* Status update */}
-            {task.status !== 'Closed' && task.status !== 'Cancelled' && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Update Status</p>
-                <div className="flex flex-wrap gap-2">
-                  {STATUS_OPTIONS.filter((o) => o.value !== task.status && o.value !== 'Cancelled').map((opt) => (
-                    <button
-                      key={opt.value}
-                      disabled={updatingStatus}
-                      onClick={() => updateStatus({ status: opt.value })}
-                      className="px-3 py-1 rounded-lg border text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Optional notes…"
-                  rows={2}
-                  className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
-                />
-              </div>
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center"><LoadingSpinner /></div>
+      ) : !task ? (
+        <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">Task not found.</div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Meta */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <MetaRow icon={<User className="h-3.5 w-3.5" />} label="Assigned to" value={task.assignedUserName ?? '(unassigned)'} />
+            <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="Due" value={new Date(task.dueDate).toLocaleDateString()} accent={task.isOverdue} />
+            <MetaRow icon={<CheckCircle className="h-3.5 w-3.5" />} label="Status" value={task.status} />
+            <MetaRow icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Priority" value={task.priority} />
+            {task.escalationLevel > 0 && (
+              <MetaRow icon={<AlertTriangle className="h-3.5 w-3.5 text-orange-500" />} label="Escalation" value={`Level ${task.escalationLevel}`} accent />
             )}
+            {task.entityType && (
+              <MetaRow icon={<></>} label="Entity" value={`${task.entityType}`} />
+            )}
+          </div>
 
-            {/* Audit log */}
+          {/* Status update */}
+          {task.status !== 'Closed' && task.status !== 'Cancelled' && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</p>
-              {task.auditEntries.length === 0 ? (
-                <p className="text-sm text-slate-400">No activity yet.</p>
-              ) : (
-                <ol className="relative border-l border-slate-200 ml-3 space-y-4">
-                  {task.auditEntries.map((entry) => (
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Update Status</p>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_OPTIONS.filter((o) => o.value !== task.status && o.value !== 'Cancelled').map((opt) => (
+                  <button
+                    key={opt.value}
+                    disabled={updatingStatus}
+                    onClick={() => updateStatus({ status: opt.value })}
+                    className="px-3 py-1 rounded-lg border text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes…"
+                rows={2}
+                className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+              />
+            </div>
+          )}
+
+          {/* Audit log */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</p>
+            {task.auditEntries.length === 0 ? (
+              <p className="text-sm text-slate-400">No activity yet.</p>
+            ) : (
+              <ol className="relative border-l border-slate-200 ml-3 space-y-4">
+                {task.auditEntries.map((entry) => {
+                  const config = ACTION_CONFIG[entry.action]
+                  const ActionIcon = config?.icon
+                  return (
                     <li key={entry.id} className="ml-4">
                       <span className="absolute -left-1.5 mt-1.5 h-2.5 w-2.5 rounded-full border border-white bg-slate-300" />
                       <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleString()}</p>
-                      <p className="text-sm font-medium text-slate-700">
-                        {ACTION_LABELS[entry.action] ?? entry.action}
+                      <p className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                        {ActionIcon && <ActionIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
+                        {config?.label ?? entry.action}
                         {entry.userName && <span className="font-normal text-slate-500"> — {entry.userName}</span>}
                       </p>
                       {entry.oldValue && entry.newValue && (
@@ -141,14 +161,14 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
                       )}
                       {entry.notes && <p className="text-xs text-slate-500 italic">{entry.notes}</p>}
                     </li>
-                  ))}
-                </ol>
-              )}
-            </div>
+                  )
+                })}
+              </ol>
+            )}
           </div>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+    </dialog>
   )
 }
 

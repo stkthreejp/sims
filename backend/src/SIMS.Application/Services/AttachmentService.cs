@@ -11,23 +11,20 @@ namespace SIMS.Application.Services;
 
 public class AttachmentService : IAttachmentService
 {
-    private readonly IServiceProvider _sp;
+    private readonly Microsoft.EntityFrameworkCore.DbContext _db;
     private readonly IBlobStorageService _blob;
     private readonly long _maxFileSize;
 
-    private Microsoft.EntityFrameworkCore.DbContext Db =>
-        (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
-
-    public AttachmentService(IServiceProvider sp, IBlobStorageService blob, IConfiguration config)
+    public AttachmentService(Microsoft.EntityFrameworkCore.DbContext db, IBlobStorageService blob, IConfiguration config)
     {
-        _sp = sp;
+        _db = db;
         _blob = blob;
-        _maxFileSize = long.Parse(config["Storage:MaxFileSizeBytes"] ?? "52428800");
+        _maxFileSize = long.TryParse(config["Storage:MaxFileSizeBytes"], out var parsed) ? parsed : 52_428_800L;
     }
 
     public async Task<IEnumerable<AttachmentDto>> GetByEntityAsync(DocumentEntityType entityType, Guid entityId)
     {
-        var q = Db.Set<Attachment>()
+        var q = _db.Set<Attachment>()
             .Include(a => a.UploadedBy)
             .Where(a => a.EntityType == entityType);
 
@@ -55,16 +52,21 @@ public class AttachmentService : IAttachmentService
         if (file.Length > _maxFileSize)
             return Result<AttachmentDto>.Failure("FILE_TOO_LARGE", $"File exceeds the {_maxFileSize / 1024 / 1024}MB limit.");
 
+        // Strip directory components and non-printable characters from the name before storing.
+        // The blob path itself is GUID-based (safe); this name is only used in Content-Disposition.
+        var safeFileName = System.Text.RegularExpressions.Regex.Replace(
+            Path.GetFileName(file.FileName), @"[^\w.\-() ]", "_");
+
         // Upload to Azure
         string blobPath;
         using (var stream = file.OpenReadStream())
-            blobPath = await _blob.UploadAsync(stream, file.FileName, file.ContentType);
+            blobPath = await _blob.UploadAsync(stream, safeFileName, file.ContentType);
 
         var attachment = new Attachment
         {
             EntityType = entityType,
             DocumentType = documentType,
-            FileName = file.FileName,
+            FileName = safeFileName,
             BlobPath = blobPath,
             ContentType = file.ContentType,
             FileSizeBytes = file.Length,
@@ -81,16 +83,16 @@ public class AttachmentService : IAttachmentService
             case DocumentEntityType.Agent:      attachment.AgentId = entityId;      break;
         }
 
-        Db.Set<Attachment>().Add(attachment);
-        await Db.SaveChangesAsync();
-        await Db.Entry(attachment).Reference(a => a.UploadedBy).LoadAsync();
+        _db.Set<Attachment>().Add(attachment);
+        await _db.SaveChangesAsync();
+        await _db.Entry(attachment).Reference(a => a.UploadedBy).LoadAsync();
 
         return Result<AttachmentDto>.Success(MapToDto(attachment));
     }
 
     public async Task<Result<string>> GetDownloadUrlAsync(Guid id)
     {
-        var attachment = await Db.Set<Attachment>().FirstOrDefaultAsync(a => a.Id == id);
+        var attachment = await _db.Set<Attachment>().FirstOrDefaultAsync(a => a.Id == id);
         if (attachment == null)
             return Result<string>.Failure("NOT_FOUND", "Attachment not found.");
 
@@ -100,7 +102,7 @@ public class AttachmentService : IAttachmentService
 
     public async Task<Result> DeleteAsync(Guid id, Guid userId)
     {
-        var attachment = await Db.Set<Attachment>().FirstOrDefaultAsync(a => a.Id == id);
+        var attachment = await _db.Set<Attachment>().FirstOrDefaultAsync(a => a.Id == id);
         if (attachment == null)
             return Result.Failure("NOT_FOUND", "Attachment not found.");
 
@@ -109,7 +111,7 @@ public class AttachmentService : IAttachmentService
 
         attachment.IsDeleted = true;
         attachment.DeletedAt = DateTime.UtcNow;
-        await Db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
         return Result.Success();
     }
 

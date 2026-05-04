@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText, ChevronDown, ChevronRight, RefreshCw, AlertTriangle, TrendingDown, Calculator } from 'lucide-react'
@@ -13,7 +13,7 @@ import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi
 import { insuredsApi } from '@/api/insureds.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
-import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate } from '@/types/submission.types'
+import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
@@ -65,6 +65,146 @@ const emptyQuoteForm = (): QuoteForm => ({
   uninsuredMotoristLimit: '', medicalPaymentsLimit: '',
   companyId: '', producerId: '', isFilingState: false,
 })
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function SubmissionHeader({
+  submission,
+  entityId,
+  canCreatePolicies,
+  showGenerateModal,
+  onOpenGenerateModal,
+  onCloseGenerateModal,
+}: {
+  submission: Submission
+  entityId: string
+  canCreatePolicies: boolean
+  showGenerateModal: boolean
+  onOpenGenerateModal: () => void
+  onCloseGenerateModal: () => void
+}) {
+  return (
+    <>
+      <Link
+        to={`/insureds/${submission.insuredId}`}
+        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> {submission.insuredName}
+      </Link>
+
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">{submission.submissionNumber}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{submission.insuredName}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {canCreatePolicies && (
+            <button
+              onClick={onOpenGenerateModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <FileText className="h-3.5 w-3.5" /> Generate Document
+            </button>
+          )}
+          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[submission.status]}`}>
+            {SUBMISSION_STATUS_LABELS[submission.status]}
+          </span>
+        </div>
+      </div>
+
+      {showGenerateModal && (
+        <GenerateDocumentModal
+          entityType="Submission"
+          entityId={entityId}
+          onClose={onCloseGenerateModal}
+        />
+      )}
+    </>
+  )
+}
+
+function SubmissionInfoCard({ submission }: { submission: Submission }) {
+  return (
+    <div className="bg-white border rounded-lg p-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+      <div>
+        <p className="text-xs text-slate-500 mb-0.5">Underwriter</p>
+        <p className="font-medium">{submission.underwriterName}</p>
+      </div>
+      {submission.assistantUWName && (
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">Asst. Underwriter</p>
+          <p className="font-medium">{submission.assistantUWName}</p>
+        </div>
+      )}
+      {submission.agentName && (
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">Agent</p>
+          <p className="font-medium">{submission.agentName}</p>
+          {submission.agencyName && <p className="text-xs text-slate-400">{submission.agencyName}</p>}
+        </div>
+      )}
+      {submission.effectiveDate && (
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">Target Eff. Date</p>
+          <p className="font-medium">{new Date(submission.effectiveDate).toLocaleDateString()}</p>
+        </div>
+      )}
+      {submission.expirationDate && (
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">Target Exp. Date</p>
+          <p className="font-medium">{new Date(submission.expirationDate).toLocaleDateString()}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LobChipBar({
+  submission,
+  onSetLobs,
+  isPending,
+}: {
+  submission: Submission
+  onSetLobs: (lobs: string[]) => void
+  isPending: boolean
+}) {
+  return (
+    <div className="bg-white border rounded-lg px-5 py-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-slate-500 shrink-0">Lines of Business:</span>
+        {submission.linesOfBusiness.length === 0 && (
+          <span className="text-xs text-slate-400 italic">None detected — add one below</span>
+        )}
+        {submission.linesOfBusiness.map((lob) => (
+          <span key={lob} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            {LOB_LABELS[lob as keyof typeof LOB_LABELS] ?? lob}
+            <button
+              onClick={() => onSetLobs(submission.linesOfBusiness.filter((l) => l !== lob))}
+              disabled={isPending}
+              className="ml-0.5 hover:text-blue-600 disabled:opacity-50"
+              title={`Remove ${lob}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).length > 0 && (
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) onSetLobs([...submission.linesOfBusiness, e.target.value]) }}
+            disabled={isPending}
+            className="text-xs border border-dashed border-slate-300 rounded-full px-2.5 py-1 text-slate-500 hover:border-blue-400 hover:text-blue-600 bg-white disabled:opacity-50 cursor-pointer"
+          >
+            <option value="">+ Add LOB</option>
+            {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).map((l) => (
+              <option key={l} value={l}>{LOB_LABELS[l]}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -239,14 +379,14 @@ export function SubmissionDetailPage() {
     enabled: !!submission?.insuredId && equipmentOpen,
   })
 
-  const defaultTerritoryCode = (() => {
+  const defaultTerritoryCode = useMemo(() => {
     const state = insured?.state?.trim().toUpperCase()
     if (!state || imTerritories.length === 0) return undefined
     const match = imTerritories.find((t) =>
       t.states.split(',').map((s) => s.trim().toUpperCase()).includes(state),
     )
     return match?.code
-  })()
+  }, [insured?.state, imTerritories])
 
   useEffect(() => {
     if (supplemental) {
@@ -500,115 +640,22 @@ export function SubmissionDetailPage() {
         </div>
       )}
 
-      {/* Breadcrumb */}
-      <Link
-        to={`/insureds/${submission.insuredId}`}
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> {submission.insuredName}
-      </Link>
+      <SubmissionHeader
+        submission={submission}
+        entityId={id!}
+        canCreatePolicies={canCreatePolicies}
+        showGenerateModal={showGenerateModal}
+        onOpenGenerateModal={() => setShowGenerateModal(true)}
+        onCloseGenerateModal={() => setShowGenerateModal(false)}
+      />
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">{submission.submissionNumber}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{submission.insuredName}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {canCreatePolicies && (
-            <button
-              onClick={() => setShowGenerateModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <FileText className="h-3.5 w-3.5" /> Generate Document
-            </button>
-          )}
-          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[submission.status]}`}>
-            {SUBMISSION_STATUS_LABELS[submission.status]}
-          </span>
-        </div>
-      </div>
+      <SubmissionInfoCard submission={submission} />
 
-      {showGenerateModal && (
-        <GenerateDocumentModal
-          entityType="Submission"
-          entityId={id!}
-          onClose={() => setShowGenerateModal(false)}
-        />
-      )}
-
-      {/* Submission info */}
-      <div className="bg-white border rounded-lg p-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-        <div>
-          <p className="text-xs text-slate-500 mb-0.5">Underwriter</p>
-          <p className="font-medium">{submission.underwriterName}</p>
-        </div>
-        {submission.assistantUWName && (
-          <div>
-            <p className="text-xs text-slate-500 mb-0.5">Asst. Underwriter</p>
-            <p className="font-medium">{submission.assistantUWName}</p>
-          </div>
-        )}
-        {submission.agentName && (
-          <div>
-            <p className="text-xs text-slate-500 mb-0.5">Agent</p>
-            <p className="font-medium">{submission.agentName}</p>
-            {submission.agencyName && <p className="text-xs text-slate-400">{submission.agencyName}</p>}
-          </div>
-        )}
-        {submission.effectiveDate && (
-          <div>
-            <p className="text-xs text-slate-500 mb-0.5">Target Eff. Date</p>
-            <p className="font-medium">{new Date(submission.effectiveDate).toLocaleDateString()}</p>
-          </div>
-        )}
-        {submission.expirationDate && (
-          <div>
-            <p className="text-xs text-slate-500 mb-0.5">Target Exp. Date</p>
-            <p className="font-medium">{new Date(submission.expirationDate).toLocaleDateString()}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Lines of Business chip bar */}
-      <div className="bg-white border rounded-lg px-5 py-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-medium text-slate-500 shrink-0">Lines of Business:</span>
-          {submission.linesOfBusiness.length === 0 && (
-            <span className="text-xs text-slate-400 italic">None detected — add one below</span>
-          )}
-          {submission.linesOfBusiness.map((lob) => (
-            <span key={lob} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              {LOB_LABELS[lob as keyof typeof LOB_LABELS] ?? lob}
-              <button
-                onClick={() => setLobsMutation.mutate(submission.linesOfBusiness.filter((l) => l !== lob))}
-                disabled={setLobsMutation.isPending}
-                className="ml-0.5 hover:text-blue-600 disabled:opacity-50"
-                title={`Remove ${lob}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          {/* Add LOB dropdown */}
-          {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).length > 0 && (
-            <select
-              value=""
-              onChange={(e) => {
-                if (e.target.value)
-                  setLobsMutation.mutate([...submission.linesOfBusiness, e.target.value])
-              }}
-              disabled={setLobsMutation.isPending}
-              className="text-xs border border-dashed border-slate-300 rounded-full px-2.5 py-1 text-slate-500 hover:border-blue-400 hover:text-blue-600 bg-white disabled:opacity-50 cursor-pointer"
-            >
-              <option value="">+ Add LOB</option>
-              {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).map((l) => (
-                <option key={l} value={l}>{LOB_LABELS[l]}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
+      <LobChipBar
+        submission={submission}
+        onSetLobs={(lobs) => setLobsMutation.mutate(lobs)}
+        isPending={setLobsMutation.isPending}
+      />
 
       {/* Quotes section */}
       <div className="bg-white border rounded-lg">

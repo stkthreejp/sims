@@ -25,7 +25,7 @@ public class AttachmentsController : ControllerBase
     public Task<IActionResult> GetSubmission(Guid entityId) => GetAll(DocumentEntityType.Submission, entityId);
 
     [HttpGet("api/v1/quotes/{entityId:guid}/attachments")]
-    public Task<IActionResult> GetPolicy(Guid entityId) => GetAll(DocumentEntityType.Policy, entityId);
+    public Task<IActionResult> GetQuote(Guid entityId) => GetAll(DocumentEntityType.Policy, entityId);
 
     [HttpGet("api/v1/carriers/{entityId:guid}/attachments")]
     public Task<IActionResult> GetCarrier(Guid entityId) => GetAll(DocumentEntityType.Carrier, entityId);
@@ -39,21 +39,25 @@ public class AttachmentsController : ControllerBase
     // ── Upload ────────────────────────────────────────────────────────────────
 
     [HttpPost("api/v1/submissions/{entityId:guid}/attachments")]
+    [Authorize(Roles = "Admin,Underwriter")]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadSubmission(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Submission, entityId, file, documentType, description);
 
     [HttpPost("api/v1/quotes/{entityId:guid}/attachments")]
+    [Authorize(Roles = "Admin,Underwriter")]
     [RequestSizeLimit(52_428_800)]
-    public Task<IActionResult> UploadPolicy(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
+    public Task<IActionResult> UploadQuote(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Policy, entityId, file, documentType, description);
 
     [HttpPost("api/v1/carriers/{entityId:guid}/attachments")]
+    [Authorize(Roles = "Admin,Underwriter")]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadCarrier(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Carrier, entityId, file, documentType, description);
 
     [HttpPost("api/v1/agents/{entityId:guid}/attachments")]
+    [Authorize(Roles = "Admin,Underwriter")]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadAgent(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Agent, entityId, file, documentType, description);
@@ -76,6 +80,7 @@ public class AttachmentsController : ControllerBase
     // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpDelete("api/v1/attachments/{id:guid}")]
+    [Authorize(Roles = "Admin,Underwriter")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _attachmentService.DeleteAsync(id, CurrentUserId);

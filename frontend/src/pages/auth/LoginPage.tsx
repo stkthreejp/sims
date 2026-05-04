@@ -121,9 +121,6 @@ export function LoginPage() {
         </button>
       </form>
 
-      <p className="text-xs text-slate-400 mt-6 text-center">
-        Default: admin / Admin@123!
-      </p>
     </div>
   )
 }
