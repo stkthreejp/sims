@@ -9,7 +9,7 @@ import type { PolicyLineOfBusiness } from '@/types/quote.types'
 import type { RatingPlanListItem, ShadowRatingStatus } from '@/types/rating.types'
 
 // Maps frontend LOB enum values to the keys returned by the settings API
-const LOB_SHADOW_KEY: Record<PolicyLineOfBusiness, keyof ShadowRatingStatus> = {
+const LOB_SHADOW_KEY: Partial<Record<PolicyLineOfBusiness, keyof ShadowRatingStatus>> = {
   GeneralLiability:  'gl',
   InlandMarine:      'im',
   AutoLiability:     'al',

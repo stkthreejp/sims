@@ -9,7 +9,7 @@ import { formatCurrency } from '@/lib/utils'
 
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 
-const LOB_SHADOW_KEY: Record<PolicyLineOfBusiness, 'gl' | 'im' | 'al' | 'apd'> = {
+const LOB_SHADOW_KEY: Partial<Record<PolicyLineOfBusiness, 'gl' | 'im' | 'al' | 'apd'>> = {
   GeneralLiability:  'gl',
   InlandMarine:      'im',
   AutoLiability:     'al',

@@ -222,6 +222,7 @@ export interface ShadowRatingDashboard {
   results: ShadowRatingResult[]
   outlierCount: number
   totalResults: number
+  settings?: ShadowRatingStatus
 }
 
 export interface ShadowRatingStatus {
