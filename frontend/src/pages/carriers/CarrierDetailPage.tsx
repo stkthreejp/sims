@@ -595,7 +595,7 @@ export function CarrierDetailPage() {
                   className="w-full border rounded px-2 py-1.5 text-sm bg-white"
                 >
                   <option value="">All Lines (default)</option>
-                  {ACTIVE_LOBS.map((lob) => (
+                  {carrier.linesOfBusiness.map((lob) => (
                     <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
                   ))}
                 </select>
@@ -873,7 +873,7 @@ export function CarrierDetailPage() {
                   className="w-full border rounded px-2 py-1.5 text-sm bg-white disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   <option value="">Select a line of business…</option>
-                  {ACTIVE_LOBS.map((lob) => (
+                  {carrier.linesOfBusiness.map((lob) => (
                     <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
                   ))}
                 </select>
