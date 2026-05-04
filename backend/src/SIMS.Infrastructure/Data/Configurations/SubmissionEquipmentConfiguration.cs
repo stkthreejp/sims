@@ -22,6 +22,7 @@ public class SubmissionEquipmentConfiguration : IEntityTypeConfiguration<Submiss
         builder.HasOne(e => e.Submission).WithMany(s => s.Equipment)
             .HasForeignKey(e => e.SubmissionId).OnDelete(DeleteBehavior.Cascade);
 
+        builder.Property(e => e.EquipmentTypeId).HasColumnName("equipment_type_id");
         builder.HasOne(e => e.EquipmentType).WithMany()
             .HasForeignKey(e => e.EquipmentTypeId).OnDelete(DeleteBehavior.Restrict);
     }
