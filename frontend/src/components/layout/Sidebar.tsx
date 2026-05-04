@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 
 const navItems = [
@@ -13,6 +13,10 @@ const navItems = [
   { to: '/users', label: 'Users', icon: Users, adminOnly: true },
   { to: '/document-library', label: 'Doc Library', icon: LayoutTemplate, adminOnly: true },
   { to: '/reports', label: 'Reports', icon: BarChart2, roles: ['Admin', 'Underwriter'] },
+]
+
+const ratingAdminItems = [
+  { to: '/admin/rating', label: 'Rating Plans', icon: Sliders },
 ]
 
 const adminTaskItems = [
@@ -125,6 +129,11 @@ export function Sidebar() {
           <>
             <SectionLabel>Accounting</SectionLabel>
             {accountingItems.map(({ to, label, icon }) => (
+              <NavItem key={to} to={to} label={label} icon={icon} />
+            ))}
+
+            <SectionLabel>Rating Engine</SectionLabel>
+            {ratingAdminItems.map(({ to, label, icon }) => (
               <NavItem key={to} to={to} label={label} icon={icon} />
             ))}
 

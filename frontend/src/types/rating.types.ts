@@ -29,3 +29,19 @@ export interface RatingPlanVersionPicker {
   effectiveDate: string
   lob: PolicyLineOfBusiness
 }
+
+export type PlanStatus = 'Draft' | 'Active' | 'Retired'
+
+export interface RatingPlanListItem {
+  id: string
+  lob: PolicyLineOfBusiness
+  lobLabel: string
+  name: string
+  formulaKey: string
+  status: PlanStatus
+  activeVersionNumber: number | null
+  activeEffectiveDate: string | null
+  activeVersionId: string | null
+  versionCount: number
+  assignedCarrierCount: number
+}

@@ -5,6 +5,7 @@ import type {
   CarrierRatingAssignmentCreate,
   CarrierRatingAssignmentUpdate,
   RatingPlanVersionPicker,
+  RatingPlanListItem,
 } from '@/types/rating.types'
 
 export const ratingApi = {
@@ -32,4 +33,7 @@ export const ratingApi = {
     apiClient
       .get<RatingPlanVersionPicker[]>('/rating-plan-versions', { params: { lob } })
       .then((r) => r.data),
+
+  getPlans: () =>
+    apiClient.get<RatingPlanListItem[]>('/rating-plans').then((r) => r.data),
 }

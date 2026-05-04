@@ -35,3 +35,18 @@ public class RatingPlanVersionPickerDto
     public DateOnly EffectiveDate { get; set; }
     public PolicyLineOfBusiness Lob { get; set; }
 }
+
+public class RatingPlanListItemDto
+{
+    public Guid Id { get; set; }
+    public PolicyLineOfBusiness Lob { get; set; }
+    public string LobLabel { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string FormulaKey { get; set; } = string.Empty;
+    public PlanStatus Status { get; set; }
+    public int? ActiveVersionNumber { get; set; }
+    public DateOnly? ActiveEffectiveDate { get; set; }
+    public Guid? ActiveVersionId { get; set; }
+    public int VersionCount { get; set; }
+    public int AssignedCarrierCount { get; set; }
+}
