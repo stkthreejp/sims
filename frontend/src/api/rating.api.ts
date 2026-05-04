@@ -6,6 +6,10 @@ import type {
   CarrierRatingAssignmentUpdate,
   RatingPlanVersionPicker,
   RatingPlanListItem,
+  RatingPlanDetail,
+  RatingPlanVersionDetail,
+  FactorTable,
+  EligibilityRule,
 } from '@/types/rating.types'
 
 export const ratingApi = {
@@ -36,4 +40,22 @@ export const ratingApi = {
 
   getPlans: () =>
     apiClient.get<RatingPlanListItem[]>('/rating-plans').then((r) => r.data),
+
+  getPlan: (id: string) =>
+    apiClient.get<RatingPlanDetail>(`/rating-plans/${id}`).then((r) => r.data),
+
+  getVersion: (id: string) =>
+    apiClient.get<RatingPlanVersionDetail>(`/rating-plan-versions/${id}`).then((r) => r.data),
+
+  getVersionFactors: (id: string) =>
+    apiClient.get<FactorTable[]>(`/rating-plan-versions/${id}/factors`).then((r) => r.data),
+
+  getVersionEligibilityRules: (id: string) =>
+    apiClient.get<EligibilityRule[]>(`/rating-plan-versions/${id}/eligibility-rules`).then((r) => r.data),
+
+  promoteVersion: (id: string) =>
+    apiClient.post(`/rating-plan-versions/${id}/promote`).then((r) => r.data),
+
+  retireVersion: (id: string) =>
+    apiClient.post(`/rating-plan-versions/${id}/retire`).then((r) => r.data),
 }

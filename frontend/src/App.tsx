@@ -33,6 +33,8 @@ import { HolidayCalendarAdminPage } from '@/pages/admin/HolidayCalendarAdminPage
 import { EscalationRulesAdminPage } from '@/pages/admin/EscalationRulesAdminPage'
 import { FeesAdminPage } from '@/pages/admin/FeesAdminPage'
 import { AdminRatingPage } from '@/pages/admin/AdminRatingPage'
+import { AdminRatingPlanDetailPage } from '@/pages/admin/AdminRatingPlanDetailPage'
+import { AdminRatingPlanVersionPage } from '@/pages/admin/AdminRatingPlanVersionPage'
 import { InvoicesPage } from '@/pages/billing/InvoicesPage'
 import { ReceiptsPage } from '@/pages/billing/ReceiptsPage'
 import { CashApplicationPage } from '@/pages/billing/CashApplicationPage'
@@ -103,6 +105,8 @@ export default function App() {
             <Route path="/admin/escalation-rules" element={<EscalationRulesAdminPage />} />
             <Route path="/admin/fees" element={<FeesAdminPage />} />
             <Route path="/admin/rating" element={<AdminRatingPage />} />
+            <Route path="/admin/rating/plans/:planId" element={<AdminRatingPlanDetailPage />} />
+            <Route path="/admin/rating/versions/:versionId" element={<AdminRatingPlanVersionPage />} />
             <Route path="/billing/invoices" element={<InvoicesPage />} />
             <Route path="/billing/receipts" element={<ReceiptsPage />} />
             <Route path="/billing/cash-application" element={<CashApplicationPage />} />

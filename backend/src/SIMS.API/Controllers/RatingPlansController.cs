@@ -91,4 +91,69 @@ public class RatingPlansController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
+    {
+        var plan = await _db.RatingPlans
+            .Where(p => p.Id == id && !p.IsDeleted)
+            .Select(p => new
+            {
+                p.Id, p.LineOfBusiness, p.Name, p.FormulaKey, p.Status,
+                Versions = p.Versions
+                    .Where(v => !v.IsDeleted)
+                    .OrderByDescending(v => v.VersionNumber)
+                    .Select(v => new
+                    {
+                        v.Id, v.VersionNumber, v.Status,
+                        v.EffectiveDate, v.ExpirationDate, v.Notes,
+                        v.PromotedAt, v.PromotedById,
+                        PromotedByName = v.PromotedBy == null ? null : v.PromotedBy.FirstName + " " + v.PromotedBy.LastName,
+                        AssignedCarrierCount = _db.CarrierRatingAssignments
+                            .Count(a => a.RatingPlanVersionId == v.Id && !a.IsDeleted),
+                    })
+                    .ToList(),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (plan == null) return NotFound();
+
+        var assignments = await _db.CarrierRatingAssignments
+            .Where(a => !a.IsDeleted && a.RatingPlanVersion.RatingPlanId == id)
+            .Select(a => new PlanCarrierAssignmentDto
+            {
+                AssignmentId = a.Id,
+                CarrierId = a.CarrierId,
+                CarrierName = a.Carrier.Name,
+                VersionId = a.RatingPlanVersionId,
+                VersionNumber = a.RatingPlanVersion.VersionNumber,
+            })
+            .OrderBy(a => a.CarrierName)
+            .ToListAsync(ct);
+
+        var dto = new RatingPlanDetailDto
+        {
+            Id = plan.Id,
+            Lob = plan.LineOfBusiness,
+            LobLabel = LobLabels.GetValueOrDefault(plan.LineOfBusiness, plan.LineOfBusiness.ToString()),
+            Name = plan.Name,
+            FormulaKey = plan.FormulaKey,
+            Status = plan.Status,
+            Versions = plan.Versions.Select(v => new RatingPlanVersionSummaryDto
+            {
+                Id = v.Id,
+                VersionNumber = v.VersionNumber,
+                Status = v.Status,
+                EffectiveDate = v.EffectiveDate,
+                ExpirationDate = v.ExpirationDate,
+                Notes = v.Notes,
+                PromotedAt = v.PromotedAt,
+                PromotedByName = v.PromotedByName,
+                AssignedCarrierCount = v.AssignedCarrierCount,
+            }).ToList(),
+            Assignments = assignments,
+        };
+
+        return Ok(dto);
+    }
 }
