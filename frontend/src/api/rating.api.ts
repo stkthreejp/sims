@@ -16,6 +16,7 @@ import type {
   RatingImpactPreview,
   CsvImportResult,
   ShadowRatingDashboard,
+  ShadowRatingStatus,
 } from '@/types/rating.types'
 
 export const ratingApi = {
@@ -92,5 +93,8 @@ export const ratingApi = {
     apiClient.get<ShadowRatingDashboard>('/rating/shadow/results', { params: { days } }).then((r) => r.data),
 
   getShadowStatus: () =>
-    apiClient.get<{ shadowModeEnabled: boolean }>('/rating/shadow/status').then((r) => r.data),
+    apiClient.get<ShadowRatingStatus>('/rating/shadow/settings').then((r) => r.data),
+
+  updateShadowLob: (lob: string, enabled: boolean) =>
+    apiClient.put<ShadowRatingStatus>(`/rating/shadow/settings/${lob}`, { enabled }).then((r) => r.data),
 }

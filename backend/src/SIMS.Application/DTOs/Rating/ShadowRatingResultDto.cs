@@ -1,4 +1,24 @@
+using SIMS.Domain.Enums;
+
 namespace SIMS.Application.DTOs.Rating;
+
+public class ShadowSettingsDto
+{
+    public bool GL { get; set; }
+    public bool IM { get; set; }
+    public bool AL { get; set; }
+    public bool APD { get; set; }
+
+    public bool IsEnabledFor(PolicyLineOfBusiness lob) => lob switch
+    {
+        PolicyLineOfBusiness.GeneralLiability => GL,
+        PolicyLineOfBusiness.InlandMarine => IM,
+        PolicyLineOfBusiness.AutoLiability => AL,
+        PolicyLineOfBusiness.AutoPhysicalDamage => APD,
+        _ => false,
+    };
+}
+
 
 public class ShadowRatingResultDto
 {

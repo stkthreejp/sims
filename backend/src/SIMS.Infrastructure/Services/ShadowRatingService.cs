@@ -6,6 +6,7 @@ using SIMS.Application.DTOs.Rating;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Rating;
 using SIMS.Domain.Entities.Rating;
+using SIMS.Domain.Enums;
 using SIMS.Infrastructure.Data;
 
 namespace SIMS.Infrastructure.Services;
@@ -154,6 +155,43 @@ public class ShadowRatingService : IShadowRatingService
             IsOutlier = Math.Abs(deltaPct) > 0.5m,
             ScheduleModifier = modifier,
         });
+    }
+
+    public async Task<ShadowSettingsDto> GetShadowSettingsAsync(CancellationToken ct = default)
+    {
+        var s = await _db.RatingSettings.FirstOrDefaultAsync(ct);
+        return s is null ? new ShadowSettingsDto() : new ShadowSettingsDto
+        {
+            GL = s.ShadowModeGL,
+            IM = s.ShadowModeIM,
+            AL = s.ShadowModeAL,
+            APD = s.ShadowModeAPD,
+        };
+    }
+
+    public async Task<bool> IsShadowModeEnabledForLobAsync(PolicyLineOfBusiness lob, CancellationToken ct = default)
+    {
+        var settings = await GetShadowSettingsAsync(ct);
+        return settings.IsEnabledFor(lob);
+    }
+
+    public async Task SetShadowModeForLobAsync(PolicyLineOfBusiness lob, bool enabled, CancellationToken ct = default)
+    {
+        var settings = await _db.RatingSettings.FirstOrDefaultAsync(ct);
+        if (settings is null)
+        {
+            settings = new RatingSettings { Id = new Guid("00000000-0000-0000-0000-000000000001"), CreatedAt = DateTime.UtcNow };
+            _db.RatingSettings.Add(settings);
+        }
+        switch (lob)
+        {
+            case PolicyLineOfBusiness.GeneralLiability:   settings.ShadowModeGL  = enabled; break;
+            case PolicyLineOfBusiness.InlandMarine:        settings.ShadowModeIM  = enabled; break;
+            case PolicyLineOfBusiness.AutoLiability:       settings.ShadowModeAL  = enabled; break;
+            case PolicyLineOfBusiness.AutoPhysicalDamage:  settings.ShadowModeAPD = enabled; break;
+        }
+        settings.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<ShadowRatingResultDto>> GetResultsAsync(int days, CancellationToken ct = default)

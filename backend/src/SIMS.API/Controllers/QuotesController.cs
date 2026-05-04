@@ -3,7 +3,6 @@ using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 
 namespace SIMS.API.Controllers;
@@ -16,15 +15,13 @@ public class QuotesController : ControllerBase
     private readonly IQuoteService _quoteService;
     private readonly IRatingEngineService _ratingEngine;
     private readonly IShadowRatingService _shadowRating;
-    private readonly IConfiguration _config;
 
     public QuotesController(IQuoteService quoteService, IRatingEngineService ratingEngine,
-        IShadowRatingService shadowRating, IConfiguration config)
+        IShadowRatingService shadowRating)
     {
         _quoteService = quoteService;
         _ratingEngine = ratingEngine;
         _shadowRating = shadowRating;
-        _config = config;
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -79,8 +76,11 @@ public class QuotesController : ControllerBase
     [Authorize(Roles = "Admin,Underwriter")]
     public async Task<IActionResult> ShadowRate(Guid id, [FromBody] RateQuoteRequest request)
     {
-        if (!_config.GetValue<bool>("Rating:ShadowMode"))
-            return Conflict(new { ErrorCode = "SHADOW_MODE_DISABLED", ErrorMessage = "Shadow mode is not enabled." });
+        // Look up the quote's LOB to check the per-LOB shadow flag
+        var quote = await _quoteService.GetByIdAsync(id);
+        if (!quote.IsSuccess) return NotFound();
+        if (!await _shadowRating.IsShadowModeEnabledForLobAsync(quote.Value!.LineOfBusiness))
+            return Conflict(new { ErrorCode = "SHADOW_MODE_DISABLED", ErrorMessage = "Shadow mode is not enabled for this line of business." });
         var result = await _shadowRating.ShadowRateAsync(id, request, CurrentUserId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }

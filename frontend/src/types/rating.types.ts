@@ -223,3 +223,10 @@ export interface ShadowRatingDashboard {
   outlierCount: number
   totalResults: number
 }
+
+export interface ShadowRatingStatus {
+  gl: boolean
+  im: boolean
+  al: boolean
+  apd: boolean
+}

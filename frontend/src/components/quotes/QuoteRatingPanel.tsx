@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Calculator, Check, AlertTriangle, X, Lock } from 'lucide-react'
+import { Calculator, Check, AlertTriangle, X, Lock, FlaskConical } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import { submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
+import { ratingApi } from '@/api/rating.api'
 import { formatCurrency } from '@/lib/utils'
+
+import type { PolicyLineOfBusiness } from '@/types/quote.types'
+
+const LOB_SHADOW_KEY: Record<PolicyLineOfBusiness, 'gl' | 'im' | 'al' | 'apd'> = {
+  GeneralLiability:  'gl',
+  InlandMarine:      'im',
+  AutoLiability:     'al',
+  AutoPhysicalDamage:'apd',
+}
 
 type Props = {
   quoteId: string
   submissionId: string
+  lineOfBusiness: PolicyLineOfBusiness
   isBound: boolean
 }
 
@@ -18,7 +29,7 @@ function safeParse(raw: string): Record<string, unknown> {
   try { return JSON.parse(raw) as Record<string, unknown> } catch { return {} }
 }
 
-export function QuoteRatingPanel({ quoteId, submissionId, isBound }: Props) {
+export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBound }: Props) {
   const qc = useQueryClient()
 
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
@@ -56,6 +67,12 @@ export function QuoteRatingPanel({ quoteId, submissionId, isBound }: Props) {
   const reasonRequired = modifier !== 1.0
   const reasonInvalid = reasonRequired && !reason.trim()
 
+  const { data: shadowStatus } = useQuery({
+    queryKey: ['shadow-status'],
+    queryFn: () => ratingApi.getShadowStatus(),
+    staleTime: 60 * 1000,
+  })
+
   const rateMutation = useMutation({
     mutationFn: () => quotesApi.rate(quoteId, {
       scheduleModifier: modifier,
@@ -69,7 +86,29 @@ export function QuoteRatingPanel({ quoteId, submissionId, isBound }: Props) {
     onError: (err: any) => {
       const code = err?.response?.data?.errorCode
       const msg = err?.response?.data?.errorMessage ?? 'Failed to calculate premium'
-      // Surface engine codes inline below; toast carries the headline.
+      toast.error(msg, { description: code ? `Code: ${code}` : undefined })
+    },
+  })
+
+  const shadowMutation = useMutation({
+    mutationFn: () => quotesApi.shadowRate(quoteId, {
+      scheduleModifier: modifier,
+      scheduleModifierReason: reason.trim() || undefined,
+    }),
+    onSuccess: (result: any) => {
+      const shadow = result?.shadowPremium
+      const actual = result?.actualPremium
+      const deltaPct = result?.deltaPct
+      const deltaStr = deltaPct != null ? ` (${deltaPct >= 0 ? '+' : ''}${Number(deltaPct).toFixed(2)}% vs spreadsheet)` : ''
+      toast.success(
+        `Shadow: ${formatCurrency(shadow)}${deltaStr}`,
+        { description: actual != null ? `Spreadsheet: ${formatCurrency(actual)}` : undefined, duration: 6000 }
+      )
+      qc.invalidateQueries({ queryKey: ['shadow-results'] })
+    },
+    onError: (err: any) => {
+      const code = err?.response?.data?.errorCode
+      const msg = err?.response?.data?.errorMessage ?? 'Shadow rate failed'
       toast.error(msg, { description: code ? `Code: ${code}` : undefined })
     },
   })
@@ -198,15 +237,26 @@ export function QuoteRatingPanel({ quoteId, submissionId, isBound }: Props) {
       {/* Calculate button + errors */}
       {!isBound && (
         <div className="space-y-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={() => rateMutation.mutate()}
-              disabled={rateMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}
+              disabled={rateMutation.isPending || shadowMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Calculator className="h-4 w-4" />
               {rateMutation.isPending ? 'Calculating…' : snapshot ? 'Recalculate Premium' : 'Calculate Premium'}
             </button>
+            {shadowStatus?.[LOB_SHADOW_KEY[lineOfBusiness]] && (
+              <button
+                onClick={() => shadowMutation.mutate()}
+                disabled={shadowMutation.isPending || rateMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Run engine without changing the quote premium — compare to spreadsheet"
+              >
+                <FlaskConical className="h-4 w-4 text-slate-500" />
+                {shadowMutation.isPending ? 'Running…' : 'Shadow Rate'}
+              </button>
+            )}
             {blockedByMissingFields && (
               <span className="text-xs text-amber-700">
                 Fix missing fields on equipment items above before rating.

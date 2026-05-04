@@ -50,18 +50,23 @@ export default function AdminShadowRatingPage() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {data && (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: 9999,
-              fontSize: 12,
-              fontWeight: 600,
-              background: data.shadowModeEnabled ? '#f0fdf4' : '#fef2f2',
-              color: data.shadowModeEnabled ? '#16a34a' : '#dc2626',
-            }}>
-              Shadow Mode {data.shadowModeEnabled ? 'ON' : 'OFF'}
-            </span>
-          )}
+          {data && (() => {
+            const s = data.settings as any
+            const anyOn = s && (s.gl || s.im || s.al || s.apd)
+            const onLobs = s ? [s.gl && 'GL', s.im && 'IM', s.al && 'AL', s.apd && 'APD'].filter(Boolean).join(', ') : ''
+            return (
+              <span style={{
+                padding: '4px 12px',
+                borderRadius: 9999,
+                fontSize: 12,
+                fontWeight: 600,
+                background: anyOn ? '#f0fdf4' : '#fef2f2',
+                color: anyOn ? '#16a34a' : '#dc2626',
+              }}>
+                {anyOn ? `Shadow ON: ${onLobs}` : 'Shadow Mode OFF'}
+              </span>
+            )
+          })()}
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}

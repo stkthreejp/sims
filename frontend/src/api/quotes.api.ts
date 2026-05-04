@@ -27,6 +27,9 @@ export const quotesApi = {
   rate: (id: string, data: RateQuoteRequest) =>
     apiClient.post<RatingResult>(`/quotes/${id}/rate`, data).then((r) => r.data),
 
+  shadowRate: (id: string, data: RateQuoteRequest) =>
+    apiClient.post(`/quotes/${id}/shadow-rate`, data).then((r) => r.data),
+
   // Returns null when no snapshot exists yet (404 from API).
   getRatingSnapshot: (id: string) =>
     apiClient.get<RatingResult>(`/quotes/${id}/rating-snapshot`)

@@ -854,6 +854,7 @@ export function SubmissionDetailPage() {
                   <QuoteRatingPanel
                     quoteId={q.id}
                     submissionId={q.submissionId}
+                    lineOfBusiness={q.lineOfBusiness}
                     isBound={q.status === 'Bound'}
                   />
                 )}
