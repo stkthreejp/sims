@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CheckCircle, XCircle, Clock, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle, XCircle, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { useAuthStore } from '@/store/authStore'
 import type { RatingPlanVersionSummary, PlanStatus } from '@/types/rating.types'
 
 function StatusBadge({ status }: { status: PlanStatus }) {
@@ -25,6 +26,7 @@ function EffectiveRange({ v }: { v: RatingPlanVersionSummary }) {
 export function AdminRatingPlanDetailPage() {
   const { planId } = useParams<{ planId: string }>()
   const qc = useQueryClient()
+  const currentUserId = useAuthStore((s) => s.user?.id)
 
   const { data: plan, isLoading } = useQuery({
     queryKey: ['rating-plan', planId],
@@ -133,19 +135,26 @@ export function AdminRatingPlanDetailPage() {
                       View <ArrowRight className="h-3 w-3" />
                     </Link>
 
-                    {v.status === 'Draft' && (
-                      <button
-                        onClick={() => {
-                          const priorLabel = activeVersion ? `, retiring v${activeVersion.versionNumber} effective ${activeVersion.effectiveDate}` : ''
-                          if (confirm(`Promote v${v.versionNumber} to Active for ${plan.name}?${priorLabel}`))
-                            promoteMutation.mutate(v.id)
-                        }}
-                        disabled={promoteMutation.isPending}
-                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        <CheckCircle className="h-3 w-3" /> Promote
-                      </button>
-                    )}
+                    {v.status === 'Draft' && (() => {
+                      const blockedByMakerChecker =
+                        (v.createdById && v.createdById === currentUserId) ||
+                        (v.lastEditedById && v.lastEditedById === currentUserId)
+                      return (
+                        <div title={blockedByMakerChecker ? 'You edited this draft — a different admin must promote it.' : undefined}>
+                          <button
+                            onClick={() => {
+                              const priorLabel = activeVersion ? `, retiring v${activeVersion.versionNumber} effective ${activeVersion.effectiveDate}` : ''
+                              if (confirm(`Promote v${v.versionNumber} to Active for ${plan.name}?${priorLabel}`))
+                                promoteMutation.mutate(v.id)
+                            }}
+                            disabled={promoteMutation.isPending || !!blockedByMakerChecker}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <CheckCircle className="h-3 w-3" /> Promote
+                          </button>
+                        </div>
+                      )
+                    })()}
 
                     {(v.status === 'Draft' || v.status === 'Active') && (
                       <button

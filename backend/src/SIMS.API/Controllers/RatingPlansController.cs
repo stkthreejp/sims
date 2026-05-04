@@ -108,6 +108,7 @@ public class RatingPlansController : ControllerBase
                         v.Id, v.VersionNumber, v.Status,
                         v.EffectiveDate, v.ExpirationDate, v.Notes,
                         v.PromotedAt, v.PromotedById,
+                        v.CreatedById, v.LastEditedById,
                         PromotedByName = v.PromotedBy == null ? null : v.PromotedBy.FirstName + " " + v.PromotedBy.LastName,
                         AssignedCarrierCount = _db.CarrierRatingAssignments
                             .Count(a => a.RatingPlanVersionId == v.Id && !a.IsDeleted),
@@ -150,6 +151,8 @@ public class RatingPlansController : ControllerBase
                 PromotedAt = v.PromotedAt,
                 PromotedByName = v.PromotedByName,
                 AssignedCarrierCount = v.AssignedCarrierCount,
+                CreatedById = v.CreatedById,
+                LastEditedById = v.LastEditedById,
             }).ToList(),
             Assignments = assignments,
         };

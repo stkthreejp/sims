@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle, XCircle, Search, ChevronDown, ChevronRight } fr
 import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { useAuthStore } from '@/store/authStore'
 import type { PlanStatus, FactorTable } from '@/types/rating.types'
 
 type Tab = 'schedule' | 'factors' | 'eligibility' | 'audit'
@@ -100,6 +101,7 @@ function FactorTablePanel({ table }: { table: FactorTable }) {
 export function AdminRatingPlanVersionPage() {
   const { versionId } = useParams<{ versionId: string }>()
   const qc = useQueryClient()
+  const currentUserId = useAuthStore((s) => s.user?.id)
   const [activeTab, setActiveTab] = useState<Tab>('schedule')
 
   const { data: version, isLoading: vLoading } = useQuery({
@@ -189,18 +191,25 @@ export function AdminRatingPlanVersionPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {version.status === 'Draft' && (
-              <button
-                onClick={() => {
-                  if (confirm(`Promote v${version.versionNumber} to Active for ${version.planName}?`))
-                    promoteMutation.mutate()
-                }}
-                disabled={promoteMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700 disabled:opacity-50"
-              >
-                <CheckCircle className="h-3.5 w-3.5" /> Promote
-              </button>
-            )}
+            {version.status === 'Draft' && (() => {
+              const blockedByMakerChecker =
+                (version.createdById && version.createdById === currentUserId) ||
+                (version.lastEditedById && version.lastEditedById === currentUserId)
+              return (
+                <div title={blockedByMakerChecker ? 'You edited this draft — a different admin must promote it.' : undefined}>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Promote v${version.versionNumber} to Active for ${version.planName}?`))
+                        promoteMutation.mutate()
+                    }}
+                    disabled={promoteMutation.isPending || !!blockedByMakerChecker}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" /> Promote
+                  </button>
+                </div>
+              )
+            })()}
             {(version.status === 'Draft' || version.status === 'Active') && (
               <button
                 onClick={() => {

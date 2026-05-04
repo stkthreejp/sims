@@ -71,6 +71,8 @@ public class RatingPlanVersionsController : ControllerBase
             PromotedAt = v.PromotedAt,
             PromotedByName = v.PromotedBy?.FullName,
             PromotedById = v.PromotedById,
+            CreatedById = v.CreatedById,
+            LastEditedById = v.LastEditedById,
         });
     }
 
@@ -151,6 +153,11 @@ public class RatingPlanVersionsController : ControllerBase
         if (version.Status != PlanStatus.Draft)
             return Conflict(new { ErrorCode = "NOT_DRAFT", ErrorMessage = "Only Draft versions can be promoted." });
 
+        var currentUserId = CurrentUserId;
+        if ((version.CreatedById.HasValue && version.CreatedById == currentUserId) ||
+            (version.LastEditedById.HasValue && version.LastEditedById == currentUserId))
+            return StatusCode(403, new { ErrorCode = "MAKER_CHECKER", ErrorMessage = "You edited this draft — a different admin must promote it." });
+
         if (!version.FactorTables.Any(t => t.Rows.Any()))
             return Conflict(new { ErrorCode = "NO_FACTORS", ErrorMessage = "Version must have at least one factor table with rows before promoting." });
 
@@ -183,7 +190,7 @@ public class RatingPlanVersionsController : ControllerBase
 
         version.Status = PlanStatus.Active;
         version.PromotedAt = DateTime.UtcNow;
-        version.PromotedById = CurrentUserId;
+        version.PromotedById = currentUserId;
         version.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);

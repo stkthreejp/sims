@@ -27,6 +27,8 @@ public class RatingPlanVersionSummaryDto
     public DateTime? PromotedAt { get; set; }
     public string? PromotedByName { get; set; }
     public int AssignedCarrierCount { get; set; }
+    public Guid? CreatedById { get; set; }
+    public Guid? LastEditedById { get; set; }
 }
 
 public class PlanCarrierAssignmentDto
@@ -58,6 +60,8 @@ public class RatingPlanVersionDetailDto
     public DateTime? PromotedAt { get; set; }
     public string? PromotedByName { get; set; }
     public Guid? PromotedById { get; set; }
+    public Guid? CreatedById { get; set; }
+    public Guid? LastEditedById { get; set; }
 }
 
 // ─── Factors ─────────────────────────────────────────────────────────────────

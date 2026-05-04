@@ -3019,6 +3019,12 @@ namespace SIMS.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("LastEditedById")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("PromotedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -3046,6 +3052,10 @@ namespace SIMS.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("LastEditedById");
 
                     b.HasIndex("PromotedById");
 
@@ -4834,6 +4844,16 @@ namespace SIMS.Infrastructure.Migrations
 
             modelBuilder.Entity("SIMS.Domain.Entities.Rating.RatingPlanVersion", b =>
                 {
+                    b.HasOne("SIMS.Domain.Entities.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.User", "LastEditedBy")
+                        .WithMany()
+                        .HasForeignKey("LastEditedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SIMS.Domain.Entities.User", "PromotedBy")
                         .WithMany()
                         .HasForeignKey("PromotedById")
@@ -4844,6 +4864,10 @@ namespace SIMS.Infrastructure.Migrations
                         .HasForeignKey("RatingPlanId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("LastEditedBy");
 
                     b.Navigation("PromotedBy");
 

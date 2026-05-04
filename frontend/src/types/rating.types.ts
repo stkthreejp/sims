@@ -44,6 +44,8 @@ export interface RatingPlanVersionSummary {
   promotedAt: string | null
   promotedByName: string | null
   assignedCarrierCount: number
+  createdById: string | null
+  lastEditedById: string | null
 }
 
 export interface PlanCarrierAssignment {
@@ -84,6 +86,8 @@ export interface RatingPlanVersionDetail {
   promotedAt: string | null
   promotedByName: string | null
   promotedById: string | null
+  createdById: string | null
+  lastEditedById: string | null
 }
 
 // ─── Factor tables ────────────────────────────────────────────────────────────
