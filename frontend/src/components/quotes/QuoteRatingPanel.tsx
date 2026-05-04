@@ -246,7 +246,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
               <Calculator className="h-4 w-4" />
               {rateMutation.isPending ? 'Calculating…' : snapshot ? 'Recalculate Premium' : 'Calculate Premium'}
             </button>
-            {shadowStatus?.[LOB_SHADOW_KEY[lineOfBusiness]] && (
+            {shadowStatus?.[LOB_SHADOW_KEY[lineOfBusiness]!] && (
               <button
                 onClick={() => shadowMutation.mutate()}
                 disabled={shadowMutation.isPending || rateMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}

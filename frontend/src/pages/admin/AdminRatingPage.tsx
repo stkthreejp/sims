@@ -120,7 +120,7 @@ function LobSection({ lob, plans, shadowStatus, shadowLoading }: {
 }) {
   const lobPlans = plans.filter((p) => p.lob === lob)
   const shadowKey = LOB_SHADOW_KEY[lob]
-  const shadowEnabled = shadowStatus ? shadowStatus[shadowKey] : false
+  const shadowEnabled = shadowStatus && shadowKey ? shadowStatus[shadowKey] : false
 
   return (
     <div>

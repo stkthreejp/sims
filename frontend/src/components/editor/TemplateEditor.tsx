@@ -172,7 +172,7 @@ export function TemplateEditor({ content, onChange, entityType }: TemplateEditor
   // Sync content when it changes externally (e.g. after import)
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content, false, { preserveWhitespace: 'full' })
+      editor.commands.setContent(content, false)
     }
   }, [content]) // eslint-disable-line react-hooks/exhaustive-deps
 
