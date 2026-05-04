@@ -11,6 +11,16 @@ public class CarrierRatingAssignmentConfiguration : IEntityTypeConfiguration<Car
         builder.ToTable("carrier_rating_assignments");
         builder.HasKey(a => a.Id);
 
+        builder.Property(a => a.Id).HasColumnName("id");
+        builder.Property(a => a.CreatedAt).HasColumnName("created_at");
+        builder.Property(a => a.UpdatedAt).HasColumnName("updated_at");
+        builder.Property(a => a.IsDeleted).HasColumnName("is_deleted");
+        builder.Property(a => a.DeletedAt).HasColumnName("deleted_at");
+
+        builder.Property(a => a.CarrierId).HasColumnName("carrier_id");
+        builder.Property(a => a.LineOfBusiness).HasColumnName("line_of_business");
+        builder.Property(a => a.RatingPlanVersionId).HasColumnName("rating_plan_version_id");
+
         builder.HasIndex(a => new { a.CarrierId, a.LineOfBusiness }).IsUnique();
 
         builder.HasOne(a => a.Carrier).WithMany()
