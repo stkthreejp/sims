@@ -16,6 +16,9 @@ public class Insured : BaseEntity
     public string? Dba { get; set; }
     public BusinessEntityType? EntityType { get; set; }
     public int? YearsInBusiness { get; set; }
+    public string? OperationType { get; set; }
+    public int? CreditScore { get; set; }
+    public string? Website { get; set; }
     public string? TaxId { get; set; }
 
     // Contact

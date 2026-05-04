@@ -31,6 +31,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<PolicyTransaction> PolicyTransactions => Set<PolicyTransaction>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<QuoteUWWriteup> QuoteUWWriteups => Set<QuoteUWWriteup>();
+    public DbSet<QuoteUWWriteupCondition> QuoteUWWriteupConditions => Set<QuoteUWWriteupCondition>();
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
     public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
     public DbSet<EmailAttachment> EmailAttachments => Set<EmailAttachment>();

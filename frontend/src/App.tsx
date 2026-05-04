@@ -36,6 +36,7 @@ import { AdminRatingPage } from '@/pages/admin/AdminRatingPage'
 import { AdminRatingPlanDetailPage } from '@/pages/admin/AdminRatingPlanDetailPage'
 import { AdminRatingPlanVersionPage } from '@/pages/admin/AdminRatingPlanVersionPage'
 import AdminShadowRatingPage from '@/pages/admin/AdminShadowRatingPage'
+import QuoteWriteupPage from '@/pages/quotes/QuoteWriteupPage'
 import { InvoicesPage } from '@/pages/billing/InvoicesPage'
 import { ReceiptsPage } from '@/pages/billing/ReceiptsPage'
 import { CashApplicationPage } from '@/pages/billing/CashApplicationPage'
@@ -109,6 +110,7 @@ export default function App() {
             <Route path="/admin/rating/plans/:planId" element={<AdminRatingPlanDetailPage />} />
             <Route path="/admin/rating/versions/:versionId" element={<AdminRatingPlanVersionPage />} />
             <Route path="/admin/rating/shadow" element={<AdminShadowRatingPage />} />
+            <Route path="/quotes/:quoteId/writeup" element={<QuoteWriteupPage />} />
             <Route path="/billing/invoices" element={<InvoicesPage />} />
             <Route path="/billing/receipts" element={<ReceiptsPage />} />
             <Route path="/billing/cash-application" element={<CashApplicationPage />} />

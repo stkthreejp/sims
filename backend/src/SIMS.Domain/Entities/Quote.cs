@@ -60,6 +60,7 @@ public class Quote : BaseEntity
     public User CreatedBy { get; set; } = null!;
     public ICollection<Note> Notes { get; set; } = new List<Note>();
     public ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
+    public QuoteUWWriteup? UWWriteup { get; set; }
 
     // Effective rates for this term — override takes precedence when set
     public decimal EffectiveCarrierRate => CommissionOverrideCarrierRate ?? CarrierCommissionRate;

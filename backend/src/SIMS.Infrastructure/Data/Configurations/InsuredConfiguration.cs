@@ -24,6 +24,9 @@ public class InsuredConfiguration : IEntityTypeConfiguration<Insured>
         builder.Property(i => i.State).IsRequired().HasMaxLength(2);
         builder.Property(i => i.ZipCode).IsRequired().HasMaxLength(10);
         builder.Property(i => i.County).HasMaxLength(100);
+        builder.Property(i => i.OperationType).HasColumnName("operation_type").HasMaxLength(200);
+        builder.Property(i => i.CreditScore).HasColumnName("credit_score");
+        builder.Property(i => i.Website).HasColumnName("website").HasMaxLength(500);
 
         builder.Ignore(i => i.DisplayName);
 
