@@ -78,6 +78,7 @@ public class SubmissionIMController : ControllerBase
         };
         _db.SubmissionEquipment.Add(e);
         await _db.SaveChangesAsync();
+        await SyncIMCoveragesAsync(submissionId);
         return CreatedAtAction(nameof(GetEquipment), new { submissionId }, MapEquipmentToDto(e));
     }
 
@@ -98,7 +99,28 @@ public class SubmissionIMController : ControllerBase
         e.Deductible = dto.Deductible;
         e.SettlementBasis = dto.SettlementBasis;
         await _db.SaveChangesAsync();
+        await SyncIMCoveragesAsync(submissionId);
         return Ok(MapEquipmentToDto(e));
+    }
+
+    private async Task SyncIMCoveragesAsync(Guid submissionId)
+    {
+        var values = await _db.SubmissionEquipment
+            .Where(e => e.SubmissionId == submissionId && !e.IsDeleted && e.Value.HasValue)
+            .Select(e => e.Value!.Value)
+            .ToListAsync();
+
+        var im = await _db.SubmissionIMCoverages.FirstOrDefaultAsync(i => i.SubmissionId == submissionId);
+        if (im == null)
+        {
+            im = new SubmissionIMCoverages { SubmissionId = submissionId, CoinsurancePercentage = 90 };
+            _db.SubmissionIMCoverages.Add(im);
+        }
+
+        im.ScheduledEquipmentTotalLimit = values.Count > 0 ? values.Sum() : null;
+        im.MaximumValueAnyOneItem = values.Count > 0 ? values.Max() : null;
+        im.CoinsurancePercentage ??= 90;
+        await _db.SaveChangesAsync();
     }
 
     // Allowed deductible tiers (null is also valid — represents the "10% ACV" tier).
@@ -131,6 +153,7 @@ public class SubmissionIMController : ControllerBase
         if (e == null) return NotFound();
         e.IsDeleted = true; e.DeletedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+        await SyncIMCoveragesAsync(submissionId);
         return NoContent();
     }
 
