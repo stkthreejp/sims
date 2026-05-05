@@ -172,7 +172,7 @@ export function TemplateEditor({ content, onChange, entityType }: TemplateEditor
   // Sync content when it changes externally (e.g. after import)
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content, false)
+      editor.commands.setContent(content, { emitUpdate: false })
     }
   }, [content, editor])
 
