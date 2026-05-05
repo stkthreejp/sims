@@ -22,12 +22,16 @@ public class RatingEngineService : IRatingEngineService
             .Include(q => q.Submission)
                 .ThenInclude(s => s.Equipment)
                     .ThenInclude(e => e.EquipmentType)
+            .Include(q => q.Submission)
+                .ThenInclude(s => s.Vehicles)
             .FirstOrDefaultAsync(q => q.Id == quoteId);
 
         if (quote is null)
             return Result<RatingResultDto>.Failure("NOT_FOUND", "Quote not found.");
 
         var assignment = await _db.CarrierRatingAssignments
+            .Include(a => a.RatingPlanVersion)
+                .ThenInclude(v => v.RatingPlan)
             .Include(a => a.RatingPlanVersion)
                 .ThenInclude(v => v.FactorTables)
                     .ThenInclude(ft => ft.Rows)
@@ -40,78 +44,27 @@ public class RatingEngineService : IRatingEngineService
             return Result<RatingResultDto>.Failure("NO_RATING_PLAN", "No rating plan assigned for this carrier and line of business.");
 
         var version = assignment.RatingPlanVersion;
+        var formulaKey = version.RatingPlan.FormulaKey;
 
         var modifier = Math.Clamp(request.ScheduleModifier, version.ScheduleMin, version.ScheduleMax);
 
-        // A schedule modifier other than 1.00 must be justified.
         if (modifier != 1.0m && string.IsNullOrWhiteSpace(request.ScheduleModifierReason))
             return Result<RatingResultDto>.Failure("REASON_REQUIRED", "A reason is required when applying a schedule modifier other than 1.00.");
 
-        var acceptedTypeIds = version.EligibilityRules
-            .Where(r => r.Accepted)
-            .Select(r => r.EquipmentTypeId)
-            .ToHashSet();
-
-        var baseRateTable = version.FactorTables.FirstOrDefault(ft => ft.Code == "BASE_RATE");
-        var deductibleTable = version.FactorTables.FirstOrDefault(ft => ft.Code == "DEDUCTIBLE_FACTOR");
-
-        if (baseRateTable is null || deductibleTable is null)
-            return Result<RatingResultDto>.Failure("MISSING_FACTORS", "Rating plan is missing required factor tables.");
-
-        var equipment = quote.Submission.Equipment
-            .Where(e => !e.IsDeleted)
-            .OrderBy(e => e.ItemNumber)
-            .ToList();
-
-        if (equipment.Count == 0)
-            return Result<RatingResultDto>.Failure("NO_EQUIPMENT", "No equipment items found on this submission.");
-
-        // Validate items before rating
-        foreach (var item in equipment)
+        // ── Dispatch to formula ──────────────────────────────────────────────
+        FormulaOutput output;
+        if (formulaKey == "APD_v1")
         {
-            if (item.EquipmentTypeId is null || item.EquipmentType is null)
-                return Result<RatingResultDto>.Failure("MISSING_TYPE", $"Equipment item #{item.ItemNumber} has no equipment type assigned.");
-            if (!acceptedTypeIds.Contains(item.EquipmentTypeId.Value))
-                return Result<RatingResultDto>.Failure("INELIGIBLE", $"Equipment type '{item.EquipmentType.Name}' is not eligible under this rating plan.");
-            if (item.Value is null or 0)
-                return Result<RatingResultDto>.Failure("MISSING_VALUE", $"Equipment item #{item.ItemNumber} has no stated value.");
+            var err = TryRateApd(quote, version, modifier, out output);
+            if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
+        }
+        else
+        {
+            var err = TryRateIm(quote, version, modifier, out output);
+            if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
         }
 
-        // Delegate pure math to ImV1Formula
-        var formulaInputs = equipment.Select(item => new ImV1Formula.EquipmentInput(
-            item.EquipmentType!.TypeNumber, item.Year, item.Value!.Value, item.Deductible)).ToList();
-
-        ImV1Formula.RatingResult ratingResult;
-        try
-        {
-            ratingResult = ImV1Formula.Rate(baseRateTable, deductibleTable, formulaInputs,
-                quote.EffectiveDate.Year, modifier, version.MinimumPremium);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Result<RatingResultDto>.Failure("LOOKUP_FAIL", ex.Message);
-        }
-
-        var manualPremium = ratingResult.ManualPremium;
-        var grandTotal = ratingResult.GrandTotal;
-
-        var lines = equipment.Zip(ratingResult.Lines, (item, line) =>
-        {
-            var factors = new { base_rate = line.BaseRate, deductible_factor = line.DeductibleFactor, age_band = line.AgeBand, deductible = line.DeductibleKey };
-            var inputs = new { type = item.EquipmentType!.Name, year = item.Year, value = item.Value, deductible = line.DeductibleKey };
-            return new QuoteRatingLine
-            {
-                Id = Guid.NewGuid(),
-                ExposureRef = $"EQ-{item.ItemNumber:D3}",
-                Inputs = JsonSerializer.Serialize(inputs),
-                FactorsApplied = JsonSerializer.Serialize(factors),
-                LinePremium = line.LinePremium,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-            };
-        }).ToList();
-
-        // Replace existing non-bound snapshots for this quote
+        // ── Persist snapshot ─────────────────────────────────────────────────
         var existing = await _db.QuoteRatingSnapshots
             .Where(s => s.QuoteId == quoteId && !s.IsBoundSnapshot)
             .ToListAsync();
@@ -124,21 +77,20 @@ public class RatingEngineService : IRatingEngineService
             RatingPlanVersionId = version.Id,
             RatedAt = DateTime.UtcNow,
             RatedById = ratedById,
-            ManualPremium = manualPremium,
+            ManualPremium = output.ManualPremium,
             ScheduleModifier = modifier,
             ScheduleModifierReason = request.ScheduleModifierReason,
-            GrandTotalPremium = grandTotal,
+            GrandTotalPremium = output.GrandTotal,
             EndorsementPremium = 0,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            Lines = lines,
+            Lines = output.Lines,
         };
 
         _db.QuoteRatingSnapshots.Add(snapshot);
 
-        // Stamp the quote's premium fields so existing bind flow picks it up
-        quote.PremiumAmount = grandTotal;
-        quote.TotalPremium = grandTotal;
+        quote.PremiumAmount = output.GrandTotal;
+        quote.TotalPremium = output.GrandTotal;
         quote.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -171,6 +123,211 @@ public class RatingEngineService : IRatingEngineService
         return Result<RatingResultDto>.Success(MapSnapshotToDto(snapshot, snapshot.RatingPlanVersion, ratedByName));
     }
 
+    // ── IM_v1 ────────────────────────────────────────────────────────────────
+
+    private static (string code, string msg)? TryRateIm(
+        Domain.Entities.Quote quote, RatingPlanVersion version, decimal modifier, out FormulaOutput output)
+    {
+        output = default;
+
+        var acceptedTypeIds = version.EligibilityRules
+            .Where(r => r.Accepted)
+            .Select(r => r.EquipmentTypeId)
+            .ToHashSet();
+
+        var baseRateTable = version.FactorTables.FirstOrDefault(ft => ft.Code == "BASE_RATE");
+        var deductibleTable = version.FactorTables.FirstOrDefault(ft => ft.Code == "DEDUCTIBLE_FACTOR");
+
+        if (baseRateTable is null || deductibleTable is null)
+            return ("MISSING_FACTORS", "Rating plan is missing required factor tables.");
+
+        var equipment = quote.Submission.Equipment
+            .Where(e => !e.IsDeleted)
+            .OrderBy(e => e.ItemNumber)
+            .ToList();
+
+        if (equipment.Count == 0)
+            return ("NO_EQUIPMENT", "No equipment items found on this submission.");
+
+        foreach (var item in equipment)
+        {
+            if (item.EquipmentTypeId is null || item.EquipmentType is null)
+                return ("MISSING_TYPE", $"Equipment item #{item.ItemNumber} has no equipment type assigned.");
+            if (!acceptedTypeIds.Contains(item.EquipmentTypeId.Value))
+                return ("INELIGIBLE", $"Equipment type '{item.EquipmentType.Name}' is not eligible under this rating plan.");
+            if (item.Value is null or 0)
+                return ("MISSING_VALUE", $"Equipment item #{item.ItemNumber} has no stated value.");
+        }
+
+        ImV1Formula.RatingResult result;
+        try
+        {
+            var inputs = equipment.Select(item => new ImV1Formula.EquipmentInput(
+                item.EquipmentType!.TypeNumber, item.Year, item.Value!.Value, item.Deductible)).ToList();
+            result = ImV1Formula.Rate(baseRateTable, deductibleTable, inputs,
+                quote.EffectiveDate.Year, modifier, version.MinimumPremium);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ("LOOKUP_FAIL", ex.Message);
+        }
+
+        var lines = equipment.Zip(result.Lines, (item, line) =>
+        {
+            var factors = new { base_rate = line.BaseRate, deductible_factor = line.DeductibleFactor, age_band = line.AgeBand, deductible = line.DeductibleKey };
+            var inputs = new { type = item.EquipmentType!.Name, year = item.Year, value = item.Value, deductible = line.DeductibleKey };
+            return new QuoteRatingLine
+            {
+                Id = Guid.NewGuid(),
+                ExposureRef = $"EQ-{item.ItemNumber:D3}",
+                Inputs = JsonSerializer.Serialize(inputs),
+                FactorsApplied = JsonSerializer.Serialize(factors),
+                LinePremium = line.LinePremium,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            };
+        }).ToList();
+
+        output = new FormulaOutput(result.ManualPremium, result.GrandTotal, lines);
+        return null;
+    }
+
+    // ── APD_v1 ───────────────────────────────────────────────────────────────
+
+    private static (string code, string msg)? TryRateApd(
+        Domain.Entities.Quote quote, RatingPlanVersion version, decimal modifier, out FormulaOutput output)
+    {
+        output = default;
+
+        var vehicles = quote.Submission.Vehicles
+            .Where(v => !v.IsDeleted)
+            .OrderBy(v => v.UnitNumber)
+            .ToList();
+
+        if (vehicles.Count == 0)
+            return ("NO_VEHICLES", "No vehicles found on this submission.");
+
+        // Validate required fields
+        foreach (var v in vehicles)
+        {
+            if (v.ApdVehicleClass is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing APD vehicle class.");
+            if (v.ApdRoadType is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing road type.");
+            if (v.ApdAnnualMiles is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing annual miles.");
+            if (v.ApdOperationCode is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing operation code.");
+            if (string.IsNullOrWhiteSpace(v.ApdState))
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing state.");
+            if (v.ApdStatedValue is null or 0)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing stated value.");
+            if (v.ApdCompDeductible is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing comp deductible.");
+            if (v.ApdCollDeductible is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing coll deductible.");
+            if (v.ApdDriverAgeCode is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing driver age code.");
+            if (v.ApdDriverPointsCode is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing driver points code.");
+            if (v.ApdDriverExpMod is null)
+                return ("MISSING_FIELD", $"Vehicle #{v.UnitNumber} is missing driver experience modifier.");
+
+            // Enforce minimum deductibles: TT class=3 min $10k comp, Trailer class=4 min $25k comp
+            var minCompDed = v.ApdVehicleClass switch { 3 => 10_000m, 4 => 25_000m, _ => 0m };
+            if (v.ApdCompDeductible < minCompDed)
+                return ("MIN_DEDUCTIBLE", $"Vehicle #{v.UnitNumber} comp deductible must be at least ${minCompDed:N0} for this vehicle class.");
+        }
+
+        // Look up the 8 required factor tables
+        FactorTable? T(string code) => version.FactorTables.FirstOrDefault(ft => ft.Code == code);
+        var compBase  = T("COMP_BASE_RATE");
+        var collBase  = T("COLL_BASE_RATE");
+        var mileage   = T("MILEAGE_FACTOR");
+        var driver    = T("DRIVER_FACTOR");
+        var operation = T("OPERATION_FACTOR");
+        var state     = T("STATE_FACTOR");
+        var compDed   = T("COMP_DED_FACTOR");
+        var collDed   = T("COLL_DED_FACTOR");
+
+        if (compBase is null || collBase is null || mileage is null || driver is null ||
+            operation is null || state is null || compDed is null || collDed is null)
+            return ("MISSING_FACTORS", "APD rating plan is missing one or more required factor tables.");
+
+        var inputs = vehicles.Select(v => new ApdV1Formula.VehicleInput(
+            UnitNumber:      v.UnitNumber,
+            VehicleClass:    v.ApdVehicleClass!.Value,
+            RoadType:        v.ApdRoadType!.Value,
+            MileageClass:    int.Parse(ApdV1Formula.MileageClassKey(v.ApdAnnualMiles)),
+            OperationCode:   v.ApdOperationCode!.Value,
+            State:           v.ApdState!,
+            StatedValue:     v.ApdStatedValue!.Value,
+            CompDeductible:  v.ApdCompDeductible!.Value,
+            CollDeductible:  v.ApdCollDeductible!.Value,
+            DriverAgeCode:   v.ApdDriverAgeCode!.Value,
+            DriverPointsCode: v.ApdDriverPointsCode!.Value,
+            DriverExpMod:    v.ApdDriverExpMod!.Value
+        )).ToList();
+
+        ApdV1Formula.RatingResult result;
+        try
+        {
+            result = ApdV1Formula.Rate(compBase, collBase, mileage, driver, operation, state,
+                compDed, collDed, inputs, modifier, version.MinimumPremium);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ("LOOKUP_FAIL", ex.Message);
+        }
+
+        var lines = vehicles.Zip(result.Lines, (v, line) =>
+        {
+            var factors = new
+            {
+                comp_base_rate   = line.CompBaseRate,
+                coll_base_rate   = line.CollBaseRate,
+                mileage_factor   = line.MilageFactor,
+                driver_factor    = line.DriverFactor,
+                driver_exp_mod   = line.DriverExpMod,
+                operation_factor = line.OperationFactor,
+                state_factor     = line.StateFactor,
+                comp_ded_factor  = line.CompDedFactor,
+                coll_ded_factor  = line.CollDedFactor,
+                value_bracket    = line.ValueBracket,
+                mileage_class    = line.MileageClassKey,
+            };
+            var vehicleInputs = new
+            {
+                unit           = v.UnitNumber,
+                year           = v.Year,
+                make           = v.Make,
+                model          = v.Model,
+                stated_value   = v.ApdStatedValue,
+                comp_deductible = v.ApdCompDeductible,
+                coll_deductible = v.ApdCollDeductible,
+                state          = v.ApdState,
+                operation_code = v.ApdOperationCode,
+            };
+            return new QuoteRatingLine
+            {
+                Id = Guid.NewGuid(),
+                ExposureRef = $"VEH-{v.UnitNumber:D3}",
+                Inputs = JsonSerializer.Serialize(vehicleInputs),
+                FactorsApplied = JsonSerializer.Serialize(factors),
+                LinePremium = line.TotalPremium,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            };
+        }).ToList();
+
+        output = new FormulaOutput(result.ManualPremium, result.GrandTotal, lines);
+        return null;
+    }
+
+    // ── Shared helpers ───────────────────────────────────────────────────────
+
+    private record struct FormulaOutput(decimal ManualPremium, decimal GrandTotal, List<QuoteRatingLine> Lines);
+
     private static RatingResultDto MapSnapshotToDto(QuoteRatingSnapshot s, RatingPlanVersion v, string? ratedByName) => new()
     {
         SnapshotId = s.Id,
@@ -195,5 +352,4 @@ public class RatingEngineService : IRatingEngineService
                 FactorsApplied = l.FactorsApplied,
             }).ToList(),
     };
-
 }
