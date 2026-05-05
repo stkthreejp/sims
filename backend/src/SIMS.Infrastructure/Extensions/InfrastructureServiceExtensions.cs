@@ -58,6 +58,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IAgentService, AgentService>();
         services.AddScoped<ICarrierService, CarrierService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IInsuredService, InsuredService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<IQuoteService, QuoteService>();
@@ -152,6 +153,17 @@ public static class InfrastructureServiceExtensions
             ("admin.users.manage", "Manage Users", "Admin"),
             ("admin.roles.view", "View Roles", "Admin"),
             ("admin.roles.manage", "Manage Roles", "Admin"),
+            // Navigation section permissions — control sidebar visibility
+            ("nav.submissions", "Submissions Section", "Navigation"),
+            ("nav.inbox", "Inbox Section", "Navigation"),
+            ("nav.agents", "Agents Section", "Navigation"),
+            ("nav.carriers", "Carriers Section", "Navigation"),
+            ("nav.document-library", "Document Library Section", "Navigation"),
+            ("nav.reports", "Reports Section", "Navigation"),
+            ("nav.billing", "Accounting / Billing Section", "Navigation"),
+            ("nav.admin.rating", "Rating Engine Admin", "Navigation"),
+            ("nav.admin.tasks", "Task Engine Admin", "Navigation"),
+            ("nav.admin.fees", "Fee Rules Admin", "Navigation"),
         };
 
         foreach (var (name, display, category) in permissions)
@@ -170,33 +182,44 @@ public static class InfrastructureServiceExtensions
                 "policies.view", "policies.create", "policies.edit", "policies.bind", "policies.issue",
                 "policies.endorse", "policies.renew", "policies.cancel",
                 "policies.notes.create", "policies.notes.edit", "policies.notes.delete",
-                "policies.attachments.upload", "policies.attachments.delete"
+                "policies.attachments.upload", "policies.attachments.delete",
+                "nav.submissions", "nav.inbox", "nav.reports",
             }),
             ["CSR"] = ("Customer service", new[] {
                 "insureds.view", "insureds.create", "insureds.edit",
                 "policies.view", "policies.notes.create", "policies.notes.edit",
-                "policies.attachments.upload"
+                "policies.attachments.upload",
+                "nav.submissions",
             }),
             ["ReadOnly"] = ("Read only access", new[] {
-                "insureds.view", "policies.view"
+                "insureds.view", "policies.view",
             }),
         };
 
+        // Create any missing roles and assign their full permission set
         foreach (var (roleName, (description, perms)) in roleDefinitions)
         {
             if (!await roleManager.RoleExistsAsync(roleName))
             {
                 var role = new Role { Name = roleName, Description = description, IsSystemRole = true };
                 await roleManager.CreateAsync(role);
-
-                var createdRole = await roleManager.FindByNameAsync(roleName);
-                if (createdRole != null)
-                {
-                    var permEntities = db.Permissions.Where(p => perms.Contains(p.Name)).ToList();
-                    foreach (var perm in permEntities)
-                        db.RolePermissions.Add(new RolePermission { RoleId = createdRole.Id, PermissionId = perm.Id });
-                }
             }
+
+            var existingRole = await roleManager.FindByNameAsync(roleName);
+            if (existingRole == null) continue;
+
+            // Add any permissions not yet assigned to this role (idempotent)
+            var existingPermIds = db.RolePermissions
+                .Where(rp => rp.RoleId == existingRole.Id)
+                .Select(rp => rp.PermissionId)
+                .ToHashSet();
+
+            var permEntities = db.Permissions
+                .Where(p => perms.Contains(p.Name) && !existingPermIds.Contains(p.Id))
+                .ToList();
+
+            foreach (var perm in permEntities)
+                db.RolePermissions.Add(new RolePermission { RoleId = existingRole.Id, PermissionId = perm.Id });
         }
         await db.SaveChangesAsync();
 

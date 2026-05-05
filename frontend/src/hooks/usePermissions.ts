@@ -41,6 +41,18 @@ export function usePermissions() {
     canViewRoles: hasPermission('admin.roles.view'),
     canManageRoles: hasPermission('admin.roles.manage'),
 
+    // Navigation sections (control sidebar visibility)
+    canViewSubmissions: hasPermission('nav.submissions'),
+    canViewInbox: hasPermission('nav.inbox'),
+    canViewAgents: hasPermission('nav.agents'),
+    canViewCarriers: hasPermission('nav.carriers'),
+    canViewDocumentLibrary: hasPermission('nav.document-library'),
+    canViewReports: hasPermission('nav.reports'),
+    canViewBilling: hasPermission('nav.billing'),
+    canViewRatingAdmin: hasPermission('nav.admin.rating'),
+    canViewTaskAdmin: hasPermission('nav.admin.tasks'),
+    canViewFeesAdmin: hasPermission('nav.admin.fees'),
+
     isAdmin,
   }
 }
