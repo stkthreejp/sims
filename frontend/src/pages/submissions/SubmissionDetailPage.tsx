@@ -112,7 +112,7 @@ function daysUntil(dateStr: string | null | undefined): number | null {
 
 // ── Page Component ─────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'quotes' | 'drivers' | 'vehicles' | 'equipment' | 'prior-carriers' | 'documents'
+type Tab = 'quotes' | 'exposures' | 'prior-carriers' | 'documents' | 'activity'
 
 export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -127,7 +127,8 @@ export function SubmissionDetailPage() {
   )
   const [reExtractLob, setReExtractLob] = useState('')
 
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [activeTab, setActiveTab] = useState<Tab>('quotes')
+  const [expLob, setExpLob] = useState<'auto' | 'gl' | 'im'>('auto')
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
@@ -179,13 +180,13 @@ export function SubmissionDetailPage() {
   const { data: drivers = [] } = useQuery({
     queryKey: ['submission-drivers', id],
     queryFn: () => submissionDriversApi.getAll(id!),
-    enabled: !!id && activeTab === 'drivers',
+    enabled: !!id && activeTab === 'exposures',
   })
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['submission-vehicles', id],
     queryFn: () => submissionVehiclesApi.getAll(id!),
-    enabled: !!id && activeTab === 'vehicles',
+    enabled: !!id && activeTab === 'exposures',
   })
 
   const { data: priorCarriers = [] } = useQuery({
@@ -215,20 +216,20 @@ export function SubmissionDetailPage() {
   const { data: equipment = [] } = useQuery({
     queryKey: ['submission-equipment', id],
     queryFn: () => submissionIMApi.getEquipment(id!),
-    enabled: !!id && activeTab === 'equipment',
+    enabled: !!id && activeTab === 'exposures',
   })
 
   const { data: imEquipmentTypes = [] } = useQuery({
     queryKey: ['im-equipment-types'],
     queryFn: () => imLookupsApi.getEquipmentTypes(),
-    enabled: activeTab === 'equipment',
+    enabled: activeTab === 'exposures',
     staleTime: 5 * 60 * 1000,
   })
 
   const { data: imTerritories = [] } = useQuery({
     queryKey: ['im-territories'],
     queryFn: () => imLookupsApi.getTerritories(),
-    enabled: activeTab === 'equipment',
+    enabled: activeTab === 'exposures',
     staleTime: 5 * 60 * 1000,
   })
 
@@ -483,6 +484,20 @@ export function SubmissionDetailPage() {
 
   if (isLoading) return <LoadingSpinner />
   if (!submission) return <p style={{ padding: 24, color: 'var(--ink-3)' }}>Submission not found.</p>
+
+  // ── Derived exposure LOB state ─────────────────────────────────────────────
+
+  const hasGL = submission.linesOfBusiness.includes('GeneralLiability')
+  const hasIM = submission.linesOfBusiness.includes('InlandMarine')
+  const expLobList = [
+    { k: 'auto' as const, label: 'Commercial Auto', count: drivers.length + vehicles.length },
+    ...(hasGL ? [{ k: 'gl' as const, label: 'General Liability', count: null as null }] : []),
+    ...(hasIM ? [{ k: 'im' as const, label: 'Inland Marine', count: equipment.length }] : []),
+  ]
+  const activeLob: 'auto' | 'gl' | 'im' =
+    (expLob === 'gl' && !hasGL) ? 'auto' :
+    (expLob === 'im' && !hasIM) ? 'auto' :
+    expLob
 
   // ── Shared quote list renderer ─────────────────────────────────────────────
 
@@ -954,62 +969,198 @@ export function SubmissionDetailPage() {
         </section>
       </div>
 
-      {/* Tabs */}
-      <div className="sd-card" style={{ marginBottom: 0 }}>
-        <div className="sd-tabs" style={{ overflowX: 'auto' }}>
-          {([
-            { key: 'overview', label: 'Overview' },
-            { key: 'quotes', label: 'Quotes', count: quotes.length },
-            { key: 'drivers', label: 'Drivers' },
-            { key: 'vehicles', label: 'Vehicles' },
-            { key: 'equipment', label: 'Equipment' },
-            { key: 'prior-carriers', label: 'Prior Carriers' },
-            { key: 'documents', label: 'Documents' },
-          ] as { key: Tab; label: string; count?: number }[]).map(({ key, label, count }) => (
-            <button
-              key={key}
-              className={`sd-tab${activeTab === key ? ' active' : ''}`}
-              onClick={() => setActiveTab(key)}
-            >
-              {label}
-              {count != null && <span className="cnt">{count}</span>}
-            </button>
-          ))}
-        </div>
+      {/* Always-visible: Loss history + UW Notes */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <section className="sd-card">
+          <div className="sd-card-head"><h3>Loss history (5 yrs)</h3></div>
+          <div className="sd-card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 100 }}>
+            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No loss history on file</p>
+          </div>
+        </section>
+        <section className="sd-card">
+          <div className="sd-card-head"><h3>UW Notes</h3></div>
+          <div className="sd-card-body" style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ink-2)' }}>
+            {submission.descriptionOfOperations
+              ? <p style={{ margin: 0 }}>{submission.descriptionOfOperations}</p>
+              : <p style={{ margin: 0, color: 'var(--ink-4)', fontStyle: 'italic' }}>No notes on file.</p>}
+            {submission.underwriterName && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>
+                  {submission.underwriterName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                </div>
+                <span><b style={{ color: 'var(--ink-2)' }}>{submission.underwriterName}</b></span>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
 
-        {/* Overview tab */}
-        {activeTab === 'overview' && (
-          <div style={{ padding: '16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              {/* Quotes summary */}
-              <div className="sd-card" style={{ gridColumn: '1 / -1' }}>
-                <div className="sd-card-head">
-                  <h3>Quotes <span className="cnt">{quotes.length}</span></h3>
+      {/* Tab strip */}
+      <div className="sd-tabs" style={{ marginBottom: 14 }}>
+        {([
+          { key: 'quotes', label: 'Quotes', count: quotes.length },
+          { key: 'exposures', label: 'Exposures', count: drivers.length + vehicles.length + equipment.length > 0 ? drivers.length + vehicles.length + equipment.length : undefined },
+          { key: 'prior-carriers', label: 'Prior carriers', count: priorCarriers.length > 0 ? priorCarriers.length : undefined },
+          { key: 'documents', label: 'Documents' },
+          { key: 'activity', label: 'Activity' },
+        ] as { key: Tab; label: string; count?: number }[]).map(({ key, label, count }) => (
+          <button
+            key={key}
+            className={`sd-tab${activeTab === key ? ' active' : ''}`}
+            onClick={() => setActiveTab(key)}
+          >
+            {label}
+            {count != null && <span className="cnt">{count}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Quotes tab */}
+      {activeTab === 'quotes' && (
+        <section className="sd-card">
+          <div className="sd-card-head">
+            <h3>All quotes <span className="cnt">{quotes.length}</span></h3>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="sd-btn sm primary" onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
+                <Plus size={12} /> Add quote
+              </button>
+            </div>
+          </div>
+          <div className="sd-card-body tight">
+            {renderQuoteList()}
+          </div>
+        </section>
+      )}
+
+      {/* Exposures tab */}
+      {activeTab === 'exposures' && (
+        <section className="sd-card">
+          {expLobList.length > 1 && (
+            <div className="sd-card-head" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <div className="exp-lob-switch">
+                {expLobList.map((l) => (
+                  <button key={l.k} className={`exp-lob${activeLob === l.k ? ' active' : ''}`} onClick={() => setExpLob(l.k)}>
+                    {l.label}
+                    {l.count != null && <span className="exp-lob-c">{l.count}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeLob === 'auto' && (
+            <>
+              {/* Driver form */}
+              {showDriverForm && (
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingDriverId ? 'Edit Driver' : 'Add Driver'}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    <div><label style={labelStyle}>Driver #</label><input type="number" value={driverForm.driverNumber} onChange={(e) => setDriverForm((f) => ({ ...f, driverNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Name *</label><input value={driverForm.name} onChange={(e) => setDriverForm((f) => ({ ...f, name: e.target.value }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Date of Birth</label><input type="date" value={driverForm.dateOfBirth ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, dateOfBirth: e.target.value || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>License #</label><input value={driverForm.licenseNumber ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, licenseNumber: e.target.value || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>License State</label><input maxLength={2} value={driverForm.licenseState ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, licenseState: e.target.value.toUpperCase() || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Date Hired</label><input type="date" value={driverForm.dateHired ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, dateHired: e.target.value || undefined }))} style={inputStyle} /></div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button onClick={() => saveDriverMutation.mutate(driverForm)} disabled={!driverForm.name || saveDriverMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
+                    <button onClick={() => { setShowDriverForm(false); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
+                  </div>
                 </div>
-                <div className="sd-card-body tight">
-                  {renderQuoteList()}
+              )}
+              {/* Drivers section */}
+              <div className="exp-h">
+                <div className="exp-h-l">Drivers <span className="c">{drivers.length}</span></div>
+                <button className="sd-btn ghost sm" onClick={() => { setShowDriverForm(true); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }}><Plus size={12} /> Add</button>
+              </div>
+              {drivers.length === 0 && !showDriverForm ? (
+                <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No drivers added yet</div>
+              ) : (
+                <table className="sd-table">
+                  <thead><tr><th>#</th><th>Name</th><th>DOB</th><th>License</th><th>State</th><th>Hired</th><th /></tr></thead>
+                  <tbody>
+                    {drivers.map((d) => (
+                      <tr key={d.id}>
+                        <td className="id">{d.driverNumber}</td>
+                        <td className="primary-cell">{d.name}</td>
+                        <td>{d.dateOfBirth ?? '—'}</td>
+                        <td className="id">{d.licenseNumber ?? '—'}</td>
+                        <td>{d.licenseState ?? '—'}</td>
+                        <td>{d.dateHired ?? '—'}</td>
+                        <td style={{ padding: '8px 14px' }}>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => { setDriverForm({ driverNumber: d.driverNumber, name: d.name, dateOfBirth: d.dateOfBirth ?? undefined, licenseNumber: d.licenseNumber ?? undefined, licenseState: d.licenseState ?? undefined, dateHired: d.dateHired ?? undefined }); setEditingDriverId(d.id); setShowDriverForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
+                            <button onClick={() => { if (confirm('Remove driver?')) deleteDriverMutation.mutate(d.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {/* Vehicle form */}
+              <div style={{ borderTop: '1px solid var(--line)' }}>
+                {showVehicleForm && (
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                      <div><label style={labelStyle}>Unit #</label><input type="number" value={vehicleForm.unitNumber} onChange={(e) => setVehicleForm((f) => ({ ...f, unitNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Year</label><input type="number" value={vehicleForm.year ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, year: parseInt(e.target.value) || undefined }))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Make</label><input value={vehicleForm.make ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, make: e.target.value || undefined }))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Model</label><input value={vehicleForm.model ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, model: e.target.value || undefined }))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>VIN</label><input value={vehicleForm.vin ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, vin: e.target.value || undefined }))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>GVW (lbs)</label><input type="number" value={vehicleForm.gvw ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, gvw: parseInt(e.target.value) || undefined }))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Class *</label><select value={vehicleForm.vehicleClass} onChange={(e) => setVehicleForm((f) => ({ ...f, vehicleClass: e.target.value as VehicleClass }))} style={inputStyle}>{(Object.keys(VEHICLE_CLASS_LABELS) as VehicleClass[]).map((k) => <option key={k} value={k}>{VEHICLE_CLASS_LABELS[k]}</option>)}</select></div>
+                      <div><label style={labelStyle}>Garaging ZIP</label><input value={vehicleForm.garagingZip ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, garagingZip: e.target.value || undefined }))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Radius</label><select value={vehicleForm.radius ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, radius: (e.target.value as OperatingRadius) || undefined }))} style={inputStyle}><option value="">— Select —</option>{(Object.keys(OPERATING_RADIUS_LABELS) as OperatingRadius[]).map((k) => <option key={k} value={k}>{OPERATING_RADIUS_LABELS[k]}</option>)}</select></div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button onClick={() => saveVehicleMutation.mutate(vehicleForm)} disabled={saveVehicleMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
+                      <button onClick={() => { setShowVehicleForm(false); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {/* Vehicles section */}
+                <div className="exp-h">
+                  <div className="exp-h-l">Vehicles <span className="c">{vehicles.length}</span></div>
+                  <button className="sd-btn ghost sm" onClick={() => { setShowVehicleForm(true); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }}><Plus size={12} /> Add</button>
                 </div>
+                {vehicles.length === 0 && !showVehicleForm ? (
+                  <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No vehicles added yet</div>
+                ) : (
+                  <table className="sd-table">
+                    <thead><tr><th>Unit</th><th>Year / Make / Model</th><th>VIN</th><th>Class</th><th>GVW</th><th>Radius</th><th /></tr></thead>
+                    <tbody>
+                      {vehicles.map((v) => (
+                        <tr key={v.id}>
+                          <td className="id">{v.unitNumber}</td>
+                          <td className="primary-cell">{[v.year, v.make, v.model].filter(Boolean).join(' ') || '—'}</td>
+                          <td className="id">{v.vin ?? '—'}</td>
+                          <td><span className="sd-lob">{VEHICLE_CLASS_LABELS[v.vehicleClass]}</span></td>
+                          <td>{v.gvw ? v.gvw.toLocaleString() : '—'}</td>
+                          <td>{v.radius ? OPERATING_RADIUS_LABELS[v.radius] : '—'}</td>
+                          <td style={{ padding: '8px 14px' }}>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
+                              <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
-              {/* UW Notes */}
-              <div className="sd-card" style={{ gridColumn: '1 / -1' }}>
-                <div className="sd-card-head"><h3>UW Notes / Description of Operations</h3></div>
-                <div className="sd-card-body">
-                  {submission.descriptionOfOperations
-                    ? <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', lineHeight: 1.6 }}>{submission.descriptionOfOperations}</p>
-                    : <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No notes on file.</p>
-                  }
-                </div>
-              </div>
-
-              {/* Supplemental */}
-              <div className="sd-card" style={{ gridColumn: '1 / -1' }}>
+              {/* Supplemental collapsible */}
+              <div style={{ borderTop: '1px solid var(--line)' }}>
                 <button
                   className="sd-card-head"
-                  style={{ width: '100%', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left' }}
+                  style={{ width: '100%', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   onClick={() => setSupplementalOpen((o) => !o)}
                 >
-                  <h3>Supplemental Info</h3>
+                  <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Supplemental Info</h3>
                   <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{supplementalOpen ? '▲' : '▼'}</span>
                 </button>
                 {supplementalOpen && (
@@ -1017,30 +1168,15 @@ export function SubmissionDetailPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <label style={labelStyle}>Commodities Hauled (comma-separated)</label>
-                        <input
-                          value={supplementalForm.commoditiesHauled.join(', ')}
-                          onChange={(e) => { setSupplementalForm((f) => ({ ...f, commoditiesHauled: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }}
-                          placeholder="e.g. Lumber, Steel"
-                          style={inputStyle}
-                        />
+                        <input value={supplementalForm.commoditiesHauled.join(', ')} onChange={(e) => { setSupplementalForm((f) => ({ ...f, commoditiesHauled: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }} placeholder="e.g. Lumber, Steel" style={inputStyle} />
                       </div>
                       <div>
                         <label style={labelStyle}>Terminal Locations (comma-separated)</label>
-                        <input
-                          value={supplementalForm.terminalLocations.join(', ')}
-                          onChange={(e) => { setSupplementalForm((f) => ({ ...f, terminalLocations: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }}
-                          placeholder="e.g. Dallas TX"
-                          style={inputStyle}
-                        />
+                        <input value={supplementalForm.terminalLocations.join(', ')} onChange={(e) => { setSupplementalForm((f) => ({ ...f, terminalLocations: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }} placeholder="e.g. Dallas TX" style={inputStyle} />
                       </div>
                       <div>
                         <label style={labelStyle}>Filings Required (comma-separated)</label>
-                        <input
-                          value={supplementalForm.filingsRequired.join(', ')}
-                          onChange={(e) => { setSupplementalForm((f) => ({ ...f, filingsRequired: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }}
-                          placeholder="e.g. MCS-90"
-                          style={inputStyle}
-                        />
+                        <input value={supplementalForm.filingsRequired.join(', ')} onChange={(e) => { setSupplementalForm((f) => ({ ...f, filingsRequired: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })); setSupplementalDirty(true) }} placeholder="e.g. MCS-90" style={inputStyle} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
@@ -1063,187 +1199,55 @@ export function SubmissionDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* Quotes tab */}
-        {activeTab === 'quotes' && (
-          <div className="sd-card-body tight">
-            {renderQuoteList()}
-          </div>
-        )}
-
-        {/* Drivers tab */}
-        {activeTab === 'drivers' && (
-          <div>
-            {showDriverForm && (
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingDriverId ? 'Edit Driver' : 'Add Driver'}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                  <div><label style={labelStyle}>Driver #</label><input type="number" value={driverForm.driverNumber} onChange={(e) => setDriverForm((f) => ({ ...f, driverNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Name *</label><input value={driverForm.name} onChange={(e) => setDriverForm((f) => ({ ...f, name: e.target.value }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Date of Birth</label><input type="date" value={driverForm.dateOfBirth ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, dateOfBirth: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>License #</label><input value={driverForm.licenseNumber ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, licenseNumber: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>License State</label><input maxLength={2} value={driverForm.licenseState ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, licenseState: e.target.value.toUpperCase() || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Date Hired</label><input type="date" value={driverForm.dateHired ?? ''} onChange={(e) => setDriverForm((f) => ({ ...f, dateHired: e.target.value || undefined }))} style={inputStyle} /></div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button onClick={() => saveDriverMutation.mutate(driverForm)} disabled={!driverForm.name || saveDriverMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
-                  <button onClick={() => { setShowDriverForm(false); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
-                </div>
-              </div>
-            )}
-            {drivers.length === 0 && !showDriverForm ? (
-              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                <div style={{ color: 'var(--ink-2)', fontWeight: 600, marginBottom: 4 }}>No drivers added yet</div>
-                <button className="sd-btn outline sm" style={{ marginTop: 10 }} onClick={() => { setShowDriverForm(true); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }}><Plus size={13} /> Add Driver</button>
-              </div>
-            ) : (
-              <>
-                <table className="sd-table">
-                  <thead><tr><th>#</th><th>Name</th><th>DOB</th><th>License</th><th>State</th><th>Hired</th><th /></tr></thead>
-                  <tbody>
-                    {drivers.map((d) => (
-                      <tr key={d.id}>
-                        <td className="id">{d.driverNumber}</td>
-                        <td className="primary-cell">{d.name}</td>
-                        <td>{d.dateOfBirth ?? '—'}</td>
-                        <td className="id">{d.licenseNumber ?? '—'}</td>
-                        <td>{d.licenseState ?? '—'}</td>
-                        <td>{d.dateHired ?? '—'}</td>
-                        <td style={{ padding: '8px 14px' }}>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => { setDriverForm({ driverNumber: d.driverNumber, name: d.name, dateOfBirth: d.dateOfBirth ?? undefined, licenseNumber: d.licenseNumber ?? undefined, licenseState: d.licenseState ?? undefined, dateHired: d.dateHired ?? undefined }); setEditingDriverId(d.id); setShowDriverForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                            <button onClick={() => { if (confirm('Remove driver?')) deleteDriverMutation.mutate(d.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!showDriverForm && (
-                  <div style={{ padding: '10px 14px', borderTop: '1px solid var(--line-2)' }}>
-                    <button onClick={() => { setShowDriverForm(true); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }} className="sd-btn ghost sm"><Plus size={13} /> Add Driver</button>
+          {activeLob === 'im' && (
+            <>
+              {showEquipmentForm && (
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingEquipmentId ? 'Edit Equipment' : 'Add Equipment'}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                    <div><label style={labelStyle}>Item #</label><input type="number" value={equipmentForm.itemNumber} onChange={(e) => setEquipmentForm((f) => ({ ...f, itemNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Year</label><input type="number" value={equipmentForm.year ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, year: parseInt(e.target.value) || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Make</label><input value={equipmentForm.make ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, make: e.target.value || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Model</label><input value={equipmentForm.model ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, model: e.target.value || undefined }))} style={inputStyle} /></div>
+                    <div className="col-span-2"><label style={labelStyle}>Description</label><input value={equipmentForm.description ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, description: e.target.value || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Serial #</label><input value={equipmentForm.serialNumber ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, serialNumber: e.target.value || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Stated Value</label><input type="number" value={equipmentForm.value ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, value: parseFloat(e.target.value) || undefined }))} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Equipment Type</label><select value={equipmentForm.equipmentTypeId ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, equipmentTypeId: e.target.value || null }))} style={inputStyle}><option value="">— Select —</option>{imEquipmentTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                    <div>
+                      <label style={labelStyle}>Deductible</label>
+                      <select value={equipmentForm.deductible === null ? '10ACV' : equipmentForm.deductible !== undefined ? String(equipmentForm.deductible) : ''} onChange={(e) => { const v = e.target.value; setEquipmentForm((f) => ({ ...f, deductible: v === '' ? undefined : v === '10ACV' ? null : Number(v) })) }} style={inputStyle}>
+                        <option value="">— Select —</option>
+                        {IM_DEDUCTIBLE_TIERS.map((t) => <option key={t.label} value={t.value === null ? '10ACV' : String(t.value)}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    <div><label style={labelStyle}>Settlement Basis</label><select value={equipmentForm.settlementBasis ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, settlementBasis: (e.target.value as SettlementBasis) || null }))} style={inputStyle}><option value="">— Select —</option>{(Object.keys(SETTLEMENT_BASIS_LABELS) as SettlementBasis[]).map((k) => <option key={k} value={k}>{SETTLEMENT_BASIS_LABELS[k]}</option>)}</select></div>
+                    <div>
+                      <label style={labelStyle}>Territory</label>
+                      <select value={equipmentForm.territoryCode ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, territoryCode: e.target.value || null }))} style={inputStyle}>
+                        <option value="">— Select —</option>
+                        {imTerritories.map((t) => <option key={t.id} value={t.code}>Terr {t.code} ({t.states})</option>)}
+                      </select>
+                      {!editingEquipmentId && defaultTerritoryCode && !equipmentForm.territoryCode && (
+                        <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4, marginBottom: 0 }}>Default: Terr {defaultTerritoryCode}</p>
+                      )}
+                    </div>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Vehicles tab */}
-        {activeTab === 'vehicles' && (
-          <div>
-            {showVehicleForm && (
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingVehicleId ? 'Edit Vehicle' : 'Add Vehicle'}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                  <div><label style={labelStyle}>Unit #</label><input type="number" value={vehicleForm.unitNumber} onChange={(e) => setVehicleForm((f) => ({ ...f, unitNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Year</label><input type="number" value={vehicleForm.year ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, year: parseInt(e.target.value) || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Make</label><input value={vehicleForm.make ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, make: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Model</label><input value={vehicleForm.model ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, model: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>VIN</label><input value={vehicleForm.vin ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, vin: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>GVW (lbs)</label><input type="number" value={vehicleForm.gvw ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, gvw: parseInt(e.target.value) || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Class *</label><select value={vehicleForm.vehicleClass} onChange={(e) => setVehicleForm((f) => ({ ...f, vehicleClass: e.target.value as VehicleClass }))} style={inputStyle}>{(Object.keys(VEHICLE_CLASS_LABELS) as VehicleClass[]).map((k) => <option key={k} value={k}>{VEHICLE_CLASS_LABELS[k]}</option>)}</select></div>
-                  <div><label style={labelStyle}>Garaging ZIP</label><input value={vehicleForm.garagingZip ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, garagingZip: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Radius</label><select value={vehicleForm.radius ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, radius: (e.target.value as OperatingRadius) || undefined }))} style={inputStyle}><option value="">— Select —</option>{(Object.keys(OPERATING_RADIUS_LABELS) as OperatingRadius[]).map((k) => <option key={k} value={k}>{OPERATING_RADIUS_LABELS[k]}</option>)}</select></div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button onClick={() => saveVehicleMutation.mutate(vehicleForm)} disabled={saveVehicleMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
-                  <button onClick={() => { setShowVehicleForm(false); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
-                </div>
-              </div>
-            )}
-            {vehicles.length === 0 && !showVehicleForm ? (
-              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                <div style={{ color: 'var(--ink-2)', fontWeight: 600, marginBottom: 4 }}>No vehicles added yet</div>
-                <button className="sd-btn outline sm" style={{ marginTop: 10 }} onClick={() => { setShowVehicleForm(true); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }}><Plus size={13} /> Add Vehicle</button>
-              </div>
-            ) : (
-              <>
-                <table className="sd-table">
-                  <thead><tr><th>Unit</th><th>Year / Make / Model</th><th>VIN</th><th>Class</th><th>GVW</th><th>Radius</th><th /></tr></thead>
-                  <tbody>
-                    {vehicles.map((v) => (
-                      <tr key={v.id}>
-                        <td className="id">{v.unitNumber}</td>
-                        <td className="primary-cell">{[v.year, v.make, v.model].filter(Boolean).join(' ') || '—'}</td>
-                        <td className="id">{v.vin ?? '—'}</td>
-                        <td><span className="sd-lob">{VEHICLE_CLASS_LABELS[v.vehicleClass]}</span></td>
-                        <td>{v.gvw ? v.gvw.toLocaleString() : '—'}</td>
-                        <td>{v.radius ? OPERATING_RADIUS_LABELS[v.radius] : '—'}</td>
-                        <td style={{ padding: '8px 14px' }}>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                            <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!showVehicleForm && (
-                  <div style={{ padding: '10px 14px', borderTop: '1px solid var(--line-2)' }}>
-                    <button onClick={() => { setShowVehicleForm(true); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }} className="sd-btn ghost sm"><Plus size={13} /> Add Vehicle</button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Equipment tab */}
-        {activeTab === 'equipment' && (
-          <div>
-            {showEquipmentForm && (
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingEquipmentId ? 'Edit Equipment' : 'Add Equipment'}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                  <div><label style={labelStyle}>Item #</label><input type="number" value={equipmentForm.itemNumber} onChange={(e) => setEquipmentForm((f) => ({ ...f, itemNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Year</label><input type="number" value={equipmentForm.year ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, year: parseInt(e.target.value) || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Make</label><input value={equipmentForm.make ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, make: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Model</label><input value={equipmentForm.model ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, model: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div className="col-span-2"><label style={labelStyle}>Description</label><input value={equipmentForm.description ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, description: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Serial #</label><input value={equipmentForm.serialNumber ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, serialNumber: e.target.value || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Stated Value</label><input type="number" value={equipmentForm.value ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, value: parseFloat(e.target.value) || undefined }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Equipment Type *</label><select value={equipmentForm.equipmentTypeId ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, equipmentTypeId: e.target.value || null }))} style={inputStyle}><option value="">— Select —</option>{imEquipmentTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                  <div>
-                    <label style={labelStyle}>Deductible *</label>
-                    <select
-                      value={equipmentForm.deductible === null ? '10ACV' : equipmentForm.deductible !== undefined ? String(equipmentForm.deductible) : ''}
-                      onChange={(e) => { const v = e.target.value; setEquipmentForm((f) => ({ ...f, deductible: v === '' ? undefined : v === '10ACV' ? null : Number(v) })) }}
-                      style={inputStyle}
-                    >
-                      <option value="">— Select —</option>
-                      {IM_DEDUCTIBLE_TIERS.map((t) => <option key={t.label} value={t.value === null ? '10ACV' : String(t.value)}>{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div><label style={labelStyle}>Settlement Basis</label><select value={equipmentForm.settlementBasis ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, settlementBasis: (e.target.value as SettlementBasis) || null }))} style={inputStyle}><option value="">— Select —</option>{(Object.keys(SETTLEMENT_BASIS_LABELS) as SettlementBasis[]).map((k) => <option key={k} value={k}>{SETTLEMENT_BASIS_LABELS[k]}</option>)}</select></div>
-                  <div>
-                    <label style={labelStyle}>Territory</label>
-                    <select value={equipmentForm.territoryCode ?? ''} onChange={(e) => setEquipmentForm((f) => ({ ...f, territoryCode: e.target.value || null }))} style={inputStyle}>
-                      <option value="">— Select —</option>
-                      {imTerritories.map((t) => <option key={t.id} value={t.code}>Terr {t.code} ({t.states})</option>)}
-                    </select>
-                    {!editingEquipmentId && defaultTerritoryCode && !equipmentForm.territoryCode && (
-                      <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4, marginBottom: 0 }}>Default: Terr {defaultTerritoryCode}</p>
-                    )}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button onClick={() => saveEquipmentMutation.mutate(equipmentForm)} disabled={saveEquipmentMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
+                    <button onClick={() => { setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button onClick={() => saveEquipmentMutation.mutate(equipmentForm)} disabled={saveEquipmentMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
-                  <button onClick={() => { setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
-                </div>
+              )}
+              <div className="exp-h">
+                <div className="exp-h-l">Equipment schedule <span className="c">{equipment.length}</span></div>
+                <button className="sd-btn ghost sm" onClick={() => { setShowEquipmentForm(true); setEquipmentForm({ itemNumber: (equipment.at(-1)?.itemNumber ?? 0) + 1, territoryCode: defaultTerritoryCode ?? null }); setEditingEquipmentId(null) }}><Plus size={12} /> Add</button>
               </div>
-            )}
-            {equipment.length === 0 && !showEquipmentForm ? (
-              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                <div style={{ color: 'var(--ink-2)', fontWeight: 600, marginBottom: 4 }}>No equipment scheduled yet</div>
-                <button className="sd-btn outline sm" style={{ marginTop: 10 }} onClick={() => { setShowEquipmentForm(true); setEquipmentForm({ itemNumber: 1, territoryCode: defaultTerritoryCode ?? null }); setEditingEquipmentId(null) }}><Plus size={13} /> Add Equipment</button>
-              </div>
-            ) : (
-              <>
+              {equipment.length === 0 && !showEquipmentForm ? (
+                <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No equipment scheduled yet</div>
+              ) : (
                 <table className="sd-table">
                   <thead><tr><th>Item</th><th>Year / Make / Model</th><th>Type</th><th className="num">Value</th><th>Ded.</th><th>Sett.</th><th>Terr.</th><th /></tr></thead>
                   <tbody>
@@ -1270,19 +1274,35 @@ export function SubmissionDetailPage() {
                     })}
                   </tbody>
                 </table>
-                {!showEquipmentForm && (
-                  <div style={{ padding: '10px 14px', borderTop: '1px solid var(--line-2)' }}>
-                    <button onClick={() => { setShowEquipmentForm(true); setEquipmentForm({ itemNumber: (equipment.at(-1)?.itemNumber ?? 0) + 1, territoryCode: defaultTerritoryCode ?? null }); setEditingEquipmentId(null) }} className="sd-btn ghost sm"><Plus size={13} /> Add Equipment</button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+              )}
+            </>
+          )}
 
-        {/* Prior Carriers tab */}
-        {activeTab === 'prior-carriers' && (
-          <div>
+          {activeLob === 'gl' && (
+            <div className="sd-card-body">
+              <div className="sd-fields">
+                {glCoverages ? (
+                  <>
+                    {glCoverages.eachOccurrence != null && <div className="sd-field"><span className="lbl">Each Occurrence</span><span className="val">{fmtMoney(glCoverages.eachOccurrence)}</span></div>}
+                    {glCoverages.generalAggregate != null && <div className="sd-field"><span className="lbl">General Aggregate</span><span className="val">{fmtMoney(glCoverages.generalAggregate)}</span></div>}
+                  </>
+                ) : (
+                  <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No GL coverage data on file.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Prior Carriers tab */}
+      {activeTab === 'prior-carriers' && (
+        <section className="sd-card">
+          <div className="sd-card-head">
+            <h3>Prior carriers <span className="cnt">{priorCarriers.length}</span></h3>
+            <button className="sd-btn sm primary" onClick={() => { setShowCarrierForm(true); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null) }}><Plus size={12} /> Add prior carrier</button>
+          </div>
+          <div className="sd-card-body tight">
             {showCarrierForm && (
               <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingCarrierId ? 'Edit Prior Carrier' : 'Add Prior Carrier'}</div>
@@ -1334,15 +1354,29 @@ export function SubmissionDetailPage() {
               </>
             )}
           </div>
-        )}
+        </section>
+      )}
 
-        {/* Documents tab */}
-        {activeTab === 'documents' && (
+      {/* Documents tab */}
+      {activeTab === 'documents' && (
+        <section className="sd-card">
+          <div className="sd-card-head"><h3>Documents</h3></div>
           <div style={{ padding: '14px 16px' }}>
             <DocumentsSection entityType="Submission" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
           </div>
-        )}
-      </div>
+        </section>
+      )}
+
+      {/* Activity tab */}
+      {activeTab === 'activity' && (
+        <section className="sd-card">
+          <div className="sd-card-head"><h3>Activity</h3></div>
+          <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
+            <div style={{ color: 'var(--ink-2)', fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>No activity recorded yet</div>
+            <div style={{ fontSize: 12 }}>Activity log coming soon.</div>
+          </div>
+        </section>
+      )}
 
       {showGenerateModal && (
         <GenerateDocumentModal
