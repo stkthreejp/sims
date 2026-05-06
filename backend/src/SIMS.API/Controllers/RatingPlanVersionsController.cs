@@ -15,7 +15,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/rating-plan-versions")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.RatingManage)]
 public class RatingPlanVersionsController : ControllerBase
 {
     private static readonly Dictionary<PolicyLineOfBusiness, string> LobLabels = new()
@@ -45,7 +45,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Version detail ───────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var v = await _db.RatingPlanVersions
@@ -89,7 +89,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Factor tables ────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/factors")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> GetFactors(Guid id, CancellationToken ct)
     {
         var exists = await _db.RatingPlanVersions.AnyAsync(v => v.Id == id && !v.IsDeleted, ct);
@@ -124,7 +124,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Eligibility rules ────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/eligibility-rules")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> GetEligibilityRules(Guid id, CancellationToken ct)
     {
         var exists = await _db.RatingPlanVersions.AnyAsync(v => v.Id == id && !v.IsDeleted, ct);
@@ -150,7 +150,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Promote ─────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/promote")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> Promote(Guid id, CancellationToken ct)
     {
         var version = await _db.RatingPlanVersions
@@ -216,7 +216,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Retire ───────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/retire")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> Retire(Guid id, CancellationToken ct)
     {
         var version = await _db.RatingPlanVersions
@@ -241,7 +241,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Update draft metadata ────────────────────────────────────────────────
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> UpdateMeta(Guid id, [FromBody] UpdateVersionMetaDto dto, CancellationToken ct)
     {
         var version = await _db.RatingPlanVersions.FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted, ct);
@@ -264,7 +264,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Bulk-replace factor table rows ──────────────────────────────────────
 
     [HttpPut("{id:guid}/factors/{tableCode}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> UpdateFactorTable(Guid id, string tableCode, [FromBody] UpdateFactorTableDto dto, CancellationToken ct)
     {
         var version = await _db.RatingPlanVersions.FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted, ct);
@@ -298,7 +298,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── CSV import ───────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/import-csv")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> ImportCsv(Guid id, [FromForm] IFormFile file, CancellationToken ct)
     {
         var version = await _db.RatingPlanVersions
@@ -385,7 +385,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Impact preview ───────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/preview-impact")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> ComputeImpactPreview(Guid id, CancellationToken ct)
     {
         var version = await _db.RatingPlanVersions
@@ -549,7 +549,7 @@ public class RatingPlanVersionsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/preview-impact")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.RatingAdmin)]
     public async Task<IActionResult> GetImpactPreview(Guid id, CancellationToken ct)
     {
         var preview = await _db.RatingPlanVersionImpactPreviews

@@ -50,7 +50,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in AppPermissions.All)
+    {
+        options.AddPolicy(permission.Name, policy =>
+            policy.RequireClaim("permission", permission.Name));
+    }
+});
 
 // Rate limiting — auth endpoints: 10 attempts per minute per IP
 builder.Services.AddRateLimiter(options =>

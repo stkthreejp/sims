@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using SIMS.Application.Configuration;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Application.Services;
 using SIMS.Domain.Entities;
 using SIMS.Infrastructure.Data;
@@ -133,70 +134,41 @@ public static class InfrastructureServiceExtensions
         await db.Database.MigrateAsync();
 
         // Seed permissions
-        var permissions = new[]
+        foreach (var permission in AppPermissions.All)
         {
-            ("insureds.view", "View Insureds", "Insureds"),
-            ("insureds.create", "Create Insureds", "Insureds"),
-            ("insureds.edit", "Edit Insureds", "Insureds"),
-            ("insureds.delete", "Delete Insureds", "Insureds"),
-            ("policies.view", "View Policies", "Policies"),
-            ("policies.create", "Create Policies", "Policies"),
-            ("policies.edit", "Edit Policies", "Policies"),
-            ("policies.delete", "Delete Policies", "Policies"),
-            ("policies.bind", "Bind Policies", "Policies"),
-            ("policies.issue", "Issue Policies", "Policies"),
-            ("policies.endorse", "Endorse Policies", "Policies"),
-            ("policies.renew", "Renew Policies", "Policies"),
-            ("policies.cancel", "Cancel Policies", "Policies"),
-            ("policies.notes.create", "Create Notes", "Notes"),
-            ("policies.notes.edit", "Edit Notes", "Notes"),
-            ("policies.notes.delete", "Delete Notes", "Notes"),
-            ("policies.attachments.upload", "Upload Attachments", "Attachments"),
-            ("policies.attachments.delete", "Delete Attachments", "Attachments"),
-            ("admin.users.view", "View Users", "Admin"),
-            ("admin.users.manage", "Manage Users", "Admin"),
-            ("admin.roles.view", "View Roles", "Admin"),
-            ("admin.roles.manage", "Manage Roles", "Admin"),
-            // Navigation section permissions — control sidebar visibility
-            ("nav.submissions", "Submissions Section", "Navigation"),
-            ("nav.inbox", "Inbox Section", "Navigation"),
-            ("nav.agents", "Agents Section", "Navigation"),
-            ("nav.carriers", "Carriers Section", "Navigation"),
-            ("nav.document-library", "Document Library Section", "Navigation"),
-            ("nav.reports", "Reports Section", "Navigation"),
-            ("nav.billing", "Accounting / Billing Section", "Navigation"),
-            ("nav.admin.rating", "Rating Engine Admin", "Navigation"),
-            ("nav.admin.tasks", "Task Engine Admin", "Navigation"),
-            ("nav.admin.fees", "Fee Rules Admin", "Navigation"),
-        };
-
-        foreach (var (name, display, category) in permissions)
-        {
-            if (!db.Permissions.Any(p => p.Name == name))
-                db.Permissions.Add(new Permission { Name = name, DisplayName = display, Category = category });
+            if (!db.Permissions.Any(p => p.Name == permission.Name))
+                db.Permissions.Add(new Permission
+                {
+                    Name = permission.Name,
+                    DisplayName = permission.DisplayName,
+                    Category = permission.Category
+                });
         }
         await db.SaveChangesAsync();
 
         // Seed roles
         var roleDefinitions = new Dictionary<string, (string description, string[] permissions)>
         {
-            ["Admin"] = ("Full system access", permissions.Select(p => p.Item1).ToArray()),
+            ["Admin"] = ("Full system access", AppPermissions.All.Select(p => p.Name).ToArray()),
             ["Underwriter"] = ("Underwriting staff", new[] {
-                "insureds.view", "insureds.create", "insureds.edit",
-                "policies.view", "policies.create", "policies.edit", "policies.bind", "policies.issue",
-                "policies.endorse", "policies.renew", "policies.cancel",
-                "policies.notes.create", "policies.notes.edit", "policies.notes.delete",
-                "policies.attachments.upload", "policies.attachments.delete",
-                "nav.submissions", "nav.inbox", "nav.reports",
+                AppPermissions.InsuredsView, AppPermissions.InsuredsCreate, AppPermissions.InsuredsEdit,
+                AppPermissions.PoliciesView, AppPermissions.PoliciesCreate, AppPermissions.PoliciesEdit,
+                AppPermissions.PoliciesBind, AppPermissions.PoliciesIssue, AppPermissions.PoliciesEndorse,
+                AppPermissions.PoliciesRenew, AppPermissions.PoliciesCancel,
+                AppPermissions.NotesCreate, AppPermissions.NotesEdit, AppPermissions.NotesDelete,
+                AppPermissions.AttachmentsUpload, AppPermissions.AttachmentsDelete,
+                AppPermissions.UnderwritingManage, AppPermissions.AccountingManage,
+                AppPermissions.RatingManage, AppPermissions.ReportsView,
+                AppPermissions.NavSubmissions, AppPermissions.NavInbox, AppPermissions.NavReports,
             }),
             ["CSR"] = ("Customer service", new[] {
-                "insureds.view", "insureds.create", "insureds.edit",
-                "policies.view", "policies.notes.create", "policies.notes.edit",
-                "policies.attachments.upload",
-                "nav.submissions",
+                AppPermissions.InsuredsView, AppPermissions.InsuredsCreate, AppPermissions.InsuredsEdit,
+                AppPermissions.PoliciesView, AppPermissions.NotesCreate, AppPermissions.NotesEdit,
+                AppPermissions.AttachmentsUpload,
+                AppPermissions.NavSubmissions,
             }),
             ["ReadOnly"] = ("Read only access", new[] {
-                "insureds.view", "policies.view",
+                AppPermissions.InsuredsView, AppPermissions.PoliciesView,
             }),
         };
 

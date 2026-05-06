@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/invoices")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class InvoicesController : ControllerBase
 {
     private readonly IInvoicingService _svc;
@@ -28,7 +28,7 @@ public class InvoicesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest req, CancellationToken ct)
     {
         var r = await _svc.BindAsync(req, UserId, ct);

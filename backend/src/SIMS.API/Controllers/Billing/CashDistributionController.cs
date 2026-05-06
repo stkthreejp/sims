@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/cash-distribution")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class CashDistributionController : ControllerBase
 {
     private readonly ICashDistributionService _svc;
@@ -33,7 +33,7 @@ public class CashDistributionController : ControllerBase
     }
 
     [HttpPost("batches")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> CreateBatch([FromBody] CreateBatchRequest req, CancellationToken ct)
     {
         var r = await _svc.CreateBatchAsync(req, UserId, ct);
@@ -42,7 +42,7 @@ public class CashDistributionController : ControllerBase
     }
 
     [HttpPost("batches/{id:long}/mark-executed")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> MarkExecuted(
         long id, [FromBody] MarkExecutedRequest req, CancellationToken ct)
     {

@@ -39,7 +39,7 @@ public class UWWriteupController : ControllerBase
     }
 
     [HttpPost("approve")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> Approve(Guid quoteId, CancellationToken ct)
     {
         var userId = GetUserId();

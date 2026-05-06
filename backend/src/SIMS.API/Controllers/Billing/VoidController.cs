@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/void")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class VoidController : ControllerBase
 {
     private readonly IVoidService _svc;

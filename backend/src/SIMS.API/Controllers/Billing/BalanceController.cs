@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/balance")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class BalanceController : ControllerBase
 {
     private readonly DbContext _db;

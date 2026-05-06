@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/cash-application")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class CashApplicationController : ControllerBase
 {
     private readonly ICashApplicationService _svc;
@@ -21,7 +21,7 @@ public class CashApplicationController : ControllerBase
         => Ok(await _svc.GetOpenInvoicesAsync(ct));
 
     [HttpPost("apply")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> Apply([FromBody] ApplyCashRequest req, CancellationToken ct)
     {
         var r = await _svc.ApplyAsync(req, UserId, ct);

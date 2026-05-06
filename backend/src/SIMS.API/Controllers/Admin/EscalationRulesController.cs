@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers.Admin;
 
 [ApiController]
 [Route("api/v1/admin/escalation-rules")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AdminSystemManage)]
 public class EscalationRulesController : ControllerBase
 {
     private readonly IEscalationRuleService _svc;

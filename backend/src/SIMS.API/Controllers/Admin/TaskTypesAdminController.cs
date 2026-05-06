@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers.Admin;
 
 [ApiController]
 [Route("api/v1/admin/task-types")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AdminSystemManage)]
 public class TaskTypesAdminController : ControllerBase
 {
     private readonly ITaskTypeService _svc;

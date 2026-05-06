@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/disbursements")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class DisbursementsController : ControllerBase
 {
     private readonly IDisbursementService _svc;
@@ -37,7 +37,7 @@ public class DisbursementsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> Create([FromBody] CreateDisbursementRequest req, CancellationToken ct)
     {
         var r = await _svc.CreateDisbursementAsync(req, UserId, ct);
@@ -46,7 +46,7 @@ public class DisbursementsController : ControllerBase
     }
 
     [HttpPost("{id:long}/post")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> Post(long id, CancellationToken ct)
     {
         var r = await _svc.PostDisbursementAsync(id, UserId, ct);
@@ -55,7 +55,7 @@ public class DisbursementsController : ControllerBase
     }
 
     [HttpPost("{id:long}/void")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> Void(
         long id, [FromBody] VoidDisbursementRequest req, CancellationToken ct)
     {

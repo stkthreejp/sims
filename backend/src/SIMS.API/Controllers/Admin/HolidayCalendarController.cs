@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers.Admin;
 
 [ApiController]
 [Route("api/v1/admin/holiday-calendar")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AdminSystemManage)]
 public class HolidayCalendarController : ControllerBase
 {
     private readonly IHolidayCalendarService _svc;

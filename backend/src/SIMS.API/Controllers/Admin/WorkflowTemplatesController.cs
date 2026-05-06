@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers.Admin;
 
 [ApiController]
 [Route("api/v1/admin/workflow-templates")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AdminSystemManage)]
 public class WorkflowTemplatesController : ControllerBase
 {
     private readonly IWorkflowTemplateService _svc;

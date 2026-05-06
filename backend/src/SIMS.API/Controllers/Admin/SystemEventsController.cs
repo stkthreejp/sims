@@ -6,7 +6,7 @@ namespace SIMS.API.Controllers.Admin;
 
 [ApiController]
 [Route("api/v1/admin/system-events")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AdminSystemManage)]
 public class SystemEventsController : ControllerBase
 {
     private readonly ISystemEventService _svc;

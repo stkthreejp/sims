@@ -11,7 +11,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/rating-plans")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.RatingAdmin)]
 public class RatingPlansController : ControllerBase
 {
     private static readonly Dictionary<PolicyLineOfBusiness, string> LobLabels = new()

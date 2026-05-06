@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/roles")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AdminRolesManage)]
 public class RolesController : ControllerBase
 {
     private readonly IRoleService _roleService;

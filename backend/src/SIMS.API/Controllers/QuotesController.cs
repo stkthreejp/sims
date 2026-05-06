@@ -73,7 +73,7 @@ public class QuotesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/shadow-rate")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> ShadowRate(Guid id, [FromBody] RateQuoteRequest request)
     {
         // Look up the quote's LOB to check the per-LOB shadow flag
@@ -93,7 +93,7 @@ public class QuotesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/commission-override")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> CommissionOverride(Guid id, [FromBody] CommissionOverrideRequest req)
     {
         var result = await _quoteService.ApplyCommissionOverrideAsync(id, req, CurrentUserId);

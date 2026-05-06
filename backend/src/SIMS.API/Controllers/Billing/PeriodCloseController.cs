@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/periods")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class PeriodCloseController : ControllerBase
 {
     private readonly IPeriodCloseService _svc;
@@ -29,7 +29,7 @@ public class PeriodCloseController : ControllerBase
         => Ok(await _svc.EvaluateChecklistAsync(id, ct));
 
     [HttpPost("{id:long}/close")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> ClosePeriod(long id, [FromBody] ClosePeriodRequest req, CancellationToken ct)
     {
         var r = await _svc.ClosePeriodAsync(id, req.Notes, UserId, ct);
@@ -37,7 +37,7 @@ public class PeriodCloseController : ControllerBase
     }
 
     [HttpPost("{id:long}/reopen")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> ReopenPeriod(long id, [FromBody] ReopenPeriodRequest req, CancellationToken ct)
     {
         var r = await _svc.ReopenPeriodAsync(id, req.Reason, UserId, ct);

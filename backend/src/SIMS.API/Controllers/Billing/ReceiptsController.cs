@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/receipts")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class ReceiptsController : ControllerBase
 {
     private readonly IReceiptsService _svc;
@@ -28,7 +28,7 @@ public class ReceiptsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> CreateReceipt([FromBody] CreateReceiptRequest req, CancellationToken ct)
     {
         var r = await _svc.CreateAsync(req, UserId, ct);

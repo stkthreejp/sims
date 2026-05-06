@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/rating/shadow")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.RatingAdmin)]
 public class ShadowRatingController : ControllerBase
 {
     private readonly IShadowRatingService _shadowRating;

@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/carriers/{carrierId:guid}/commissions")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AccountingAdmin)]
 public class CarrierCommissionsController : ControllerBase
 {
     private readonly ICarrierCommissionService _svc;

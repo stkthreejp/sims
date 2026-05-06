@@ -30,7 +30,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AdminUsersManage)]
     public async Task<IActionResult> Create([FromBody] UserCreateDto dto)
     {
         var result = await _userService.CreateAsync(dto);
@@ -39,7 +39,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AdminUsersManage)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UserUpdateDto dto)
     {
         var result = await _userService.UpdateAsync(id, dto);
@@ -47,7 +47,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AdminUsersManage)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _userService.DeleteAsync(id);

@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/agents/{agentId:guid}/commissions")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AccountingAdmin)]
 public class AgentCommissionsController : ControllerBase
 {
     private readonly IAgentCommissionService _svc;

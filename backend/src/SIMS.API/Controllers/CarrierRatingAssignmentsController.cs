@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/carrier-rating-assignments")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.RatingManage)]
 public class CarrierRatingAssignmentsController : ControllerBase
 {
     private readonly ICarrierRatingAssignmentService _svc;

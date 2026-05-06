@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/rollups")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class RollupController : ControllerBase
 {
     private readonly IRollupService _svc;
@@ -28,7 +28,7 @@ public class RollupController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> TriggerRollup([FromBody] TriggerRollupRequest req, CancellationToken ct)
     {
         try
@@ -43,7 +43,7 @@ public class RollupController : ControllerBase
     }
 
     [HttpPost("{id:long}/resync")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> Resync(long id, CancellationToken ct)
     {
         try

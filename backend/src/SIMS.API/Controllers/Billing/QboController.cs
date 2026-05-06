@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/qbo")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class QboController : ControllerBase
 {
     private readonly IQboTokenService _tokens;
@@ -50,7 +50,7 @@ public class QboController : ControllerBase
 
     /// <summary>Returns QBO chart of accounts for GL mapping setup.</summary>
     [HttpGet("accounts")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> GetAccounts(CancellationToken ct)
     {
         if (!await _tokens.IsConnectedAsync(ct))

@@ -76,7 +76,7 @@ public class PoliciesController : ControllerBase
     // --- Non-renewal ---
 
     [HttpPost("{id:guid}/non-renew")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> NonRenew(Guid id, [FromBody] NonRenewPolicyDto dto)
     {
         var result = await _policies.NonRenewAsync(id, dto, CurrentUserId);

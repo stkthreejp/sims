@@ -6,7 +6,7 @@ namespace SIMS.API.Controllers.Reports;
 
 [ApiController]
 [Route("api/v1/reports")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.ReportsView)]
 public class ReportsController : ControllerBase
 {
     private readonly IReportService _svc;

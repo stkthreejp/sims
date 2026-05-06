@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Admin;
 
 [ApiController]
 [Route("api/v1/admin/fees")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = AppPermissions.AdminSystemManage)]
 public class FeesController : ControllerBase
 {
     private readonly IFeeAdminService _svc;
@@ -85,7 +85,7 @@ public class FeesController : ControllerBase
     // --- Audit Log ---
 
     [HttpGet("versions/{id:long}/audit-log")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> GetAuditLog(long id, CancellationToken ct)
         => Ok(await _svc.GetAuditLogAsync(id, ct));
 }

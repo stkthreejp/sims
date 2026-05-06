@@ -8,7 +8,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/payee-statements")]
-[Authorize(Roles = "Admin,Underwriter")]
+[Authorize(Policy = AppPermissions.AccountingManage)]
 public class PayeeStatementsController : ControllerBase
 {
     private readonly IPayeeStatementService _svc;
@@ -28,7 +28,7 @@ public class PayeeStatementsController : ControllerBase
     }
 
     [HttpPost("import")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> Import([FromForm] ImportPayeeStatementRequest req, IFormFile file, CancellationToken ct)
     {
         if (file == null || file.Length == 0)
@@ -41,7 +41,7 @@ public class PayeeStatementsController : ControllerBase
     }
 
     [HttpPut("{statementId:long}/lines/{lineId:long}/match")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> SetLineMatch(
         long statementId, long lineId, [FromBody] SetLineMatchRequest req, CancellationToken ct)
     {
@@ -53,7 +53,7 @@ public class PayeeStatementsController : ControllerBase
     }
 
     [HttpPost("{id:long}/post")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> PostReconciliation(long id, CancellationToken ct)
     {
         var r = await _svc.PostReconciliationAsync(id, UserId, ct);

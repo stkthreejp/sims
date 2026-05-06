@@ -39,25 +39,25 @@ public class AttachmentsController : ControllerBase
     // ── Upload ────────────────────────────────────────────────────────────────
 
     [HttpPost("api/v1/submissions/{entityId:guid}/attachments")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadSubmission(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Submission, entityId, file, documentType, description);
 
     [HttpPost("api/v1/quotes/{entityId:guid}/attachments")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadQuote(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Policy, entityId, file, documentType, description);
 
     [HttpPost("api/v1/carriers/{entityId:guid}/attachments")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadCarrier(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Carrier, entityId, file, documentType, description);
 
     [HttpPost("api/v1/agents/{entityId:guid}/attachments")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadAgent(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Agent, entityId, file, documentType, description);
@@ -80,7 +80,7 @@ public class AttachmentsController : ControllerBase
     // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpDelete("api/v1/attachments/{id:guid}")]
-    [Authorize(Roles = "Admin,Underwriter")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _attachmentService.DeleteAsync(id, CurrentUserId);
