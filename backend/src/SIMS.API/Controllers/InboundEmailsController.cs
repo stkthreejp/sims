@@ -7,7 +7,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/inbound-emails")]
-[Authorize]
+[Authorize(Policy = AppPermissions.UnderwritingManage)]
 public class InboundEmailsController : ControllerBase
 {
     private readonly IInboundEmailService _inboundEmailService;

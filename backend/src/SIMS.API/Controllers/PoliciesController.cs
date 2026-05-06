@@ -30,21 +30,22 @@ public class PoliciesController : ControllerBase
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
 
     // --- Policy CRUD ---
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] QueryParameters query)
-        => Ok(await _policies.GetAllAsync(query));
+        => Ok(await _policies.GetAllAsync(query, CurrentAccess));
 
     [HttpGet("by-insured/{insuredId:guid}")]
     public async Task<IActionResult> GetByInsured(Guid insuredId)
-        => Ok(await _policies.GetByInsuredAsync(insuredId));
+        => Ok(await _policies.GetByInsuredAsync(insuredId, CurrentAccess));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var result = await _policies.GetByIdAsync(id);
+        var result = await _policies.GetByIdAsync(id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
     }
 
@@ -53,14 +54,14 @@ public class PoliciesController : ControllerBase
     [HttpPost("{id:guid}/endorsements")]
     public async Task<IActionResult> AddEndorsement(Guid id, [FromBody] CreateEndorsementDto dto)
     {
-        var result = await _policies.AddEndorsementAsync(id, dto, CurrentUserId);
+        var result = await _policies.AddEndorsementAsync(id, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpPost("{id:guid}/endorsements/{txnId:guid}/issue")]
     public async Task<IActionResult> IssueEndorsement(Guid id, Guid txnId, [FromBody] IssueEndorsementDto dto)
     {
-        var result = await _policies.IssueEndorsementAsync(id, txnId, dto, CurrentUserId);
+        var result = await _policies.IssueEndorsementAsync(id, txnId, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
@@ -69,7 +70,7 @@ public class PoliciesController : ControllerBase
     [HttpPost("{id:guid}/renew")]
     public async Task<IActionResult> CreateRenewalQuote(Guid id)
     {
-        var result = await _policies.CreateRenewalQuoteAsync(id, CurrentUserId);
+        var result = await _policies.CreateRenewalQuoteAsync(id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
@@ -79,7 +80,7 @@ public class PoliciesController : ControllerBase
     [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> NonRenew(Guid id, [FromBody] NonRenewPolicyDto dto)
     {
-        var result = await _policies.NonRenewAsync(id, dto, CurrentUserId);
+        var result = await _policies.NonRenewAsync(id, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
@@ -88,44 +89,44 @@ public class PoliciesController : ControllerBase
     [HttpGet("{id:guid}/notes")]
     public async Task<IActionResult> GetNotes(Guid id)
     {
-        var policy = await _policies.GetByIdAsync(id);
+        var policy = await _policies.GetByIdAsync(id, CurrentAccess);
         if (!policy.IsSuccess) return NotFound();
-        return Ok(await _notes.GetByQuoteAsync(policy.Value!.BoundQuoteId));
+        return Ok(await _notes.GetByQuoteAsync(policy.Value!.BoundQuoteId, CurrentAccess));
     }
 
     [HttpPost("{id:guid}/notes")]
     public async Task<IActionResult> CreateNote(Guid id, [FromBody] NoteCreateDto dto)
     {
-        var policy = await _policies.GetByIdAsync(id);
+        var policy = await _policies.GetByIdAsync(id, CurrentAccess);
         if (!policy.IsSuccess) return NotFound();
-        var result = await _notes.CreateAsync(policy.Value!.BoundQuoteId, dto, CurrentUserId);
+        var result = await _notes.CreateAsync(policy.Value!.BoundQuoteId, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpPut("{id:guid}/notes/{noteId:guid}")]
     public async Task<IActionResult> UpdateNote(Guid id, Guid noteId, [FromBody] NoteUpdateDto dto)
     {
-        var policy = await _policies.GetByIdAsync(id);
+        var policy = await _policies.GetByIdAsync(id, CurrentAccess);
         if (!policy.IsSuccess) return NotFound();
-        var result = await _notes.UpdateAsync(policy.Value!.BoundQuoteId, noteId, dto, CurrentUserId);
+        var result = await _notes.UpdateAsync(policy.Value!.BoundQuoteId, noteId, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpDelete("{id:guid}/notes/{noteId:guid}")]
     public async Task<IActionResult> DeleteNote(Guid id, Guid noteId)
     {
-        var policy = await _policies.GetByIdAsync(id);
+        var policy = await _policies.GetByIdAsync(id, CurrentAccess);
         if (!policy.IsSuccess) return NotFound();
-        var result = await _notes.DeleteAsync(policy.Value!.BoundQuoteId, noteId, CurrentUserId);
+        var result = await _notes.DeleteAsync(policy.Value!.BoundQuoteId, noteId, CurrentAccess);
         return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpPatch("{id:guid}/notes/{noteId:guid}/pin")]
     public async Task<IActionResult> TogglePinNote(Guid id, Guid noteId)
     {
-        var policy = await _policies.GetByIdAsync(id);
+        var policy = await _policies.GetByIdAsync(id, CurrentAccess);
         if (!policy.IsSuccess) return NotFound();
-        var result = await _notes.TogglePinAsync(policy.Value!.BoundQuoteId, noteId, CurrentUserId);
+        var result = await _notes.TogglePinAsync(policy.Value!.BoundQuoteId, noteId, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

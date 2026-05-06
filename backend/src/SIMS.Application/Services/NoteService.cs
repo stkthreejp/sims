@@ -1,6 +1,7 @@
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Notes;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,11 +15,13 @@ public class NoteService : INoteService
 
     public NoteService(IServiceProvider sp) => _sp = sp;
 
-    public async Task<IEnumerable<NoteDto>> GetByQuoteAsync(Guid quoteId)
+    public async Task<IEnumerable<NoteDto>> GetByQuoteAsync(Guid quoteId, UserAccessScope access)
     {
         var notes = await Db.Set<Note>()
+            .Include(n => n.Quote).ThenInclude(q => q.Submission)
             .Include(n => n.CreatedBy)
             .Where(n => n.QuoteId == quoteId && !n.IsDeleted)
+            .ForAccessScope(access)
             .OrderByDescending(n => n.IsPinned)
             .ThenByDescending(n => n.CreatedAt)
             .ToListAsync();
@@ -26,25 +29,35 @@ public class NoteService : INoteService
         return notes.Select(MapToDto);
     }
 
-    public async Task<Result<NoteDto>> GetByIdAsync(Guid quoteId, Guid id)
+    public async Task<Result<NoteDto>> GetByIdAsync(Guid quoteId, Guid id, UserAccessScope access)
     {
         var note = await Db.Set<Note>()
+            .Include(n => n.Quote).ThenInclude(q => q.Submission)
             .Include(n => n.CreatedBy)
-            .FirstOrDefaultAsync(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted);
+            .Where(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
 
         return note == null
             ? Result<NoteDto>.Failure("NOT_FOUND", "Note not found.")
             : Result<NoteDto>.Success(MapToDto(note));
     }
 
-    public async Task<Result<NoteDto>> CreateAsync(Guid quoteId, NoteCreateDto dto, Guid userId)
+    public async Task<Result<NoteDto>> CreateAsync(Guid quoteId, NoteCreateDto dto, UserAccessScope access)
     {
+        var canAccessQuote = await Db.Set<Quote>()
+            .Where(q => q.Id == quoteId && !q.IsDeleted)
+            .ForAccessScope(access)
+            .AnyAsync();
+        if (!canAccessQuote)
+            return Result<NoteDto>.Failure(BusinessDataAccess.AccessDeniedCode, BusinessDataAccess.AccessDeniedMessage);
+
         var note = new Note
         {
             QuoteId = quoteId,
             Subject = dto.Subject,
             Body = dto.Body,
-            CreatedById = userId
+            CreatedById = access.UserId
         };
 
         Db.Set<Note>().Add(note);
@@ -54,25 +67,32 @@ public class NoteService : INoteService
         return Result<NoteDto>.Success(MapToDto(note));
     }
 
-    public async Task<Result<NoteDto>> UpdateAsync(Guid quoteId, Guid id, NoteUpdateDto dto, Guid userId)
+    public async Task<Result<NoteDto>> UpdateAsync(Guid quoteId, Guid id, NoteUpdateDto dto, UserAccessScope access)
     {
-        var note = await Db.Set<Note>().Include(n => n.CreatedBy)
-            .FirstOrDefaultAsync(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted);
+        var note = await Db.Set<Note>()
+            .Include(n => n.Quote).ThenInclude(q => q.Submission)
+            .Include(n => n.CreatedBy)
+            .Where(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (note == null) return Result<NoteDto>.Failure("NOT_FOUND", "Note not found.");
 
         note.Subject = dto.Subject;
         note.Body = dto.Body;
-        note.UpdatedById = userId;
+        note.UpdatedById = access.UserId;
         note.UpdatedAt = DateTime.UtcNow;
         await Db.SaveChangesAsync();
 
         return Result<NoteDto>.Success(MapToDto(note));
     }
 
-    public async Task<Result> DeleteAsync(Guid quoteId, Guid id, Guid userId)
+    public async Task<Result> DeleteAsync(Guid quoteId, Guid id, UserAccessScope access)
     {
         var note = await Db.Set<Note>()
-            .FirstOrDefaultAsync(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted);
+            .Include(n => n.Quote).ThenInclude(q => q.Submission)
+            .Where(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (note == null) return Result.Failure("NOT_FOUND", "Note not found.");
 
         note.IsDeleted = true;
@@ -81,10 +101,14 @@ public class NoteService : INoteService
         return Result.Success();
     }
 
-    public async Task<Result<NoteDto>> TogglePinAsync(Guid quoteId, Guid id, Guid userId)
+    public async Task<Result<NoteDto>> TogglePinAsync(Guid quoteId, Guid id, UserAccessScope access)
     {
-        var note = await Db.Set<Note>().Include(n => n.CreatedBy)
-            .FirstOrDefaultAsync(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted);
+        var note = await Db.Set<Note>()
+            .Include(n => n.Quote).ThenInclude(q => q.Submission)
+            .Include(n => n.CreatedBy)
+            .Where(n => n.Id == id && n.QuoteId == quoteId && !n.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (note == null) return Result<NoteDto>.Failure("NOT_FOUND", "Note not found.");
 
         note.IsPinned = !note.IsPinned;

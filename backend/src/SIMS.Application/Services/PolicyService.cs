@@ -4,6 +4,7 @@ using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Policies;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 
@@ -22,12 +23,13 @@ public class PolicyService : IPolicyService
         _invoicing = invoicing;
     }
 
-    public async Task<PagedResult<PolicyListItemDto>> GetAllAsync(QueryParameters query)
+    public async Task<PagedResult<PolicyListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
     {
         var q = Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
             .Include(p => p.Carrier)
             .Where(p => !p.IsDeleted)
+            .ForAccessScope(access)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -59,26 +61,29 @@ public class PolicyService : IPolicyService
         };
     }
 
-    public async Task<IEnumerable<PolicyListItemDto>> GetByInsuredAsync(Guid insuredId)
+    public async Task<IEnumerable<PolicyListItemDto>> GetByInsuredAsync(Guid insuredId, UserAccessScope access)
     {
         var items = await Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
             .Include(p => p.Carrier)
             .Where(p => p.Submission.InsuredId == insuredId && !p.IsDeleted)
+            .ForAccessScope(access)
             .OrderByDescending(p => p.BoundDate)
             .ToListAsync();
 
         return items.Select(MapToListItemDto);
     }
 
-    public async Task<Result<PolicyDto>> GetByIdAsync(Guid id)
+    public async Task<Result<PolicyDto>> GetByIdAsync(Guid id, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
             .Include(p => p.Carrier)
             .Include(p => p.BoundQuote)
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
-            .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+            .Where(p => p.Id == id && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
 
         return policy == null
             ? Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.")
@@ -86,10 +91,12 @@ public class PolicyService : IPolicyService
     }
 
     public async Task<Result<PolicyTransactionDto>> AddEndorsementAsync(
-        Guid policyId, CreateEndorsementDto dto, Guid userId)
+        Guid policyId, CreateEndorsementDto dto, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
-            .FirstOrDefaultAsync(p => p.Id == policyId && !p.IsDeleted);
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (policy == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyTransactionDto>.Failure("INVALID_STATUS", "Only active policies can be endorsed.");
@@ -106,7 +113,7 @@ public class PolicyService : IPolicyService
             NewTotalPremium = policy.TotalPremium + dto.PremiumChange,
             EndorsementDescription = dto.EndorsementDescription,
             Notes = dto.Notes,
-            ProcessedById = userId,
+            ProcessedById = access.UserId,
             ProcessedAt = DateTime.UtcNow,
         };
 
@@ -118,7 +125,7 @@ public class PolicyService : IPolicyService
     }
 
     public async Task<Result<PolicyTransactionDto>> IssueEndorsementAsync(
-        Guid policyId, Guid txnId, IssueEndorsementDto dto, Guid userId)
+        Guid policyId, Guid txnId, IssueEndorsementDto dto, UserAccessScope access)
     {
         var txn = await Db.Set<PolicyTransaction>()
             .Include(t => t.Policy).ThenInclude(p => p.BoundQuote)
@@ -126,7 +133,14 @@ public class PolicyService : IPolicyService
             .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Locations)
             .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Vehicles)
             .Include(t => t.ProcessedBy)
-            .FirstOrDefaultAsync(t => t.Id == txnId && t.PolicyId == policyId);
+            .Where(t => t.Id == txnId && t.PolicyId == policyId)
+            .Where(t =>
+                access.CanAccessAllBusinessData ||
+                t.Policy.Submission.CreatedById == access.UserId ||
+                t.Policy.Submission.UnderwriterId == access.UserId ||
+                t.Policy.Submission.AssistantUWId == access.UserId ||
+                t.Policy.BoundQuote.CreatedById == access.UserId)
+            .FirstOrDefaultAsync();
 
         if (txn == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Endorsement not found.");
         if (txn.TransactionType != TransactionType.Endorsement)
@@ -165,18 +179,20 @@ public class PolicyService : IPolicyService
                 VehicleCount: submission.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
                 PolicyTransactionId: txn.Id
             );
-            await _invoicing.BindAsync(req, userId);
+            await _invoicing.BindAsync(req, access.UserId);
         }
 
         return Result<PolicyTransactionDto>.Success(MapToTransactionDto(txn));
     }
 
-    public async Task<Result<QuoteDto>> CreateRenewalQuoteAsync(Guid policyId, Guid userId)
+    public async Task<Result<QuoteDto>> CreateRenewalQuoteAsync(Guid policyId, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
             .Include(p => p.BoundQuote)
             .Include(p => p.Submission)
-            .FirstOrDefaultAsync(p => p.Id == policyId && !p.IsDeleted);
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (policy == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<QuoteDto>.Failure("INVALID_STATUS", "Only active policies can be renewed.");
@@ -203,17 +219,19 @@ public class PolicyService : IPolicyService
             MedicalPaymentsLimit = source?.MedicalPaymentsLimit,
         };
 
-        return await quoteService.CreateAsync(renewalDto, userId);
+        return await quoteService.CreateAsync(renewalDto, access.UserId);
     }
 
-    public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, Guid userId)
+    public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
             .Include(p => p.Carrier)
             .Include(p => p.BoundQuote)
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
-            .FirstOrDefaultAsync(p => p.Id == policyId && !p.IsDeleted);
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can be non-renewed.");

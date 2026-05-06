@@ -2,6 +2,7 @@ using System.Text.Json;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Submissions;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,7 @@ public class SubmissionService : ISubmissionService
         _workflowEngine = workflowEngine;
     }
 
-    public async Task<PagedResult<SubmissionListItemDto>> GetAllAsync(QueryParameters query)
+    public async Task<PagedResult<SubmissionListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
     {
         var q = Db.Set<Submission>()
             .Include(s => s.Insured)
@@ -29,6 +30,7 @@ public class SubmissionService : ISubmissionService
             .Include(s => s.Underwriter)
             .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
             .Where(s => !s.IsDeleted)
+            .ForAccessScope(access)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -61,20 +63,21 @@ public class SubmissionService : ISubmissionService
         };
     }
 
-    public async Task<IEnumerable<SubmissionListItemDto>> GetByInsuredAsync(Guid insuredId)
+    public async Task<IEnumerable<SubmissionListItemDto>> GetByInsuredAsync(Guid insuredId, UserAccessScope access)
     {
         var submissions = await Db.Set<Submission>()
             .Include(s => s.Agent)
             .Include(s => s.Underwriter)
             .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
             .Where(s => s.InsuredId == insuredId && !s.IsDeleted)
+            .ForAccessScope(access)
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync();
 
         return submissions.Select(MapToListItemDto);
     }
 
-    public async Task<Result<SubmissionDto>> GetByIdAsync(Guid id)
+    public async Task<Result<SubmissionDto>> GetByIdAsync(Guid id, UserAccessScope access)
     {
         var submission = await Db.Set<Submission>()
             .Include(s => s.Insured)
@@ -82,7 +85,9 @@ public class SubmissionService : ISubmissionService
             .Include(s => s.Underwriter)
             .Include(s => s.AssistantUW)
             .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
-            .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+            .Where(s => s.Id == id && !s.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
 
         return submission == null
             ? Result<SubmissionDto>.Failure("NOT_FOUND", "Submission not found.")
@@ -121,7 +126,7 @@ public class SubmissionService : ISubmissionService
         return Result<SubmissionDto>.Success(MapToDto(submission));
     }
 
-    public async Task<Result<SubmissionDto>> UpdateAsync(Guid id, SubmissionUpdateDto dto)
+    public async Task<Result<SubmissionDto>> UpdateAsync(Guid id, SubmissionUpdateDto dto, UserAccessScope access)
     {
         var submission = await Db.Set<Submission>()
             .Include(s => s.Insured)
@@ -129,7 +134,9 @@ public class SubmissionService : ISubmissionService
             .Include(s => s.Underwriter)
             .Include(s => s.AssistantUW)
             .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
-            .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+            .Where(s => s.Id == id && !s.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
 
         if (submission == null) return Result<SubmissionDto>.Failure("NOT_FOUND", "Submission not found.");
 
@@ -174,7 +181,7 @@ public class SubmissionService : ISubmissionService
         return Result<SubmissionDto>.Success(MapToDto(submission));
     }
 
-    public async Task<Result<SubmissionDto>> SetLinesOfBusinessAsync(Guid id, List<string> lobs)
+    public async Task<Result<SubmissionDto>> SetLinesOfBusinessAsync(Guid id, List<string> lobs, UserAccessScope access)
     {
         var submission = await Db.Set<Submission>()
             .Include(s => s.Insured)
@@ -182,7 +189,9 @@ public class SubmissionService : ISubmissionService
             .Include(s => s.Underwriter)
             .Include(s => s.AssistantUW)
             .Include(s => s.Quotes.Where(qt => !qt.IsDeleted))
-            .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+            .Where(s => s.Id == id && !s.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
 
         if (submission == null)
             return Result<SubmissionDto>.Failure("NOT_FOUND", "Submission not found.");
@@ -196,11 +205,13 @@ public class SubmissionService : ISubmissionService
         return Result<SubmissionDto>.Success(MapToDto(submission));
     }
 
-    public async Task<Result> DeleteAsync(Guid id)
+    public async Task<Result> DeleteAsync(Guid id, UserAccessScope access)
     {
         var submission = await Db.Set<Submission>()
             .Include(s => s.Quotes)
-            .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+            .Where(s => s.Id == id && !s.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (submission == null) return Result.Failure("NOT_FOUND", "Submission not found.");
 
         if (submission.Quotes.Any(q => q.Status == QuoteStatus.Bound))

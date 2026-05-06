@@ -25,19 +25,20 @@ public class QuotesController : ControllerBase
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] QueryParameters query)
-        => Ok(await _quoteService.GetAllAsync(query));
+        => Ok(await _quoteService.GetAllAsync(query, CurrentAccess));
 
     [HttpGet("by-submission/{submissionId:guid}")]
     public async Task<IActionResult> GetBySubmission(Guid submissionId)
-        => Ok(await _quoteService.GetBySubmissionAsync(submissionId));
+        => Ok(await _quoteService.GetBySubmissionAsync(submissionId, CurrentAccess));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var result = await _quoteService.GetByIdAsync(id);
+        var result = await _quoteService.GetByIdAsync(id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
     }
 
@@ -52,13 +53,16 @@ public class QuotesController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] QuoteUpdateDto dto)
     {
-        var result = await _quoteService.UpdateAsync(id, dto);
+        var result = await _quoteService.UpdateAsync(id, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpPost("{id:guid}/rate")]
     public async Task<IActionResult> Rate(Guid id, [FromBody] RateQuoteRequest request)
     {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
         var result = await _ratingEngine.RateAsync(id, request, CurrentUserId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
@@ -66,6 +70,9 @@ public class QuotesController : ControllerBase
     [HttpGet("{id:guid}/rating-snapshot")]
     public async Task<IActionResult> GetRatingSnapshot(Guid id)
     {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
         var result = await _ratingEngine.GetLatestSnapshotAsync(id);
         if (!result.IsSuccess && result.ErrorCode == "NOT_FOUND")
             return NotFound(new { result.ErrorCode, result.ErrorMessage });
@@ -77,7 +84,7 @@ public class QuotesController : ControllerBase
     public async Task<IActionResult> ShadowRate(Guid id, [FromBody] RateQuoteRequest request)
     {
         // Look up the quote's LOB to check the per-LOB shadow flag
-        var quote = await _quoteService.GetByIdAsync(id);
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
         if (!quote.IsSuccess) return NotFound();
         if (!await _shadowRating.IsShadowModeEnabledForLobAsync(quote.Value!.LineOfBusiness))
             return Conflict(new { ErrorCode = "SHADOW_MODE_DISABLED", ErrorMessage = "Shadow mode is not enabled for this line of business." });
@@ -88,7 +95,7 @@ public class QuotesController : ControllerBase
     [HttpPost("{id:guid}/bind")]
     public async Task<IActionResult> Bind(Guid id, [FromBody] QuoteBindDto dto)
     {
-        var result = await _quoteService.BindAsync(id, dto, CurrentUserId);
+        var result = await _quoteService.BindAsync(id, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
@@ -96,14 +103,14 @@ public class QuotesController : ControllerBase
     [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> CommissionOverride(Guid id, [FromBody] CommissionOverrideRequest req)
     {
-        var result = await _quoteService.ApplyCommissionOverrideAsync(id, req, CurrentUserId);
+        var result = await _quoteService.ApplyCommissionOverrideAsync(id, req, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var result = await _quoteService.DeleteAsync(id);
+        var result = await _quoteService.DeleteAsync(id, CurrentAccess);
         return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 }

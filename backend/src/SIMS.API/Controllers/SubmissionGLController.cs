@@ -9,7 +9,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/submissions/{submissionId:guid}/gl")]
-[Authorize]
+[Authorize(Policy = AppPermissions.UnderwritingManage)]
 public class SubmissionGLController : ControllerBase
 {
     private readonly ApplicationDbContext _db;

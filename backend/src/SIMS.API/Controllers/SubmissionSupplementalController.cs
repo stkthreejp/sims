@@ -10,7 +10,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/submissions/{submissionId:guid}/supplemental")]
-[Authorize]
+[Authorize(Policy = AppPermissions.UnderwritingManage)]
 public class SubmissionSupplementalController : ControllerBase
 {
     private readonly ApplicationDbContext _db;

@@ -22,19 +22,20 @@ public class SubmissionsController : ControllerBase
     public SubmissionsController(ISubmissionService submissionService) => _submissionService = submissionService;
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] QueryParameters query)
-        => Ok(await _submissionService.GetAllAsync(query));
+        => Ok(await _submissionService.GetAllAsync(query, CurrentAccess));
 
     [HttpGet("by-insured/{insuredId:guid}")]
     public async Task<IActionResult> GetByInsured(Guid insuredId)
-        => Ok(await _submissionService.GetByInsuredAsync(insuredId));
+        => Ok(await _submissionService.GetByInsuredAsync(insuredId, CurrentAccess));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var result = await _submissionService.GetByIdAsync(id);
+        var result = await _submissionService.GetByIdAsync(id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
     }
 
@@ -49,21 +50,21 @@ public class SubmissionsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] SubmissionUpdateDto dto)
     {
-        var result = await _submissionService.UpdateAsync(id, dto);
+        var result = await _submissionService.UpdateAsync(id, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpPatch("{id:guid}/lines-of-business")]
     public async Task<IActionResult> SetLinesOfBusiness(Guid id, [FromBody] SetLinesOfBusinessRequest request)
     {
-        var result = await _submissionService.SetLinesOfBusinessAsync(id, request.LinesOfBusiness);
+        var result = await _submissionService.SetLinesOfBusinessAsync(id, request.LinesOfBusiness, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var result = await _submissionService.DeleteAsync(id);
+        var result = await _submissionService.DeleteAsync(id, CurrentAccess);
         return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 }

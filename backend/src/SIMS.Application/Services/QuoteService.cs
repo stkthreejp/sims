@@ -2,6 +2,7 @@ using SIMS.Application.Common;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
@@ -31,12 +32,13 @@ public class QuoteService : IQuoteService
         _agentCommissions = agentCommissions;
     }
 
-    public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query)
+    public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
     {
         var q = Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
             .Include(qt => qt.Carrier)
             .Where(qt => !qt.IsDeleted)
+            .ForAccessScope(access)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -69,12 +71,13 @@ public class QuoteService : IQuoteService
         };
     }
 
-    public async Task<IEnumerable<QuoteListItemDto>> GetBySubmissionAsync(Guid submissionId)
+    public async Task<IEnumerable<QuoteListItemDto>> GetBySubmissionAsync(Guid submissionId, UserAccessScope access)
     {
         var quotes = await Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.SubmissionId == submissionId && !qt.IsDeleted)
+            .ForAccessScope(access)
             .OrderByDescending(qt => qt.CreatedAt)
             .ToListAsync();
 
@@ -93,12 +96,14 @@ public class QuoteService : IQuoteService
         return quotes.Select(MapToListItemDto);
     }
 
-    public async Task<Result<QuoteDto>> GetByIdAsync(Guid id)
+    public async Task<Result<QuoteDto>> GetByIdAsync(Guid id, UserAccessScope access)
     {
         var quote = await Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
             .Include(qt => qt.Carrier)
-            .FirstOrDefaultAsync(qt => qt.Id == id && !qt.IsDeleted);
+            .Where(qt => qt.Id == id && !qt.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
 
         return quote == null
             ? Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.")
@@ -169,12 +174,14 @@ public class QuoteService : IQuoteService
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
 
-    public async Task<Result<QuoteDto>> UpdateAsync(Guid id, QuoteUpdateDto dto)
+    public async Task<Result<QuoteDto>> UpdateAsync(Guid id, QuoteUpdateDto dto, UserAccessScope access)
     {
         var quote = await Db.Set<Quote>()
             .Include(qt => qt.Submission)
             .Include(qt => qt.Carrier)
-            .FirstOrDefaultAsync(qt => qt.Id == id && !qt.IsDeleted);
+            .Where(qt => qt.Id == id && !qt.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot edit a bound policy.");
@@ -242,14 +249,16 @@ public class QuoteService : IQuoteService
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
 
-    public async Task<Result<QuoteDto>> BindAsync(Guid id, QuoteBindDto dto, Guid userId)
+    public async Task<Result<QuoteDto>> BindAsync(Guid id, QuoteBindDto dto, UserAccessScope access)
     {
         var quote = await Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
             .Include(qt => qt.Submission).ThenInclude(s => s.Locations)
             .Include(qt => qt.Submission).ThenInclude(s => s.Vehicles)
             .Include(qt => qt.Carrier)
-            .FirstOrDefaultAsync(qt => qt.Id == id && !qt.IsDeleted);
+            .Where(qt => qt.Id == id && !qt.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Quote is already bound.");
@@ -315,7 +324,7 @@ public class QuoteService : IQuoteService
             EffectiveDate = dto.EffectiveDate,
             PremiumChange = quote.TotalPremium,
             NewTotalPremium = quote.TotalPremium,
-            ProcessedById = userId,
+            ProcessedById = access.UserId,
             ProcessedAt = DateTime.UtcNow,
         };
         Db.Set<PolicyTransaction>().Add(transaction);
@@ -338,7 +347,7 @@ public class QuoteService : IQuoteService
             VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
             PolicyTransactionId: transaction.Id
         );
-        await invoicing.BindAsync(invoiceReq, userId);
+        await invoicing.BindAsync(invoiceReq, access.UserId);
 
         await _workflowEngine.FireEventAsync(
             "quote.status.bound",
@@ -350,12 +359,14 @@ public class QuoteService : IQuoteService
     }
 
     public async Task<Result<QuoteDto>> ApplyCommissionOverrideAsync(
-        Guid id, CommissionOverrideRequest req, Guid userId)
+        Guid id, CommissionOverrideRequest req, UserAccessScope access)
     {
         var quote = await Db.Set<Quote>()
             .Include(qt => qt.Submission)
             .Include(qt => qt.Carrier)
-            .FirstOrDefaultAsync(qt => qt.Id == id && !qt.IsDeleted);
+            .Where(qt => qt.Id == id && !qt.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot modify commission on a bound policy.");
@@ -404,7 +415,7 @@ public class QuoteService : IQuoteService
         quote.CommissionOverrideCarrierRate = newCarrierRate;
         quote.CommissionOverrideSMMRate = newSMMRate;
         quote.CommissionOverrideAgentRate = newAgentRate;
-        quote.CommissionOverrideBy = userId;
+        quote.CommissionOverrideBy = access.UserId;
         quote.CommissionOverrideAt = DateTime.UtcNow;
         quote.UpdatedAt = DateTime.UtcNow;
 
@@ -413,9 +424,12 @@ public class QuoteService : IQuoteService
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
 
-    public async Task<Result> DeleteAsync(Guid id)
+    public async Task<Result> DeleteAsync(Guid id, UserAccessScope access)
     {
-        var quote = await Db.Set<Quote>().FirstOrDefaultAsync(qt => qt.Id == id && !qt.IsDeleted);
+        var quote = await Db.Set<Quote>()
+            .Where(qt => qt.Id == id && !qt.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
         if (quote == null) return Result.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result.Failure("BOUND_POLICY", "Cannot delete a bound policy.");

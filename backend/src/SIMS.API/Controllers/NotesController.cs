@@ -16,22 +16,23 @@ public class NotesController : ControllerBase
     public NotesController(INoteService noteService) => _noteService = noteService;
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
 
     [HttpGet]
     public async Task<IActionResult> GetAll(Guid quoteId)
-        => Ok(await _noteService.GetByQuoteAsync(quoteId));
+        => Ok(await _noteService.GetByQuoteAsync(quoteId, CurrentAccess));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid quoteId, Guid id)
     {
-        var result = await _noteService.GetByIdAsync(quoteId, id);
+        var result = await _noteService.GetByIdAsync(quoteId, id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : NotFound();
     }
 
     [HttpPost]
     public async Task<IActionResult> Create(Guid quoteId, [FromBody] NoteCreateDto dto)
     {
-        var result = await _noteService.CreateAsync(quoteId, dto, CurrentUserId);
+        var result = await _noteService.CreateAsync(quoteId, dto, CurrentAccess);
         if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
         return CreatedAtAction(nameof(GetById), new { quoteId, id = result.Value!.Id }, result.Value);
     }
@@ -39,21 +40,21 @@ public class NotesController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid quoteId, Guid id, [FromBody] NoteUpdateDto dto)
     {
-        var result = await _noteService.UpdateAsync(quoteId, id, dto, CurrentUserId);
+        var result = await _noteService.UpdateAsync(quoteId, id, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid quoteId, Guid id)
     {
-        var result = await _noteService.DeleteAsync(quoteId, id, CurrentUserId);
+        var result = await _noteService.DeleteAsync(quoteId, id, CurrentAccess);
         return result.IsSuccess ? NoContent() : NotFound();
     }
 
     [HttpPatch("{id:guid}/pin")]
     public async Task<IActionResult> TogglePin(Guid quoteId, Guid id)
     {
-        var result = await _noteService.TogglePinAsync(quoteId, id, CurrentUserId);
+        var result = await _noteService.TogglePinAsync(quoteId, id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : NotFound();
     }
 }
