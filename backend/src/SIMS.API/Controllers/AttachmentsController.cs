@@ -34,7 +34,7 @@ public class AttachmentsController : ControllerBase
     public Task<IActionResult> GetAgent(Guid entityId) => GetAll(DocumentEntityType.Agent, entityId);
 
     private async Task<IActionResult> GetAll(DocumentEntityType entityType, Guid entityId)
-        => Ok(await _attachmentService.GetByEntityAsync(entityType, entityId));
+        => Ok(await _attachmentService.GetByEntityAsync(entityType, entityId, CurrentUserId));
 
     // ── Upload ────────────────────────────────────────────────────────────────
 
@@ -73,8 +73,8 @@ public class AttachmentsController : ControllerBase
     [HttpGet("api/v1/attachments/{id:guid}/download-url")]
     public async Task<IActionResult> GetDownloadUrl(Guid id)
     {
-        var result = await _attachmentService.GetDownloadUrlAsync(id);
-        return result.IsSuccess ? Ok(new { url = result.Value }) : NotFound(new { result.ErrorMessage });
+        var result = await _attachmentService.GetDownloadUrlAsync(id, CurrentUserId);
+        return result.IsSuccess ? Ok(new { url = result.Value }) : ToAttachmentError(result.ErrorCode, result.ErrorMessage);
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────
@@ -84,6 +84,11 @@ public class AttachmentsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _attachmentService.DeleteAsync(id, CurrentUserId);
-        return result.IsSuccess ? NoContent() : NotFound(new { result.ErrorMessage });
+        return result.IsSuccess ? NoContent() : ToAttachmentError(result.ErrorCode, result.ErrorMessage);
     }
+
+    private IActionResult ToAttachmentError(string? errorCode, string? errorMessage)
+        => errorCode == "ATTACHMENT_ACCESS_DENIED"
+            ? Forbid()
+            : NotFound(new { ErrorCode = errorCode, ErrorMessage = errorMessage });
 }

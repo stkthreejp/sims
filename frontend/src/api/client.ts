@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 export const apiClient = axios.create({
   baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 })
 
 // Attach access token to every request
@@ -47,17 +48,11 @@ apiClient.interceptors.response.use(
     originalRequest._retry = true
     isRefreshing = true
 
-    const { refreshToken, setAuth, clearAuth } = useAuthStore.getState()
-
-    if (!refreshToken) {
-      clearAuth()
-      window.location.href = '/login'
-      return Promise.reject(error)
-    }
+    const { setAuth, clearAuth } = useAuthStore.getState()
 
     try {
-      const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken })
-      setAuth(data.user, data.accessToken, data.refreshToken)
+      const { data } = await axios.post('/api/v1/auth/refresh', null, { withCredentials: true })
+      setAuth(data.user, data.accessToken)
       processQueue(null, data.accessToken)
       if (originalRequest.headers)
         originalRequest.headers['Authorization'] = `Bearer ${data.accessToken}`

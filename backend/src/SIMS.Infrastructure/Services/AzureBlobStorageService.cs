@@ -3,18 +3,22 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
 using SIMS.Application.Interfaces.Services;
 using Microsoft.Extensions.Configuration;
+using System.Net.Mime;
 
 namespace SIMS.Infrastructure.Services;
 
 public class AzureBlobStorageService : IBlobStorageService
 {
     private readonly BlobContainerClient _container;
+    private readonly TimeSpan _defaultDownloadExpiry;
 
     public AzureBlobStorageService(IConfiguration config)
     {
         var connectionString = config["Storage:AzureBlobConnectionString"]
             ?? throw new InvalidOperationException("Azure Blob connection string is not configured.");
         var containerName = config["Storage:AzureBlobContainerName"] ?? "documents";
+        var expiryMinutes = int.TryParse(config["Storage:DownloadUrlExpiryMinutes"], out var parsed) ? parsed : 15;
+        _defaultDownloadExpiry = TimeSpan.FromMinutes(Math.Clamp(expiryMinutes, 1, 60));
         _container = new BlobContainerClient(connectionString, containerName);
         _container.CreateIfNotExists(PublicAccessType.None);
     }
@@ -40,8 +44,8 @@ public class AzureBlobStorageService : IBlobStorageService
             BlobContainerName = _container.Name,
             BlobName = blobPath,
             Resource = "b",
-            ExpiresOn = DateTimeOffset.UtcNow.Add(expiry ?? TimeSpan.FromHours(1)),
-            ContentDisposition = $"attachment; filename=\"{fileName}\"",
+            ExpiresOn = DateTimeOffset.UtcNow.Add(expiry ?? _defaultDownloadExpiry),
+            ContentDisposition = BuildContentDisposition(fileName),
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Read);
 
@@ -60,5 +64,11 @@ public class AzureBlobStorageService : IBlobStorageService
     {
         var blobClient = _container.GetBlobClient(blobPath);
         await blobClient.DeleteIfExistsAsync();
+    }
+
+    private static string BuildContentDisposition(string fileName)
+    {
+        var safeName = Path.GetFileName(fileName).Replace("\"", "_").Replace("\r", "_").Replace("\n", "_");
+        return new ContentDisposition { DispositionType = "attachment", FileName = safeName }.ToString();
     }
 }

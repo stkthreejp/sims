@@ -6,7 +6,7 @@ import { authApi } from '@/api/auth.api'
 import { queryClient } from '@/lib/queryClient'
 
 export function Topbar() {
-  const { user, refreshToken, clearAuth } = useAuthStore()
+  const { user, clearAuth } = useAuthStore()
   const navigate = useNavigate()
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -18,7 +18,7 @@ export function Topbar() {
 
   const handleLogout = async () => {
     try {
-      if (refreshToken) await authApi.logout(refreshToken)
+      await authApi.logout()
     } finally {
       clearAuth()
       queryClient.clear()

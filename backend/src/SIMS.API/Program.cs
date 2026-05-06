@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using SIMS.API.Configuration;
 using SIMS.API.Middleware;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Infrastructure.Extensions;
@@ -10,6 +11,7 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddSimsKeyVault();
+builder.Configuration.ValidateSecurityConfiguration(builder.Environment);
 
 // Register Syncfusion community license
 Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(

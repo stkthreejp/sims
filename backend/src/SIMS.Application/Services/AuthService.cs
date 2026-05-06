@@ -245,7 +245,19 @@ public class AuthService : IAuthService
         var token = user.RefreshTokens.Single(rt => rt.Token == refreshToken);
 
         if (!token.IsActive)
+        {
+            if (!string.IsNullOrWhiteSpace(token.ReplacedByToken))
+            {
+                RevokeRefreshTokenFamily(user, ipAddress);
+                await _userManager.UpdateAsync(user);
+                return Result<LoginResponseDto>.Failure("TOKEN_REUSE_DETECTED", "Refresh token reuse detected.");
+            }
+
             return Result<LoginResponseDto>.Failure("TOKEN_EXPIRED", "Refresh token has expired or been revoked.");
+        }
+
+        if (user.IsDeleted || user.Status != Domain.Enums.UserStatus.Active)
+            return Result<LoginResponseDto>.Failure("ACCOUNT_INACTIVE", "Account is inactive.");
 
         // Rotate
         token.RevokedAt = DateTime.UtcNow;
@@ -253,6 +265,7 @@ public class AuthService : IAuthService
         var newRefreshToken = GenerateRefreshToken(user.Id, ipAddress);
         token.ReplacedByToken = newRefreshToken.Token;
         user.RefreshTokens.Add(newRefreshToken);
+        RemoveExpiredRefreshTokens(user);
         await _userManager.UpdateAsync(user);
 
         var roles = await _userManager.GetRolesAsync(user);
@@ -369,6 +382,26 @@ public class AuthService : IAuthService
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             CreatedByIp = ipAddress
         };
+    }
+
+    private static void RevokeRefreshTokenFamily(User user, string ipAddress)
+    {
+        foreach (var token in user.RefreshTokens.Where(t => t.IsActive))
+        {
+            token.RevokedAt = DateTime.UtcNow;
+            token.RevokedByIp = ipAddress;
+        }
+    }
+
+    private static void RemoveExpiredRefreshTokens(User user)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-30);
+        var stale = user.RefreshTokens
+            .Where(t => t.IsExpired && t.ExpiresAt < cutoff)
+            .ToList();
+
+        foreach (var token in stale)
+            user.RefreshTokens.Remove(token);
     }
 
     private async Task<IEnumerable<string>> GetUserPermissionsAsync(User user, IList<string> roles)

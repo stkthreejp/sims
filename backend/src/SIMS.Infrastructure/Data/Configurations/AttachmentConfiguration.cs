@@ -14,6 +14,10 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<Attachment>
         builder.Property(a => a.BlobPath).IsRequired().HasMaxLength(500);
         builder.Property(a => a.ContentType).IsRequired().HasMaxLength(100);
         builder.Property(a => a.Description).HasMaxLength(500);
+        builder.HasIndex(a => new { a.EntityType, a.QuoteId, a.IsDeleted });
+        builder.HasIndex(a => new { a.EntityType, a.SubmissionId, a.IsDeleted });
+        builder.HasIndex(a => new { a.EntityType, a.CarrierId, a.IsDeleted });
+        builder.HasIndex(a => new { a.EntityType, a.AgentId, a.IsDeleted });
 
         // Optional FK — only one will be populated per row
         builder.HasOne(a => a.Quote).WithMany(q => q.Attachments)

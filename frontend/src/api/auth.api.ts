@@ -8,11 +8,11 @@ export const authApi = {
   loginWithMicrosoft: (idToken: string) =>
     apiClient.post<LoginResponse>('/auth/microsoft', { idToken }).then((r) => r.data),
 
-  refresh: (refreshToken: string) =>
-    apiClient.post<LoginResponse>('/auth/refresh', { refreshToken }).then((r) => r.data),
+  refresh: () =>
+    apiClient.post<LoginResponse>('/auth/refresh').then((r) => r.data),
 
-  logout: (refreshToken: string) =>
-    apiClient.post('/auth/logout', { refreshToken }),
+  logout: () =>
+    apiClient.post('/auth/logout'),
 
   me: () =>
     apiClient.get<UserInfo>('/auth/me').then((r) => r.data),

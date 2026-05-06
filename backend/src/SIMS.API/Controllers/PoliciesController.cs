@@ -133,7 +133,7 @@ public class PoliciesController : ControllerBase
 
     [HttpGet("{id:guid}/attachments")]
     public async Task<IActionResult> GetAttachments(Guid id)
-        => Ok(await _attachments.GetByEntityAsync(DocumentEntityType.Policy, id));
+        => Ok(await _attachments.GetByEntityAsync(DocumentEntityType.Policy, id, CurrentUserId));
 
     [HttpPost("{id:guid}/attachments")]
     public async Task<IActionResult> UploadAttachment(
@@ -146,8 +146,8 @@ public class PoliciesController : ControllerBase
     [HttpGet("{id:guid}/attachments/{attachmentId:guid}/download")]
     public async Task<IActionResult> DownloadAttachment(Guid id, Guid attachmentId)
     {
-        var result = await _attachments.GetDownloadUrlAsync(attachmentId);
-        if (!result.IsSuccess) return NotFound();
+        var result = await _attachments.GetDownloadUrlAsync(attachmentId, CurrentUserId);
+        if (!result.IsSuccess) return result.ErrorCode == "ATTACHMENT_ACCESS_DENIED" ? Forbid() : NotFound();
         return Redirect(result.Value!);
     }
 
@@ -155,6 +155,10 @@ public class PoliciesController : ControllerBase
     public async Task<IActionResult> DeleteAttachment(Guid id, Guid attachmentId)
     {
         var result = await _attachments.DeleteAsync(attachmentId, CurrentUserId);
-        return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        return result.IsSuccess
+            ? NoContent()
+            : result.ErrorCode == "ATTACHMENT_ACCESS_DENIED"
+                ? Forbid()
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 }

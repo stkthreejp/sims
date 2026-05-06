@@ -19,7 +19,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       const res = await authApi.login(data)
-      setAuth(res.user, res.accessToken, res.refreshToken)
+      setAuth(res.user, res.accessToken)
       navigate('/dashboard')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { errorMessage?: string } } })
@@ -41,7 +41,7 @@ export function LoginPage() {
         return
       }
       const res = await authApi.loginWithMicrosoft(idToken)
-      setAuth(res.user, res.accessToken, res.refreshToken)
+      setAuth(res.user, res.accessToken)
       navigate('/dashboard')
     } catch (err: unknown) {
       // Ignore user-cancelled popup (BrowserAuthError with errorCode 'user_cancelled')

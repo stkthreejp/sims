@@ -176,7 +176,7 @@ export default function App() {
         </ErrorBoundary>
       </BrowserRouter>
       <Toaster richColors position="top-right" />
-      <ReactQueryDevtools initialIsOpen={false} />
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   )
 }

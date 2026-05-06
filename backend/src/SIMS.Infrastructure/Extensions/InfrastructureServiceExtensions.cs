@@ -107,9 +107,12 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICarrierRatingAssignmentService, CarrierRatingAssignmentService>();
         services.AddScoped<IShadowRatingService, ShadowRatingService>();
         services.AddScoped<IUWWriteupService, UWWriteupService>();
-        services.AddHttpClient("gemini");
-        services.AddHttpClient("qbo_oauth");
-        services.AddHttpClient("qbo_api");
+        services.AddHttpClient("gemini", c => c.Timeout = TimeSpan.FromSeconds(
+            int.TryParse(configuration["HttpClients:GeminiTimeoutSeconds"], out var geminiTimeout) ? geminiTimeout : 60));
+        services.AddHttpClient("qbo_oauth", c => c.Timeout = TimeSpan.FromSeconds(
+            int.TryParse(configuration["HttpClients:QboOAuthTimeoutSeconds"], out var qboOAuthTimeout) ? qboOAuthTimeout : 30));
+        services.AddHttpClient("qbo_api", c => c.Timeout = TimeSpan.FromSeconds(
+            int.TryParse(configuration["HttpClients:QboApiTimeoutSeconds"], out var qboApiTimeout) ? qboApiTimeout : 30));
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
         services.AddHostedService<TaskEscalationWorker>();
@@ -125,6 +128,7 @@ public static class InfrastructureServiceExtensions
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<Role>>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
         await db.Database.MigrateAsync();
 
@@ -223,20 +227,29 @@ public static class InfrastructureServiceExtensions
         }
         await db.SaveChangesAsync();
 
-        // Seed admin user
-        if (await userManager.FindByNameAsync("admin") == null)
+        // Optional first-admin bootstrap. Never seed a hard-coded password.
+        var adminUserName = configuration["AdminBootstrap:UserName"] ?? "admin";
+        var adminPassword = configuration["AdminBootstrap:Password"];
+        if (await userManager.FindByNameAsync(adminUserName) == null && !string.IsNullOrWhiteSpace(adminPassword))
         {
             var admin = new User
             {
-                UserName = "admin",
-                Email = "admin@SIMS.local",
-                FirstName = "System",
-                LastName = "Admin",
+                UserName = adminUserName,
+                Email = configuration["AdminBootstrap:Email"] ?? "admin@SIMS.local",
+                FirstName = configuration["AdminBootstrap:FirstName"] ?? "System",
+                LastName = configuration["AdminBootstrap:LastName"] ?? "Admin",
                 EmailConfirmed = true,
                 MustChangePassword = true
             };
-            await userManager.CreateAsync(admin, "Admin@123!");
-            await userManager.AddToRoleAsync(admin, "Admin");
+            var createResult = await userManager.CreateAsync(admin, adminPassword);
+            if (!createResult.Succeeded)
+                throw new InvalidOperationException("Admin bootstrap failed: " +
+                    string.Join(", ", createResult.Errors.Select(e => e.Description)));
+
+            var roleResult = await userManager.AddToRoleAsync(admin, "Admin");
+            if (!roleResult.Succeeded)
+                throw new InvalidOperationException("Admin bootstrap role assignment failed: " +
+                    string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
     }
 }
