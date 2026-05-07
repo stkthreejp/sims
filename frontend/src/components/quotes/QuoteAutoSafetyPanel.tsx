@@ -194,8 +194,18 @@ function getLoadErrorMessage(error: unknown) {
   if (!axios.isAxiosError(error)) return 'Please try again.'
   if (!error.response) return 'The API is not reachable. Check that the backend app is running and the frontend API URL is configured.'
 
-  const data = error.response.data as { errorMessage?: string; ErrorMessage?: string } | undefined
-  return data?.errorMessage ?? data?.ErrorMessage ?? `Request failed with status ${error.response.status}.`
+  const data = error.response.data as {
+    errorMessage?: string
+    ErrorMessage?: string
+    detail?: string
+    title?: string
+  } | undefined
+
+  return data?.errorMessage
+    ?? data?.ErrorMessage
+    ?? data?.detail
+    ?? data?.title
+    ?? `Request failed with status ${error.response.status}.`
 }
 
 function Metric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {

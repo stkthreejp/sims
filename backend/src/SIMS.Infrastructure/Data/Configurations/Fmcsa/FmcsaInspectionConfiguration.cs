@@ -10,6 +10,7 @@ public class FmcsaInspectionConfiguration : IEntityTypeConfiguration<FmcsaInspec
     {
         builder.ToTable("fmcsa_inspections");
         builder.HasKey(x => x.Id);
+        builder.ConfigureBaseEntity();
         builder.Property(x => x.UsDotNumber).HasColumnName("us_dot_number").HasMaxLength(20).IsRequired();
         builder.Property(x => x.ReportNumber).HasColumnName("report_number").HasMaxLength(50).IsRequired();
         builder.Property(x => x.InspectionDate).HasColumnName("inspection_date");

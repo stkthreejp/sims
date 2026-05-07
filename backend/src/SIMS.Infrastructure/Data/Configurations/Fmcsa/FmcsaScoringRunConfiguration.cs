@@ -10,6 +10,7 @@ public class FmcsaScoringRunConfiguration : IEntityTypeConfiguration<FmcsaScorin
     {
         builder.ToTable("fmcsa_scoring_runs");
         builder.HasKey(x => x.Id);
+        builder.ConfigureBaseEntity();
         builder.Property(x => x.UsDotNumber).HasColumnName("us_dot_number").HasMaxLength(20).IsRequired();
         builder.Property(x => x.SnapshotMonth).HasColumnName("snapshot_month").HasMaxLength(7).IsRequired();
         builder.Property(x => x.MethodologyVersion).HasColumnName("methodology_version").HasMaxLength(50).IsRequired();

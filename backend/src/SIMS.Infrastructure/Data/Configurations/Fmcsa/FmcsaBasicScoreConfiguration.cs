@@ -10,6 +10,7 @@ public class FmcsaBasicScoreConfiguration : IEntityTypeConfiguration<FmcsaBasicS
     {
         builder.ToTable("fmcsa_basic_scores");
         builder.HasKey(x => x.Id);
+        builder.ConfigureBaseEntity();
         builder.Property(x => x.FmcsaScoringRunId).HasColumnName("fmcsa_scoring_run_id");
         builder.Property(x => x.Basic).HasColumnName("basic").HasMaxLength(80).IsRequired();
         builder.Property(x => x.Measure).HasColumnName("measure").HasPrecision(12, 4);

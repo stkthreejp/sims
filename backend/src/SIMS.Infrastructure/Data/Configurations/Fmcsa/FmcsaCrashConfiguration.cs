@@ -10,6 +10,7 @@ public class FmcsaCrashConfiguration : IEntityTypeConfiguration<FmcsaCrash>
     {
         builder.ToTable("fmcsa_crashes");
         builder.HasKey(x => x.Id);
+        builder.ConfigureBaseEntity();
         builder.Property(x => x.UsDotNumber).HasColumnName("us_dot_number").HasMaxLength(20).IsRequired();
         builder.Property(x => x.ReportNumber).HasColumnName("report_number").HasMaxLength(50).IsRequired();
         builder.Property(x => x.CrashDate).HasColumnName("crash_date");

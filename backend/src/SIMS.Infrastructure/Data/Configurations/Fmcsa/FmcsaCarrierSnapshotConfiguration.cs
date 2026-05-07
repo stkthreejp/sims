@@ -10,6 +10,7 @@ public class FmcsaCarrierSnapshotConfiguration : IEntityTypeConfiguration<FmcsaC
     {
         builder.ToTable("fmcsa_carrier_snapshots");
         builder.HasKey(x => x.Id);
+        builder.ConfigureBaseEntity();
         builder.Property(x => x.UsDotNumber).HasColumnName("us_dot_number").HasMaxLength(20).IsRequired();
         builder.Property(x => x.SnapshotMonth).HasColumnName("snapshot_month").HasMaxLength(7).IsRequired();
         builder.Property(x => x.LegalName).HasColumnName("legal_name").HasMaxLength(250).IsRequired();

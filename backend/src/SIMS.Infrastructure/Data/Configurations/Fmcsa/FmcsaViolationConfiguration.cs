@@ -10,6 +10,7 @@ public class FmcsaViolationConfiguration : IEntityTypeConfiguration<FmcsaViolati
     {
         builder.ToTable("fmcsa_violations");
         builder.HasKey(x => x.Id);
+        builder.ConfigureBaseEntity();
         builder.Property(x => x.FmcsaInspectionId).HasColumnName("fmcsa_inspection_id");
         builder.Property(x => x.UsDotNumber).HasColumnName("us_dot_number").HasMaxLength(20).IsRequired();
         builder.Property(x => x.ReportNumber).HasColumnName("report_number").HasMaxLength(50).IsRequired();
