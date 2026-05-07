@@ -112,7 +112,7 @@ public class QboTokenService : IQboTokenService
         var body = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"QBO token refresh failed ({response.StatusCode}): {body}");
+            throw new InvalidOperationException($"QBO token refresh failed ({response.StatusCode}).");
 
         return JsonSerializer.Deserialize<QboTokenResponse>(body, JsonOptions)
             ?? throw new InvalidOperationException("Empty token response from QBO");

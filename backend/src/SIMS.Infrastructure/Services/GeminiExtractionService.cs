@@ -184,8 +184,7 @@ public class GeminiExtractionService : IGeminiExtractionService
             response = await _httpClient.PostAsJsonAsync(url, requestBody, ct);
             if (!response.IsSuccessStatusCode)
             {
-                var err = await response.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning("Gemini detection returned {Status} for {FileName}: {Body}", response.StatusCode, fileName, err);
+                _logger.LogWarning("Gemini detection returned {Status} for {FileName}", response.StatusCode, fileName);
                 return [];
             }
         }
@@ -231,8 +230,7 @@ public class GeminiExtractionService : IGeminiExtractionService
             response = await _httpClient.PostAsJsonAsync(GeminiUrl, requestBody, ct);
             if (!response.IsSuccessStatusCode)
             {
-                var err = await response.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning("Gemini API returned {Status} for {FileName}: {Body}", response.StatusCode, fileName, err);
+                _logger.LogWarning("Gemini API returned {Status} for {FileName}", response.StatusCode, fileName);
                 return null;
             }
         }
@@ -252,7 +250,7 @@ public class GeminiExtractionService : IGeminiExtractionService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not deserialize Gemini response for {FileName}: {Text}", fileName, text);
+            _logger.LogWarning(ex, "Could not deserialize Gemini response for {FileName}", fileName);
             return null;
         }
     }

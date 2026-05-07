@@ -41,12 +41,11 @@ public class QboWebhookController : ControllerBase
             return Unauthorized();
         }
 
-        _logger.LogDebug("QBO webhook received: {Body}", body);
-
         try
         {
             var payload = JsonNode.Parse(body);
             var entities = payload?["eventNotifications"]?.AsArray();
+            _logger.LogDebug("QBO webhook received with {NotificationCount} notification(s)", entities?.Count ?? 0);
             if (entities == null) return Ok();
 
             foreach (var notification in entities)

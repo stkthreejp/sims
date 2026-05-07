@@ -67,6 +67,10 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IRatingEngineService, RatingEngineService>();
         services.AddScoped<INoteService, NoteService>();
         services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+        if (string.Equals(configuration["Uploads:MalwareScanning:Provider"], "ClamAV", StringComparison.OrdinalIgnoreCase))
+            services.AddScoped<IFileScanService, ClamAvFileScanService>();
+        else
+            services.AddScoped<IFileScanService, NoOpFileScanService>();
         services.AddScoped<IAttachmentService, AttachmentService>();
         services.AddScoped<IDocumentTemplateService, DocumentTemplateService>();
         services.AddScoped<IDocumentGenerationService, DocumentGenerationService>();

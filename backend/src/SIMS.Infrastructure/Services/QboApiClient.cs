@@ -29,7 +29,7 @@ public class QboApiClient : IQboApiClient
         var response = await SendAsync(HttpMethod.Post, url, payload, ct);
         var json = JsonNode.Parse(response)!;
         return json["JournalEntry"]?["Id"]?.GetValue<string>()
-            ?? throw new InvalidOperationException($"Unexpected QBO JournalEntry response: {response}");
+            ?? throw new InvalidOperationException("Unexpected QBO JournalEntry response shape.");
     }
 
     public async Task<IReadOnlyList<QboAccount>> GetChartOfAccountsAsync(CancellationToken ct = default)
@@ -67,7 +67,7 @@ public class QboApiClient : IQboApiClient
         var content = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"QBO API error {(int)response.StatusCode}: {content}");
+            throw new InvalidOperationException($"QBO API error {(int)response.StatusCode} ({response.ReasonPhrase}).");
 
         return content;
     }

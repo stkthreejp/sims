@@ -14,14 +14,20 @@ public class AttachmentService : IAttachmentService
 {
     private readonly Microsoft.EntityFrameworkCore.DbContext _db;
     private readonly IBlobStorageService _blob;
+    private readonly IFileScanService _fileScan;
     private readonly long _maxFileSize;
     private readonly HashSet<string> _allowedExtensions;
     private readonly Dictionary<string, string> _contentTypesByExtension;
 
-    public AttachmentService(Microsoft.EntityFrameworkCore.DbContext db, IBlobStorageService blob, IConfiguration config)
+    public AttachmentService(
+        Microsoft.EntityFrameworkCore.DbContext db,
+        IBlobStorageService blob,
+        IFileScanService fileScan,
+        IConfiguration config)
     {
         _db = db;
         _blob = blob;
+        _fileScan = fileScan;
         _maxFileSize = long.TryParse(config["Storage:MaxFileSizeBytes"], out var parsed) ? parsed : 52_428_800L;
         _allowedExtensions = (config.GetSection("Storage:AllowedExtensions").Get<string[]>()
                 ?? [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt", ".csv"])
@@ -92,6 +98,10 @@ public class AttachmentService : IAttachmentService
 
         if (!await HasExpectedSignatureAsync(file, extension))
             return Result<AttachmentDto>.Failure("INVALID_FILE_SIGNATURE", "File contents do not match the file type.");
+
+        var scan = await _fileScan.ScanAsync(file);
+        if (!scan.IsAllowed)
+            return Result<AttachmentDto>.Failure(scan.ErrorCode ?? "FILE_SCAN_FAILED", scan.ErrorMessage ?? "The uploaded file could not be scanned.");
 
         // Upload to Azure
         string blobPath;
