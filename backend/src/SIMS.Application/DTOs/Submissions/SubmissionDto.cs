@@ -33,9 +33,11 @@ public class SubmissionListItemDto
     public Guid InsuredId { get; set; }
     public string InsuredName { get; set; } = string.Empty;
     public string? AgentName { get; set; }
+    public string? AgencyName { get; set; }
     public string UnderwriterName { get; set; } = string.Empty;
     public DateOnly? EffectiveDate { get; set; }
     public SubmissionStatus Status { get; set; }
+    public List<string> LinesOfBusiness { get; set; } = [];
     public int QuoteCount { get; set; }
     public DateTime CreatedAt { get; set; }
 }

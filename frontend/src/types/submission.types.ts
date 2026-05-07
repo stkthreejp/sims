@@ -15,9 +15,11 @@ export interface SubmissionListItem {
   insuredId: string
   insuredName: string
   agentName: string | null
+  agencyName: string | null
   underwriterName: string
   effectiveDate: string | null
   status: SubmissionStatus
+  linesOfBusiness: string[]
   quoteCount: number
   createdAt: string
 }
