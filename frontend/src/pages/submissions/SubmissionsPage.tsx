@@ -183,8 +183,8 @@ export function SubmissionsPage() {
           <div className="subs-sub">All submissions across your book · {list.length} records</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="sd-btn outline"><Upload size={13} />Import</button>
-          <button className="sd-btn outline"><Download size={13} />Export</button>
+          <button className="sd-btn"><Upload size={13} />Import</button>
+          <button className="sd-btn"><Download size={13} />Export</button>
           <button className="sd-btn primary" onClick={() => navigate('/submissions/new')}>
             <Plus size={13} />New submission
           </button>

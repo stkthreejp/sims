@@ -547,7 +547,7 @@ export function SubmissionDetailPage() {
       {quotes.length === 0 && !showQuoteForm ? (
         <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
           <div style={{ color: 'var(--ink-2)', fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>No quotes yet</div>
-          <button className="sd-btn outline sm" style={{ marginTop: 12 }} onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
+          <button className="sd-btn sm" style={{ marginTop: 12 }} onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
             <Plus size={13} /> Add Quote
           </button>
         </div>
@@ -803,7 +803,7 @@ export function SubmissionDetailPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {canCreatePolicies && (
-            <button onClick={() => setShowGenerateModal(true)} className="sd-btn outline">
+            <button onClick={() => setShowGenerateModal(true)} className="sd-btn">
               <FileText size={13} /> Generate doc
             </button>
           )}
@@ -1024,7 +1024,7 @@ export function SubmissionDetailPage() {
           ) : (
             <div className="sd-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 118, gap: 10 }}>
               <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No loss history on file</p>
-              <Link to={`/submissions/${id}/loss-history`} className="sd-btn outline sm"><Plus size={13} /> Add loss year</Link>
+              <Link to={`/submissions/${id}/loss-history`} className="sd-btn sm"><Plus size={13} /> Add loss year</Link>
             </div>
           )}
         </section>
