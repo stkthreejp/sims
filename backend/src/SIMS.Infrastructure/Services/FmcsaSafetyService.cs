@@ -6,7 +6,9 @@ using SIMS.Domain.Entities.Fmcsa;
 using SIMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using System.Net.Http;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace SIMS.Infrastructure.Services;
 
@@ -26,11 +28,13 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private readonly ApplicationDbContext _db;
     private readonly FmcsaSocrataClient _socrata;
+    private readonly ILogger<FmcsaSafetyService> _logger;
 
-    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata)
+    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata, ILogger<FmcsaSafetyService> logger)
     {
         _db = db;
         _socrata = socrata;
+        _logger = logger;
     }
 
     public async Task<Result<AutoSafetySummaryDto>> GetQuoteAutoSafetyAsync(Guid quoteId, CancellationToken ct = default)
@@ -131,20 +135,49 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             return Result<AutoSafetyRefreshDto>.Success(new AutoSafetyRefreshDto { Summary = missingDotSummary.Value! });
         }
 
-        var carrierRows = await _socrata.GetCensusByDotAsync(dotNumber, ct);
-        var inspectionRows = await _socrata.GetInspectionsByDotAsync(dotNumber, ct);
-        var violationRows = await _socrata.GetViolationsByDotAsync(dotNumber, ct);
-        var crashRows = await _socrata.GetCrashesByDotAsync(dotNumber, ct);
+        List<Dictionary<string, JsonElement>> carrierRows;
+        List<Dictionary<string, JsonElement>> inspectionRows;
+        List<Dictionary<string, JsonElement>> violationRows;
+        List<Dictionary<string, JsonElement>> crashRows;
+
+        try
+        {
+            carrierRows = await _socrata.GetCensusByDotAsync(dotNumber, ct);
+            inspectionRows = await _socrata.GetInspectionsByDotAsync(dotNumber, ct);
+            violationRows = await _socrata.GetViolationsByDotAsync(dotNumber, ct);
+            crashRows = await _socrata.GetCrashesByDotAsync(dotNumber, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "FMCSA Socrata lookup failed for USDOT {DotNumber}", dotNumber);
+            return Result<AutoSafetyRefreshDto>.Failure(
+                "FMCSA_SOURCE_UNAVAILABLE",
+                "FMCSA source data could not be reached for this USDOT number. Try again shortly.");
+        }
 
         var now = DateTime.UtcNow;
         var snapshotMonth = now.ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
-        var carrierCount = await UpsertCarrierSnapshotsAsync(dotNumber, snapshotMonth, carrierRows, now, ct);
-        var inspectionCount = await UpsertInspectionsAsync(dotNumber, inspectionRows, now, ct);
-        var violationCount = await UpsertViolationsAsync(dotNumber, violationRows, now, ct);
-        var crashCount = await UpsertCrashesAsync(dotNumber, crashRows, now, ct);
+        int carrierCount;
+        int inspectionCount;
+        int violationCount;
+        int crashCount;
+        try
+        {
+            carrierCount = await UpsertCarrierSnapshotsAsync(dotNumber, snapshotMonth, carrierRows, now, ct);
+            inspectionCount = await UpsertInspectionsAsync(dotNumber, inspectionRows, now, ct);
+            violationCount = await UpsertViolationsAsync(dotNumber, violationRows, now, ct);
+            crashCount = await UpsertCrashesAsync(dotNumber, crashRows, now, ct);
 
-        await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "FMCSA data save failed for USDOT {DotNumber}", dotNumber);
+            return Result<AutoSafetyRefreshDto>.Failure(
+                "FMCSA_SAVE_FAILED",
+                "FMCSA data was found but could not be saved. Check that the latest database migration is applied.");
+        }
 
         var summary = await GetQuoteAutoSafetyAsync(quoteId, ct);
         if (!summary.IsSuccess)

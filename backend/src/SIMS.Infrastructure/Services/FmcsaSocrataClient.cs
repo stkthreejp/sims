@@ -55,18 +55,29 @@ public class FmcsaSocrataClient
 
         foreach (var dotColumn in dotColumns)
         {
-            try
+            foreach (var query in BuildDotQueries(dotColumn, dotNumber, limit, offset))
             {
-                var query = $"$limit={limit}&$offset={offset}&$where={WebUtility.UrlEncode($"{dotColumn}='{dotNumber}'")}";
-                return await SendAsync(datasetId, query, ct);
-            }
-            catch (HttpRequestException ex) when (IsLikelyBadColumn(ex))
-            {
-                lastError = ex;
+                try
+                {
+                    return await SendAsync(datasetId, query, ct);
+                }
+                catch (HttpRequestException ex) when (IsLikelyBadColumn(ex))
+                {
+                    lastError = ex;
+                }
             }
         }
 
         throw lastError ?? new InvalidOperationException($"Unable to query Socrata dataset {datasetId}.");
+    }
+
+    private static IEnumerable<string> BuildDotQueries(string dotColumn, string dotNumber, int limit, int offset)
+    {
+        var numericDot = dotNumber.All(char.IsDigit);
+        if (numericDot)
+            yield return $"$limit={limit}&$offset={offset}&$where={WebUtility.UrlEncode($"{dotColumn}={dotNumber}")}";
+
+        yield return $"$limit={limit}&$offset={offset}&$where={WebUtility.UrlEncode($"{dotColumn}='{dotNumber}'")}";
     }
 
     private async Task<List<Dictionary<string, JsonElement>>> SendAsync(string datasetId, string query, CancellationToken ct)

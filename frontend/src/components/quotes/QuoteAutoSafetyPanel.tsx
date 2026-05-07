@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
 import { AlertTriangle, CheckCircle2, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
@@ -17,9 +18,10 @@ const riskStyle: Record<AutoSafetyRiskLevel, string> = {
 
 export function QuoteAutoSafetyPanel({ quoteId }: Props) {
   const qc = useQueryClient()
-  const { data, isLoading, isError } = useQuery({
+  const { data, error, isLoading, isError } = useQuery({
     queryKey: ['quote-auto-safety', quoteId],
     queryFn: () => quotesApi.getAutoSafety(quoteId),
+    retry: false,
   })
   const refreshMutation = useMutation({
     mutationFn: () => quotesApi.refreshAutoSafety(quoteId),
@@ -37,16 +39,18 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 text-sm text-slate-500">
-        Loading auto safety profile...
+      <div className="px-5 py-4 bg-slate-50 border-y border-slate-200 text-sm text-slate-600">
+        Opening auto safety profile...
       </div>
     )
   }
 
   if (isError || !data) {
+    const message = getLoadErrorMessage(error)
     return (
-      <div className="px-5 py-4 bg-red-50 border-t border-red-100 text-sm text-red-700">
-        Auto safety profile could not be loaded.
+      <div className="px-5 py-4 bg-red-50 border-y border-red-100 text-sm text-red-700">
+        <div className="font-semibold">Auto safety profile could not be loaded.</div>
+        <div className="mt-1 text-red-600">{message}</div>
       </div>
     )
   }
@@ -184,6 +188,14 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
       </div>
     </div>
   )
+}
+
+function getLoadErrorMessage(error: unknown) {
+  if (!axios.isAxiosError(error)) return 'Please try again.'
+  if (!error.response) return 'The API is not reachable. Check that the backend app is running and the frontend API URL is configured.'
+
+  const data = error.response.data as { errorMessage?: string; ErrorMessage?: string } | undefined
+  return data?.errorMessage ?? data?.ErrorMessage ?? `Request failed with status ${error.response.status}.`
 }
 
 function Metric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
