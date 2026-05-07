@@ -243,9 +243,13 @@ public class SubmissionService : ISubmissionService
         InsuredId = s.InsuredId,
         InsuredName = s.Insured?.DisplayName ?? "",
         AgentName = s.Agent?.Name,
+        AgencyName = s.Agent?.AgencyName,
         UnderwriterName = s.Underwriter?.FullName ?? "",
         EffectiveDate = s.EffectiveDate,
         Status = s.Status,
+        LinesOfBusiness = string.IsNullOrWhiteSpace(s.LinesOfBusiness)
+            ? []
+            : JsonSerializer.Deserialize<List<string>>(s.LinesOfBusiness) ?? [],
         QuoteCount = s.Quotes?.Count ?? 0,
         CreatedAt = s.CreatedAt
     };

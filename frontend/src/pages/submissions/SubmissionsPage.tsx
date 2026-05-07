@@ -276,10 +276,8 @@ export function SubmissionsPage() {
                 const days      = daysToEff(s.effectiveDate)
                 const daysLabel = days === null ? '' : days >= 0 ? `${days}d to eff.` : `${Math.abs(days)}d past`
                 const daysCls   = days === null ? '' : days < 0 ? 'past' : days <= 14 ? 'soon' : ''
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const lobs      = (s as any).linesOfBusiness as string[] | undefined
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const agency    = (s as any).agencyName as string | null | undefined
+                const lobs   = s.linesOfBusiness
+                const agency = s.agencyName
 
                 return (
                   <tr
