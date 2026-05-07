@@ -59,8 +59,11 @@ apiClient.interceptors.response.use(
       return apiClient(originalRequest)
     } catch (refreshError) {
       processQueue(refreshError, null)
-      clearAuth()
-      window.location.href = '/login'
+      const status = axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined
+      if (status === 401 || status === 403) {
+        clearAuth()
+        window.location.href = '/login'
+      }
       return Promise.reject(refreshError)
     } finally {
       isRefreshing = false

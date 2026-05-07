@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from 'react'
+import axios from 'axios'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -105,8 +106,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       .then((session) => {
         if (!cancelled) setAuth(session.user, session.accessToken)
       })
-      .catch(() => {
-        if (!cancelled) clearAuth()
+      .catch((error) => {
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined
+        if (!cancelled && (status === 401 || status === 403)) clearAuth()
       })
       .finally(() => {
         if (!cancelled) setCheckingSession(false)
