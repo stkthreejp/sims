@@ -40,6 +40,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<SubmissionDriver> SubmissionDrivers => Set<SubmissionDriver>();
     public DbSet<SubmissionVehicle> SubmissionVehicles => Set<SubmissionVehicle>();
     public DbSet<SubmissionPriorCarrier> SubmissionPriorCarriers => Set<SubmissionPriorCarrier>();
+    public DbSet<SubmissionLossYear> SubmissionLossYears => Set<SubmissionLossYear>();
+    public DbSet<SubmissionLossClaim> SubmissionLossClaims => Set<SubmissionLossClaim>();
     public DbSet<SubmissionSupplemental> SubmissionSupplementals => Set<SubmissionSupplemental>();
     public DbSet<SubmissionGLCoverages> SubmissionGLCoverages => Set<SubmissionGLCoverages>();
     public DbSet<SubmissionGLClassification> SubmissionGLClassifications => Set<SubmissionGLClassification>();
@@ -134,6 +136,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<SubmissionDriver>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionVehicle>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionPriorCarrier>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionLossYear>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionLossClaim>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionSupplemental>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionGLCoverages>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionGLClassification>().HasQueryFilter(e => !e.IsDeleted);

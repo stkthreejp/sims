@@ -25,6 +25,7 @@ const InsuredEditPage = lazy(() => import('@/pages/insureds/InsuredEditPage').th
 // Submissions
 const SubmissionsPage = lazy(() => import('@/pages/submissions/SubmissionsPage').then((m) => ({ default: m.SubmissionsPage })))
 const SubmissionDetailPage = lazy(() => import('@/pages/submissions/SubmissionDetailPage').then((m) => ({ default: m.SubmissionDetailPage })))
+const SubmissionLossHistoryPage = lazy(() => import('@/pages/submissions/SubmissionLossHistoryPage').then((m) => ({ default: m.SubmissionLossHistoryPage })))
 const SubmissionCreatePage = lazy(() => import('@/pages/submissions/SubmissionCreatePage').then((m) => ({ default: m.SubmissionCreatePage })))
 
 // Policies
@@ -127,6 +128,7 @@ export default function App() {
               <Route path="/insureds/:id/edit" element={<InsuredEditPage />} />
 
               <Route path="/submissions/new" element={<SubmissionCreatePage />} />
+              <Route path="/submissions/:id/loss-history" element={<SubmissionLossHistoryPage />} />
               <Route path="/submissions/:id" element={<SubmissionDetailPage />} />
               <Route path="/submissions" element={<SubmissionsPage />} />
 

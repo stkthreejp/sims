@@ -13,6 +13,7 @@ import { carriersApi } from '@/api/carriers.api'
 import { usersApi } from '@/api/users.api'
 import { agentsApi } from '@/api/agents.api'
 import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
+import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
@@ -102,6 +103,11 @@ function fmtMoneyK(n: number | null | undefined) {
   if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M'
   if (Math.abs(n) >= 1e3) return '$' + Math.round(n / 1e3) + 'K'
   return '$' + n.toLocaleString()
+}
+
+function fmtPct(n: number | null | undefined) {
+  if (n == null) return '—'
+  return `${(n * 100).toFixed(1)}%`
 }
 
 function daysUntil(dateStr: string | null | undefined): number | null {
@@ -217,6 +223,12 @@ export function SubmissionDetailPage() {
     queryKey: ['submission-equipment', id],
     queryFn: () => submissionIMApi.getEquipment(id!),
     enabled: !!id && activeTab === 'exposures',
+  })
+
+  const { data: lossSummary } = useQuery({
+    queryKey: ['submission-loss-history-summary', id],
+    queryFn: () => submissionLossHistoryApi.getSummary(id!),
+    enabled: !!id,
   })
 
   const { data: imEquipmentTypes = [] } = useQuery({
@@ -864,9 +876,13 @@ export function SubmissionDetailPage() {
           <div className="s">{submission.effectiveDate ? new Date(submission.effectiveDate).toLocaleDateString() : '—'}</div>
         </div>
         <div className="sd-metric">
-          <div className="k">Prior term premium</div>
-          <div className="v" style={{ color: 'var(--ink-3)' }}>—</div>
-          <div className="s">No loss history on file</div>
+          <div className="k">Loss ratio</div>
+          <div className="v" style={{ color: lossSummary?.lossRatio != null && lossSummary.lossRatio > 0.65 ? '#b33a2a' : 'inherit' }}>
+            {fmtPct(lossSummary?.lossRatio)}
+          </div>
+          <div className="s">
+            {lossSummary?.yearCount ? `${lossSummary.yearCount} yrs · ${fmtMoneyK(lossSummary.totalIncurred)} incurred` : 'No loss history on file'}
+          </div>
         </div>
       </div>
 
@@ -972,10 +988,45 @@ export function SubmissionDetailPage() {
       {/* Always-visible: Loss history + UW Notes */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
         <section className="sd-card">
-          <div className="sd-card-head"><h3>Loss history (5 yrs)</h3></div>
-          <div className="sd-card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 100 }}>
-            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No loss history on file</p>
+          <div className="sd-card-head">
+            <h3>Loss history (5 yrs)</h3>
+            <Link to={`/submissions/${id}/loss-history`} className="sd-btn ghost sm">Open analysis</Link>
           </div>
+          {lossSummary?.yearCount ? (
+            <div className="sd-card-body tight">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, borderBottom: '1px solid var(--line-2)', background: 'var(--line-2)' }}>
+                {[
+                  ['Loss ratio', fmtPct(lossSummary.lossRatio)],
+                  ['Incurred', fmtMoneyK(lossSummary.totalIncurred)],
+                  ['Premium', fmtMoneyK(lossSummary.totalPremium)],
+                  ['Claims', String(lossSummary.claimCount)],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: 'var(--surface)', padding: '10px 12px' }}>
+                    <div style={{ fontSize: 10, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink-4)', fontWeight: 600 }}>{label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, fontVariantNumeric: 'tabular-nums', marginTop: 3 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              <table className="sd-table">
+                <thead><tr><th>Year</th><th className="num">Premium</th><th className="num">Incurred</th><th className="num">LR</th></tr></thead>
+                <tbody>
+                  {lossSummary.years.slice(0, 5).map((y) => (
+                    <tr key={y.id}>
+                      <td className="id">{y.policyYear}</td>
+                      <td className="num">{fmtMoneyK(y.premiumAmount)}</td>
+                      <td className="num">{fmtMoneyK(y.incurred)}</td>
+                      <td className="num">{fmtPct(y.lossRatio)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="sd-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 118, gap: 10 }}>
+              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No loss history on file</p>
+              <Link to={`/submissions/${id}/loss-history`} className="sd-btn outline sm"><Plus size={13} /> Add loss year</Link>
+            </div>
+          )}
         </section>
         <section className="sd-card">
           <div className="sd-card-head"><h3>UW Notes</h3></div>

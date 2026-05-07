@@ -29,6 +29,7 @@ public class Submission : BaseEntity
     public ICollection<SubmissionDriver> Drivers { get; set; } = new List<SubmissionDriver>();
     public ICollection<SubmissionVehicle> Vehicles { get; set; } = new List<SubmissionVehicle>();
     public ICollection<SubmissionPriorCarrier> PriorCarriers { get; set; } = new List<SubmissionPriorCarrier>();
+    public ICollection<SubmissionLossYear> LossYears { get; set; } = new List<SubmissionLossYear>();
     public ICollection<SubmissionGLClassification> GLClassifications { get; set; } = new List<SubmissionGLClassification>();
     public ICollection<SubmissionEquipment> Equipment { get; set; } = new List<SubmissionEquipment>();
     public SubmissionSupplemental? Supplemental { get; set; }

@@ -39,6 +39,9 @@ frontend_ms.log
 # Local tool homes/caches
 .appdata/
 .dotnet/
+backend/.appdata/
+backend/.dotnet-home/
+backend/.nuget-packages/
 
 # Claude Code local settings (may contain personal config)
 .claude/settings.local.json
