@@ -36,6 +36,7 @@ export interface Insured {
   dba: string | null
   entityType: BusinessEntityType | null
   yearsInBusiness: number | null
+  usDotNumber: string | null
   taxId: string | null
   email: string | null
   phone: string | null
@@ -60,6 +61,7 @@ export interface InsuredCreate {
   dba?: string
   entityType?: BusinessEntityType
   yearsInBusiness?: number
+  usDotNumber?: string
   taxId?: string
   email?: string
   phone?: string

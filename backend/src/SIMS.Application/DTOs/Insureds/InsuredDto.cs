@@ -15,6 +15,7 @@ public class InsuredDto
     public string? Dba { get; set; }
     public BusinessEntityType? EntityType { get; set; }
     public int? YearsInBusiness { get; set; }
+    public string? UsDotNumber { get; set; }
     public string? TaxId { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
@@ -53,6 +54,9 @@ public class InsuredCreateDto
 
     [Range(0, 200)]
     public int? YearsInBusiness { get; set; }
+
+    [MaxLength(20)]
+    public string? UsDotNumber { get; set; }
 
     [MaxLength(20)]
     public string? TaxId { get; set; }

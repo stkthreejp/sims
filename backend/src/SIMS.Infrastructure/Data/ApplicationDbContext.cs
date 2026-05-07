@@ -1,5 +1,6 @@
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Entities.Fmcsa;
 using SIMS.Domain.Entities.Rating;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -71,6 +72,14 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<RatingPlanVersionImpactPreview> RatingPlanVersionImpactPreviews => Set<RatingPlanVersionImpactPreview>();
     public DbSet<ShadowRatingResult> ShadowRatingResults => Set<ShadowRatingResult>();
     public DbSet<RatingSettings> RatingSettings => Set<RatingSettings>();
+
+    // FMCSA / Auto underwriting
+    public DbSet<FmcsaCarrierSnapshot> FmcsaCarrierSnapshots => Set<FmcsaCarrierSnapshot>();
+    public DbSet<FmcsaInspection> FmcsaInspections => Set<FmcsaInspection>();
+    public DbSet<FmcsaViolation> FmcsaViolations => Set<FmcsaViolation>();
+    public DbSet<FmcsaCrash> FmcsaCrashes => Set<FmcsaCrash>();
+    public DbSet<FmcsaScoringRun> FmcsaScoringRuns => Set<FmcsaScoringRun>();
+    public DbSet<FmcsaBasicScore> FmcsaBasicScores => Set<FmcsaBasicScore>();
 
     // Accounting
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
@@ -151,6 +160,12 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<HolidayCalendar>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UserDelegation>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<EscalationRule>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<FmcsaCarrierSnapshot>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<FmcsaInspection>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<FmcsaViolation>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<FmcsaCrash>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<FmcsaScoringRun>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<FmcsaBasicScore>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()

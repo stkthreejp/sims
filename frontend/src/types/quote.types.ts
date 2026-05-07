@@ -199,6 +199,70 @@ export interface RatingResult {
   lines: RatingLine[]
 }
 
+export type AutoSafetyStatus = 'Ready' | 'MissingDot' | 'NoData'
+export type AutoSafetyRiskLevel = 'Unknown' | 'Acceptable' | 'Watch' | 'High'
+
+export interface AutoSafetyBasic {
+  basic: string
+  measure: number | null
+  percentile: number | null
+  isPrioritized: boolean
+  eventCount: number
+  outOfServiceCount: number
+  trendDirection: string
+}
+
+export interface AutoSafetyOos {
+  inspectionCount: number
+  driverOosCount: number
+  vehicleOosCount: number
+  driverOosRate: number | null
+  vehicleOosRate: number | null
+}
+
+export interface AutoSafetyHotspot {
+  state: string
+  inspectionCount: number
+  violationCount: number
+  outOfServiceCount: number
+}
+
+export interface AutoSafetyEvent {
+  date: string
+  eventType: string
+  state: string | null
+  description: string
+  basic: string | null
+  severityWeight: number
+}
+
+export interface AutoSafetySummary {
+  status: AutoSafetyStatus
+  message: string | null
+  usDotNumber: string | null
+  carrierName: string | null
+  snapshotMonth: string | null
+  methodologyVersion: string | null
+  overallRiskLevel: AutoSafetyRiskLevel
+  powerUnits: number | null
+  driverCount: number | null
+  dataRefreshedAt: string | null
+  summaryFlags: string[]
+  basics: AutoSafetyBasic[]
+  oos: AutoSafetyOos
+  geographicHotspots: AutoSafetyHotspot[]
+  recentSevereEvents: AutoSafetyEvent[]
+}
+
+export interface AutoSafetyRefresh {
+  summary: AutoSafetySummary
+  carrierRowsImported: number
+  inspectionRowsImported: number
+  violationRowsImported: number
+  crashRowsImported: number
+  refreshedAt: string
+}
+
 export interface Attachment {
   id: string
   quoteId: string

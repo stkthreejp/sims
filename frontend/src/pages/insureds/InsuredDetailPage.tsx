@@ -511,6 +511,16 @@ export function InsuredDetailPage() {
               {insured.taxId && (
                 <Field label="FEIN" mono>{insured.taxId}</Field>
               )}
+              {insured.usDotNumber && (
+                <Field label="USDOT #" mono>{insured.usDotNumber}</Field>
+              )}
+              {!insured.usDotNumber && (
+                <Field label="USDOT #">
+                  <Link to={`/insureds/${insured.id}/edit`} style={{ color: 'var(--accent-ink)', fontWeight: 500 }}>
+                    Add USDOT number
+                  </Link>
+                </Field>
+              )}
               {insured.yearsInBusiness != null && (
                 <Field label="Years in business">{insured.yearsInBusiness} years</Field>
               )}
@@ -520,7 +530,7 @@ export function InsuredDetailPage() {
               {insured.dba && (
                 <Field label="DBA" colSpan>{insured.dba}</Field>
               )}
-              {!insured.taxId && !insured.yearsInBusiness && !insured.entityType && (
+              {!insured.taxId && !insured.usDotNumber && !insured.yearsInBusiness && !insured.entityType && (
                 <p style={{ color: 'var(--ink-4)', fontSize: 12.5, gridColumn: '1 / -1' }}>No business profile on file.</p>
               )}
             </div>

@@ -98,6 +98,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IDisbursementService, DisbursementService>();
         // QBO
         services.Configure<QboSettings>(configuration.GetSection("Qbo"));
+        services.Configure<FmcsaSocrataSettings>(configuration.GetSection("Fmcsa:Socrata"));
         services.AddScoped<IQboTokenService, QboTokenService>();
         services.AddScoped<IQboApiClient, QboApiClient>();
         services.AddScoped<IJournalDriver, CsvJournalDriver>();
@@ -112,12 +113,20 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICarrierRatingAssignmentService, CarrierRatingAssignmentService>();
         services.AddScoped<IShadowRatingService, ShadowRatingService>();
         services.AddScoped<IUWWriteupService, UWWriteupService>();
+        services.AddScoped<IFmcsaSafetyService, FmcsaSafetyService>();
+        services.AddScoped<FmcsaSocrataClient>();
         services.AddHttpClient("gemini", c => c.Timeout = TimeSpan.FromSeconds(
             int.TryParse(configuration["HttpClients:GeminiTimeoutSeconds"], out var geminiTimeout) ? geminiTimeout : 60));
         services.AddHttpClient("qbo_oauth", c => c.Timeout = TimeSpan.FromSeconds(
             int.TryParse(configuration["HttpClients:QboOAuthTimeoutSeconds"], out var qboOAuthTimeout) ? qboOAuthTimeout : 30));
         services.AddHttpClient("qbo_api", c => c.Timeout = TimeSpan.FromSeconds(
             int.TryParse(configuration["HttpClients:QboApiTimeoutSeconds"], out var qboApiTimeout) ? qboApiTimeout : 30));
+        services.AddHttpClient("fmcsa_socrata", c =>
+        {
+            c.BaseAddress = new Uri(configuration["Fmcsa:Socrata:BaseUrl"] ?? "https://data.transportation.gov");
+            c.Timeout = TimeSpan.FromSeconds(
+                int.TryParse(configuration["HttpClients:FmcsaSocrataTimeoutSeconds"], out var fmcsaTimeout) ? fmcsaTimeout : 60);
+        });
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
         services.AddHostedService<TaskEscalationWorker>();

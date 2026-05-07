@@ -1,0 +1,196 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, CheckCircle2, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, XCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import { quotesApi } from '@/api/quotes.api'
+import type { AutoSafetyRiskLevel } from '@/types/quote.types'
+
+type Props = {
+  quoteId: string
+}
+
+const riskStyle: Record<AutoSafetyRiskLevel, string> = {
+  Unknown: 'bg-slate-100 text-slate-600 border-slate-200',
+  Acceptable: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Watch: 'bg-amber-50 text-amber-700 border-amber-200',
+  High: 'bg-red-50 text-red-700 border-red-200',
+}
+
+export function QuoteAutoSafetyPanel({ quoteId }: Props) {
+  const qc = useQueryClient()
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['quote-auto-safety', quoteId],
+    queryFn: () => quotesApi.getAutoSafety(quoteId),
+  })
+  const refreshMutation = useMutation({
+    mutationFn: () => quotesApi.refreshAutoSafety(quoteId),
+    onSuccess: (result) => {
+      qc.setQueryData(['quote-auto-safety', quoteId], result.summary)
+      toast.success('FMCSA data refreshed', {
+        description: `${result.inspectionRowsImported} inspections, ${result.violationRowsImported} violations, ${result.crashRowsImported} crashes`,
+      })
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.errorMessage ?? 'FMCSA refresh failed'
+      toast.error(msg)
+    },
+  })
+
+  if (isLoading) {
+    return (
+      <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 text-sm text-slate-500">
+        Loading auto safety profile...
+      </div>
+    )
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="px-5 py-4 bg-red-50 border-t border-red-100 text-sm text-red-700">
+        Auto safety profile could not be loaded.
+      </div>
+    )
+  }
+
+  if (data.status !== 'Ready') {
+    return (
+      <div className="px-5 py-4 bg-slate-50 border-t border-slate-200">
+        <div className="flex items-start gap-3 rounded border border-slate-200 bg-white p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-slate-800">Auto Safety</div>
+            <p className="mt-1 text-sm text-slate-600">{data.message ?? 'FMCSA data is not available yet.'}</p>
+            {data.usDotNumber && <p className="mt-2 text-xs text-slate-500">USDOT {data.usDotNumber}</p>}
+          </div>
+          {data.status === 'NoData' && (
+            <button
+              onClick={() => refreshMutation.mutate()}
+              disabled={refreshMutation.isPending}
+              className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+              {refreshMutation.isPending ? 'Refreshing' : 'Refresh FMCSA'}
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {data.overallRiskLevel === 'High' ? <ShieldAlert className="h-4 w-4 text-red-600" /> : <ShieldCheck className="h-4 w-4 text-slate-700" />}
+          <h3 className="text-sm font-semibold text-slate-800">Auto Safety</h3>
+          <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-semibold ${riskStyle[data.overallRiskLevel]}`}>
+            {data.overallRiskLevel}
+          </span>
+        </div>
+        <div className="text-xs text-slate-500">
+          {data.snapshotMonth ? `Snapshot ${data.snapshotMonth}` : 'No scored snapshot'}{data.methodologyVersion ? ` - ${data.methodologyVersion}` : ''}
+        </div>
+        <button
+          onClick={() => refreshMutation.mutate()}
+          disabled={refreshMutation.isPending}
+          className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+          {refreshMutation.isPending ? 'Refreshing' : 'Refresh FMCSA'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        <Metric label="Carrier" value={data.carrierName ?? 'Unknown'} />
+        <Metric label="USDOT" value={data.usDotNumber ?? 'None'} />
+        <Metric label="Power Units" value={data.powerUnits?.toLocaleString() ?? '-'} />
+        <Metric label="Drivers" value={data.driverCount?.toLocaleString() ?? '-'} />
+      </div>
+
+      {data.summaryFlags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {data.summaryFlags.map((flag) => (
+            <span key={flag} className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+              <AlertTriangle className="h-3 w-3" /> {flag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded border bg-white p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+            <Truck className="h-3.5 w-3.5" /> OOS Intensity
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <Metric label="Inspections" value={data.oos.inspectionCount.toLocaleString()} compact />
+            <Metric label="Driver OOS" value={data.oos.driverOosRate == null ? '-' : `${data.oos.driverOosRate}%`} compact />
+            <Metric label="Vehicle OOS" value={data.oos.vehicleOosRate == null ? '-' : `${data.oos.vehicleOosRate}%`} compact />
+          </div>
+        </div>
+
+        <div className="col-span-2 rounded border bg-white p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+            <MapPin className="h-3.5 w-3.5" /> Geographic Hotspots
+          </div>
+          {data.geographicHotspots.length === 0 ? (
+            <p className="text-sm text-slate-400">No inspection location concentration yet.</p>
+          ) : (
+            <div className="grid grid-cols-5 gap-2">
+              {data.geographicHotspots.map((h) => (
+                <div key={h.state} className="rounded bg-slate-50 p-2">
+                  <div className="text-sm font-semibold text-slate-800">{h.state}</div>
+                  <div className="text-xs text-slate-500">{h.inspectionCount} insp - {h.violationCount} viol</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded border bg-white">
+        <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">BASICs</div>
+        <div className="grid grid-cols-7 divide-x">
+          {data.basics.map((b) => (
+            <div key={b.basic} className="min-w-0 p-3">
+              <div className="truncate text-xs font-semibold text-slate-700" title={b.basic}>{b.basic}</div>
+              <div className="mt-2 flex items-center gap-1 text-xs">
+                {b.isPrioritized ? <XCircle className="h-3.5 w-3.5 text-red-600" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
+                <span className={b.isPrioritized ? 'text-red-700' : 'text-slate-500'}>
+                  {b.percentile == null ? `${b.eventCount} events` : `${b.percentile}%`}
+                </span>
+              </div>
+              {b.outOfServiceCount > 0 && <div className="mt-1 text-xs text-amber-700">{b.outOfServiceCount} OOS</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded border bg-white">
+        <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">Recent Severe Events</div>
+        {data.recentSevereEvents.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-slate-400">No recent high-severity or OOS events in the imported window.</p>
+        ) : (
+          <div className="divide-y">
+            {data.recentSevereEvents.map((event, idx) => (
+              <div key={`${event.date}-${idx}`} className="grid grid-cols-[120px_160px_1fr_80px] gap-3 px-4 py-2 text-sm">
+                <span className="text-slate-500">{new Date(event.date).toLocaleDateString()}</span>
+                <span className="font-medium text-slate-700">{event.eventType}</span>
+                <span className="truncate text-slate-600">{event.description}</span>
+                <span className="text-right text-slate-500">{event.state ?? '-'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Metric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
+  return (
+    <div className={compact ? '' : 'rounded border bg-white p-3'}>
+      <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-slate-800" title={value}>{value}</div>
+    </div>
+  )
+}

@@ -15,13 +15,15 @@ public class QuotesController : ControllerBase
     private readonly IQuoteService _quoteService;
     private readonly IRatingEngineService _ratingEngine;
     private readonly IShadowRatingService _shadowRating;
+    private readonly IFmcsaSafetyService _fmcsaSafety;
 
     public QuotesController(IQuoteService quoteService, IRatingEngineService ratingEngine,
-        IShadowRatingService shadowRating)
+        IShadowRatingService shadowRating, IFmcsaSafetyService fmcsaSafety)
     {
         _quoteService = quoteService;
         _ratingEngine = ratingEngine;
         _shadowRating = shadowRating;
+        _fmcsaSafety = fmcsaSafety;
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -76,6 +78,27 @@ public class QuotesController : ControllerBase
         var result = await _ratingEngine.GetLatestSnapshotAsync(id);
         if (!result.IsSuccess && result.ErrorCode == "NOT_FOUND")
             return NotFound(new { result.ErrorCode, result.ErrorMessage });
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpGet("{id:guid}/auto-safety")]
+    public async Task<IActionResult> GetAutoSafety(Guid id)
+    {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
+        var result = await _fmcsaSafety.GetQuoteAutoSafetyAsync(id);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/auto-safety/refresh")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> RefreshAutoSafety(Guid id)
+    {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
+        var result = await _fmcsaSafety.RefreshQuoteAutoSafetyAsync(id);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

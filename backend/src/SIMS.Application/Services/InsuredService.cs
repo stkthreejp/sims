@@ -93,6 +93,7 @@ public class InsuredService : IInsuredService
             LastName = dto.LastName,
             DateOfBirth = dto.DateOfBirth,
             CompanyName = dto.CompanyName,
+            UsDotNumber = NormalizeDotNumber(dto.UsDotNumber),
             TaxId = dto.TaxId,
             Email = dto.Email,
             Phone = dto.Phone,
@@ -124,6 +125,7 @@ public class InsuredService : IInsuredService
         insured.LastName = dto.LastName;
         insured.DateOfBirth = dto.DateOfBirth;
         insured.CompanyName = dto.CompanyName;
+        insured.UsDotNumber = NormalizeDotNumber(dto.UsDotNumber);
         insured.TaxId = dto.TaxId;
         insured.Email = dto.Email;
         insured.Phone = dto.Phone;
@@ -165,6 +167,7 @@ public class InsuredService : IInsuredService
         LastName = i.LastName,
         DateOfBirth = i.DateOfBirth,
         CompanyName = i.CompanyName,
+        UsDotNumber = i.UsDotNumber,
         TaxId = i.TaxId,
         Email = i.Email,
         Phone = i.Phone,
@@ -179,4 +182,11 @@ public class InsuredService : IInsuredService
         CreatedAt = i.CreatedAt,
         PolicyCount = i.Submissions?.Count ?? 0
     };
+
+    private static string? NormalizeDotNumber(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        return string.IsNullOrWhiteSpace(digits) ? null : digits;
+    }
 }

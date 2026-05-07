@@ -55,10 +55,16 @@ export function InsuredCreatePage() {
             </div>
           </div>
         ) : (
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-            <input {...register('companyName', { required: 'Required' })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            {errors.companyName && <p className="text-xs text-red-600 mt-1">{errors.companyName.message}</p>}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+              <input {...register('companyName', { required: 'Required' })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              {errors.companyName && <p className="text-xs text-red-600 mt-1">{errors.companyName.message}</p>}
+            </div>
+            <div className="w-1/2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">USDOT #</label>
+              <input {...register('usDotNumber')} inputMode="numeric" placeholder="Optional" className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
         )}
 

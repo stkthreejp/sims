@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText,
   RefreshCw, AlertTriangle, TrendingDown, Calculator, MoreHorizontal,
+  ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
@@ -21,6 +22,7 @@ import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate,
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
+import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
 import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
@@ -36,6 +38,8 @@ const LOB_SHORT: Record<string, string> = {
   Property: 'Prop',
   Cargo: 'Cargo',
 }
+
+const AUTO_SAFETY_LOBS = new Set<PolicyLineOfBusiness>(['AutoLiability', 'AutoPhysicalDamage', 'CommercialAuto'])
 
 const STATUS_PILL: Record<SubmissionStatus, string> = {
   New: 'new',
@@ -144,6 +148,7 @@ export function SubmissionDetailPage() {
   const [overrideMode, setOverrideMode] = useState<'dollar' | 'rate'>('dollar')
   const [overrideInput, setOverrideInput] = useState('')
   const [ratingOpenForQuoteId, setRatingOpenForQuoteId] = useState<string | null>(null)
+  const [autoSafetyOpenForQuoteId, setAutoSafetyOpenForQuoteId] = useState<string | null>(null)
   const [supplementalOpen, setSupplementalOpen] = useState(false)
   const emptyDriverForm = (): SubmissionDriverCreate => ({ driverNumber: 1, name: '', dateOfBirth: undefined, licenseNumber: undefined, licenseState: undefined, dateHired: undefined })
   const [showDriverForm, setShowDriverForm] = useState(false)
@@ -582,6 +587,15 @@ export function SubmissionDetailPage() {
                   >
                     <Calculator size={12} /> Rate
                   </button>
+                  {AUTO_SAFETY_LOBS.has(q.lineOfBusiness) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setAutoSafetyOpenForQuoteId((cur) => cur === q.id ? null : q.id) }}
+                      className={`sd-btn sm ${autoSafetyOpenForQuoteId === q.id ? 'primary' : 'outline'}`}
+                      title="FMCSA auto safety"
+                    >
+                      <ShieldCheck size={12} /> Safety
+                    </button>
+                  )}
                   {q.status !== 'Bound' && q.status !== 'Cancelled' && q.status !== 'Expired' && canCreatePolicies && !q.hasCommissionOverride && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setOverrideQuoteId(q.id); setOverrideMode('dollar'); setOverrideInput('') }}
@@ -666,6 +680,11 @@ export function SubmissionDetailPage() {
                   lineOfBusiness={q.lineOfBusiness}
                   isBound={q.status === 'Bound'}
                 />
+              )}
+
+              {/* Auto safety panel */}
+              {autoSafetyOpenForQuoteId === q.id && AUTO_SAFETY_LOBS.has(q.lineOfBusiness) && (
+                <QuoteAutoSafetyPanel quoteId={q.id} />
               )}
 
               {/* Bind form */}
