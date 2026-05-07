@@ -15,7 +15,7 @@ import { agentsApi } from '@/api/agents.api'
 import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
 import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
-import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS } from '@/types/submissionLob.types'
+import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
@@ -1166,6 +1166,23 @@ export function SubmissionDetailPage() {
                       <div><label style={labelStyle}>Garaging ZIP</label><input value={vehicleForm.garagingZip ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, garagingZip: e.target.value || undefined }))} style={inputStyle} /></div>
                       <div><label style={labelStyle}>Radius</label><select value={vehicleForm.radius ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, radius: (e.target.value as OperatingRadius) || undefined }))} style={inputStyle}><option value="">— Select —</option>{(Object.keys(OPERATING_RADIUS_LABELS) as OperatingRadius[]).map((k) => <option key={k} value={k}>{OPERATING_RADIUS_LABELS[k]}</option>)}</select></div>
                     </div>
+                    {/* APD rating inputs */}
+                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
+                      <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>APD Rating Inputs</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                        <div><label style={labelStyle}>APD Vehicle Class</label><select value={vehicleForm.apdVehicleClass ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdVehicleClass: e.target.value ? parseInt(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_VEHICLE_CLASS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                        <div><label style={labelStyle}>Road Type</label><select value={vehicleForm.apdRoadType ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdRoadType: e.target.value ? parseInt(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_ROAD_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                        <div><label style={labelStyle}>Annual Miles</label><input type="number" value={vehicleForm.apdAnnualMiles ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdAnnualMiles: parseInt(e.target.value) || undefined }))} style={inputStyle} /></div>
+                        <div><label style={labelStyle}>Operation Code</label><select value={vehicleForm.apdOperationCode ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdOperationCode: e.target.value ? parseInt(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_OPERATION_CODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                        <div><label style={labelStyle}>State</label><select value={vehicleForm.apdState ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdState: e.target.value || undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_SUPPORTED_STATES.map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
+                        <div><label style={labelStyle}>Stated Value ($)</label><input type="number" value={vehicleForm.apdStatedValue ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdStatedValue: parseFloat(e.target.value) || undefined }))} style={inputStyle} /></div>
+                        <div><label style={labelStyle}>Comp Deductible</label><select value={vehicleForm.apdCompDeductible ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdCompDeductible: e.target.value ? parseInt(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_COMP_DEDUCTIBLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                        <div><label style={labelStyle}>Coll Deductible</label><select value={vehicleForm.apdCollDeductible ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdCollDeductible: e.target.value ? parseInt(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_COLL_DEDUCTIBLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                        <div><label style={labelStyle}>Driver Age Code</label><select value={vehicleForm.apdDriverAgeCode ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdDriverAgeCode: e.target.value !== '' ? parseInt(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_DRIVER_AGE_CODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                        <div><label style={labelStyle}>Driver Points Code</label><select value={vehicleForm.apdDriverPointsCode ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdDriverPointsCode: e.target.value !== '' ? parseInt(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_DRIVER_POINTS_CODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                        <div><label style={labelStyle}>Driver Exp Mod</label><select value={vehicleForm.apdDriverExpMod ?? ''} onChange={(e) => setVehicleForm((f) => ({ ...f, apdDriverExpMod: e.target.value ? parseFloat(e.target.value) : undefined }))} style={inputStyle}><option value="">— Select —</option>{APD_DRIVER_EXP_MOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <button onClick={() => saveVehicleMutation.mutate(vehicleForm)} disabled={saveVehicleMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
                       <button onClick={() => { setShowVehicleForm(false); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
@@ -1181,7 +1198,7 @@ export function SubmissionDetailPage() {
                   <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No vehicles added yet</div>
                 ) : (
                   <table className="sd-table">
-                    <thead><tr><th>Unit</th><th>Year / Make / Model</th><th>VIN</th><th>Class</th><th>GVW</th><th>Radius</th><th /></tr></thead>
+                    <thead><tr><th>Unit</th><th>Year / Make / Model</th><th>VIN</th><th>Class</th><th>GVW</th><th>Radius</th><th>Stated Value</th><th /></tr></thead>
                     <tbody>
                       {vehicles.map((v) => (
                         <tr key={v.id}>
@@ -1191,9 +1208,10 @@ export function SubmissionDetailPage() {
                           <td><span className="sd-lob">{VEHICLE_CLASS_LABELS[v.vehicleClass]}</span></td>
                           <td>{v.gvw ? v.gvw.toLocaleString() : '—'}</td>
                           <td>{v.radius ? OPERATING_RADIUS_LABELS[v.radius] : '—'}</td>
+                          <td>{v.apdStatedValue ? formatCurrency(v.apdStatedValue) : '—'}</td>
                           <td style={{ padding: '8px 14px' }}>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
+                              <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined, apdVehicleClass: v.apdVehicleClass ?? undefined, apdRoadType: v.apdRoadType ?? undefined, apdAnnualMiles: v.apdAnnualMiles ?? undefined, apdOperationCode: v.apdOperationCode ?? undefined, apdState: v.apdState ?? undefined, apdStatedValue: v.apdStatedValue ?? undefined, apdCompDeductible: v.apdCompDeductible ?? undefined, apdCollDeductible: v.apdCollDeductible ?? undefined, apdDriverAgeCode: v.apdDriverAgeCode ?? undefined, apdDriverPointsCode: v.apdDriverPointsCode ?? undefined, apdDriverExpMod: v.apdDriverExpMod ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
                               <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
                             </div>
                           </td>

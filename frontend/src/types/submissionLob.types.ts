@@ -34,6 +34,77 @@ export interface SubmissionDriverCreate {
   dateHired?: string
 }
 
+// APD rating lookup constants
+export const APD_VEHICLE_CLASS_OPTIONS = [
+  { value: 1, label: 'Light/Medium Truck' },
+  { value: 2, label: 'Heavy/Extra Heavy Truck' },
+  { value: 3, label: 'Truck-Tractor' },
+  { value: 4, label: 'Trailer' },
+] as const
+
+export const APD_ROAD_TYPE_OPTIONS = [
+  { value: 1, label: 'On-Road Only' },
+  { value: 2, label: 'On/Off-Road' },
+  { value: 3, label: 'On-Road w/ Mining' },
+  { value: 4, label: 'On/Off-Road w/ Mining' },
+  { value: 5, label: 'Off-Road Only' },
+] as const
+
+export const APD_OPERATION_CODE_OPTIONS = [
+  { value: 91, label: '91 – For-Hire' },
+  { value: 92, label: '92 – Private' },
+  { value: 99, label: '99 – All Other' },
+] as const
+
+export const APD_DRIVER_AGE_CODE_OPTIONS = [
+  { value: 0, label: 'N/A' },
+  { value: 1, label: 'Age 20' },
+  { value: 2, label: 'Age 21' },
+  { value: 3, label: 'Age 22' },
+  { value: 4, label: 'Age 23' },
+  { value: 5, label: 'Age 24' },
+  { value: 6, label: 'Age 25–29' },
+  { value: 7, label: 'Age 30–64' },
+  { value: 8, label: 'Age 65+' },
+] as const
+
+export const APD_DRIVER_POINTS_CODE_OPTIONS = [
+  { value: 0, label: '0 Points' },
+  { value: 1, label: '1 Point' },
+  { value: 2, label: '2 Points' },
+  { value: 3, label: '3 Points' },
+  { value: 4, label: '4 Points' },
+  { value: 5, label: '5+ Points' },
+] as const
+
+export const APD_DRIVER_EXP_MOD_OPTIONS = [
+  { value: 1.0, label: '1.00 – Standard' },
+  { value: 1.15, label: '1.15 – Surcharge' },
+  { value: 1.25, label: '1.25 – High Surcharge' },
+] as const
+
+export const APD_COMP_DEDUCTIBLE_OPTIONS = [
+  { value: 1000, label: '$1,000' },
+  { value: 2500, label: '$2,500' },
+  { value: 5000, label: '$5,000' },
+  { value: 10000, label: '$10,000' },
+  { value: 25000, label: '$25,000' },
+] as const
+
+export const APD_COLL_DEDUCTIBLE_OPTIONS = [
+  { value: 1000, label: '$1,000' },
+  { value: 2500, label: '$2,500' },
+  { value: 5000, label: '$5,000' },
+  { value: 10000, label: '$10,000' },
+  { value: 25000, label: '$25,000' },
+] as const
+
+export const APD_SUPPORTED_STATES = [
+  'AL','AR','AZ','CO','FL','GA','IA','ID','IL','IN','KS','KY','LA',
+  'MD','MI','MN','MO','MS','MT','NC','ND','NE','NM','NV','OH','OK',
+  'OR','PA','SC','SD','TN','TX','UT','VA','WA','WI','WV','WY',
+] as const
+
 export interface SubmissionVehicle {
   id: string
   submissionId: string
@@ -47,6 +118,18 @@ export interface SubmissionVehicle {
   garagingZip: string | null
   radius: OperatingRadius | null
   createdAt: string
+  // APD rating inputs
+  apdVehicleClass: number | null
+  apdRoadType: number | null
+  apdAnnualMiles: number | null
+  apdOperationCode: number | null
+  apdState: string | null
+  apdStatedValue: number | null
+  apdCompDeductible: number | null
+  apdCollDeductible: number | null
+  apdDriverAgeCode: number | null
+  apdDriverPointsCode: number | null
+  apdDriverExpMod: number | null
 }
 
 export interface SubmissionVehicleCreate {
@@ -59,6 +142,18 @@ export interface SubmissionVehicleCreate {
   vehicleClass: VehicleClass
   garagingZip?: string
   radius?: OperatingRadius
+  // APD rating inputs
+  apdVehicleClass?: number
+  apdRoadType?: number
+  apdAnnualMiles?: number
+  apdOperationCode?: number
+  apdState?: string
+  apdStatedValue?: number
+  apdCompDeductible?: number
+  apdCollDeductible?: number
+  apdDriverAgeCode?: number
+  apdDriverPointsCode?: number
+  apdDriverExpMod?: number
 }
 
 export interface SubmissionLocation {

@@ -45,6 +45,17 @@ public class SubmissionVehiclesController : ControllerBase
             VehicleClass = dto.VehicleClass,
             GaragingZip = dto.GaragingZip,
             Radius = dto.Radius,
+            ApdVehicleClass = dto.ApdVehicleClass,
+            ApdRoadType = dto.ApdRoadType,
+            ApdAnnualMiles = dto.ApdAnnualMiles,
+            ApdOperationCode = dto.ApdOperationCode,
+            ApdState = dto.ApdState,
+            ApdStatedValue = dto.ApdStatedValue,
+            ApdCompDeductible = dto.ApdCompDeductible,
+            ApdCollDeductible = dto.ApdCollDeductible,
+            ApdDriverAgeCode = dto.ApdDriverAgeCode,
+            ApdDriverPointsCode = dto.ApdDriverPointsCode,
+            ApdDriverExpMod = dto.ApdDriverExpMod,
         };
         _db.SubmissionVehicles.Add(vehicle);
         await _db.SaveChangesAsync();
@@ -66,6 +77,17 @@ public class SubmissionVehiclesController : ControllerBase
         vehicle.VehicleClass = dto.VehicleClass;
         vehicle.GaragingZip = dto.GaragingZip;
         vehicle.Radius = dto.Radius;
+        vehicle.ApdVehicleClass = dto.ApdVehicleClass;
+        vehicle.ApdRoadType = dto.ApdRoadType;
+        vehicle.ApdAnnualMiles = dto.ApdAnnualMiles;
+        vehicle.ApdOperationCode = dto.ApdOperationCode;
+        vehicle.ApdState = dto.ApdState;
+        vehicle.ApdStatedValue = dto.ApdStatedValue;
+        vehicle.ApdCompDeductible = dto.ApdCompDeductible;
+        vehicle.ApdCollDeductible = dto.ApdCollDeductible;
+        vehicle.ApdDriverAgeCode = dto.ApdDriverAgeCode;
+        vehicle.ApdDriverPointsCode = dto.ApdDriverPointsCode;
+        vehicle.ApdDriverExpMod = dto.ApdDriverExpMod;
         await _db.SaveChangesAsync();
         return Ok(MapToDto(vehicle));
     }
@@ -95,5 +117,16 @@ public class SubmissionVehiclesController : ControllerBase
         GaragingZip = v.GaragingZip,
         Radius = v.Radius,
         CreatedAt = v.CreatedAt,
+        ApdVehicleClass = v.ApdVehicleClass,
+        ApdRoadType = v.ApdRoadType,
+        ApdAnnualMiles = v.ApdAnnualMiles,
+        ApdOperationCode = v.ApdOperationCode,
+        ApdState = v.ApdState,
+        ApdStatedValue = v.ApdStatedValue,
+        ApdCompDeductible = v.ApdCompDeductible,
+        ApdCollDeductible = v.ApdCollDeductible,
+        ApdDriverAgeCode = v.ApdDriverAgeCode,
+        ApdDriverPointsCode = v.ApdDriverPointsCode,
+        ApdDriverExpMod = v.ApdDriverExpMod,
     };
 }

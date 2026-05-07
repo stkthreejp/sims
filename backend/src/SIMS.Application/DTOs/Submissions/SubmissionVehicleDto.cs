@@ -16,6 +16,19 @@ public class SubmissionVehicleDto
     public string? GaragingZip { get; set; }
     public OperatingRadius? Radius { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // APD rating inputs
+    public int? ApdVehicleClass { get; set; }
+    public int? ApdRoadType { get; set; }
+    public int? ApdAnnualMiles { get; set; }
+    public int? ApdOperationCode { get; set; }
+    public string? ApdState { get; set; }
+    public decimal? ApdStatedValue { get; set; }
+    public decimal? ApdCompDeductible { get; set; }
+    public decimal? ApdCollDeductible { get; set; }
+    public int? ApdDriverAgeCode { get; set; }
+    public int? ApdDriverPointsCode { get; set; }
+    public decimal? ApdDriverExpMod { get; set; }
 }
 
 public class SubmissionVehicleCreateDto
@@ -29,6 +42,19 @@ public class SubmissionVehicleCreateDto
     public VehicleClass VehicleClass { get; set; }
     public string? GaragingZip { get; set; }
     public OperatingRadius? Radius { get; set; }
+
+    // APD rating inputs
+    public int? ApdVehicleClass { get; set; }
+    public int? ApdRoadType { get; set; }
+    public int? ApdAnnualMiles { get; set; }
+    public int? ApdOperationCode { get; set; }
+    public string? ApdState { get; set; }
+    public decimal? ApdStatedValue { get; set; }
+    public decimal? ApdCompDeductible { get; set; }
+    public decimal? ApdCollDeductible { get; set; }
+    public int? ApdDriverAgeCode { get; set; }
+    public int? ApdDriverPointsCode { get; set; }
+    public decimal? ApdDriverExpMod { get; set; }
 }
 
 public class SubmissionVehicleUpdateDto : SubmissionVehicleCreateDto { }
