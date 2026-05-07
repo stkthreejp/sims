@@ -55,3 +55,6 @@ backend/.nuget-packages/
 
 # Attachments (runtime data)
 backend/attachments/
+
+# Claude Code session files
+.claude/
