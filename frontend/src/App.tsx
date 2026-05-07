@@ -63,6 +63,7 @@ const AdminRatingPlanDetailPage = lazy(() => import('@/pages/admin/AdminRatingPl
 const AdminRatingPlanVersionPage = lazy(() => import('@/pages/admin/AdminRatingPlanVersionPage').then((m) => ({ default: m.AdminRatingPlanVersionPage })))
 const AdminShadowRatingPage = lazy(() => import('@/pages/admin/AdminShadowRatingPage'))
 const RolePermissionsPage = lazy(() => import('@/pages/admin/RolePermissionsPage').then((m) => ({ default: m.RolePermissionsPage })))
+const DatabaseStatusPage = lazy(() => import('@/pages/admin/DatabaseStatusPage').then((m) => ({ default: m.DatabaseStatusPage })))
 
 // Quotes & Billing
 const QuoteWriteupPage = lazy(() => import('@/pages/quotes/QuoteWriteupPage'))
@@ -160,6 +161,7 @@ export default function App() {
               <Route path="/admin/rating/versions/:versionId" element={<AdminRatingPlanVersionPage />} />
               <Route path="/admin/rating/shadow" element={<AdminShadowRatingPage />} />
               <Route path="/admin/role-permissions" element={<RolePermissionsPage />} />
+              <Route path="/admin/database-status" element={<DatabaseStatusPage />} />
               <Route path="/quotes/:quoteId/writeup" element={<QuoteWriteupPage />} />
               <Route path="/billing/invoices" element={<InvoicesPage />} />
               <Route path="/billing/receipts" element={<ReceiptsPage />} />

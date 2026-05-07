@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
@@ -102,6 +102,7 @@ export function Sidebar() {
             <SectionLabel>Admin</SectionLabel>
             {isAdmin && <NavItem to="/users" label="Users" icon={Users} />}
             {isAdmin && <NavItem to="/admin/role-permissions" label="Role Permissions" icon={KeyRound} />}
+            {isAdmin && <NavItem to="/admin/database-status" label="Database Status" icon={Database} />}
             {perms.canViewDocumentLibrary && <NavItem to="/document-library" label="Doc Library" icon={LayoutTemplate} />}
             {perms.canViewFeesAdmin && <NavItem to="/admin/fees" label="Fee Rules" icon={Receipt} />}
             {perms.canViewRatingAdmin && <NavItem to="/admin/rating" label="Rating Plans" icon={Sliders} />}

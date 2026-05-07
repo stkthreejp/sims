@@ -5,6 +5,22 @@ import type {
   SystemEvent, HolidayCalendar, EscalationRule,
 } from '@/types/task.types'
 
+export interface DatabaseTableStatus {
+  name: string
+  exists: boolean
+}
+
+export interface DatabaseStatus {
+  canConnect: boolean
+  providerName: string | null
+  databaseName: string | null
+  dataSource: string | null
+  latestAppliedMigration: string | null
+  appliedMigrations: string[]
+  pendingMigrations: string[]
+  expectedTables: DatabaseTableStatus[]
+}
+
 // ── Task Types ────────────────────────────────────────────────────────────────
 
 export const adminTaskTypesApi = {
@@ -51,6 +67,11 @@ export const adminWorkflowsApi = {
 export const adminSystemEventsApi = {
   getAll: () =>
     apiClient.get<SystemEvent[]>('/admin/system-events').then((r) => r.data),
+}
+
+export const adminDatabaseApi = {
+  getStatus: () =>
+    apiClient.get<DatabaseStatus>('/admin/database/status').then((r) => r.data),
 }
 
 // ── Holiday Calendar ──────────────────────────────────────────────────────────
