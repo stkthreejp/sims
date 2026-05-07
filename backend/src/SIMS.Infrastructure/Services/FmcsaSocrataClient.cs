@@ -50,7 +50,16 @@ public class FmcsaSocrataClient
     private async Task<List<Dictionary<string, JsonElement>>> TryGetRowsPageAsync(
         string datasetId, string dotNumber, int limit, int offset, CancellationToken ct)
     {
-        var dotColumns = new[] { "dot_number", "usdot_number", "us_dot_number", "usdot" };
+        var dotColumns = new[]
+        {
+            "dot_number",
+            "usdot_number",
+            "us_dot_number",
+            "usdot",
+            "usdot_num",
+            "dot_num",
+            "dot"
+        };
         Exception? lastError = null;
 
         foreach (var dotColumn in dotColumns)
@@ -66,6 +75,17 @@ public class FmcsaSocrataClient
                     lastError = ex;
                 }
             }
+        }
+
+        try
+        {
+            var query = $"$limit={limit}&$offset={offset}&$q={WebUtility.UrlEncode(dotNumber)}";
+            var rows = await SendAsync(datasetId, query, ct);
+            return rows.Where(r => RowMatchesDotNumber(r, dotNumber)).ToList();
+        }
+        catch (HttpRequestException ex) when (IsLikelyBadColumn(ex))
+        {
+            lastError = ex;
         }
 
         throw lastError ?? new InvalidOperationException($"Unable to query Socrata dataset {datasetId}.");
@@ -94,6 +114,33 @@ public class FmcsaSocrataClient
             throw new HttpRequestException($"Socrata error {(int)response.StatusCode}: {content}", null, response.StatusCode);
 
         return JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(content, JsonOpts) ?? new();
+    }
+
+    private static bool RowMatchesDotNumber(Dictionary<string, JsonElement> row, string dotNumber)
+    {
+        foreach (var (key, value) in row)
+        {
+            if (!key.Contains("dot", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var raw = value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : value.ValueKind == JsonValueKind.Number
+                    ? value.ToString()
+                    : null;
+
+            if (string.Equals(NormalizeDigits(raw), dotNumber, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string? NormalizeDigits(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        return digits.Length == 0 ? null : digits;
     }
 
     private static bool IsLikelyBadColumn(HttpRequestException ex) =>
