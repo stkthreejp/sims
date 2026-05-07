@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { apiClient } from './client'
 import type { LoginRequest, LoginResponse, UserInfo } from '@/types/auth.types'
 
@@ -10,6 +11,9 @@ export const authApi = {
 
   refresh: () =>
     apiClient.post<LoginResponse>('/auth/refresh').then((r) => r.data),
+
+  refreshSession: () =>
+    axios.post<LoginResponse>('/api/v1/auth/refresh', null, { withCredentials: true }).then((r) => r.data),
 
   logout: () =>
     apiClient.post('/auth/logout'),

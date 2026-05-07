@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toaster } from 'sonner'
 import { queryClient } from '@/lib/queryClient'
 import { useAuthStore } from '@/store/authStore'
+import { authApi } from '@/api/auth.api'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -86,11 +87,35 @@ const PageFallback = () => (
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const [hydrated, setHydrated] = useState(false)
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const setAuth = useAuthStore((s) => s.setAuth)
+  const clearAuth = useAuthStore((s) => s.clearAuth)
+  const [checkingSession, setCheckingSession] = useState(true)
 
-  useEffect(() => { setHydrated(true) }, [])
+  useEffect(() => {
+    let cancelled = false
 
-  if (!hydrated) return <PageFallback />
+    if (!isAuthenticated || accessToken) {
+      setCheckingSession(false)
+      return
+    }
+
+    setCheckingSession(true)
+    authApi.refreshSession()
+      .then((session) => {
+        if (!cancelled) setAuth(session.user, session.accessToken)
+      })
+      .catch(() => {
+        if (!cancelled) clearAuth()
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingSession(false)
+      })
+
+    return () => { cancelled = true }
+  }, [accessToken, clearAuth, isAuthenticated, setAuth])
+
+  if (checkingSession) return <PageFallback />
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
