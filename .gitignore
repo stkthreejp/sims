@@ -42,6 +42,7 @@ frontend_ms.log
 backend/.appdata/
 backend/.dotnet-home/
 backend/.nuget-packages/
+.codex-temp-dbcheck/
 
 # Claude Code local settings (may contain personal config)
 .claude/settings.local.json
