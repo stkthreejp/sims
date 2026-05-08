@@ -316,7 +316,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     private async Task<int> UpsertCrashesAsync(string dotNumber, List<Dictionary<string, JsonElement>> rows, DateTime now, CancellationToken ct)
     {
         var count = 0;
-        foreach (var row in rows)
+        foreach (var row in DeduplicateBy(rows, r => GetString(r, "report_number", "crash_report_number", "crash_id")))
         {
             var reportNumber = GetString(row, "report_number", "crash_report_number", "crash_id");
             if (string.IsNullOrWhiteSpace(reportNumber)) continue;
@@ -341,6 +341,19 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         }
 
         return count;
+    }
+
+    private static IEnumerable<Dictionary<string, JsonElement>> DeduplicateBy(
+        IEnumerable<Dictionary<string, JsonElement>> rows,
+        Func<Dictionary<string, JsonElement>, string?> keySelector)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            var key = keySelector(row);
+            if (string.IsNullOrWhiteSpace(key) || seen.Add(key))
+                yield return row;
+        }
     }
 
     private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaViolation> violations)
