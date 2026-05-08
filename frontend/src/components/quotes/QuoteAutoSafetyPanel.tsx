@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, XCircle } from 'lucide-react'
@@ -9,6 +10,8 @@ type Props = {
   quoteId: string
 }
 
+type AutoSafetyTab = 'safer' | 'radius' | 'events' | 'history'
+
 const riskStyle: Record<AutoSafetyRiskLevel, string> = {
   Unknown: 'bg-slate-100 text-slate-600 border-slate-200',
   Acceptable: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -18,6 +21,7 @@ const riskStyle: Record<AutoSafetyRiskLevel, string> = {
 
 export function QuoteAutoSafetyPanel({ quoteId }: Props) {
   const qc = useQueryClient()
+  const [activeTab, setActiveTab] = useState<AutoSafetyTab>('safer')
   const { data, error, isLoading, isError } = useQuery({
     queryKey: ['quote-auto-safety', quoteId],
     queryFn: () => quotesApi.getAutoSafety(quoteId),
@@ -130,51 +134,46 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
       )}
 
       <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-slate-600">
-        <SectionPill label="SAFER / OOS" />
-        <SectionPill label="Radius" />
-        <SectionPill label="Events" />
-        <SectionPill label="CSA / History" />
+        <SectionPill label="SAFER / OOS" active={activeTab === 'safer'} onClick={() => setActiveTab('safer')} />
+        <SectionPill label="Radius" active={activeTab === 'radius'} onClick={() => setActiveTab('radius')} />
+        <SectionPill label="Events" active={activeTab === 'events'} onClick={() => setActiveTab('events')} />
+        <SectionPill label="CSA / History" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2 rounded border bg-white p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-            <Truck className="h-3.5 w-3.5" /> SAFER / OOS
+      {activeTab === 'safer' && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2 rounded border bg-white p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+              <Truck className="h-3.5 w-3.5" /> SAFER / OOS
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <OosMetric label="Overall" count={oos.inspectionCount} oosCount={overallOosCount} rate={overallOosRate} />
+              <OosMetric label="Driver" count={driverInspectionCount} oosCount={oos.driverOosCount} rate={oos.driverOosRate} />
+              <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} />
+              <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} />
+            </div>
+            <p className="mt-3 text-xs text-slate-400">National average comparisons are next backend fields.</p>
           </div>
-          <div className="grid grid-cols-4 gap-3">
-            <OosMetric
-              label="Overall"
-              count={oos.inspectionCount}
-              oosCount={overallOosCount}
-              rate={overallOosRate}
-            />
-            <OosMetric label="Driver" count={driverInspectionCount} oosCount={oos.driverOosCount} rate={oos.driverOosRate} />
-            <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} />
-            <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} />
-          </div>
-          <p className="mt-3 text-xs text-slate-400">
-            National average comparisons are next backend fields.
-          </p>
-        </div>
 
+          <div className="rounded border bg-white p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+              <Activity className="h-3.5 w-3.5" /> Accident Summary
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Metric label="Fatal" value={(accident?.fatalCount ?? 0).toLocaleString()} compact />
+              <Metric label="Injury" value={(accident?.injuryCount ?? 0).toLocaleString()} compact />
+              <Metric label="Tow" value={(accident?.towCount ?? 0).toLocaleString()} compact />
+              <Metric label="Reportable" value={(accident?.totalReportableCount ?? 0).toLocaleString()} compact />
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              SAFER-style reportable crash events; ratio: {accident?.accidentToPowerUnitRatio == null ? '-' : `${accident.accidentToPowerUnitRatio}%`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'radius' && (
         <div className="rounded border bg-white p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-            <Activity className="h-3.5 w-3.5" /> Accident Summary
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Metric label="Fatal" value={(accident?.fatalCount ?? 0).toLocaleString()} compact />
-            <Metric label="Injury" value={(accident?.injuryCount ?? 0).toLocaleString()} compact />
-            <Metric label="Tow" value={(accident?.towCount ?? 0).toLocaleString()} compact />
-            <Metric label="Reportable" value={(accident?.totalReportableCount ?? 0).toLocaleString()} compact />
-          </div>
-          <p className="mt-3 text-xs text-slate-400">
-            Accident to power unit ratio: {accident?.accidentToPowerUnitRatio == null ? '-' : `${accident.accidentToPowerUnitRatio}%`}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2 rounded border bg-white p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
             <MapPin className="h-3.5 w-3.5" /> Radius Of Operations
           </div>
@@ -196,63 +195,77 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             ))}
           </div>
         </div>
+      )}
 
-        <div className="rounded border bg-white p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-            <Clock3 className="h-3.5 w-3.5" /> History Snapshot
-          </div>
-          <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
-          <div className="mt-3 space-y-1 text-xs text-slate-400">
-            <div>Inspection trend: next</div>
-            <div>BASIC history: next</div>
-            <div>MCS-150 changes: next</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded border bg-white">
-        <div className="flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">
-          <BarChart3 className="h-3.5 w-3.5" /> CSA / BASICs
-        </div>
-        <div className="grid grid-cols-7 divide-x">
-          {data.basics.map((b) => (
-            <div key={b.basic} className="min-w-0 p-3">
-              <div className="truncate text-xs font-semibold text-slate-700" title={b.basic}>{b.basic}</div>
-              <div className="mt-2 flex items-center gap-1 text-xs">
-                {b.isPrioritized ? <XCircle className="h-3.5 w-3.5 text-red-600" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
-                <span className={b.isPrioritized ? 'text-red-700' : 'text-slate-500'}>
-                  {b.percentile == null ? `${b.eventCount} events` : `${b.percentile}%`}
-                </span>
-              </div>
-              {b.outOfServiceCount > 0 && <div className="mt-1 text-xs text-amber-700">{b.outOfServiceCount} OOS</div>}
+      {activeTab === 'events' && (
+        <div className="rounded border bg-white">
+          <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">Events</div>
+          {data.recentSevereEvents.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-slate-400">No recent high-severity or OOS events in the imported window.</p>
+          ) : (
+            <div className="divide-y">
+              {data.recentSevereEvents.map((event, idx) => (
+                <div key={`${event.date}-${idx}`} className="grid grid-cols-[120px_160px_1fr_80px] gap-3 px-4 py-2 text-sm">
+                  <span className="text-slate-500">{new Date(event.date).toLocaleDateString()}</span>
+                  <span className="font-medium text-slate-700">{event.eventType}</span>
+                  <span className="truncate text-slate-600">{event.description}</span>
+                  <span className="text-right text-slate-500">{event.state ?? '-'}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      )}
 
-      <div className="rounded border bg-white">
-        <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">Events</div>
-        {data.recentSevereEvents.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-slate-400">No recent high-severity or OOS events in the imported window.</p>
-        ) : (
-          <div className="divide-y">
-            {data.recentSevereEvents.map((event, idx) => (
-              <div key={`${event.date}-${idx}`} className="grid grid-cols-[120px_160px_1fr_80px] gap-3 px-4 py-2 text-sm">
-                <span className="text-slate-500">{new Date(event.date).toLocaleDateString()}</span>
-                <span className="font-medium text-slate-700">{event.eventType}</span>
-                <span className="truncate text-slate-600">{event.description}</span>
-                <span className="text-right text-slate-500">{event.state ?? '-'}</span>
-              </div>
-            ))}
+      {activeTab === 'history' && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2 rounded border bg-white">
+            <div className="flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">
+              <BarChart3 className="h-3.5 w-3.5" /> CSA / BASICs
+            </div>
+            <div className="grid grid-cols-7 divide-x">
+              {data.basics.map((b) => (
+                <div key={b.basic} className="min-w-0 p-3">
+                  <div className="truncate text-xs font-semibold text-slate-700" title={b.basic}>{b.basic}</div>
+                  <div className="mt-2 flex items-center gap-1 text-xs">
+                    {b.isPrioritized ? <XCircle className="h-3.5 w-3.5 text-red-600" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
+                    <span className={b.isPrioritized ? 'text-red-700' : 'text-slate-500'}>
+                      {b.percentile == null ? `${b.eventCount} events` : `${b.percentile}%`}
+                    </span>
+                  </div>
+                  {b.outOfServiceCount > 0 && <div className="mt-1 text-xs text-amber-700">{b.outOfServiceCount} OOS</div>}
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+
+          <div className="rounded border bg-white p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+              <Clock3 className="h-3.5 w-3.5" /> History Snapshot
+            </div>
+            <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
+            <div className="mt-3 space-y-1 text-xs text-slate-400">
+              <div>Inspection trend: next</div>
+              <div>BASIC history: next</div>
+              <div>MCS-150 changes: next</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function SectionPill({ label }: { label: string }) {
-  return <div className="rounded border border-slate-200 bg-white px-3 py-2 text-center">{label}</div>
+function SectionPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded border px-3 py-2 text-center transition ${active ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+    >
+      {label}
+    </button>
+  )
 }
 
 function OosMetric({ label, count, oosCount, rate }: { label: string; count: number; oosCount: number; rate: number | null }) {

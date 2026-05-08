@@ -336,6 +336,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         {
             var reportNumber = GetString(row, "report_number", "crash_report_number", "crash_id");
             if (string.IsNullOrWhiteSpace(reportNumber)) continue;
+            var crashDate = GetDate(row, "crash_date", "accident_date", "date");
+            if (crashDate == null) continue;
 
             var crash = await _db.FmcsaCrashes
                 .FirstOrDefaultAsync(c => c.UsDotNumber == dotNumber && c.ReportNumber == reportNumber, ct);
@@ -345,11 +347,11 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 _db.FmcsaCrashes.Add(crash);
             }
 
-            crash.CrashDate = GetDate(row, "crash_date", "date") ?? DateOnly.FromDateTime(now);
+            crash.CrashDate = crashDate.Value;
             crash.State = GetString(row, "state", "crash_state");
-            crash.TowAway = GetBool(row, "tow_away", "towaway", "tow_away_indicator", "towaway_indicator", "tow");
-            crash.Injury = GetBool(row, "injury", "injuries", "injury_indicator", "injury_crash");
-            crash.Fatality = GetBool(row, "fatality", "fatalities", "fatality_indicator", "fatal_crash", "fatal");
+            crash.TowAway = GetCrashFlag(row, "tow_away", "towaway", "tow_away_indicator", "towaway_indicator", "tow", "tow_away_count", "towaway_count");
+            crash.Injury = GetCrashFlag(row, "injury", "injuries", "injury_indicator", "injury_crash", "injury_count", "non_fatal_injuries", "nonfatal_injuries", "number_of_injuries");
+            crash.Fatality = GetCrashFlag(row, "fatality", "fatalities", "fatality_indicator", "fatal_crash", "fatal", "fatality_count", "fatal_injuries", "number_of_fatalities");
             crash.SeverityWeight = crash.Fatality ? 3m : crash.Injury ? 2m : 1m;
             crash.TimeWeight = 1m;
             crash.ImportedAt = now;
@@ -473,10 +475,21 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static AutoSafetyAccidentSummaryDto BuildAccidentSummary(List<FmcsaCrash> crashes, int? powerUnits)
     {
-        var fatal = crashes.Count(c => c.Fatality);
-        var injury = crashes.Count(c => c.Injury);
-        var tow = crashes.Count(c => c.TowAway);
-        var totalReportable = crashes.Count;
+        var reportableCrashes = crashes
+            .Where(c => c.Fatality || c.Injury || c.TowAway)
+            .GroupBy(c => new { c.CrashDate, State = c.State ?? string.Empty })
+            .Select(g => new
+            {
+                Fatal = g.Any(c => c.Fatality),
+                Injury = g.Any(c => c.Injury),
+                Tow = g.Any(c => c.TowAway),
+            })
+            .ToList();
+
+        var fatal = reportableCrashes.Count(c => c.Fatal);
+        var injury = reportableCrashes.Count(c => !c.Fatal && c.Injury);
+        var tow = reportableCrashes.Count(c => !c.Fatal && !c.Injury && c.Tow);
+        var totalReportable = reportableCrashes.Count;
 
         return new AutoSafetyAccidentSummaryDto
         {
@@ -690,6 +703,42 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             || raw.Equals("yes", StringComparison.OrdinalIgnoreCase)
             || raw.Equals("1", StringComparison.OrdinalIgnoreCase)
             || raw.Equals("x", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool GetCrashFlag(Dictionary<string, JsonElement> row, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!TryGetValue(row, name, out var value)) continue;
+
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number))
+                return number > 0;
+
+            var raw = value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : value.ValueKind is JsonValueKind.True or JsonValueKind.False or JsonValueKind.Number
+                    ? value.ToString()
+                    : null;
+
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+                return parsed > 0;
+            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var decimalValue))
+                return decimalValue > 0;
+
+            if (raw.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || raw.Equals("y", StringComparison.OrdinalIgnoreCase)
+                || raw.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                || raw.Equals("x", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (raw.Equals("false", StringComparison.OrdinalIgnoreCase)
+                || raw.Equals("n", StringComparison.OrdinalIgnoreCase)
+                || raw.Equals("no", StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return false;
     }
 
     private static bool TryGetValue(Dictionary<string, JsonElement> row, string name, out JsonElement value)
