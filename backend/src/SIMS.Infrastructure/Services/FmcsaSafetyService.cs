@@ -93,7 +93,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         }
 
         var basics = BuildBasics(scoringRun, violations);
-        var oos = BuildOos(inspections);
+        var oos = BuildOos(inspections, violations);
         var hotspots = BuildHotspots(inspections, violations);
         var severeEvents = BuildSevereEvents(violations);
         var flags = BuildFlags(basics, oos, carrier, scoringRun);
@@ -233,6 +233,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         {
             var reportNumber = GetString(row, "report_number", "insp_report_number", "inspection_report_number");
             if (string.IsNullOrWhiteSpace(reportNumber)) continue;
+            var inspectionDate = GetDate(row, "inspection_date", "insp_date", "inspection_dt", "inspection_date_dt", "activity_date", "report_date", "date");
+            if (inspectionDate == null) continue;
 
             var inspection = await _db.FmcsaInspections
                 .FirstOrDefaultAsync(i => i.UsDotNumber == dotNumber && i.ReportNumber == reportNumber, ct);
@@ -242,13 +244,13 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 _db.FmcsaInspections.Add(inspection);
             }
 
-            inspection.InspectionDate = GetDate(row, "inspection_date", "insp_date", "date") ?? DateOnly.FromDateTime(now);
+            inspection.InspectionDate = inspectionDate.Value;
             inspection.State = GetString(row, "state", "inspection_state", "insp_state");
             inspection.InspectionLevel = GetInt(row, "inspection_level", "insp_level", "level");
-            inspection.DriverOutOfService = GetBool(row, "driver_oos", "driver_out_of_service", "drv_oos");
-            inspection.VehicleOutOfService = GetBool(row, "vehicle_oos", "vehicle_out_of_service", "veh_oos");
-            inspection.DriverViolationCount = GetInt(row, "driver_violation_count", "drv_violation_count") ?? 0;
-            inspection.VehicleViolationCount = GetInt(row, "vehicle_violation_count", "veh_violation_count") ?? 0;
+            inspection.DriverOutOfService = GetBool(row, "driver_oos", "driver_out_of_service", "drv_oos", "driver_oos_indicator", "driver_oos_flag");
+            inspection.VehicleOutOfService = GetBool(row, "vehicle_oos", "vehicle_out_of_service", "veh_oos", "vehicle_oos_indicator", "vehicle_oos_flag");
+            inspection.DriverViolationCount = GetInt(row, "driver_violation_count", "drv_violation_count", "driver_violations") ?? 0;
+            inspection.VehicleViolationCount = GetInt(row, "vehicle_violation_count", "veh_violation_count", "vehicle_violations") ?? 0;
             inspection.ImportedAt = now;
             count++;
         }
@@ -265,6 +267,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             var violationCode = GetString(row, "violation_code", "viol_code", "code");
             var description = GetString(row, "description", "violation_description", "viol_desc");
             if (string.IsNullOrWhiteSpace(reportNumber) || string.IsNullOrWhiteSpace(violationCode)) continue;
+            var inspectionDate = GetDate(row, "inspection_date", "insp_date", "inspection_dt", "inspection_date_dt", "activity_date", "report_date", "date");
 
             var inspection = await _db.FmcsaInspections
                 .FirstOrDefaultAsync(i => i.UsDotNumber == dotNumber && i.ReportNumber == reportNumber, ct);
@@ -274,11 +277,15 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 {
                     UsDotNumber = dotNumber,
                     ReportNumber = reportNumber,
-                    InspectionDate = GetDate(row, "inspection_date", "insp_date", "date") ?? DateOnly.FromDateTime(now),
+                    InspectionDate = inspectionDate ?? DateOnly.FromDateTime(now),
                     State = GetString(row, "state", "inspection_state", "insp_state"),
                     ImportedAt = now,
                 };
                 _db.FmcsaInspections.Add(inspection);
+            }
+            else if (inspectionDate.HasValue)
+            {
+                inspection.InspectionDate = inspectionDate.Value;
             }
 
             var violation = await _db.FmcsaViolations
@@ -301,12 +308,14 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
             violation.Description = description;
             violation.Basic = NormalizeBasic(GetString(row, "basic", "basic_desc", "basic_name"));
-            violation.ViolationGroup = GetString(row, "violation_group", "group_desc", "viol_group");
-            violation.IsOutOfService = GetBool(row, "oos_indicator", "is_out_of_service", "out_of_service");
+            violation.ViolationGroup = GetString(row, "violation_group", "group_desc", "viol_group", "defect_group", "violation_category", "category", "unit_type");
+            violation.IsOutOfService = GetBool(row, "oos_indicator", "is_out_of_service", "out_of_service", "oos", "oos_flag", "out_of_service_indicator");
             violation.IsDriverDisqualifying = GetBool(row, "driver_disqualified", "is_driver_disqualifying");
             violation.SeverityWeight = violation.IsOutOfService || violation.IsDriverDisqualifying ? 2 : 1;
             violation.TimeWeight = 1m;
             violation.ImportedAt = now;
+            if (violation.IsOutOfService || violation.IsDriverDisqualifying)
+                ApplyViolationOosToInspection(inspection, violation);
             count++;
         }
 
@@ -395,11 +404,28 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         }).ToList();
     }
 
-    private static AutoSafetyOosDto BuildOos(List<FmcsaInspection> inspections)
+    private static AutoSafetyOosDto BuildOos(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
     {
         var count = inspections.Count;
-        var driverOos = inspections.Count(i => i.DriverOutOfService);
-        var vehicleOos = inspections.Count(i => i.VehicleOutOfService);
+        var driverOosReports = inspections
+            .Where(i => i.DriverOutOfService)
+            .Select(i => i.ReportNumber)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var vehicleOosReports = inspections
+            .Where(i => i.VehicleOutOfService)
+            .Select(i => i.ReportNumber)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var violation in violations.Where(v => v.IsOutOfService || v.IsDriverDisqualifying))
+        {
+            if (IsDriverOosViolation(violation))
+                driverOosReports.Add(violation.ReportNumber);
+            else if (IsVehicleOosViolation(violation))
+                vehicleOosReports.Add(violation.ReportNumber);
+        }
+
+        var driverOos = driverOosReports.Count;
+        var vehicleOos = vehicleOosReports.Count;
 
         return new AutoSafetyOosDto
         {
@@ -409,6 +435,56 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             DriverOosRate = count == 0 ? null : Math.Round(driverOos * 100m / count, 2),
             VehicleOosRate = count == 0 ? null : Math.Round(vehicleOos * 100m / count, 2),
         };
+    }
+
+    private static void ApplyViolationOosToInspection(FmcsaInspection inspection, FmcsaViolation violation)
+    {
+        if (IsDriverOosViolation(violation))
+        {
+            inspection.DriverOutOfService = true;
+            return;
+        }
+
+        if (IsVehicleOosViolation(violation))
+            inspection.VehicleOutOfService = true;
+    }
+
+    private static bool IsDriverOosViolation(FmcsaViolation violation)
+    {
+        if (violation.IsDriverDisqualifying)
+            return true;
+
+        var text = BuildViolationText(violation);
+        return ContainsAny(text, "driver", "drv", "license", "medical", "hours", "hos", "log", "substance", "alcohol", "disqual")
+            || IsDriverBasic(violation.Basic);
+    }
+
+    private static bool IsVehicleOosViolation(FmcsaViolation violation)
+    {
+        var text = BuildViolationText(violation);
+        return ContainsAny(text, "vehicle", "veh", "brake", "tire", "lamp", "light", "steer", "load", "hazmat", "hm")
+            || IsVehicleBasic(violation.Basic);
+    }
+
+    private static string BuildViolationText(FmcsaViolation violation)
+    {
+        return string.Join(' ', violation.Basic, violation.ViolationGroup, violation.ViolationCode, violation.Description)
+            .ToLowerInvariant();
+    }
+
+    private static bool IsDriverBasic(string? basic)
+    {
+        return basic is "Hours-of-Service Compliance" or "Controlled Substances/Alcohol" or "Driver Fitness";
+    }
+
+    private static bool IsVehicleBasic(string? basic)
+    {
+        return basic is "Vehicle Maintenance" or "Hazardous Materials Compliance";
+    }
+
+    private static bool ContainsAny(string value, params string[] terms)
+    {
+        return terms.Any(value.Contains);
     }
 
     private static List<AutoSafetyHotspotDto> BuildHotspots(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
