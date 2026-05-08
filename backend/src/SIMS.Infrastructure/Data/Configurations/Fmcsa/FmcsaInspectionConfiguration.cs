@@ -18,8 +18,10 @@ public class FmcsaInspectionConfiguration : IEntityTypeConfiguration<FmcsaInspec
         builder.Property(x => x.InspectionLevel).HasColumnName("inspection_level");
         builder.Property(x => x.DriverOutOfService).HasColumnName("driver_out_of_service");
         builder.Property(x => x.VehicleOutOfService).HasColumnName("vehicle_out_of_service");
+        builder.Property(x => x.HazmatOutOfService).HasColumnName("hazmat_out_of_service");
         builder.Property(x => x.DriverViolationCount).HasColumnName("driver_violation_count");
         builder.Property(x => x.VehicleViolationCount).HasColumnName("vehicle_violation_count");
+        builder.Property(x => x.HazmatViolationCount).HasColumnName("hazmat_violation_count");
         builder.Property(x => x.ImportedAt).HasColumnName("imported_at");
         builder.HasIndex(x => new { x.UsDotNumber, x.InspectionDate });
         builder.HasIndex(x => new { x.UsDotNumber, x.ReportNumber }).IsUnique();

@@ -15,6 +15,7 @@ public class AutoSafetySummaryDto
     public List<string> SummaryFlags { get; set; } = new();
     public List<AutoSafetyBasicDto> Basics { get; set; } = new();
     public AutoSafetyOosDto Oos { get; set; } = new();
+    public AutoSafetyAccidentSummaryDto AccidentSummary { get; set; } = new();
     public List<AutoSafetyHotspotDto> GeographicHotspots { get; set; } = new();
     public List<AutoSafetyEventDto> RecentSevereEvents { get; set; } = new();
 }
@@ -43,10 +44,26 @@ public class AutoSafetyBasicDto
 public class AutoSafetyOosDto
 {
     public int InspectionCount { get; set; }
+    public int OverallOosCount { get; set; }
+    public decimal? OverallOosRate { get; set; }
+    public int DriverInspectionCount { get; set; }
     public int DriverOosCount { get; set; }
+    public int VehicleInspectionCount { get; set; }
     public int VehicleOosCount { get; set; }
+    public int HazmatInspectionCount { get; set; }
+    public int HazmatOosCount { get; set; }
     public decimal? DriverOosRate { get; set; }
     public decimal? VehicleOosRate { get; set; }
+    public decimal? HazmatOosRate { get; set; }
+}
+
+public class AutoSafetyAccidentSummaryDto
+{
+    public int FatalCount { get; set; }
+    public int InjuryCount { get; set; }
+    public int TowCount { get; set; }
+    public int TotalReportableCount { get; set; }
+    public decimal? AccidentToPowerUnitRatio { get; set; }
 }
 
 public class AutoSafetyHotspotDto

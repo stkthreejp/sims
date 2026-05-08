@@ -214,10 +214,25 @@ export interface AutoSafetyBasic {
 
 export interface AutoSafetyOos {
   inspectionCount: number
+  overallOosCount: number
+  overallOosRate: number | null
+  driverInspectionCount: number
   driverOosCount: number
+  vehicleInspectionCount: number
   vehicleOosCount: number
+  hazmatInspectionCount: number
+  hazmatOosCount: number
   driverOosRate: number | null
   vehicleOosRate: number | null
+  hazmatOosRate: number | null
+}
+
+export interface AutoSafetyAccidentSummary {
+  fatalCount: number
+  injuryCount: number
+  towCount: number
+  totalReportableCount: number
+  accidentToPowerUnitRatio: number | null
 }
 
 export interface AutoSafetyHotspot {
@@ -250,6 +265,7 @@ export interface AutoSafetySummary {
   summaryFlags: string[]
   basics: AutoSafetyBasic[]
   oos: AutoSafetyOos
+  accidentSummary: AutoSafetyAccidentSummary
   geographicHotspots: AutoSafetyHotspot[]
   recentSevereEvents: AutoSafetyEvent[]
 }

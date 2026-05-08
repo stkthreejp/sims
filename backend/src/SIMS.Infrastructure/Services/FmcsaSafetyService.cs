@@ -79,8 +79,11 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .Where(v => v.UsDotNumber == dotNumber && v.Inspection.InspectionDate >= windowStart)
             .Include(v => v.Inspection)
             .ToListAsync(ct);
+        var crashes = await _db.FmcsaCrashes
+            .Where(c => c.UsDotNumber == dotNumber && c.CrashDate >= windowStart)
+            .ToListAsync(ct);
 
-        if (carrier == null && scoringRun == null && inspections.Count == 0 && violations.Count == 0)
+        if (carrier == null && scoringRun == null && inspections.Count == 0 && violations.Count == 0 && crashes.Count == 0)
         {
             return Result<AutoSafetySummaryDto>.Success(new AutoSafetySummaryDto
             {
@@ -94,6 +97,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
         var basics = BuildBasics(scoringRun, violations);
         var oos = BuildOos(inspections, violations);
+        var accidentSummary = BuildAccidentSummary(crashes, carrier?.PowerUnits);
         var hotspots = BuildHotspots(inspections, violations);
         var severeEvents = BuildSevereEvents(violations);
         var flags = BuildFlags(basics, oos, carrier, scoringRun);
@@ -108,12 +112,13 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             OverallRiskLevel = DetermineRiskLevel(basics, oos, severeEvents),
             PowerUnits = carrier?.PowerUnits,
             DriverCount = carrier?.DriverCount,
-            DataRefreshedAt = new[] { carrier?.ImportedAt, scoringRun?.GeneratedAt, inspections.Select(i => (DateTime?)i.ImportedAt).Max(), violations.Select(v => (DateTime?)v.ImportedAt).Max() }
+            DataRefreshedAt = new[] { carrier?.ImportedAt, scoringRun?.GeneratedAt, inspections.Select(i => (DateTime?)i.ImportedAt).Max(), violations.Select(v => (DateTime?)v.ImportedAt).Max(), crashes.Select(c => (DateTime?)c.ImportedAt).Max() }
                 .Where(d => d.HasValue)
                 .Max(),
             SummaryFlags = flags,
             Basics = basics,
             Oos = oos,
+            AccidentSummary = accidentSummary,
             GeographicHotspots = hotspots,
             RecentSevereEvents = severeEvents,
         });
@@ -249,8 +254,10 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             inspection.InspectionLevel = GetInt(row, "inspection_level", "insp_level", "level");
             inspection.DriverOutOfService = GetBool(row, "driver_oos", "driver_out_of_service", "drv_oos", "driver_oos_indicator", "driver_oos_flag");
             inspection.VehicleOutOfService = GetBool(row, "vehicle_oos", "vehicle_out_of_service", "veh_oos", "vehicle_oos_indicator", "vehicle_oos_flag");
+            inspection.HazmatOutOfService = GetBool(row, "hazmat_oos", "hm_oos", "hazmat_out_of_service", "hazmat_oos_indicator", "hazmat_oos_flag");
             inspection.DriverViolationCount = GetInt(row, "driver_violation_count", "drv_violation_count", "driver_violations") ?? 0;
             inspection.VehicleViolationCount = GetInt(row, "vehicle_violation_count", "veh_violation_count", "vehicle_violations") ?? 0;
+            inspection.HazmatViolationCount = GetInt(row, "hazmat_violation_count", "hm_violation_count", "hazmat_violations") ?? 0;
             inspection.ImportedAt = now;
             count++;
         }
@@ -340,9 +347,9 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
             crash.CrashDate = GetDate(row, "crash_date", "date") ?? DateOnly.FromDateTime(now);
             crash.State = GetString(row, "state", "crash_state");
-            crash.TowAway = GetBool(row, "tow_away", "towaway");
-            crash.Injury = GetBool(row, "injury", "injuries");
-            crash.Fatality = GetBool(row, "fatality", "fatalities");
+            crash.TowAway = GetBool(row, "tow_away", "towaway", "tow_away_indicator", "towaway_indicator", "tow");
+            crash.Injury = GetBool(row, "injury", "injuries", "injury_indicator", "injury_crash");
+            crash.Fatality = GetBool(row, "fatality", "fatalities", "fatality_indicator", "fatal_crash", "fatal");
             crash.SeverityWeight = crash.Fatality ? 3m : crash.Injury ? 2m : 1m;
             crash.TimeWeight = 1m;
             crash.ImportedAt = now;
@@ -415,25 +422,71 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .Where(i => i.VehicleOutOfService)
             .Select(i => i.ReportNumber)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hazmatOosReports = inspections
+            .Where(i => i.HazmatOutOfService)
+            .Select(i => i.ReportNumber)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var violation in violations.Where(v => v.IsOutOfService || v.IsDriverDisqualifying))
         {
             if (IsDriverOosViolation(violation))
                 driverOosReports.Add(violation.ReportNumber);
+            else if (IsHazmatOosViolation(violation))
+                hazmatOosReports.Add(violation.ReportNumber);
             else if (IsVehicleOosViolation(violation))
                 vehicleOosReports.Add(violation.ReportNumber);
         }
 
+        var hazmatInspectionReports = violations
+            .Where(IsHazmatOosViolation)
+            .Select(v => v.ReportNumber)
+            .Concat(inspections.Where(i => i.HazmatViolationCount > 0 || i.HazmatOutOfService).Select(i => i.ReportNumber))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var overallOos = driverOosReports
+            .Concat(vehicleOosReports)
+            .Concat(hazmatOosReports)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        var driverInspectionCount = inspections.Count;
+        var vehicleInspectionCount = inspections.Count(i => IsVehicleInspection(i));
+        var hazmatInspectionCount = hazmatInspectionReports.Count;
         var driverOos = driverOosReports.Count;
         var vehicleOos = vehicleOosReports.Count;
+        var hazmatOos = hazmatOosReports.Count;
 
         return new AutoSafetyOosDto
         {
             InspectionCount = count,
+            OverallOosCount = overallOos,
+            OverallOosRate = count == 0 ? null : Math.Round(overallOos * 100m / count, 2),
+            DriverInspectionCount = driverInspectionCount,
             DriverOosCount = driverOos,
+            VehicleInspectionCount = vehicleInspectionCount,
             VehicleOosCount = vehicleOos,
-            DriverOosRate = count == 0 ? null : Math.Round(driverOos * 100m / count, 2),
-            VehicleOosRate = count == 0 ? null : Math.Round(vehicleOos * 100m / count, 2),
+            HazmatInspectionCount = hazmatInspectionCount,
+            HazmatOosCount = hazmatOos,
+            DriverOosRate = driverInspectionCount == 0 ? null : Math.Round(driverOos * 100m / driverInspectionCount, 2),
+            VehicleOosRate = vehicleInspectionCount == 0 ? null : Math.Round(vehicleOos * 100m / vehicleInspectionCount, 2),
+            HazmatOosRate = hazmatInspectionCount == 0 ? null : Math.Round(hazmatOos * 100m / hazmatInspectionCount, 2),
+        };
+    }
+
+    private static AutoSafetyAccidentSummaryDto BuildAccidentSummary(List<FmcsaCrash> crashes, int? powerUnits)
+    {
+        var fatal = crashes.Count(c => c.Fatality);
+        var injury = crashes.Count(c => c.Injury);
+        var tow = crashes.Count(c => c.TowAway);
+        var totalReportable = crashes.Count;
+
+        return new AutoSafetyAccidentSummaryDto
+        {
+            FatalCount = fatal,
+            InjuryCount = injury,
+            TowCount = tow,
+            TotalReportableCount = totalReportable,
+            AccidentToPowerUnitRatio = powerUnits is > 0
+                ? Math.Round(totalReportable * 100m / powerUnits.Value, 2)
+                : null,
         };
     }
 
@@ -442,6 +495,12 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         if (IsDriverOosViolation(violation))
         {
             inspection.DriverOutOfService = true;
+            return;
+        }
+
+        if (IsHazmatOosViolation(violation))
+        {
+            inspection.HazmatOutOfService = true;
             return;
         }
 
@@ -462,8 +521,22 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     private static bool IsVehicleOosViolation(FmcsaViolation violation)
     {
         var text = BuildViolationText(violation);
-        return ContainsAny(text, "vehicle", "veh", "brake", "tire", "lamp", "light", "steer", "load", "hazmat", "hm")
+        return ContainsAny(text, "vehicle", "veh", "brake", "tire", "lamp", "light", "steer", "load")
             || IsVehicleBasic(violation.Basic);
+    }
+
+    private static bool IsHazmatOosViolation(FmcsaViolation violation)
+    {
+        var text = BuildViolationText(violation);
+        return ContainsAny(text, "hazmat", "hazardous", "hm")
+            || violation.Basic == "Hazardous Materials Compliance";
+    }
+
+    private static bool IsVehicleInspection(FmcsaInspection inspection)
+    {
+        return inspection.VehicleOutOfService
+            || inspection.VehicleViolationCount > 0
+            || inspection.InspectionLevel is 1 or 2 or 5 or 6;
     }
 
     private static string BuildViolationText(FmcsaViolation violation)

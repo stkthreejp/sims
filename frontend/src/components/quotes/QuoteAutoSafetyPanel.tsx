@@ -80,6 +80,15 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
     )
   }
 
+  const oos = data.oos
+  const accident = data.accidentSummary
+  const overallOosCount = oos.overallOosCount ?? Math.max(oos.driverOosCount, oos.vehicleOosCount)
+  const overallOosRate = oos.overallOosRate ?? (oos.inspectionCount === 0 ? null : Math.round(overallOosCount * 10000 / oos.inspectionCount) / 100)
+  const driverInspectionCount = oos.driverInspectionCount ?? oos.inspectionCount
+  const vehicleInspectionCount = oos.vehicleInspectionCount ?? oos.inspectionCount
+  const hazmatInspectionCount = oos.hazmatInspectionCount ?? 0
+  const hazmatOosCount = oos.hazmatOosCount ?? 0
+
   return (
     <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -132,18 +141,19 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
             <Truck className="h-3.5 w-3.5" /> SAFER / OOS
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <OosMetric
               label="Overall"
-              count={data.oos.inspectionCount}
-              oosCount={Math.max(data.oos.driverOosCount, data.oos.vehicleOosCount)}
-              rate={data.oos.inspectionCount === 0 ? null : Math.round(Math.max(data.oos.driverOosCount, data.oos.vehicleOosCount) * 10000 / data.oos.inspectionCount) / 100}
+              count={oos.inspectionCount}
+              oosCount={overallOosCount}
+              rate={overallOosRate}
             />
-            <OosMetric label="Driver" count={data.oos.inspectionCount} oosCount={data.oos.driverOosCount} rate={data.oos.driverOosRate} />
-            <OosMetric label="Vehicle" count={data.oos.inspectionCount} oosCount={data.oos.vehicleOosCount} rate={data.oos.vehicleOosRate} />
+            <OosMetric label="Driver" count={driverInspectionCount} oosCount={oos.driverOosCount} rate={oos.driverOosRate} />
+            <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} />
+            <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} />
           </div>
           <p className="mt-3 text-xs text-slate-400">
-            National average comparisons and separate vehicle/hazmat denominators are next backend fields.
+            National average comparisons are next backend fields.
           </p>
         </div>
 
@@ -152,12 +162,14 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             <Activity className="h-3.5 w-3.5" /> Accident Summary
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Metric label="Fatal" value="-" compact />
-            <Metric label="Injury" value="-" compact />
-            <Metric label="Tow" value="-" compact />
-            <Metric label="Reportable" value="-" compact />
+            <Metric label="Fatal" value={(accident?.fatalCount ?? 0).toLocaleString()} compact />
+            <Metric label="Injury" value={(accident?.injuryCount ?? 0).toLocaleString()} compact />
+            <Metric label="Tow" value={(accident?.towCount ?? 0).toLocaleString()} compact />
+            <Metric label="Reportable" value={(accident?.totalReportableCount ?? 0).toLocaleString()} compact />
           </div>
-          <p className="mt-3 text-xs text-slate-400">Crash totals are imported; summary rollup is next.</p>
+          <p className="mt-3 text-xs text-slate-400">
+            Accident to power unit ratio: {accident?.accidentToPowerUnitRatio == null ? '-' : `${accident.accidentToPowerUnitRatio}%`}
+          </p>
         </div>
       </div>
 

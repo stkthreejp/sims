@@ -11,8 +11,10 @@ public class FmcsaInspection : BaseEntity
     public int? InspectionLevel { get; set; }
     public bool DriverOutOfService { get; set; }
     public bool VehicleOutOfService { get; set; }
+    public bool HazmatOutOfService { get; set; }
     public int DriverViolationCount { get; set; }
     public int VehicleViolationCount { get; set; }
+    public int HazmatViolationCount { get; set; }
     public DateTime ImportedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<FmcsaViolation> Violations { get; set; } = new List<FmcsaViolation>();
