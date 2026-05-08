@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { AlertTriangle, CheckCircle2, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, XCircle } from 'lucide-react'
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import type { AutoSafetyRiskLevel } from '@/types/quote.types'
@@ -120,21 +120,51 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded border bg-white p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-            <Truck className="h-3.5 w-3.5" /> OOS Intensity
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <Metric label="Inspections" value={data.oos.inspectionCount.toLocaleString()} compact />
-            <Metric label="Driver OOS" value={data.oos.driverOosRate == null ? '-' : `${data.oos.driverOosRate}%`} compact />
-            <Metric label="Vehicle OOS" value={data.oos.vehicleOosRate == null ? '-' : `${data.oos.vehicleOosRate}%`} compact />
-          </div>
-        </div>
+      <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-slate-600">
+        <SectionPill label="SAFER / OOS" />
+        <SectionPill label="Radius" />
+        <SectionPill label="Events" />
+        <SectionPill label="CSA / History" />
+      </div>
 
+      <div className="grid grid-cols-3 gap-3">
         <div className="col-span-2 rounded border bg-white p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-            <MapPin className="h-3.5 w-3.5" /> Geographic Hotspots
+            <Truck className="h-3.5 w-3.5" /> SAFER / OOS
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <OosMetric
+              label="Overall"
+              count={data.oos.inspectionCount}
+              oosCount={Math.max(data.oos.driverOosCount, data.oos.vehicleOosCount)}
+              rate={data.oos.inspectionCount === 0 ? null : Math.round(Math.max(data.oos.driverOosCount, data.oos.vehicleOosCount) * 10000 / data.oos.inspectionCount) / 100}
+            />
+            <OosMetric label="Driver" count={data.oos.inspectionCount} oosCount={data.oos.driverOosCount} rate={data.oos.driverOosRate} />
+            <OosMetric label="Vehicle" count={data.oos.inspectionCount} oosCount={data.oos.vehicleOosCount} rate={data.oos.vehicleOosRate} />
+          </div>
+          <p className="mt-3 text-xs text-slate-400">
+            National average comparisons and separate vehicle/hazmat denominators are next backend fields.
+          </p>
+        </div>
+
+        <div className="rounded border bg-white p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+            <Activity className="h-3.5 w-3.5" /> Accident Summary
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Metric label="Fatal" value="-" compact />
+            <Metric label="Injury" value="-" compact />
+            <Metric label="Tow" value="-" compact />
+            <Metric label="Reportable" value="-" compact />
+          </div>
+          <p className="mt-3 text-xs text-slate-400">Crash totals are imported; summary rollup is next.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="col-span-2 rounded border bg-white p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+            <MapPin className="h-3.5 w-3.5" /> Radius Of Operations
           </div>
           {data.geographicHotspots.length === 0 ? (
             <p className="text-sm text-slate-400">No inspection location concentration yet.</p>
@@ -148,11 +178,30 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               ))}
             </div>
           )}
+          <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
+            {['<50 mi', '50-100 mi', '100-250 mi', '250+ mi'].map((band) => (
+              <div key={band} className="rounded bg-slate-50 px-2 py-1 text-center text-slate-400">{band}: -</div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded border bg-white p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+            <Clock3 className="h-3.5 w-3.5" /> History Snapshot
+          </div>
+          <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
+          <div className="mt-3 space-y-1 text-xs text-slate-400">
+            <div>Inspection trend: next</div>
+            <div>BASIC history: next</div>
+            <div>MCS-150 changes: next</div>
+          </div>
         </div>
       </div>
 
       <div className="rounded border bg-white">
-        <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">BASICs</div>
+        <div className="flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">
+          <BarChart3 className="h-3.5 w-3.5" /> CSA / BASICs
+        </div>
         <div className="grid grid-cols-7 divide-x">
           {data.basics.map((b) => (
             <div key={b.basic} className="min-w-0 p-3">
@@ -170,7 +219,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
       </div>
 
       <div className="rounded border bg-white">
-        <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">Recent Severe Events</div>
+        <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">Events</div>
         {data.recentSevereEvents.length === 0 ? (
           <p className="px-4 py-3 text-sm text-slate-400">No recent high-severity or OOS events in the imported window.</p>
         ) : (
@@ -186,6 +235,20 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function SectionPill({ label }: { label: string }) {
+  return <div className="rounded border border-slate-200 bg-white px-3 py-2 text-center">{label}</div>
+}
+
+function OosMetric({ label, count, oosCount, rate }: { label: string; count: number; oosCount: number; rate: number | null }) {
+  return (
+    <div className="rounded bg-slate-50 p-2">
+      <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-800">{rate == null ? '-' : `${rate}%`}</div>
+      <div className="mt-1 text-xs text-slate-500">{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
     </div>
   )
 }
