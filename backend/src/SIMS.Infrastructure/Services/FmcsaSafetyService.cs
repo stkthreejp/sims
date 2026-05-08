@@ -176,7 +176,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             _logger.LogError(ex, "FMCSA data save failed for USDOT {DotNumber}", dotNumber);
             return Result<AutoSafetyRefreshDto>.Failure(
                 "FMCSA_SAVE_FAILED",
-                "FMCSA data was found but could not be saved. Check that the latest database migration is applied.");
+                BuildSaveFailureMessage(ex));
         }
 
         var summary = await GetQuoteAutoSafetyAsync(quoteId, ct);
@@ -469,6 +469,14 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         if (string.IsNullOrWhiteSpace(value)) return null;
         var digits = new string(value.Where(char.IsDigit).ToArray());
         return string.IsNullOrWhiteSpace(digits) ? null : digits;
+    }
+
+    private static string BuildSaveFailureMessage(DbUpdateException ex)
+    {
+        var detail = ex.GetBaseException().Message;
+        return string.IsNullOrWhiteSpace(detail)
+            ? "FMCSA data was found but could not be saved. Check that the latest database migration is applied."
+            : $"FMCSA data was found but could not be saved: {detail}";
     }
 
     private static string? NormalizeBasic(string? value)

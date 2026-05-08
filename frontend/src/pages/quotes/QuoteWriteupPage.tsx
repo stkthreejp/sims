@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -102,10 +103,11 @@ export default function QuoteWriteupPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const qc = useQueryClient()
 
-  const { data: writeup, isLoading } = useQuery({
+  const { data: writeup, error, isError, isLoading } = useQuery({
     queryKey: ['uw-writeup', quoteId],
     queryFn: () => uwWriteupApi.get(quoteId!),
     enabled: !!quoteId,
+    retry: false,
   })
 
   const [payload, setPayload] = useState<IMWriteupPayload>(EMPTY_PAYLOAD)
@@ -166,6 +168,20 @@ export default function QuoteWriteupPage() {
 
   function removeCondition(id: string) {
     setConditions((cs) => cs.filter((c) => c.id !== id))
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-3xl mx-auto px-6 py-6">
+        <Link to="/submissions" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft className="h-4 w-4" /> Back to submissions
+        </Link>
+        <div className="mt-5 rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          <div className="font-semibold">Quote writeup could not be loaded.</div>
+          <div className="mt-1">{getWriteupErrorMessage(error)}</div>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading || !writeup) {
@@ -595,6 +611,15 @@ const DECISION_LABELS: Record<string, string> = {
   ApproveWithConditions: 'Approve with Conditions',
   ReferUp: 'Refer Up',
   Decline: 'Decline',
+}
+
+function getWriteupErrorMessage(error: unknown) {
+  if (!axios.isAxiosError(error)) return 'Please try again.'
+  if (error.response?.status === 403) return 'You do not have permission to open this quote writeup.'
+  if (error.response?.status === 404) return 'This quote writeup was not found.'
+
+  const data = error.response?.data as { errorMessage?: string; detail?: string; title?: string } | undefined
+  return data?.errorMessage ?? data?.detail ?? data?.title ?? 'Please try again.'
 }
 
 function StatusBadge({ status, decision }: { status: UWWriteupDto['status']; decision?: string }) {

@@ -60,7 +60,7 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       processQueue(refreshError, null)
       const status = axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         clearAuth()
         window.location.href = '/login'
       }

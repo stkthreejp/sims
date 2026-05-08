@@ -108,7 +108,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       })
       .catch((error) => {
         const status = axios.isAxiosError(error) ? error.response?.status : undefined
-        if (!cancelled && (status === 401 || status === 403)) clearAuth()
+        if (!cancelled && status === 401) clearAuth()
       })
       .finally(() => {
         if (!cancelled) setCheckingSession(false)
