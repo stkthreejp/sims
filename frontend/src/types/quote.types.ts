@@ -251,6 +251,20 @@ export interface AutoSafetyEvent {
   severityWeight: number
 }
 
+export interface AutoSafetyDetail {
+  category: string
+  date: string
+  reportNumber: string
+  state: string | null
+  basic: string | null
+  description: string
+  isOutOfService: boolean
+  isFatal: boolean
+  isInjury: boolean
+  isTow: boolean
+  source: string
+}
+
 export interface AutoSafetySummary {
   status: AutoSafetyStatus
   message: string | null

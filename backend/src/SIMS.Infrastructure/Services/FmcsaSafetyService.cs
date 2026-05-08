@@ -124,6 +124,51 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         });
     }
 
+    public async Task<Result<List<AutoSafetyDetailDto>>> GetQuoteAutoSafetyDetailsAsync(Guid quoteId, string kind, string? basic = null, CancellationToken ct = default)
+    {
+        var quote = await _db.Quotes
+            .Include(q => q.Submission).ThenInclude(s => s.Insured)
+            .FirstOrDefaultAsync(q => q.Id == quoteId, ct);
+
+        if (quote == null)
+            return Result<List<AutoSafetyDetailDto>>.Failure("NOT_FOUND", "Quote not found.");
+
+        var dotNumber = NormalizeDotNumber(quote.Submission?.Insured?.UsDotNumber);
+        if (string.IsNullOrWhiteSpace(dotNumber))
+            return Result<List<AutoSafetyDetailDto>>.Success([]);
+
+        var windowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-24));
+        var normalizedKind = kind?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+            return Result<List<AutoSafetyDetailDto>>.Failure("INVALID_DETAIL_KIND", "Select an Auto Safety detail type.");
+
+        if (normalizedKind.EndsWith("crash", StringComparison.Ordinal))
+        {
+            var crashes = await _db.FmcsaCrashes
+                .Where(c => c.UsDotNumber == dotNumber && c.CrashDate >= windowStart && (c.Fatality || c.Injury || c.TowAway))
+                .ToListAsync(ct);
+
+            return Result<List<AutoSafetyDetailDto>>.Success(BuildCrashDetails(crashes, normalizedKind));
+        }
+
+        var violations = await _db.FmcsaViolations
+            .Include(v => v.Inspection)
+            .Where(v => v.UsDotNumber == dotNumber && v.Inspection.InspectionDate >= windowStart)
+            .ToListAsync(ct);
+
+        var details = normalizedKind switch
+        {
+            "overall-oos" => BuildViolationDetails(violations.Where(v => v.IsOutOfService || v.IsDriverDisqualifying), "OOS"),
+            "driver-oos" => BuildViolationDetails(violations.Where(v => (v.IsOutOfService || v.IsDriverDisqualifying) && IsDriverOosViolation(v)), "Driver OOS"),
+            "vehicle-oos" => BuildViolationDetails(violations.Where(v => (v.IsOutOfService || v.IsDriverDisqualifying) && IsVehicleOosViolation(v)), "Vehicle OOS"),
+            "hazmat-oos" => BuildViolationDetails(violations.Where(v => (v.IsOutOfService || v.IsDriverDisqualifying) && IsHazmatOosViolation(v)), "Hazmat OOS"),
+            "basic" when !string.IsNullOrWhiteSpace(basic) => BuildViolationDetails(violations.Where(v => v.Basic == basic), basic!),
+            _ => [],
+        };
+
+        return Result<List<AutoSafetyDetailDto>>.Success(details);
+    }
+
     public async Task<Result<AutoSafetyRefreshDto>> RefreshQuoteAutoSafetyAsync(Guid quoteId, CancellationToken ct = default)
     {
         var quote = await _db.Quotes
@@ -502,6 +547,58 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 ? Math.Round(totalReportable * 100m / powerUnits.Value, 2)
                 : null,
         };
+    }
+
+    private static List<AutoSafetyDetailDto> BuildCrashDetails(List<FmcsaCrash> crashes, string kind)
+    {
+        return crashes
+            .GroupBy(c => c.ReportNumber, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var first = g.OrderByDescending(c => c.CrashDate).First();
+                var fatal = g.Any(c => c.Fatality);
+                var injury = g.Any(c => c.Injury);
+                var tow = g.Any(c => c.TowAway);
+                return new AutoSafetyDetailDto
+                {
+                    Category = fatal ? "Fatal crash" : injury ? "Injury crash" : "Tow-only crash",
+                    Date = first.CrashDate,
+                    ReportNumber = first.ReportNumber,
+                    State = first.State,
+                    Description = fatal ? "Fatal reportable crash" : injury ? "Injury reportable crash" : "Tow-away reportable crash",
+                    IsFatal = fatal,
+                    IsInjury = injury,
+                    IsTow = tow,
+                };
+            })
+            .Where(d => kind switch
+            {
+                "fatal-crash" => d.IsFatal,
+                "injury-crash" => !d.IsFatal && d.IsInjury,
+                "tow-crash" => !d.IsFatal && !d.IsInjury && d.IsTow,
+                _ => true,
+            })
+            .OrderByDescending(d => d.Date)
+            .ThenBy(d => d.ReportNumber)
+            .ToList();
+    }
+
+    private static List<AutoSafetyDetailDto> BuildViolationDetails(IEnumerable<FmcsaViolation> violations, string category)
+    {
+        return violations
+            .OrderByDescending(v => v.Inspection.InspectionDate)
+            .ThenBy(v => v.ReportNumber)
+            .Select(v => new AutoSafetyDetailDto
+            {
+                Category = category,
+                Date = v.Inspection.InspectionDate,
+                ReportNumber = v.ReportNumber,
+                State = v.Inspection.State,
+                Basic = v.Basic,
+                Description = v.Description ?? v.ViolationCode,
+                IsOutOfService = v.IsOutOfService || v.IsDriverDisqualifying,
+            })
+            .ToList();
     }
 
     private static void ApplyViolationOosToInspection(FmcsaInspection inspection, FmcsaViolation violation)

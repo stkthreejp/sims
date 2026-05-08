@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh } from '@/types/quote.types'
+import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const quotesApi = {
@@ -41,6 +41,9 @@ export const quotesApi = {
 
   getAutoSafety: (id: string) =>
     apiClient.get<AutoSafetySummary>(`/quotes/${id}/auto-safety`).then((r) => r.data),
+
+  getAutoSafetyDetails: (id: string, kind: string, basic?: string) =>
+    apiClient.get<AutoSafetyDetail[]>(`/quotes/${id}/auto-safety/details`, { params: { kind, basic } }).then((r) => r.data),
 
   refreshAutoSafety: (id: string) =>
     apiClient.post<AutoSafetyRefresh>(`/quotes/${id}/auto-safety/refresh`).then((r) => r.data),

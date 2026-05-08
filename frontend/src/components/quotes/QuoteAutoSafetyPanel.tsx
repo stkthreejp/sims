@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, XCircle } from 'lucide-react'
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
-import type { AutoSafetyRiskLevel } from '@/types/quote.types'
+import type { AutoSafetyDetail, AutoSafetyRiskLevel } from '@/types/quote.types'
 
 type Props = {
   quoteId: string
 }
 
 type AutoSafetyTab = 'safer' | 'radius' | 'events' | 'history'
+type DetailSelection = { kind: string; title: string; basic?: string } | null
 
 const riskStyle: Record<AutoSafetyRiskLevel, string> = {
   Unknown: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -22,6 +23,7 @@ const riskStyle: Record<AutoSafetyRiskLevel, string> = {
 export function QuoteAutoSafetyPanel({ quoteId }: Props) {
   const qc = useQueryClient()
   const [activeTab, setActiveTab] = useState<AutoSafetyTab>('safer')
+  const [detailSelection, setDetailSelection] = useState<DetailSelection>(null)
   const { data, error, isLoading, isError } = useQuery({
     queryKey: ['quote-auto-safety', quoteId],
     queryFn: () => quotesApi.getAutoSafety(quoteId),
@@ -39,6 +41,11 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
       const msg = err?.response?.data?.errorMessage ?? 'FMCSA refresh failed'
       toast.error(msg)
     },
+  })
+  const detailQuery = useQuery({
+    queryKey: ['quote-auto-safety-details', quoteId, detailSelection?.kind, detailSelection?.basic],
+    queryFn: () => quotesApi.getAutoSafetyDetails(quoteId, detailSelection!.kind, detailSelection?.basic),
+    enabled: !!detailSelection,
   })
 
   if (isLoading) {
@@ -147,10 +154,10 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               <Truck className="h-3.5 w-3.5" /> SAFER / OOS
             </div>
             <div className="grid grid-cols-4 gap-3">
-              <OosMetric label="Overall" count={oos.inspectionCount} oosCount={overallOosCount} rate={overallOosRate} />
-              <OosMetric label="Driver" count={driverInspectionCount} oosCount={oos.driverOosCount} rate={oos.driverOosRate} />
-              <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} />
-              <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} />
+              <OosMetric label="Overall" count={oos.inspectionCount} oosCount={overallOosCount} rate={overallOosRate} onClick={() => setDetailSelection({ kind: 'overall-oos', title: 'Overall OOS Events' })} />
+              <OosMetric label="Driver" count={driverInspectionCount} oosCount={oos.driverOosCount} rate={oos.driverOosRate} onClick={() => setDetailSelection({ kind: 'driver-oos', title: 'Driver OOS Events' })} />
+              <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} onClick={() => setDetailSelection({ kind: 'vehicle-oos', title: 'Vehicle OOS Events' })} />
+              <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} onClick={() => setDetailSelection({ kind: 'hazmat-oos', title: 'Hazmat OOS Events' })} />
             </div>
             <p className="mt-3 text-xs text-slate-400">National average comparisons are next backend fields.</p>
           </div>
@@ -160,10 +167,10 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               <Activity className="h-3.5 w-3.5" /> Accident Summary
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Metric label="Fatal" value={(accident?.fatalCount ?? 0).toLocaleString()} compact />
-              <Metric label="Injury" value={(accident?.injuryCount ?? 0).toLocaleString()} compact />
-              <Metric label="Tow" value={(accident?.towCount ?? 0).toLocaleString()} compact />
-              <Metric label="Reportable" value={(accident?.totalReportableCount ?? 0).toLocaleString()} compact />
+              <Metric label="Fatal" value={(accident?.fatalCount ?? 0).toLocaleString()} compact onClick={() => setDetailSelection({ kind: 'fatal-crash', title: 'Fatal Crashes' })} />
+              <Metric label="Injury" value={(accident?.injuryCount ?? 0).toLocaleString()} compact onClick={() => setDetailSelection({ kind: 'injury-crash', title: 'Injury Crashes' })} />
+              <Metric label="Tow" value={(accident?.towCount ?? 0).toLocaleString()} compact onClick={() => setDetailSelection({ kind: 'tow-crash', title: 'Tow-Only Crashes' })} />
+              <Metric label="Reportable" value={(accident?.totalReportableCount ?? 0).toLocaleString()} compact onClick={() => setDetailSelection({ kind: 'reportable-crash', title: 'Reportable Crashes' })} />
             </div>
             <p className="mt-3 text-xs text-slate-400">
               SAFER-style reportable crash events; ratio: {accident?.accidentToPowerUnitRatio == null ? '-' : `${accident.accidentToPowerUnitRatio}%`}
@@ -225,7 +232,12 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             </div>
             <div className="grid grid-cols-7 divide-x">
               {data.basics.map((b) => (
-                <div key={b.basic} className="min-w-0 p-3">
+                <button
+                  key={b.basic}
+                  type="button"
+                  onClick={() => setDetailSelection({ kind: 'basic', title: `${b.basic} Details`, basic: b.basic })}
+                  className="min-w-0 p-3 text-left hover:bg-slate-50"
+                >
                   <div className="truncate text-xs font-semibold text-slate-700" title={b.basic}>{b.basic}</div>
                   <div className="mt-2 flex items-center gap-1 text-xs">
                     {b.isPrioritized ? <XCircle className="h-3.5 w-3.5 text-red-600" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
@@ -234,7 +246,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
                     </span>
                   </div>
                   {b.outOfServiceCount > 0 && <div className="mt-1 text-xs text-amber-700">{b.outOfServiceCount} OOS</div>}
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -252,6 +264,14 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           </div>
         </div>
       )}
+      {detailSelection && (
+        <AutoSafetyDetailDrawer
+          title={detailSelection.title}
+          items={detailQuery.data ?? []}
+          isLoading={detailQuery.isLoading}
+          onClose={() => setDetailSelection(null)}
+        />
+      )}
     </div>
   )
 }
@@ -268,14 +288,62 @@ function SectionPill({ label, active, onClick }: { label: string; active: boolea
   )
 }
 
-function OosMetric({ label, count, oosCount, rate }: { label: string; count: number; oosCount: number; rate: number | null }) {
+function OosMetric({ label, count, oosCount, rate, onClick }: { label: string; count: number; oosCount: number; rate: number | null; onClick?: () => void }) {
   return (
-    <div className="rounded bg-slate-50 p-2">
+    <button type="button" onClick={onClick} className="rounded bg-slate-50 p-2 text-left hover:bg-slate-100">
       <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-semibold text-slate-800">{rate == null ? '-' : `${rate}%`}</div>
       <div className="mt-1 text-xs text-slate-500">{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
+    </button>
+  )
+}
+
+function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: string; items: AutoSafetyDetail[]; isLoading: boolean; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/25">
+      <div className="h-full w-full max-w-3xl overflow-y-auto bg-white shadow-xl">
+        <div className="sticky top-0 flex items-center justify-between border-b bg-white px-5 py-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            <p className="mt-1 text-xs text-slate-500">{isLoading ? 'Loading details...' : `${items.length} FMCSA event${items.length === 1 ? '' : 's'}`}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-slate-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="p-5 text-sm text-slate-500">Loading event details...</div>
+        ) : items.length === 0 ? (
+          <div className="p-5 text-sm text-slate-500">No matching FMCSA events found.</div>
+        ) : (
+          <div className="divide-y">
+            {items.map((item, idx) => (
+              <div key={`${item.reportNumber}-${idx}`} className="grid grid-cols-[110px_130px_1fr_80px] gap-3 px-5 py-3 text-sm">
+                <div className="text-slate-500">{formatDate(item.date)}</div>
+                <div>
+                  <div className="font-semibold text-slate-800">{item.reportNumber}</div>
+                  <div className="text-xs text-slate-400">{item.source}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-slate-700">{item.category}</div>
+                  <div className="mt-0.5 text-slate-500">{item.description}</div>
+                  {item.basic && <div className="mt-1 text-xs text-slate-400">{item.basic}</div>}
+                </div>
+                <div className="text-right text-slate-500">{item.state ?? '-'}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
+}
+
+function formatDate(value: string) {
+  const [year, month, day] = value.split('-')
+  if (!year || !month || !day) return value
+  return `${Number(month)}/${Number(day)}/${year}`
 }
 
 function getLoadErrorMessage(error: unknown) {
@@ -296,11 +364,23 @@ function getLoadErrorMessage(error: unknown) {
     ?? `Request failed with status ${error.response.status}.`
 }
 
-function Metric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
-  return (
-    <div className={compact ? '' : 'rounded border bg-white p-3'}>
+function Metric({ label, value, compact = false, onClick }: { label: string; value: string; compact?: boolean; onClick?: () => void }) {
+  const content = (
+    <>
       <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
       <div className="mt-1 truncate text-sm font-semibold text-slate-800" title={value}>{value}</div>
+    </>
+  )
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${compact ? '' : 'rounded border bg-white p-3'} text-left hover:bg-slate-50`}>
+        {content}
+      </button>
+    )
+  }
+  return (
+    <div className={compact ? '' : 'rounded border bg-white p-3'}>
+      {content}
     </div>
   )
 }

@@ -91,6 +91,16 @@ public class QuotesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("{id:guid}/auto-safety/details")]
+    public async Task<IActionResult> GetAutoSafetyDetails(Guid id, [FromQuery] string kind, [FromQuery] string? basic)
+    {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
+        var result = await _fmcsaSafety.GetQuoteAutoSafetyDetailsAsync(id, kind, basic);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("{id:guid}/auto-safety/refresh")]
     [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> RefreshAutoSafety(Guid id)

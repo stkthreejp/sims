@@ -83,3 +83,18 @@ public class AutoSafetyEventDto
     public string? Basic { get; set; }
     public int SeverityWeight { get; set; }
 }
+
+public class AutoSafetyDetailDto
+{
+    public string Category { get; set; } = string.Empty;
+    public DateOnly Date { get; set; }
+    public string ReportNumber { get; set; } = string.Empty;
+    public string? State { get; set; }
+    public string? Basic { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public bool IsOutOfService { get; set; }
+    public bool IsFatal { get; set; }
+    public bool IsInjury { get; set; }
+    public bool IsTow { get; set; }
+    public string Source { get; set; } = "FMCSA/Socrata";
+}
