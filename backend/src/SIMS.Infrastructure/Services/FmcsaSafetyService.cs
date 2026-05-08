@@ -336,8 +336,9 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         {
             var reportNumber = GetString(row, "report_number", "crash_report_number", "crash_id");
             if (string.IsNullOrWhiteSpace(reportNumber)) continue;
-            var crashDate = GetDate(row, "crash_date", "accident_date", "date");
+            var crashDate = GetDate(row, "report_date", "crash_date", "accident_date", "date");
             if (crashDate == null) continue;
+            if (!GetCrashFlag(row, "federal_recordable")) continue;
 
             var crash = await _db.FmcsaCrashes
                 .FirstOrDefaultAsync(c => c.UsDotNumber == dotNumber && c.ReportNumber == reportNumber, ct);
@@ -350,8 +351,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             crash.CrashDate = crashDate.Value;
             crash.State = GetString(row, "state", "crash_state");
             crash.TowAway = GetCrashFlag(row, "tow_away", "towaway", "tow_away_indicator", "towaway_indicator", "tow", "tow_away_count", "towaway_count");
-            crash.Injury = GetCrashFlag(row, "injury", "injuries", "injury_indicator", "injury_crash", "injury_count", "non_fatal_injuries", "nonfatal_injuries", "number_of_injuries");
-            crash.Fatality = GetCrashFlag(row, "fatality", "fatalities", "fatality_indicator", "fatal_crash", "fatal", "fatality_count", "fatal_injuries", "number_of_fatalities");
+            crash.Injury = GetCrashFlag(row, "injuries", "injury", "injury_indicator", "injury_crash", "injury_count", "non_fatal_injuries", "nonfatal_injuries", "number_of_injuries");
+            crash.Fatality = GetCrashFlag(row, "fatalities", "fatality", "fatality_indicator", "fatal_crash", "fatal", "fatality_count", "fatal_injuries", "number_of_fatalities");
             crash.SeverityWeight = crash.Fatality ? 3m : crash.Injury ? 2m : 1m;
             crash.TimeWeight = 1m;
             crash.ImportedAt = now;
@@ -477,7 +478,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     {
         var reportableCrashes = crashes
             .Where(c => c.Fatality || c.Injury || c.TowAway)
-            .GroupBy(c => new { c.CrashDate, State = c.State ?? string.Empty })
+            .GroupBy(c => c.ReportNumber, StringComparer.OrdinalIgnoreCase)
             .Select(g => new
             {
                 Fatal = g.Any(c => c.Fatality),
@@ -689,6 +690,9 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     {
         var raw = GetString(row, names);
         if (DateOnly.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)) return date;
+        if (raw?.Length == 8
+            && DateOnly.TryParseExact(raw, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var compactDate))
+            return compactDate;
         if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var dateTime))
             return DateOnly.FromDateTime(dateTime);
         return null;
