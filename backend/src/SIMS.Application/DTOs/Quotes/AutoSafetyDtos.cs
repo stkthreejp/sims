@@ -90,6 +90,11 @@ public class AutoSafetyDetailDto
     public DateOnly Date { get; set; }
     public string ReportNumber { get; set; } = string.Empty;
     public string? State { get; set; }
+    public string? City { get; set; }
+    public string? Location { get; set; }
+    public string? Agency { get; set; }
+    public string? Conditions { get; set; }
+    public string? VehicleInfo { get; set; }
     public string? Basic { get; set; }
     public string Description { get; set; } = string.Empty;
     public bool IsOutOfService { get; set; }

@@ -300,9 +300,9 @@ function OosMetric({ label, count, oosCount, rate, onClick }: { label: string; c
 
 function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: string; items: AutoSafetyDetail[]; isLoading: boolean; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/25">
-      <div className="h-full w-full max-w-3xl overflow-y-auto bg-white shadow-xl">
-        <div className="sticky top-0 flex items-center justify-between border-b bg-white px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-end bg-slate-900/20 p-4">
+      <div className="mt-16 max-h-[72vh] w-full max-w-2xl overflow-y-auto rounded border border-slate-200 bg-white shadow-xl">
+        <div className="sticky top-0 flex items-center justify-between border-b bg-white px-4 py-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
             <p className="mt-1 text-xs text-slate-500">{isLoading ? 'Loading details...' : `${items.length} FMCSA event${items.length === 1 ? '' : 's'}`}</p>
@@ -319,23 +319,43 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
         ) : (
           <div className="divide-y">
             {items.map((item, idx) => (
-              <div key={`${item.reportNumber}-${idx}`} className="grid grid-cols-[110px_130px_1fr_80px] gap-3 px-5 py-3 text-sm">
-                <div className="text-slate-500">{formatDate(item.date)}</div>
-                <div>
-                  <div className="font-semibold text-slate-800">{item.reportNumber}</div>
-                  <div className="text-xs text-slate-400">{item.source}</div>
+              <div key={`${item.reportNumber}-${idx}`} className="px-4 py-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-slate-800">{item.category}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{formatDate(item.date)} · Report {item.reportNumber} · {item.source}</div>
+                  </div>
+                  <div className="text-xs font-medium text-slate-500">{[item.city, item.state].filter(Boolean).join(', ') || '-'}</div>
                 </div>
-                <div>
-                  <div className="font-medium text-slate-700">{item.category}</div>
-                  <div className="mt-0.5 text-slate-500">{item.description}</div>
-                  {item.basic && <div className="mt-1 text-xs text-slate-400">{item.basic}</div>}
-                </div>
-                <div className="text-right text-slate-500">{item.state ?? '-'}</div>
+                <div className="mt-2 text-slate-600">{item.description}</div>
+                {(item.location || item.agency) && (
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                    <DetailLine label="Location" value={item.location} />
+                    <DetailLine label="Agency" value={item.agency} />
+                  </div>
+                )}
+                {item.conditions && <DetailBlock label="Crash Conditions" value={item.conditions} />}
+                {item.vehicleInfo && <DetailBlock label="Vehicle Info" value={item.vehicleInfo} />}
+                {item.basic && <div className="mt-2 text-xs text-slate-400">{item.basic}</div>}
               </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function DetailLine({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null
+  return <div><span className="font-semibold text-slate-600">{label}:</span> {value}</div>
+}
+
+function DetailBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mt-2 rounded bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      <div className="mb-1 font-semibold text-slate-700">{label}</div>
+      <div>{value}</div>
     </div>
   )
 }

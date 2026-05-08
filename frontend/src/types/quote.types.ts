@@ -256,6 +256,11 @@ export interface AutoSafetyDetail {
   date: string
   reportNumber: string
   state: string | null
+  city: string | null
+  location: string | null
+  agency: string | null
+  conditions: string | null
+  vehicleInfo: string | null
   basic: string | null
   description: string
   isOutOfService: boolean

@@ -395,6 +395,23 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
             crash.CrashDate = crashDate.Value;
             crash.State = GetString(row, "state", "crash_state");
+            crash.City = GetString(row, "city", "crash_city");
+            crash.CountyCode = GetString(row, "county_code", "county");
+            crash.Location = GetString(row, "location", "crash_location");
+            crash.Agency = GetString(row, "agency", "reporting_agency");
+            crash.VehiclesInAccident = GetInt(row, "vehicles_in_accident", "vehicles_in_crash");
+            crash.WeatherConditionId = GetString(row, "weather_condition_id", "weather");
+            crash.RoadSurfaceConditionId = GetString(row, "road_surface_condition_id", "road_surface");
+            crash.TrafficwayId = GetString(row, "trafficway_id", "roadway_trafficway");
+            crash.LightConditionId = GetString(row, "light_condition_id", "light_condition");
+            crash.VehicleConfigurationId = GetString(row, "vehicle_configuration_id", "vehicle_configuration");
+            crash.CargoBodyTypeId = GetString(row, "cargo_body_type_id", "cargo_body_type");
+            crash.GvwRatingId = GetString(row, "gvw_rating_id", "gvw_rating");
+            crash.VehicleIdentificationNumber = GetString(row, "vehicle_identification_number", "vin");
+            crash.VehicleLicenseNumber = GetString(row, "vehicle_license_number", "license_number");
+            crash.VehicleLicenseState = GetString(row, "vehicle_lic_state", "vehicle_license_state");
+            crash.HazmatPlacard = GetBool(row, "vehicle_hazmat_placard", "hazmat_placard");
+            crash.HazmatReleased = GetBool(row, "hazmat_released");
             crash.TowAway = GetCrashFlag(row, "tow_away", "towaway", "tow_away_indicator", "towaway_indicator", "tow", "tow_away_count", "towaway_count");
             crash.Injury = GetCrashFlag(row, "injuries", "injury", "injury_indicator", "injury_crash", "injury_count", "non_fatal_injuries", "nonfatal_injuries", "number_of_injuries");
             crash.Fatality = GetCrashFlag(row, "fatalities", "fatality", "fatality_indicator", "fatal_crash", "fatal", "fatality_count", "fatal_injuries", "number_of_fatalities");
@@ -565,6 +582,11 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     Date = first.CrashDate,
                     ReportNumber = first.ReportNumber,
                     State = first.State,
+                    City = first.City,
+                    Location = first.Location,
+                    Agency = first.Agency,
+                    Conditions = BuildCrashConditions(first),
+                    VehicleInfo = BuildCrashVehicleInfo(first),
                     Description = fatal ? "Fatal reportable crash" : injury ? "Injury reportable crash" : "Tow-away reportable crash",
                     IsFatal = fatal,
                     IsInjury = injury,
@@ -599,6 +621,41 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 IsOutOfService = v.IsOutOfService || v.IsDriverDisqualifying,
             })
             .ToList();
+    }
+
+    private static string BuildCrashConditions(FmcsaCrash crash)
+    {
+        var parts = new[]
+        {
+            FormatCode("Weather", crash.WeatherConditionId),
+            FormatCode("Road surface", crash.RoadSurfaceConditionId),
+            FormatCode("Trafficway", crash.TrafficwayId),
+            FormatCode("Light", crash.LightConditionId),
+            crash.VehiclesInAccident.HasValue ? $"Vehicles: {crash.VehiclesInAccident.Value}" : null,
+        }.Where(p => !string.IsNullOrWhiteSpace(p));
+
+        return string.Join(" | ", parts);
+    }
+
+    private static string BuildCrashVehicleInfo(FmcsaCrash crash)
+    {
+        var parts = new[]
+        {
+            FormatCode("Vehicle config", crash.VehicleConfigurationId),
+            FormatCode("Cargo body", crash.CargoBodyTypeId),
+            FormatCode("GVW", crash.GvwRatingId),
+            !string.IsNullOrWhiteSpace(crash.VehicleIdentificationNumber) ? $"VIN: {crash.VehicleIdentificationNumber}" : null,
+            !string.IsNullOrWhiteSpace(crash.VehicleLicenseNumber) ? $"Plate: {crash.VehicleLicenseState} {crash.VehicleLicenseNumber}".Trim() : null,
+            $"HM placard: {(crash.HazmatPlacard ? "Yes" : "No")}",
+            $"HM released: {(crash.HazmatReleased ? "Yes" : "No")}",
+        }.Where(p => !string.IsNullOrWhiteSpace(p));
+
+        return string.Join(" | ", parts);
+    }
+
+    private static string? FormatCode(string label, string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : $"{label}: {value}";
     }
 
     private static void ApplyViolationOosToInspection(FmcsaInspection inspection, FmcsaViolation violation)
