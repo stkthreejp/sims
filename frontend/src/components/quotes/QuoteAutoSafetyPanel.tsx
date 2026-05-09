@@ -4,7 +4,7 @@ import axios from 'axios'
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
-import type { AutoSafetyDetail, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
+import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
 
 type Props = {
   quoteId: string
@@ -232,21 +232,11 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             </div>
             <div className="grid grid-cols-7 divide-x">
               {data.basics.map((b) => (
-                <button
+                <BasicKpiTile
                   key={b.basic}
-                  type="button"
+                  basic={b}
                   onClick={() => setDetailSelection({ kind: 'basic', title: `${b.basic} Details`, basic: b.basic })}
-                  className="min-w-0 p-3 text-left hover:bg-slate-50"
-                >
-                  <div className="truncate text-xs font-semibold text-slate-700" title={b.basic}>{b.basic}</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs">
-                    {b.isPrioritized ? <XCircle className="h-3.5 w-3.5 text-red-600" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
-                    <span className={b.isPrioritized ? 'text-red-700' : 'text-slate-500'}>
-                      {b.percentile == null ? `${b.eventCount} events` : `${b.percentile}%`}
-                    </span>
-                  </div>
-                  {b.outOfServiceCount > 0 && <div className="mt-1 text-xs text-amber-700">{b.outOfServiceCount} OOS</div>}
-                </button>
+                />
               ))}
             </div>
           </div>
@@ -315,6 +305,57 @@ function OosMetric({ label, count, oosCount, rate, onClick }: { label: string; c
       <div className="mt-1 text-xs text-slate-500">{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
     </button>
   )
+}
+
+function BasicKpiTile({ basic, onClick }: { basic: AutoSafetyBasic; onClick: () => void }) {
+  const risk = getBasicRisk(basic)
+  const dialValue = basic.percentile ?? risk.value
+  const color = risk.color === 'red' ? '#dc2626' : risk.color === 'yellow' ? '#d97706' : '#059669'
+  const bgColor = risk.color === 'red' ? 'bg-red-50' : risk.color === 'yellow' ? 'bg-amber-50' : 'bg-emerald-50'
+  const textColor = risk.color === 'red' ? 'text-red-700' : risk.color === 'yellow' ? 'text-amber-700' : 'text-emerald-700'
+  const dash = `${Math.max(0, Math.min(100, dialValue))}, 100`
+
+  return (
+    <button type="button" onClick={onClick} className="min-w-0 p-3 text-left hover:bg-slate-50">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-xs font-semibold text-slate-700" title={basic.basic}>{basic.basic}</div>
+          <div className="mt-1 text-[10px] font-semibold uppercase text-slate-400">{basic.scoreSource}</div>
+        </div>
+        <div className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${bgColor}`}>
+          <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
+            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e2e8f0" strokeWidth="4" />
+            <circle cx="18" cy="18" r="15.5" fill="none" stroke={color} strokeWidth="4" strokeDasharray={dash} pathLength="100" strokeLinecap="round" />
+          </svg>
+          <span className={`absolute text-[10px] font-bold ${textColor}`}>{basic.percentile == null ? risk.label : `${Math.round(basic.percentile)}`}</span>
+        </div>
+      </div>
+      <div className="mt-2 flex items-center gap-1 text-xs">
+        {risk.color === 'red' ? <XCircle className="h-3.5 w-3.5 text-red-600" /> : <CheckCircle2 className={`h-3.5 w-3.5 ${risk.color === 'yellow' ? 'text-amber-600' : 'text-emerald-600'}`} />}
+        <span className={textColor}>{risk.status}</span>
+      </div>
+      <div className="mt-1 text-xs text-slate-500">
+        {basic.measure == null ? 'Measure -' : `Measure ${basic.measure}`}
+        {basic.percentile == null ? '' : ` | ${basic.percentile}%`}
+      </div>
+      <div className="mt-1 text-xs text-slate-500">{basic.eventCount} events{basic.outOfServiceCount > 0 ? ` | ${basic.outOfServiceCount} OOS` : ''}</div>
+    </button>
+  )
+}
+
+function getBasicRisk(basic: AutoSafetyBasic): { color: 'green' | 'yellow' | 'red'; value: number; label: string; status: string } {
+  if (basic.isPrioritized) return { color: 'red', value: 100, label: '!', status: 'Alert' }
+  if (basic.percentile != null) {
+    if (basic.percentile >= 75) return { color: 'red', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'High' }
+    if (basic.percentile >= 50) return { color: 'yellow', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Watch' }
+    return { color: 'green', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Clear' }
+  }
+
+  const eventPressure = Math.min(60, basic.eventCount * 1.5)
+  const oosPressure = Math.min(40, basic.outOfServiceCount * 6)
+  const value = Math.round(eventPressure + oosPressure)
+  if (value >= 70) return { color: 'yellow', value, label: `${value}`, status: 'Watch' }
+  return { color: 'green', value, label: `${value}`, status: basic.scoreSource === 'Official SMS' ? 'No alert' : 'Signal' }
 }
 
 function TrendChart({

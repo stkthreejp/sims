@@ -34,6 +34,14 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         ("12-6", 6, 12),
         ("6-0", 0, 6),
     ];
+    private static readonly SmsBasicMapping[] SmsBasicMappings =
+    [
+        new("Unsafe Driving", "unsafe_driv_measure", "unsafe_driv_pct", "unsafe_driv_basic_alert", "unsafe_driv_rd_alert", "unsafe_driv_ac", "unsafe_driv_insp_w_viol"),
+        new("Hours-of-Service Compliance", "hos_driv_measure", "hos_driv_pct", "hos_driv_basic_alert", "hos_driv_rd_alert", "hos_driv_ac", "hos_driv_insp_w_viol"),
+        new("Driver Fitness", "driv_fit_measure", "driv_fit_pct", "driv_fit_basic_alert", "driv_fit_rd_alert", "driv_fit_ac", "driv_fit_insp_w_viol"),
+        new("Controlled Substances/Alcohol", "contr_subst_measure", "contr_subst_pct", "contr_subst_basic_alert", "contr_subst_rd_alert", "contr_subst_ac", "contr_subst_insp_w_viol"),
+        new("Vehicle Maintenance", "veh_maint_measure", "veh_maint_pct", "veh_maint_basic_alert", "veh_maint_rd_alert", "veh_maint_ac", "veh_maint_insp_w_viol"),
+    ];
     private static readonly IReadOnlyDictionary<string, string> WeatherConditions = new Dictionary<string, string>
     {
         ["1"] = "No adverse conditions",
@@ -307,6 +315,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         List<Dictionary<string, JsonElement>> inspectionRows;
         List<Dictionary<string, JsonElement>> violationRows;
         List<Dictionary<string, JsonElement>> crashRows;
+        (string Source, List<Dictionary<string, JsonElement>> Rows) smsRows;
 
         try
         {
@@ -316,6 +325,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 inspectionRows.Select(r => GetString(r, "unique_id", "inspection_id")).Where(id => !string.IsNullOrWhiteSpace(id))!,
                 ct);
             crashRows = await _socrata.GetCrashesByDotAsync(dotNumber, ct);
+            smsRows = await _socrata.GetSmsScoresByDotAsync(dotNumber, ct);
         }
         catch (HttpRequestException ex)
         {
@@ -338,6 +348,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             inspectionCount = await UpsertInspectionsAsync(dotNumber, inspectionRows, now, ct);
             violationCount = await UpsertViolationsAsync(dotNumber, inspectionRows, violationRows, now, ct);
             crashCount = await UpsertCrashesAsync(dotNumber, crashRows, now, ct);
+            await UpsertOfficialSmsScoresAsync(dotNumber, snapshotMonth, smsRows.Source, smsRows.Rows, now, ct);
 
             await _db.SaveChangesAsync(ct);
         }
@@ -582,6 +593,41 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         return count;
     }
 
+    private async Task UpsertOfficialSmsScoresAsync(string dotNumber, string snapshotMonth, string source, List<Dictionary<string, JsonElement>> rows, DateTime now, CancellationToken ct)
+    {
+        var row = rows.FirstOrDefault();
+        if (row == null)
+            return;
+
+        var scoringRun = await _db.FmcsaScoringRuns
+            .Include(r => r.BasicScores)
+            .FirstOrDefaultAsync(r => r.UsDotNumber == dotNumber && r.SnapshotMonth == snapshotMonth, ct);
+        if (scoringRun == null)
+        {
+            scoringRun = new FmcsaScoringRun { UsDotNumber = dotNumber, SnapshotMonth = snapshotMonth };
+            _db.FmcsaScoringRuns.Add(scoringRun);
+        }
+
+        scoringRun.MethodologyVersion = $"{CurrentMethodologyVersion} - {source}";
+        scoringRun.GeneratedAt = now;
+
+        foreach (var smsBasic in SmsBasicMappings)
+        {
+            var score = scoringRun.BasicScores.FirstOrDefault(s => s.Basic == smsBasic.Basic);
+            if (score == null)
+            {
+                score = new FmcsaBasicScore { Basic = smsBasic.Basic };
+                scoringRun.BasicScores.Add(score);
+            }
+
+            score.Measure = GetDecimal(row, smsBasic.Measure);
+            score.Percentile = GetDecimal(row, smsBasic.Percentile);
+            score.IsPrioritized = GetBool(row, smsBasic.Alert, smsBasic.RoadsideAlert, smsBasic.AlertCode);
+            score.EventCount = GetInt(row, smsBasic.EventCount) ?? 0;
+            score.TrendDirection = "Flat";
+        }
+    }
+
     private static IEnumerable<Dictionary<string, JsonElement>> DeduplicateBy(
         IEnumerable<Dictionary<string, JsonElement>> rows,
         Func<Dictionary<string, JsonElement>, string?> keySelector)
@@ -597,40 +643,51 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaViolation> violations)
     {
-        if (scoringRun?.BasicScores.Count > 0)
-        {
-            return scoringRun.BasicScores
-                .OrderByDescending(s => s.IsPrioritized)
-                .ThenByDescending(s => s.Percentile ?? 0)
-                .Select(s => new AutoSafetyBasicDto
-                {
-                    Basic = s.Basic,
-                    Measure = s.Measure,
-                    Percentile = s.Percentile,
-                    IsPrioritized = s.IsPrioritized,
-                    EventCount = s.EventCount,
-                    OutOfServiceCount = s.OutOfServiceCount,
-                    TrendDirection = s.TrendDirection,
-                })
-                .ToList();
-        }
-
         var grouped = violations
             .Where(v => !string.IsNullOrWhiteSpace(v.Basic))
             .GroupBy(v => v.Basic!)
             .ToDictionary(g => g.Key, g => g.ToList());
+
+        if (scoringRun?.BasicScores.Count > 0)
+        {
+            var officialScores = scoringRun.BasicScores.ToDictionary(s => s.Basic, StringComparer.OrdinalIgnoreCase);
+            return Basics.Select(b =>
+                {
+                    officialScores.TryGetValue(b, out var score);
+                    grouped.TryGetValue(b, out var events);
+                    events ??= [];
+                    return new AutoSafetyBasicDto
+                    {
+                        Basic = b,
+                        Measure = score?.Measure,
+                        Percentile = score?.Percentile,
+                        IsPrioritized = score?.IsPrioritized ?? false,
+                        EventCount = score?.EventCount > 0
+                            ? score.EventCount
+                            : events.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
+                        OutOfServiceCount = events.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
+                        TrendDirection = score?.TrendDirection ?? "Flat",
+                        ScoreSource = score == null ? "SIMS signal" : "Official SMS",
+                    };
+                })
+                .OrderByDescending(s => s.IsPrioritized)
+                .ThenByDescending(s => s.Percentile ?? 0)
+                .ThenBy(s => Array.IndexOf(Basics, s.Basic))
+                .ToList();
+        }
 
         return Basics.Select(b =>
         {
             grouped.TryGetValue(b, out var events);
             events ??= [];
             return new AutoSafetyBasicDto
-            {
-                Basic = b,
-                EventCount = events.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
-                OutOfServiceCount = events.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
-                TrendDirection = "Flat",
-            };
+                {
+                    Basic = b,
+                    EventCount = events.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
+                    OutOfServiceCount = events.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
+                    TrendDirection = "Flat",
+                    ScoreSource = "SIMS signal",
+                };
         }).ToList();
     }
 
@@ -1050,6 +1107,15 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         public string? Make { get; set; }
         public string? Model { get; set; }
     }
+
+    private sealed record SmsBasicMapping(
+        string Basic,
+        string Measure,
+        string Percentile,
+        string Alert,
+        string RoadsideAlert,
+        string AlertCode,
+        string EventCount);
 
     private static void ApplyViolationOosToInspection(FmcsaInspection inspection, FmcsaViolation violation)
     {

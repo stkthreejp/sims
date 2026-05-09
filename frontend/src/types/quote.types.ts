@@ -210,6 +210,7 @@ export interface AutoSafetyBasic {
   eventCount: number
   outOfServiceCount: number
   trendDirection: string
+  scoreSource: string
 }
 
 export interface AutoSafetyOos {

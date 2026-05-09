@@ -52,6 +52,29 @@ public class FmcsaSocrataClient
     public Task<List<Dictionary<string, JsonElement>>> GetCrashesByDotAsync(string dotNumber, CancellationToken ct) =>
         GetRowsByDotAsync(_settings.CrashesDatasetId, dotNumber, ct);
 
+    public async Task<(string Source, List<Dictionary<string, JsonElement>> Rows)> GetSmsScoresByDotAsync(string dotNumber, CancellationToken ct)
+    {
+        var datasets = new[]
+        {
+            ("SMS AB Pass", _settings.SmsAbPassDatasetId),
+            ("SMS C Pass", _settings.SmsCPassDatasetId),
+            ("SMS AB PassProperty", _settings.SmsAbPassPropertyDatasetId),
+            ("SMS C PassProperty", _settings.SmsCPassPropertyDatasetId),
+        };
+
+        foreach (var (source, datasetId) in datasets)
+        {
+            if (string.IsNullOrWhiteSpace(datasetId))
+                continue;
+
+            var rows = await GetRowsByDotAsync(datasetId, dotNumber, ct);
+            if (rows.Count > 0)
+                return (source, rows);
+        }
+
+        return ("Official SMS", []);
+    }
+
     private async Task<List<Dictionary<string, JsonElement>>> GetRowsByDotAsync(string datasetId, string dotNumber, CancellationToken ct)
     {
         var allRows = new List<Dictionary<string, JsonElement>>();

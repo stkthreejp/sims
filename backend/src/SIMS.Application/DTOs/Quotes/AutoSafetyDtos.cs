@@ -41,6 +41,7 @@ public class AutoSafetyBasicDto
     public int EventCount { get; set; }
     public int OutOfServiceCount { get; set; }
     public string TrendDirection { get; set; } = "Flat";
+    public string ScoreSource { get; set; } = "SIMS signal";
 }
 
 public class AutoSafetyOosDto
