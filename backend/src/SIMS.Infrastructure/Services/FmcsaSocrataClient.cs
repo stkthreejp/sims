@@ -28,6 +28,27 @@ public class FmcsaSocrataClient
     public Task<List<Dictionary<string, JsonElement>>> GetViolationsByDotAsync(string dotNumber, CancellationToken ct) =>
         GetRowsByDotAsync(_settings.ViolationsDatasetId, dotNumber, ct);
 
+    public async Task<List<Dictionary<string, JsonElement>>> GetViolationsByInspectionIdsAsync(IEnumerable<string> inspectionIds, CancellationToken ct)
+    {
+        var ids = inspectionIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (ids.Count == 0)
+            return [];
+
+        var allRows = new List<Dictionary<string, JsonElement>>();
+        foreach (var batch in ids.Chunk(50))
+        {
+            var quoted = string.Join(",", batch.Select(id => $"'{id.Replace("'", "''")}'"));
+            var query = $"$limit={Math.Clamp(_settings.PageSize, 1, 50000)}&$where={WebUtility.UrlEncode($"inspection_id in ({quoted})")}";
+            allRows.AddRange(await SendAsync(_settings.ViolationsDatasetId, query, ct));
+        }
+
+        return allRows;
+    }
+
     public Task<List<Dictionary<string, JsonElement>>> GetCrashesByDotAsync(string dotNumber, CancellationToken ct) =>
         GetRowsByDotAsync(_settings.CrashesDatasetId, dotNumber, ct);
 

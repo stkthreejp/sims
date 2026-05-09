@@ -312,7 +312,9 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         {
             carrierRows = await _socrata.GetCensusByDotAsync(dotNumber, ct);
             inspectionRows = await _socrata.GetInspectionsByDotAsync(dotNumber, ct);
-            violationRows = await _socrata.GetViolationsByDotAsync(dotNumber, ct);
+            violationRows = await _socrata.GetViolationsByInspectionIdsAsync(
+                inspectionRows.Select(r => GetString(r, "inspection_id")).Where(id => !string.IsNullOrWhiteSpace(id))!,
+                ct);
             crashRows = await _socrata.GetCrashesByDotAsync(dotNumber, ct);
         }
         catch (HttpRequestException ex)
@@ -334,7 +336,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         {
             carrierCount = await UpsertCarrierSnapshotsAsync(dotNumber, snapshotMonth, carrierRows, now, ct);
             inspectionCount = await UpsertInspectionsAsync(dotNumber, inspectionRows, now, ct);
-            violationCount = await UpsertViolationsAsync(dotNumber, violationRows, now, ct);
+            violationCount = await UpsertViolationsAsync(dotNumber, inspectionRows, violationRows, now, ct);
             crashCount = await UpsertCrashesAsync(dotNumber, crashRows, now, ct);
 
             await _db.SaveChangesAsync(ct);
@@ -413,14 +415,17 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             }
 
             inspection.InspectionDate = inspectionDate.Value;
-            inspection.State = GetString(row, "state", "inspection_state", "insp_state");
-            inspection.InspectionLevel = GetInt(row, "inspection_level", "insp_level", "level");
-            inspection.DriverOutOfService = GetBool(row, "driver_oos", "driver_out_of_service", "drv_oos", "driver_oos_indicator", "driver_oos_flag");
-            inspection.VehicleOutOfService = GetBool(row, "vehicle_oos", "vehicle_out_of_service", "veh_oos", "vehicle_oos_indicator", "vehicle_oos_flag");
-            inspection.HazmatOutOfService = GetBool(row, "hazmat_oos", "hm_oos", "hazmat_out_of_service", "hazmat_oos_indicator", "hazmat_oos_flag");
-            inspection.DriverViolationCount = GetInt(row, "driver_violation_count", "drv_violation_count", "driver_violations") ?? 0;
-            inspection.VehicleViolationCount = GetInt(row, "vehicle_violation_count", "veh_violation_count", "vehicle_violations") ?? 0;
-            inspection.HazmatViolationCount = GetInt(row, "hazmat_violation_count", "hm_violation_count", "hazmat_violations") ?? 0;
+            inspection.State = GetString(row, "state", "inspection_state", "insp_state", "report_state");
+            inspection.InspectionLevel = GetInt(row, "inspection_level", "insp_level", "insp_level_id", "level");
+            inspection.DriverOutOfService = GetBool(row, "driver_oos", "driver_out_of_service", "drv_oos", "driver_oos_indicator", "driver_oos_flag")
+                || GetInt(row, "driver_oos_total") is > 0;
+            inspection.VehicleOutOfService = GetBool(row, "vehicle_oos", "vehicle_out_of_service", "veh_oos", "vehicle_oos_indicator", "vehicle_oos_flag")
+                || GetInt(row, "vehicle_oos_total") is > 0;
+            inspection.HazmatOutOfService = GetBool(row, "hazmat_oos", "hm_oos", "hazmat_out_of_service", "hazmat_oos_indicator", "hazmat_oos_flag")
+                || GetInt(row, "hazmat_oos_total") is > 0;
+            inspection.DriverViolationCount = GetInt(row, "driver_violation_count", "drv_violation_count", "driver_violations", "driver_viol_total") ?? 0;
+            inspection.VehicleViolationCount = GetInt(row, "vehicle_violation_count", "veh_violation_count", "vehicle_violations", "vehicle_viol_total") ?? 0;
+            inspection.HazmatViolationCount = GetInt(row, "hazmat_violation_count", "hm_violation_count", "hazmat_violations", "hazmat_viol_total") ?? 0;
             inspection.ImportedAt = now;
             count++;
         }
@@ -428,16 +433,31 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         return count;
     }
 
-    private async Task<int> UpsertViolationsAsync(string dotNumber, List<Dictionary<string, JsonElement>> rows, DateTime now, CancellationToken ct)
+    private async Task<int> UpsertViolationsAsync(string dotNumber, List<Dictionary<string, JsonElement>> inspectionRows, List<Dictionary<string, JsonElement>> rows, DateTime now, CancellationToken ct)
     {
         var count = 0;
+        var inspectionsById = inspectionRows
+            .Select(row => new
+            {
+                InspectionId = GetString(row, "inspection_id"),
+                ReportNumber = GetString(row, "report_number", "insp_report_number", "inspection_report_number"),
+                InspectionDate = GetDate(row, "inspection_date", "insp_date", "inspection_dt", "inspection_date_dt", "activity_date", "report_date", "date"),
+                State = GetString(row, "state", "inspection_state", "insp_state", "report_state"),
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.InspectionId) && !string.IsNullOrWhiteSpace(x.ReportNumber))
+            .ToDictionary(x => x.InspectionId!, x => x, StringComparer.OrdinalIgnoreCase);
+
         foreach (var row in rows)
         {
-            var reportNumber = GetString(row, "report_number", "insp_report_number", "inspection_report_number");
-            var violationCode = GetString(row, "violation_code", "viol_code", "code");
-            var description = GetString(row, "description", "violation_description", "viol_desc");
+            var inspectionId = GetString(row, "inspection_id");
+            if (string.IsNullOrWhiteSpace(inspectionId) || !inspectionsById.TryGetValue(inspectionId, out var inspectionRow))
+                continue;
+
+            var reportNumber = inspectionRow.ReportNumber;
+            var violationCode = BuildViolationCode(row);
+            var description = BuildViolationDescription(row);
             if (string.IsNullOrWhiteSpace(reportNumber) || string.IsNullOrWhiteSpace(violationCode)) continue;
-            var inspectionDate = GetDate(row, "inspection_date", "insp_date", "inspection_dt", "inspection_date_dt", "activity_date", "report_date", "date");
+            var inspectionDate = inspectionRow.InspectionDate;
 
             var inspection = await _db.FmcsaInspections
                 .FirstOrDefaultAsync(i => i.UsDotNumber == dotNumber && i.ReportNumber == reportNumber, ct);
@@ -448,7 +468,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     UsDotNumber = dotNumber,
                     ReportNumber = reportNumber,
                     InspectionDate = inspectionDate ?? DateOnly.FromDateTime(now),
-                    State = GetString(row, "state", "inspection_state", "insp_state"),
+                    State = inspectionRow.State,
                     ImportedAt = now,
                 };
                 _db.FmcsaInspections.Add(inspection);
@@ -478,7 +498,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
             violation.Description = description;
             violation.Basic = NormalizeBasic(GetString(row, "basic", "basic_desc", "basic_name"));
-            violation.ViolationGroup = GetString(row, "violation_group", "group_desc", "viol_group", "defect_group", "violation_category", "category", "unit_type");
+            violation.ViolationGroup = GetString(row, "violation_group", "group_desc", "viol_group", "defect_group", "violation_category", "category", "unit_type", "insp_viol_unit", "insp_violation_category_id");
             violation.IsOutOfService = GetBool(row, "oos_indicator", "is_out_of_service", "out_of_service", "oos", "oos_flag", "out_of_service_indicator");
             violation.IsDriverDisqualifying = GetBool(row, "driver_disqualified", "is_driver_disqualifying");
             violation.SeverityWeight = violation.IsOutOfService || violation.IsDriverDisqualifying ? 2 : 1;
@@ -749,6 +769,40 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 IsOutOfService = v.IsOutOfService || v.IsDriverDisqualifying,
             })
             .ToList();
+    }
+
+    private static string? BuildViolationCode(Dictionary<string, JsonElement> row)
+    {
+        var code = GetString(row, "violation_code", "viol_code", "code");
+        if (!string.IsNullOrWhiteSpace(code))
+            return code;
+
+        var part = GetString(row, "part_no");
+        var section = GetString(row, "part_no_section");
+        if (!string.IsNullOrWhiteSpace(part) && !string.IsNullOrWhiteSpace(section))
+            return $"{part}.{section}";
+
+        return GetString(row, "insp_violation_id");
+    }
+
+    private static string? BuildViolationDescription(Dictionary<string, JsonElement> row)
+    {
+        var description = GetString(row, "description", "violation_description", "viol_desc");
+        if (!string.IsNullOrWhiteSpace(description))
+            return description;
+
+        var unit = GetString(row, "insp_viol_unit");
+        var category = GetString(row, "insp_violation_category_id");
+        var citation = GetString(row, "citation_number");
+        var parts = new[]
+        {
+            !string.IsNullOrWhiteSpace(unit) ? $"Unit {unit}" : null,
+            !string.IsNullOrWhiteSpace(category) ? $"Category {category}" : null,
+            !string.IsNullOrWhiteSpace(citation) ? $"Citation {citation}" : null,
+        }.Where(p => !string.IsNullOrWhiteSpace(p));
+
+        var summary = string.Join(" - ", parts);
+        return string.IsNullOrWhiteSpace(summary) ? null : summary;
     }
 
     private static List<AutoSafetyDetailDto> BuildInspectionDetails(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
