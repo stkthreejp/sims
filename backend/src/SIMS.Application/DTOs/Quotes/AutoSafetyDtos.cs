@@ -18,6 +18,8 @@ public class AutoSafetySummaryDto
     public AutoSafetyAccidentSummaryDto AccidentSummary { get; set; } = new();
     public List<AutoSafetyHotspotDto> GeographicHotspots { get; set; } = new();
     public List<AutoSafetyEventDto> RecentSevereEvents { get; set; } = new();
+    public List<AutoSafetyTrendBucketDto> InspectionTrend { get; set; } = new();
+    public List<AutoSafetyTrendBucketDto> ViolationTrend { get; set; } = new();
 }
 
 public class AutoSafetyRefreshDto
@@ -104,4 +106,12 @@ public class AutoSafetyDetailDto
     public bool IsInjury { get; set; }
     public bool IsTow { get; set; }
     public string Source { get; set; } = "FMCSA/Socrata";
+}
+
+public class AutoSafetyTrendBucketDto
+{
+    public string Label { get; set; } = string.Empty;
+    public int TotalCount { get; set; }
+    public int OutOfServiceCount { get; set; }
+    public decimal? OutOfServiceRate { get; set; }
 }

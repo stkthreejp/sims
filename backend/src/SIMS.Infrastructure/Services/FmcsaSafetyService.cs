@@ -25,6 +25,15 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         "Hazardous Materials Compliance",
         "Driver Fitness"
     ];
+    private static readonly (string Label, int FromMonthsAgo, int ToMonthsAgo)[] TrendBuckets =
+    [
+        ("36-30", 30, 36),
+        ("30-24", 24, 30),
+        ("24-18", 18, 24),
+        ("18-12", 12, 18),
+        ("12-6", 6, 12),
+        ("6-0", 0, 6),
+    ];
     private static readonly IReadOnlyDictionary<string, string> WeatherConditions = new Dictionary<string, string>
     {
         ["1"] = "No adverse conditions",
@@ -154,12 +163,21 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .ThenByDescending(r => r.GeneratedAt)
             .FirstOrDefaultAsync(ct);
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var windowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-24));
+        var trendWindowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-36));
         var inspections = await _db.FmcsaInspections
             .Where(i => i.UsDotNumber == dotNumber && i.InspectionDate >= windowStart)
             .ToListAsync(ct);
         var violations = await _db.FmcsaViolations
             .Where(v => v.UsDotNumber == dotNumber && v.Inspection.InspectionDate >= windowStart)
+            .Include(v => v.Inspection)
+            .ToListAsync(ct);
+        var trendInspections = await _db.FmcsaInspections
+            .Where(i => i.UsDotNumber == dotNumber && i.InspectionDate >= trendWindowStart)
+            .ToListAsync(ct);
+        var trendViolations = await _db.FmcsaViolations
+            .Where(v => v.UsDotNumber == dotNumber && v.Inspection.InspectionDate >= trendWindowStart)
             .Include(v => v.Inspection)
             .ToListAsync(ct);
         var crashes = await _db.FmcsaCrashes
@@ -204,6 +222,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             AccidentSummary = accidentSummary,
             GeographicHotspots = hotspots,
             RecentSevereEvents = severeEvents,
+            InspectionTrend = BuildInspectionTrend(trendInspections, trendViolations, today),
+            ViolationTrend = BuildViolationTrend(trendViolations, today),
         });
     }
 
@@ -221,6 +241,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             return Result<List<AutoSafetyDetailDto>>.Success([]);
 
         var windowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-24));
+        var trendWindowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-36));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var normalizedKind = kind?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(normalizedKind))
             return Result<List<AutoSafetyDetailDto>>.Failure("INVALID_DETAIL_KIND", "Select an Auto Safety detail type.");
@@ -234,10 +256,21 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             return Result<List<AutoSafetyDetailDto>>.Success(BuildCrashDetails(crashes, normalizedKind));
         }
 
+        var detailWindowStart = normalizedKind is "inspection-trend" or "violation-trend" ? trendWindowStart : windowStart;
         var violations = await _db.FmcsaViolations
             .Include(v => v.Inspection)
-            .Where(v => v.UsDotNumber == dotNumber && v.Inspection.InspectionDate >= windowStart)
+            .Where(v => v.UsDotNumber == dotNumber && v.Inspection.InspectionDate >= detailWindowStart)
             .ToListAsync(ct);
+        var inspections = normalizedKind == "inspection-trend"
+            ? await _db.FmcsaInspections
+                .Where(i => i.UsDotNumber == dotNumber && i.InspectionDate >= trendWindowStart)
+                .ToListAsync(ct)
+            : [];
+        if (normalizedKind is "inspection-trend" or "violation-trend" && !string.IsNullOrWhiteSpace(basic))
+        {
+            violations = violations.Where(v => IsInTrendBucket(v.Inspection.InspectionDate, basic, today)).ToList();
+            inspections = inspections.Where(i => IsInTrendBucket(i.InspectionDate, basic, today)).ToList();
+        }
 
         var details = normalizedKind switch
         {
@@ -245,6 +278,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             "driver-oos" => BuildViolationDetails(violations.Where(v => (v.IsOutOfService || v.IsDriverDisqualifying) && IsDriverOosViolation(v)), "Driver OOS"),
             "vehicle-oos" => BuildViolationDetails(violations.Where(v => (v.IsOutOfService || v.IsDriverDisqualifying) && IsVehicleOosViolation(v)), "Vehicle OOS"),
             "hazmat-oos" => BuildViolationDetails(violations.Where(v => (v.IsOutOfService || v.IsDriverDisqualifying) && IsHazmatOosViolation(v)), "Hazmat OOS"),
+            "inspection-trend" => BuildInspectionDetails(inspections, violations),
+            "violation-trend" => BuildViolationDetails(violations, "Violation"),
             "basic" when !string.IsNullOrWhiteSpace(basic) => BuildViolationDetails(violations.Where(v => v.Basic == basic), basic!),
             _ => [],
         };
@@ -714,6 +749,104 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 IsOutOfService = v.IsOutOfService || v.IsDriverDisqualifying,
             })
             .ToList();
+    }
+
+    private static List<AutoSafetyDetailDto> BuildInspectionDetails(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
+    {
+        var violationsByReport = violations
+            .GroupBy(v => v.ReportNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        return inspections
+            .OrderByDescending(i => i.InspectionDate)
+            .ThenBy(i => i.ReportNumber)
+            .Select(i =>
+            {
+                var reportViolations = violationsByReport.GetValueOrDefault(i.ReportNumber) ?? [];
+                var oosCount = reportViolations.Count(v => v.IsOutOfService || v.IsDriverDisqualifying);
+                return new AutoSafetyDetailDto
+                {
+                    Category = i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService ? "OOS inspection" : "Inspection",
+                    Date = i.InspectionDate,
+                    ReportNumber = i.ReportNumber,
+                    State = i.State,
+                    Description = BuildInspectionDescription(i, reportViolations),
+                    IsOutOfService = i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService || oosCount > 0,
+                    Basic = reportViolations.Count == 0 ? null : $"{reportViolations.Count} violations, {oosCount} OOS",
+                };
+            })
+            .ToList();
+    }
+
+    private static string BuildInspectionDescription(FmcsaInspection inspection, List<FmcsaViolation> violations)
+    {
+        var oosTypes = new List<string>();
+        if (inspection.DriverOutOfService) oosTypes.Add("driver OOS");
+        if (inspection.VehicleOutOfService) oosTypes.Add("vehicle OOS");
+        if (inspection.HazmatOutOfService) oosTypes.Add("hazmat OOS");
+
+        var level = inspection.InspectionLevel.HasValue ? $"Level {inspection.InspectionLevel.Value} inspection" : "Inspection";
+        var violationSummary = violations.Count == 0
+            ? "no imported violations"
+            : $"{violations.Count} imported violation{(violations.Count == 1 ? "" : "s")}";
+        var oosSummary = oosTypes.Count == 0 ? null : $" ({string.Join(", ", oosTypes)})";
+
+        return $"{level} with {violationSummary}{oosSummary}.";
+    }
+
+    private static List<AutoSafetyTrendBucketDto> BuildInspectionTrend(List<FmcsaInspection> inspections, List<FmcsaViolation> violations, DateOnly today)
+    {
+        var oosReports = inspections
+            .Where(i => i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService)
+            .Select(i => i.ReportNumber)
+            .Concat(violations.Where(v => v.IsOutOfService || v.IsDriverDisqualifying).Select(v => v.ReportNumber))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return TrendBuckets.Select(bucket =>
+        {
+            var bucketInspections = inspections
+                .Where(i => IsInTrendBucket(i.InspectionDate, bucket, today))
+                .ToList();
+            var oosCount = bucketInspections.Count(i => oosReports.Contains(i.ReportNumber));
+            return new AutoSafetyTrendBucketDto
+            {
+                Label = bucket.Label,
+                TotalCount = bucketInspections.Count,
+                OutOfServiceCount = oosCount,
+                OutOfServiceRate = bucketInspections.Count == 0 ? null : Math.Round(oosCount * 100m / bucketInspections.Count, 2),
+            };
+        }).ToList();
+    }
+
+    private static List<AutoSafetyTrendBucketDto> BuildViolationTrend(List<FmcsaViolation> violations, DateOnly today)
+    {
+        return TrendBuckets.Select(bucket =>
+        {
+            var bucketViolations = violations
+                .Where(v => IsInTrendBucket(v.Inspection.InspectionDate, bucket, today))
+                .ToList();
+            var oosCount = bucketViolations.Count(v => v.IsOutOfService || v.IsDriverDisqualifying);
+            return new AutoSafetyTrendBucketDto
+            {
+                Label = bucket.Label,
+                TotalCount = bucketViolations.Count,
+                OutOfServiceCount = oosCount,
+                OutOfServiceRate = bucketViolations.Count == 0 ? null : Math.Round(oosCount * 100m / bucketViolations.Count, 2),
+            };
+        }).ToList();
+    }
+
+    private static bool IsInTrendBucket(DateOnly date, string label, DateOnly today)
+    {
+        var bucket = TrendBuckets.FirstOrDefault(b => b.Label.Equals(label, StringComparison.OrdinalIgnoreCase));
+        return bucket.Label != null && IsInTrendBucket(date, bucket, today);
+    }
+
+    private static bool IsInTrendBucket(DateOnly date, (string Label, int FromMonthsAgo, int ToMonthsAgo) bucket, DateOnly today)
+    {
+        var bucketStart = today.AddMonths(-bucket.ToMonthsAgo);
+        var bucketEnd = today.AddMonths(-bucket.FromMonthsAgo);
+        return date >= bucketStart && date < bucketEnd;
     }
 
     private static string BuildCrashConditions(FmcsaCrash crash)

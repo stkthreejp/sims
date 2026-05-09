@@ -4,7 +4,7 @@ import axios from 'axios'
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
-import type { AutoSafetyDetail, AutoSafetyRiskLevel } from '@/types/quote.types'
+import type { AutoSafetyDetail, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
 
 type Props = {
   quoteId: string
@@ -225,8 +225,8 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
       )}
 
       {activeTab === 'history' && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2 rounded border bg-white">
+        <div className="space-y-3">
+          <div className="rounded border bg-white">
             <div className="flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">
               <BarChart3 className="h-3.5 w-3.5" /> CSA / BASICs
             </div>
@@ -251,15 +251,34 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             </div>
           </div>
 
-          <div className="rounded border bg-white p-3">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-              <Clock3 className="h-3.5 w-3.5" /> History Snapshot
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2 grid grid-cols-2 gap-3">
+              <TrendChart
+                title="Inspection History"
+                totalLabel="Total Inspections"
+                oosLabel="OOS Inspections"
+                buckets={data.inspectionTrend ?? []}
+                onBucketClick={(bucket) => setDetailSelection({ kind: 'inspection-trend', title: `Inspections ${bucket.label} Months Ago`, basic: bucket.label })}
+              />
+              <TrendChart
+                title="Violation History"
+                totalLabel="Total Violations"
+                oosLabel="OOS Violations"
+                buckets={data.violationTrend ?? []}
+                onBucketClick={(bucket) => setDetailSelection({ kind: 'violation-trend', title: `Violations ${bucket.label} Months Ago`, basic: bucket.label })}
+              />
             </div>
-            <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
-            <div className="mt-3 space-y-1 text-xs text-slate-400">
-              <div>Inspection trend: next</div>
-              <div>BASIC history: next</div>
-              <div>MCS-150 changes: next</div>
+
+            <div className="rounded border bg-white p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+                <Clock3 className="h-3.5 w-3.5" /> History Snapshot
+              </div>
+              <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
+              <div className="mt-3 space-y-1 text-xs text-slate-400">
+                <div>BASIC history: next</div>
+                <div>MCS-150 changes: next</div>
+                <div>Snapshot report: next</div>
+              </div>
             </div>
           </div>
         </div>
@@ -295,6 +314,62 @@ function OosMetric({ label, count, oosCount, rate, onClick }: { label: string; c
       <div className="mt-1 text-sm font-semibold text-slate-800">{rate == null ? '-' : `${rate}%`}</div>
       <div className="mt-1 text-xs text-slate-500">{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
     </button>
+  )
+}
+
+function TrendChart({
+  title,
+  totalLabel,
+  oosLabel,
+  buckets,
+  onBucketClick,
+}: {
+  title: string
+  totalLabel: string
+  oosLabel: string
+  buckets: AutoSafetyTrendBucket[]
+  onBucketClick: (bucket: AutoSafetyTrendBucket) => void
+}) {
+  const max = Math.max(1, ...buckets.map((b) => b.totalCount))
+
+  return (
+    <div className="rounded border bg-white p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-xs font-semibold uppercase text-slate-600">{title}</div>
+        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-red-500" />{oosLabel}</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-emerald-500" />{totalLabel}</span>
+        </div>
+      </div>
+      <div className="grid h-36 grid-cols-6 items-end gap-2 border-b border-slate-200 px-1 pb-2">
+        {buckets.map((bucket) => {
+          const totalHeight = Math.max(6, Math.round((bucket.totalCount / max) * 112))
+          const oosHeight = bucket.outOfServiceCount === 0 ? 0 : Math.max(4, Math.round((bucket.outOfServiceCount / max) * 112))
+          return (
+            <button
+              type="button"
+              key={bucket.label}
+              onClick={() => onBucketClick(bucket)}
+              className="group flex h-32 flex-col justify-end rounded px-1 hover:bg-slate-50"
+              title={`${bucket.label} months ago: ${bucket.outOfServiceCount} OOS / ${bucket.totalCount} total`}
+            >
+              <div className="relative mx-auto w-full max-w-9 rounded-t bg-emerald-500/80 transition group-hover:bg-emerald-600" style={{ height: `${totalHeight}px` }}>
+                {oosHeight > 0 && <div className="absolute bottom-0 left-0 right-0 rounded-t bg-red-500" style={{ height: `${oosHeight}px` }} />}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+      <div className="mt-2 grid grid-cols-6 gap-2 text-center text-[11px] text-slate-500">
+        {buckets.map((bucket) => (
+          <button key={bucket.label} type="button" onClick={() => onBucketClick(bucket)} className="rounded px-1 py-1 hover:bg-slate-50">
+            <div className="font-medium text-slate-600">{bucket.label}</div>
+            <div>{bucket.outOfServiceCount}/{bucket.totalCount}</div>
+            <div>{bucket.outOfServiceRate == null ? '-' : `${bucket.outOfServiceRate}%`}</div>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

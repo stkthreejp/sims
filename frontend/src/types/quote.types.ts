@@ -272,6 +272,13 @@ export interface AutoSafetyDetail {
   source: string
 }
 
+export interface AutoSafetyTrendBucket {
+  label: string
+  totalCount: number
+  outOfServiceCount: number
+  outOfServiceRate: number | null
+}
+
 export interface AutoSafetySummary {
   status: AutoSafetyStatus
   message: string | null
@@ -289,6 +296,8 @@ export interface AutoSafetySummary {
   accidentSummary: AutoSafetyAccidentSummary
   geographicHotspots: AutoSafetyHotspot[]
   recentSevereEvents: AutoSafetyEvent[]
+  inspectionTrend: AutoSafetyTrendBucket[]
+  violationTrend: AutoSafetyTrendBucket[]
 }
 
 export interface AutoSafetyRefresh {
