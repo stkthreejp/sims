@@ -313,7 +313,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             carrierRows = await _socrata.GetCensusByDotAsync(dotNumber, ct);
             inspectionRows = await _socrata.GetInspectionsByDotAsync(dotNumber, ct);
             violationRows = await _socrata.GetViolationsByInspectionIdsAsync(
-                inspectionRows.Select(r => GetString(r, "inspection_id")).Where(id => !string.IsNullOrWhiteSpace(id))!,
+                inspectionRows.Select(r => GetString(r, "unique_id", "inspection_id")).Where(id => !string.IsNullOrWhiteSpace(id))!,
                 ct);
             crashRows = await _socrata.GetCrashesByDotAsync(dotNumber, ct);
         }
@@ -426,6 +426,16 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             inspection.DriverViolationCount = GetInt(row, "driver_violation_count", "drv_violation_count", "driver_violations", "driver_viol_total") ?? 0;
             inspection.VehicleViolationCount = GetInt(row, "vehicle_violation_count", "veh_violation_count", "vehicle_violations", "vehicle_viol_total") ?? 0;
             inspection.HazmatViolationCount = GetInt(row, "hazmat_violation_count", "hm_violation_count", "hazmat_violations", "hazmat_viol_total") ?? 0;
+            inspection.UnitType = GetString(row, "unit_type_desc", "unit_type");
+            inspection.UnitMake = GetString(row, "unit_make", "make");
+            inspection.UnitLicense = GetString(row, "unit_license", "license");
+            inspection.UnitLicenseState = GetString(row, "unit_license_state", "license_state");
+            inspection.Vin = GetString(row, "vin", "vehicle_identification_number");
+            inspection.UnitType2 = GetString(row, "unit_type_desc2", "unit_type_2");
+            inspection.UnitMake2 = GetString(row, "unit_make2", "unit_make_2");
+            inspection.UnitLicense2 = GetString(row, "unit_license2", "unit_license_2");
+            inspection.UnitLicenseState2 = GetString(row, "unit_license_state2", "unit_license_state_2");
+            inspection.Vin2 = GetString(row, "vin2", "vin_2");
             inspection.ImportedAt = now;
             count++;
         }
@@ -439,7 +449,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var inspectionsById = inspectionRows
             .Select(row => new
             {
-                InspectionId = GetString(row, "inspection_id"),
+                InspectionId = GetString(row, "unique_id", "inspection_id"),
                 ReportNumber = GetString(row, "report_number", "insp_report_number", "inspection_report_number"),
                 InspectionDate = GetDate(row, "inspection_date", "insp_date", "inspection_dt", "inspection_date_dt", "activity_date", "report_date", "date"),
                 State = GetString(row, "state", "inspection_state", "insp_state", "report_state"),
@@ -449,7 +459,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
         foreach (var row in rows)
         {
-            var inspectionId = GetString(row, "inspection_id");
+            var inspectionId = GetString(row, "unique_id", "inspection_id");
             if (string.IsNullOrWhiteSpace(inspectionId) || !inspectionsById.TryGetValue(inspectionId, out var inspectionRow))
                 continue;
 
@@ -499,9 +509,11 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             violation.Description = description;
             violation.Basic = NormalizeBasic(GetString(row, "basic", "basic_desc", "basic_name"));
             violation.ViolationGroup = GetString(row, "violation_group", "group_desc", "viol_group", "defect_group", "violation_category", "category", "unit_type", "insp_viol_unit", "insp_violation_category_id");
+            violation.UnitNumber = GetString(row, "viol_unit", "insp_viol_unit", "unit");
+            violation.OosWeight = GetDecimal(row, "oos_weight");
             violation.IsOutOfService = GetBool(row, "oos_indicator", "is_out_of_service", "out_of_service", "oos", "oos_flag", "out_of_service_indicator");
             violation.IsDriverDisqualifying = GetBool(row, "driver_disqualified", "is_driver_disqualifying");
-            violation.SeverityWeight = violation.IsOutOfService || violation.IsDriverDisqualifying ? 2 : 1;
+            violation.SeverityWeight = GetInt(row, "severity_weight", "total_severity_wght") ?? (violation.IsOutOfService || violation.IsDriverDisqualifying ? 2 : 1);
             violation.TimeWeight = 1m;
             violation.ImportedAt = now;
             if (violation.IsOutOfService || violation.IsDriverDisqualifying)
@@ -765,6 +777,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 ReportNumber = v.ReportNumber,
                 State = v.Inspection.State,
                 Basic = v.Basic,
+                VehicleInfo = BuildInspectionUnitInfo(v.Inspection, v.UnitNumber),
                 Description = v.Description ?? v.ViolationCode,
                 IsOutOfService = v.IsOutOfService || v.IsDriverDisqualifying,
             })
@@ -773,7 +786,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static string? BuildViolationCode(Dictionary<string, JsonElement> row)
     {
-        var code = GetString(row, "violation_code", "viol_code", "code");
+        var code = GetString(row, "violation_code", "viol_code", "code", "viol_code");
         if (!string.IsNullOrWhiteSpace(code))
             return code;
 
@@ -782,17 +795,17 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         if (!string.IsNullOrWhiteSpace(part) && !string.IsNullOrWhiteSpace(section))
             return $"{part}.{section}";
 
-        return GetString(row, "insp_violation_id");
+        return GetString(row, "insp_violation_id", "viol_code");
     }
 
     private static string? BuildViolationDescription(Dictionary<string, JsonElement> row)
     {
-        var description = GetString(row, "description", "violation_description", "viol_desc");
+        var description = GetString(row, "description", "violation_description", "viol_desc", "section_desc");
         if (!string.IsNullOrWhiteSpace(description))
             return description;
 
-        var unit = GetString(row, "insp_viol_unit");
-        var category = GetString(row, "insp_violation_category_id");
+        var unit = GetString(row, "viol_unit", "insp_viol_unit");
+        var category = GetString(row, "group_desc", "insp_violation_category_id");
         var citation = GetString(row, "citation_number");
         var parts = new[]
         {
@@ -846,6 +859,28 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var oosSummary = oosTypes.Count == 0 ? null : $" ({string.Join(", ", oosTypes)})";
 
         return $"{level} with {violationSummary}{oosSummary}.";
+    }
+
+    private static string? BuildInspectionUnitInfo(FmcsaInspection inspection, string? unitNumber)
+    {
+        var useSecondUnit = unitNumber == "2";
+        var unitType = useSecondUnit ? inspection.UnitType2 : inspection.UnitType;
+        var unitMake = useSecondUnit ? inspection.UnitMake2 : inspection.UnitMake;
+        var unitLicense = useSecondUnit ? inspection.UnitLicense2 : inspection.UnitLicense;
+        var unitLicenseState = useSecondUnit ? inspection.UnitLicenseState2 : inspection.UnitLicenseState;
+        var vin = useSecondUnit ? inspection.Vin2 : inspection.Vin;
+
+        var parts = new[]
+        {
+            !string.IsNullOrWhiteSpace(unitNumber) ? $"Unit: {unitNumber}" : null,
+            !string.IsNullOrWhiteSpace(unitType) ? $"Type: {unitType}" : null,
+            !string.IsNullOrWhiteSpace(unitMake) ? $"Make: {unitMake}" : null,
+            !string.IsNullOrWhiteSpace(vin) ? $"VIN: {vin}" : null,
+            !string.IsNullOrWhiteSpace(unitLicense) ? $"Plate: {unitLicenseState} {unitLicense}".Trim() : null,
+        }.Where(p => !string.IsNullOrWhiteSpace(p));
+
+        var value = string.Join(" | ", parts);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     private static List<AutoSafetyTrendBucketDto> BuildInspectionTrend(List<FmcsaInspection> inspections, List<FmcsaViolation> violations, DateOnly today)
@@ -1116,7 +1151,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .Where(v => v.IsOutOfService || v.IsDriverDisqualifying || v.SeverityWeight >= 2)
             .OrderByDescending(v => v.Inspection.InspectionDate)
             .ThenByDescending(v => v.SeverityWeight)
-            .Take(5)
+            .Take(20)
             .Select(v => new AutoSafetyEventDto
             {
                 Date = v.Inspection.InspectionDate,
@@ -1196,6 +1231,12 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     {
         var raw = GetString(row, names);
         return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;
+    }
+
+    private static decimal? GetDecimal(Dictionary<string, JsonElement> row, params string[] names)
+    {
+        var raw = GetString(row, names);
+        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : null;
     }
 
     private static DateOnly? GetDate(Dictionary<string, JsonElement> row, params string[] names)

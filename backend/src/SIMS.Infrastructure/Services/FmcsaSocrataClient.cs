@@ -42,7 +42,7 @@ public class FmcsaSocrataClient
         foreach (var batch in ids.Chunk(50))
         {
             var quoted = string.Join(",", batch.Select(id => $"'{id.Replace("'", "''")}'"));
-            var query = $"$limit={Math.Clamp(_settings.PageSize, 1, 50000)}&$where={WebUtility.UrlEncode($"inspection_id in ({quoted})")}";
+            var query = $"$limit={Math.Clamp(_settings.PageSize, 1, 50000)}&$where={WebUtility.UrlEncode($"unique_id in ({quoted})")}";
             allRows.AddRange(await SendAsync(_settings.ViolationsDatasetId, query, ct));
         }
 

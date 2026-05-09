@@ -15,6 +15,16 @@ public class FmcsaInspection : BaseEntity
     public int DriverViolationCount { get; set; }
     public int VehicleViolationCount { get; set; }
     public int HazmatViolationCount { get; set; }
+    public string? UnitType { get; set; }
+    public string? UnitMake { get; set; }
+    public string? UnitLicense { get; set; }
+    public string? UnitLicenseState { get; set; }
+    public string? Vin { get; set; }
+    public string? UnitType2 { get; set; }
+    public string? UnitMake2 { get; set; }
+    public string? UnitLicense2 { get; set; }
+    public string? UnitLicenseState2 { get; set; }
+    public string? Vin2 { get; set; }
     public DateTime ImportedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<FmcsaViolation> Violations { get; set; } = new List<FmcsaViolation>();

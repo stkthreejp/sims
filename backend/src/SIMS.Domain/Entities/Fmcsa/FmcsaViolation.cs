@@ -11,6 +11,8 @@ public class FmcsaViolation : BaseEntity
     public string? Description { get; set; }
     public string? Basic { get; set; }
     public string? ViolationGroup { get; set; }
+    public string? UnitNumber { get; set; }
+    public decimal? OosWeight { get; set; }
     public bool IsOutOfService { get; set; }
     public bool IsDriverDisqualifying { get; set; }
     public int SeverityWeight { get; set; } = 1;

@@ -18,6 +18,8 @@ public class FmcsaViolationConfiguration : IEntityTypeConfiguration<FmcsaViolati
         builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
         builder.Property(x => x.Basic).HasColumnName("basic").HasMaxLength(80);
         builder.Property(x => x.ViolationGroup).HasColumnName("violation_group").HasMaxLength(120);
+        builder.Property(x => x.UnitNumber).HasColumnName("unit_number").HasMaxLength(20);
+        builder.Property(x => x.OosWeight).HasColumnName("oos_weight").HasPrecision(8, 4);
         builder.Property(x => x.IsOutOfService).HasColumnName("is_out_of_service");
         builder.Property(x => x.IsDriverDisqualifying).HasColumnName("is_driver_disqualifying");
         builder.Property(x => x.SeverityWeight).HasColumnName("severity_weight");
