@@ -25,16 +25,99 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         "Hazardous Materials Compliance",
         "Driver Fitness"
     ];
+    private static readonly IReadOnlyDictionary<string, string> WeatherConditions = new Dictionary<string, string>
+    {
+        ["1"] = "No adverse conditions",
+        ["2"] = "Rain",
+        ["3"] = "Sleet, hail",
+        ["4"] = "Snow",
+        ["5"] = "Fog, smoke, smog",
+        ["6"] = "Severe crosswinds",
+        ["7"] = "Other",
+        ["8"] = "Not reported",
+        ["9"] = "Unknown",
+    };
+    private static readonly IReadOnlyDictionary<string, string> RoadSurfaceConditions = new Dictionary<string, string>
+    {
+        ["1"] = "Dry",
+        ["2"] = "Wet",
+        ["3"] = "Snow",
+        ["4"] = "Ice/frost",
+        ["5"] = "Sand, mud, dirt, oil, gravel",
+        ["6"] = "Water",
+        ["7"] = "Slush",
+        ["8"] = "Other",
+        ["9"] = "Unknown",
+    };
+    private static readonly IReadOnlyDictionary<string, string> TrafficwayTypes = new Dictionary<string, string>
+    {
+        ["1"] = "Two-way, divided",
+        ["2"] = "Two-way, not divided",
+        ["3"] = "One-way trafficway",
+        ["4"] = "Entrance/exit ramp",
+        ["5"] = "Non-trafficway",
+        ["8"] = "Other",
+        ["9"] = "Unknown",
+    };
+    private static readonly IReadOnlyDictionary<string, string> LightConditions = new Dictionary<string, string>
+    {
+        ["1"] = "Daylight",
+        ["2"] = "Dark, not lighted",
+        ["3"] = "Dark, lighted",
+        ["4"] = "Dawn",
+        ["5"] = "Dusk",
+        ["6"] = "Dark, unknown lighting",
+        ["7"] = "Other",
+        ["8"] = "Not reported",
+        ["9"] = "Unknown",
+    };
+    private static readonly IReadOnlyDictionary<string, string> VehicleConfigurationTypes = new Dictionary<string, string>
+    {
+        ["1"] = "Passenger car",
+        ["2"] = "Light truck",
+        ["3"] = "Single-unit truck",
+        ["4"] = "Truck/trailer",
+        ["5"] = "Truck tractor/semi-trailer",
+        ["6"] = "Truck tractor/double",
+        ["7"] = "Truck tractor/triple",
+        ["8"] = "Bus",
+        ["9"] = "Truck tractor",
+    };
+    private static readonly IReadOnlyDictionary<string, string> CargoBodyTypes = new Dictionary<string, string>
+    {
+        ["1"] = "Van/enclosed box",
+        ["2"] = "Cargo tank",
+        ["3"] = "Flatbed",
+        ["4"] = "Dump",
+        ["5"] = "Concrete mixer",
+        ["6"] = "Auto transporter",
+        ["7"] = "Garbage/refuse",
+        ["8"] = "Grain/chips/gravel",
+        ["9"] = "Pole/logging",
+        ["10"] = "Intermodal container",
+        ["11"] = "Vehicle towing another vehicle",
+        ["12"] = "Not applicable",
+        ["13"] = "Other",
+        ["14"] = "Logging",
+    };
+    private static readonly IReadOnlyDictionary<string, string> GvwRanges = new Dictionary<string, string>
+    {
+        ["1"] = "10,000 lbs or less",
+        ["2"] = "10,001-26,000 lbs",
+        ["3"] = "26,001 lbs or more",
+    };
 
     private readonly ApplicationDbContext _db;
     private readonly FmcsaSocrataClient _socrata;
     private readonly ILogger<FmcsaSafetyService> _logger;
+    private readonly IHttpClientFactory _httpFactory;
 
-    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata, ILogger<FmcsaSafetyService> logger)
+    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata, ILogger<FmcsaSafetyService> logger, IHttpClientFactory httpFactory)
     {
         _db = db;
         _socrata = socrata;
         _logger = logger;
+        _httpFactory = httpFactory;
     }
 
     public async Task<Result<AutoSafetySummaryDto>> GetQuoteAutoSafetyAsync(Guid quoteId, CancellationToken ct = default)
@@ -377,6 +460,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     private async Task<int> UpsertCrashesAsync(string dotNumber, List<Dictionary<string, JsonElement>> rows, DateTime now, CancellationToken ct)
     {
         var count = 0;
+        var vinDecodes = new Dictionary<string, VinDecodeResult>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in DeduplicateBy(rows, r => GetString(r, "report_number", "crash_report_number", "crash_id")))
         {
             var reportNumber = GetString(row, "report_number", "crash_report_number", "crash_id");
@@ -408,6 +492,13 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             crash.CargoBodyTypeId = GetString(row, "cargo_body_type_id", "cargo_body_type");
             crash.GvwRatingId = GetString(row, "gvw_rating_id", "gvw_rating");
             crash.VehicleIdentificationNumber = GetString(row, "vehicle_identification_number", "vin");
+            var vinDecode = await DecodeVinAsync(crash.VehicleIdentificationNumber, vinDecodes, ct);
+            if (vinDecode != null)
+            {
+                crash.VehicleYear = vinDecode.Year;
+                crash.VehicleMake = vinDecode.Make;
+                crash.VehicleModel = vinDecode.Model;
+            }
             crash.VehicleLicenseNumber = GetString(row, "vehicle_license_number", "license_number");
             crash.VehicleLicenseState = GetString(row, "vehicle_lic_state", "vehicle_license_state");
             crash.HazmatPlacard = GetBool(row, "vehicle_hazmat_placard", "hazmat_placard");
@@ -583,11 +674,13 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     ReportNumber = first.ReportNumber,
                     State = first.State,
                     City = first.City,
+                    CountyCode = first.CountyCode,
                     Location = first.Location,
                     Agency = first.Agency,
                     Conditions = BuildCrashConditions(first),
                     VehicleInfo = BuildCrashVehicleInfo(first),
-                    Description = fatal ? "Fatal reportable crash" : injury ? "Injury reportable crash" : "Tow-away reportable crash",
+                    CrashEvents = BuildCrashEvents(first, fatal, injury, tow),
+                    Description = BuildCrashDescription(first, fatal, injury, tow),
                     IsFatal = fatal,
                     IsInjury = injury,
                     IsTow = tow,
@@ -627,10 +720,10 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     {
         var parts = new[]
         {
-            FormatCode("Weather", crash.WeatherConditionId),
-            FormatCode("Road surface", crash.RoadSurfaceConditionId),
-            FormatCode("Trafficway", crash.TrafficwayId),
-            FormatCode("Light", crash.LightConditionId),
+            FormatMappedCode("Light", crash.LightConditionId, LightConditions),
+            FormatMappedCode("Weather", crash.WeatherConditionId, WeatherConditions),
+            FormatMappedCode("Road Surface", crash.RoadSurfaceConditionId, RoadSurfaceConditions),
+            FormatMappedCode("Roadway Trafficway", crash.TrafficwayId, TrafficwayTypes),
             crash.VehiclesInAccident.HasValue ? $"Vehicles: {crash.VehiclesInAccident.Value}" : null,
         }.Where(p => !string.IsNullOrWhiteSpace(p));
 
@@ -639,23 +732,101 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static string BuildCrashVehicleInfo(FmcsaCrash crash)
     {
+        var decodedVehicle = string.Join(" ", new[]
+        {
+            crash.VehicleYear?.ToString(CultureInfo.InvariantCulture),
+            crash.VehicleMake,
+            crash.VehicleModel,
+        }.Where(p => !string.IsNullOrWhiteSpace(p)));
+
         var parts = new[]
         {
-            FormatCode("Vehicle config", crash.VehicleConfigurationId),
-            FormatCode("Cargo body", crash.CargoBodyTypeId),
-            FormatCode("GVW", crash.GvwRatingId),
+            !string.IsNullOrWhiteSpace(decodedVehicle) ? decodedVehicle : null,
+            FormatMappedCode("Type", crash.VehicleConfigurationId, VehicleConfigurationTypes),
+            FormatMappedCode("Cargo Body", crash.CargoBodyTypeId, CargoBodyTypes),
+            FormatMappedCode("GVW Range", crash.GvwRatingId, GvwRanges),
             !string.IsNullOrWhiteSpace(crash.VehicleIdentificationNumber) ? $"VIN: {crash.VehicleIdentificationNumber}" : null,
             !string.IsNullOrWhiteSpace(crash.VehicleLicenseNumber) ? $"Plate: {crash.VehicleLicenseState} {crash.VehicleLicenseNumber}".Trim() : null,
-            $"HM placard: {(crash.HazmatPlacard ? "Yes" : "No")}",
-            $"HM released: {(crash.HazmatReleased ? "Yes" : "No")}",
+            crash.HazmatPlacard ? "HM placard: Yes" : null,
+            crash.HazmatReleased ? "HM released: Yes" : null,
         }.Where(p => !string.IsNullOrWhiteSpace(p));
 
         return string.Join(" | ", parts);
     }
 
-    private static string? FormatCode(string label, string? value)
+    private static string BuildCrashDescription(FmcsaCrash crash, bool fatal, bool injury, bool tow)
     {
-        return string.IsNullOrWhiteSpace(value) ? null : $"{label}: {value}";
+        var severity = fatal ? "Fatal" : injury ? "Injury" : tow ? "Tow-away" : "Reportable";
+        var vehicles = crash.VehiclesInAccident.HasValue ? $" involving {crash.VehiclesInAccident.Value} vehicle{(crash.VehiclesInAccident.Value == 1 ? "" : "s")}" : string.Empty;
+        return $"{severity} federally recordable crash{vehicles}.";
+    }
+
+    private static string BuildCrashEvents(FmcsaCrash crash, bool fatal, bool injury, bool tow)
+    {
+        var events = new List<string>();
+        if (fatal) events.Add("Fatality reported");
+        if (injury) events.Add("Injury reported");
+        if (tow) events.Add("Tow-away reported");
+        if (events.Count == 0) events.Add("Federally recordable crash");
+        return string.Join(" | ", events);
+    }
+
+    private static string? FormatMappedCode(string label, string? value, IReadOnlyDictionary<string, string> map)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return map.TryGetValue(value, out var mapped)
+            ? $"{label}: {mapped}"
+            : $"{label}: Code {value}";
+    }
+
+    private async Task<VinDecodeResult?> DecodeVinAsync(string? vin, Dictionary<string, VinDecodeResult> cache, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(vin) || vin.Length < 11)
+            return null;
+
+        if (cache.TryGetValue(vin, out var cached))
+            return cached;
+
+        try
+        {
+            var client = _httpFactory.CreateClient("nhtsa_vpic");
+            var response = await client.GetAsync($"/api/vehicles/DecodeVinValues/{Uri.EscapeDataString(vin)}?format=json", ct);
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            var payload = await JsonSerializer.DeserializeAsync<VpicDecodeResponse>(stream, cancellationToken: ct);
+            var result = payload?.Results?.FirstOrDefault();
+            if (result == null)
+                return null;
+
+            var decoded = new VinDecodeResult(
+                int.TryParse(result.ModelYear, NumberStyles.Integer, CultureInfo.InvariantCulture, out var year) ? year : null,
+                NullIfBlank(result.Make),
+                NullIfBlank(result.Model));
+
+            cache[vin] = decoded;
+            return decoded;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            _logger.LogDebug(ex, "VIN decode failed for {Vin}", vin);
+            return null;
+        }
+    }
+
+    private sealed record VinDecodeResult(int? Year, string? Make, string? Model);
+
+    private sealed class VpicDecodeResponse
+    {
+        public List<VpicDecodeResult> Results { get; set; } = [];
+    }
+
+    private sealed class VpicDecodeResult
+    {
+        public string? ModelYear { get; set; }
+        public string? Make { get; set; }
+        public string? Model { get; set; }
     }
 
     private static void ApplyViolationOosToInspection(FmcsaInspection inspection, FmcsaViolation violation)

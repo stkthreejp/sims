@@ -127,6 +127,11 @@ public static class InfrastructureServiceExtensions
             c.Timeout = TimeSpan.FromSeconds(
                 int.TryParse(configuration["HttpClients:FmcsaSocrataTimeoutSeconds"], out var fmcsaTimeout) ? fmcsaTimeout : 60);
         });
+        services.AddHttpClient("nhtsa_vpic", c =>
+        {
+            c.BaseAddress = new Uri("https://vpic.nhtsa.dot.gov");
+            c.Timeout = TimeSpan.FromSeconds(15);
+        });
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
         services.AddHostedService<TaskEscalationWorker>();

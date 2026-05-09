@@ -257,10 +257,12 @@ export interface AutoSafetyDetail {
   reportNumber: string
   state: string | null
   city: string | null
+  countyCode: string | null
   location: string | null
   agency: string | null
   conditions: string | null
   vehicleInfo: string | null
+  crashEvents: string | null
   basic: string | null
   description: string
   isOutOfService: boolean

@@ -25,6 +25,9 @@ namespace SIMS.Infrastructure.Migrations
             migrationBuilder.AddColumn<string>("trafficway_id", "fmcsa_crashes", type: "character varying(20)", maxLength: 20, nullable: true);
             migrationBuilder.AddColumn<string>("vehicle_configuration_id", "fmcsa_crashes", type: "character varying(20)", maxLength: 20, nullable: true);
             migrationBuilder.AddColumn<string>("vehicle_identification_number", "fmcsa_crashes", type: "character varying(50)", maxLength: 50, nullable: true);
+            migrationBuilder.AddColumn<string>("vehicle_make", "fmcsa_crashes", type: "character varying(100)", maxLength: 100, nullable: true);
+            migrationBuilder.AddColumn<string>("vehicle_model", "fmcsa_crashes", type: "character varying(100)", maxLength: 100, nullable: true);
+            migrationBuilder.AddColumn<int>("vehicle_year", "fmcsa_crashes", type: "integer", nullable: true);
             migrationBuilder.AddColumn<string>("vehicle_license_number", "fmcsa_crashes", type: "character varying(50)", maxLength: 50, nullable: true);
             migrationBuilder.AddColumn<string>("vehicle_license_state", "fmcsa_crashes", type: "character varying(2)", maxLength: 2, nullable: true);
             migrationBuilder.AddColumn<int>("vehicles_in_accident", "fmcsa_crashes", type: "integer", nullable: true);
@@ -46,6 +49,9 @@ namespace SIMS.Infrastructure.Migrations
             migrationBuilder.DropColumn("trafficway_id", "fmcsa_crashes");
             migrationBuilder.DropColumn("vehicle_configuration_id", "fmcsa_crashes");
             migrationBuilder.DropColumn("vehicle_identification_number", "fmcsa_crashes");
+            migrationBuilder.DropColumn("vehicle_make", "fmcsa_crashes");
+            migrationBuilder.DropColumn("vehicle_model", "fmcsa_crashes");
+            migrationBuilder.DropColumn("vehicle_year", "fmcsa_crashes");
             migrationBuilder.DropColumn("vehicle_license_number", "fmcsa_crashes");
             migrationBuilder.DropColumn("vehicle_license_state", "fmcsa_crashes");
             migrationBuilder.DropColumn("vehicles_in_accident", "fmcsa_crashes");

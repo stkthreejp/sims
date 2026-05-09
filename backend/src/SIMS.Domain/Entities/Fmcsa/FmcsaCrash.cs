@@ -21,6 +21,9 @@ public class FmcsaCrash : BaseEntity
     public string? CargoBodyTypeId { get; set; }
     public string? GvwRatingId { get; set; }
     public string? VehicleIdentificationNumber { get; set; }
+    public int? VehicleYear { get; set; }
+    public string? VehicleMake { get; set; }
+    public string? VehicleModel { get; set; }
     public string? VehicleLicenseNumber { get; set; }
     public string? VehicleLicenseState { get; set; }
     public bool HazmatPlacard { get; set; }

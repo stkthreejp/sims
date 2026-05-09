@@ -28,6 +28,9 @@ public class FmcsaCrashConfiguration : IEntityTypeConfiguration<FmcsaCrash>
         builder.Property(x => x.CargoBodyTypeId).HasColumnName("cargo_body_type_id").HasMaxLength(20);
         builder.Property(x => x.GvwRatingId).HasColumnName("gvw_rating_id").HasMaxLength(20);
         builder.Property(x => x.VehicleIdentificationNumber).HasColumnName("vehicle_identification_number").HasMaxLength(50);
+        builder.Property(x => x.VehicleYear).HasColumnName("vehicle_year");
+        builder.Property(x => x.VehicleMake).HasColumnName("vehicle_make").HasMaxLength(100);
+        builder.Property(x => x.VehicleModel).HasColumnName("vehicle_model").HasMaxLength(100);
         builder.Property(x => x.VehicleLicenseNumber).HasColumnName("vehicle_license_number").HasMaxLength(50);
         builder.Property(x => x.VehicleLicenseState).HasColumnName("vehicle_license_state").HasMaxLength(2);
         builder.Property(x => x.HazmatPlacard).HasColumnName("hazmat_placard");

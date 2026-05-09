@@ -328,14 +328,21 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
                   <div className="text-xs font-medium text-slate-500">{[item.city, item.state].filter(Boolean).join(', ') || '-'}</div>
                 </div>
                 <div className="mt-2 text-slate-600">{item.description}</div>
-                {(item.location || item.agency) && (
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500">
-                    <DetailLine label="Location" value={item.location} />
-                    <DetailLine label="Agency" value={item.agency} />
-                  </div>
-                )}
-                {item.conditions && <DetailBlock label="Crash Conditions" value={item.conditions} />}
-                {item.vehicleInfo && <DetailBlock label="Vehicle Info" value={item.vehicleInfo} />}
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  {(item.location || item.agency || item.countyCode) && (
+                    <DetailSection
+                      title="Location"
+                      items={[
+                        ['Place', item.location],
+                        ['Agency', item.agency],
+                        ['County', item.countyCode ? `Code ${item.countyCode}` : null],
+                      ]}
+                    />
+                  )}
+                  {item.conditions && <DetailSection title="Crash Conditions" items={splitDetailItems(item.conditions)} />}
+                  {item.vehicleInfo && <DetailSection title="Vehicle Information" items={splitDetailItems(item.vehicleInfo)} />}
+                  {item.crashEvents && <DetailSection title="Crash Events" items={splitDetailItems(item.crashEvents)} />}
+                </div>
                 {item.basic && <div className="mt-2 text-xs text-slate-400">{item.basic}</div>}
               </div>
             ))}
@@ -346,18 +353,31 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
   )
 }
 
-function DetailLine({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null
-  return <div><span className="font-semibold text-slate-600">{label}:</span> {value}</div>
-}
-
-function DetailBlock({ label, value }: { label: string; value: string }) {
+function DetailSection({ title, items }: { title: string; items: Array<[string, string | null | undefined]> }) {
+  const visible = items.filter(([, value]) => !!value)
+  if (visible.length === 0) return null
   return (
-    <div className="mt-2 rounded bg-slate-50 px-3 py-2 text-xs text-slate-600">
-      <div className="mb-1 font-semibold text-slate-700">{label}</div>
-      <div>{value}</div>
+    <div className="rounded border border-slate-100 bg-slate-50/70 px-3 py-2">
+      <div className="mb-1.5 text-[11px] font-semibold uppercase text-slate-500">{title}</div>
+      <div className="space-y-1">
+        {visible.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[96px_1fr] gap-2 text-xs">
+            <span className="text-slate-400">{label}</span>
+            <span className="font-medium text-slate-700">{value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
+}
+
+function splitDetailItems(value: string): Array<[string, string]> {
+  return value.split('|').map((part, idx) => {
+    const trimmed = part.trim()
+    const separator = trimmed.indexOf(':')
+    if (separator === -1) return [`Item ${idx + 1}`, trimmed]
+    return [trimmed.slice(0, separator).trim(), trimmed.slice(separator + 1).trim()]
+  })
 }
 
 function formatDate(value: string) {
