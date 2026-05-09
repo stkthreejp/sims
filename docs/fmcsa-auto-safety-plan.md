@@ -17,7 +17,8 @@ The CAB report for NAPCO TRUCKING INC / USDOT 1853487 is the underwriting benchm
 - Radius: inspection distance from the insured's primary address, distance bands, out-of-radius alerts, and map/hotspot view.
 - Events: recent crashes, OOS inspections, severe violations, driver disqualifications, and reportable accident details.
 - CSA / BASICs: official or imported BASIC measures, percentiles/alerts, inspection counts included in SMS, and OOS counts by BASIC where available.
-- History: bi-annual inspection and violation trend buckets, MCS-150 fleet history, contact/address history, ISS history, and BASIC score history.
+- History: bi-annual inspection and violation trend buckets, compact visual trend charts, MCS-150 fleet history, contact/address history, ISS history, and BASIC score history.
+- Snapshot/report: a frozen underwriting record of the Auto Safety view and supporting details at the time it was reviewed.
 
 For the NAPCO reference report, the CAB/SAFER target values include:
 
@@ -145,11 +146,44 @@ Scope:
 - Store monthly or periodic carrier snapshots for power units, drivers, address, phone, authority status, and MCS-150 updates.
 - Store monthly ISS and BASIC score snapshots where official files are available.
 - Add history DTOs for fleet size, BASIC score trend, ISS trend, inspection trend, violation trend, and contact/address history.
+- Add CAB-style 6-month buckets for inspection and violation history: 36-30, 30-24, 24-18, 18-12, 12-6, and 6-0 months.
+- Add compact SIMS-styled visual trend charts:
+  - Inspection trend: total inspections and OOS inspections.
+  - Violation trend: total violations and OOS violations.
+  - Prefer lightweight line charts or line/bar hybrids; avoid adding a chart dependency unless needed.
+- Keep a small data table under each chart for exact counts and OOS percentage.
+- Allow clicking a chart point or OOS count to open the supporting events for that period.
 - Add a compact History tab in Auto Safety with small trend charts and a change log.
 
 Success criteria:
 - Underwriters can see whether the carrier is growing/shrinking, whether scores are deteriorating or improving, and whether addresses/contact details changed materially.
+- Underwriters can quickly see whether OOS inspections/violations are improving or deteriorating over time.
 - History is summarized first, with raw detail available only when needed.
+
+### Phase 7 - Underwriting Snapshot and Document Report
+
+Scope:
+- Add an "Archive Safety Snapshot" or "Save UW Snapshot" action from the Auto Safety panel.
+- Persist the current Auto Safety summary and supporting detail rows for the quote/submission.
+- Generate a compact PDF report and save it to the quote/submission documents area.
+- Include data source labels and capture timestamp:
+  - FMCSA/Socrata refresh time.
+  - SMS snapshot month when available.
+  - User who archived the snapshot.
+- Link the latest archived snapshot/report from the Auto Safety panel.
+
+Report content:
+- Carrier identity and USDOT.
+- SAFER / OOS summary.
+- Accident summary and crash detail support.
+- CSA / BASIC summary.
+- Radius/hotspot summary when available.
+- OOS and violation trend charts when available.
+- Supporting event detail appendix.
+
+Success criteria:
+- SIMS can prove what FMCSA/Safety data the underwriter reviewed at the time of the decision.
+- Later FMCSA changes do not alter the archived report.
 
 ## UI Plan
 
@@ -160,7 +194,8 @@ Auto Safety panel sections:
 - Official SMS BASICs: measure, percentile, alert/prioritization flag, included inspections, and OOS counts.
 - Events: recent severe violations, OOS inspections, driver disqualifications, and reportable crashes.
 - Radius: distance bands, out-of-radius alert, hotspots, and map when coordinates exist.
-- History: inspection/violation trend buckets, MCS-150 fleet history, ISS history, BASIC history, and address/contact changes.
+- History: inspection/violation trend buckets, compact trend charts, MCS-150 fleet history, ISS history, BASIC history, and address/contact changes.
+- Snapshot/report: archive current view as a PDF in documents for underwriting audit support.
 - Data freshness: last Socrata refresh and latest official SMS month.
 
 ## Implementation Notes
