@@ -21,6 +21,31 @@ export interface DatabaseStatus {
   expectedTables: DatabaseTableStatus[]
 }
 
+export interface FmcsaAnalyticsImportBatch {
+  snapshotMonth: string
+  sourceName: string
+  status: string
+  rowsImported: number
+  startedAt: string
+  completedAt: string | null
+  errorMessage: string | null
+}
+
+export interface FmcsaAnalyticsStatus {
+  isConfigured: boolean
+  carrierPeerSnapshotCount: number
+  basicPeerMeasureCount: number
+  hasRunningImport: boolean
+  latestBatches: FmcsaAnalyticsImportBatch[]
+}
+
+export interface FmcsaAnalyticsRefresh {
+  snapshotMonth: string
+  carrierCount: number
+  basicMeasureCount: number
+  refreshedAt: string
+}
+
 // ── Task Types ────────────────────────────────────────────────────────────────
 
 export const adminTaskTypesApi = {
@@ -72,6 +97,20 @@ export const adminSystemEventsApi = {
 export const adminDatabaseApi = {
   getStatus: () =>
     apiClient.get<DatabaseStatus>('/admin/database/status').then((r) => r.data),
+}
+
+export const adminJobsApi = {
+  getSafetyStatus: () =>
+    apiClient.get<FmcsaAnalyticsStatus>('/fmcsa/analytics/status').then((r) => r.data),
+
+  refreshImportedSafety: () =>
+    apiClient.post<FmcsaAnalyticsRefresh>('/fmcsa/analytics/refresh-imported').then((r) => r.data),
+
+  importSmsSample: () =>
+    apiClient.post<FmcsaAnalyticsRefresh>('/fmcsa/analytics/refresh-official-sms', null, { params: { maxRowsPerDataset: 5000 } }).then((r) => r.data),
+
+  importSmsFull: () =>
+    apiClient.post<FmcsaAnalyticsRefresh>('/fmcsa/analytics/refresh-official-sms').then((r) => r.data),
 }
 
 // ── Holiday Calendar ──────────────────────────────────────────────────────────

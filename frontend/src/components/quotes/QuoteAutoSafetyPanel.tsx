@@ -42,19 +42,6 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
       toast.error(msg)
     },
   })
-  const smsSampleMutation = useMutation({
-    mutationFn: () => quotesApi.refreshOfficialSmsAnalyticsSample(),
-    onSuccess: (result) => {
-      toast.success('SMS peer sample imported', {
-        description: `${result.carrierCount.toLocaleString()} carriers, ${result.basicMeasureCount.toLocaleString()} BASIC measures`,
-      })
-      qc.invalidateQueries({ queryKey: ['quote-auto-safety', quoteId] })
-    },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.errorMessage ?? 'SMS peer sample import failed'
-      toast.error(msg)
-    },
-  })
   const detailQuery = useQuery({
     queryKey: ['quote-auto-safety-details', quoteId, detailSelection?.kind, detailSelection?.basic],
     queryFn: () => quotesApi.getAutoSafetyDetails(quoteId, detailSelection!.kind, detailSelection?.basic),
@@ -127,14 +114,6 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           {data.snapshotMonth ? `Snapshot ${data.snapshotMonth}` : 'No scored snapshot'}{data.methodologyVersion ? ` - ${data.methodologyVersion}` : ''}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => smsSampleMutation.mutate()}
-            disabled={smsSampleMutation.isPending}
-            className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <BarChart3 className={`h-3.5 w-3.5 ${smsSampleMutation.isPending ? 'animate-pulse' : ''}`} />
-            {smsSampleMutation.isPending ? 'Importing SMS' : 'SMS Sample'}
-          </button>
           <button
             onClick={() => refreshMutation.mutate()}
             disabled={refreshMutation.isPending}

@@ -17,6 +17,13 @@ public class FmcsaAnalyticsController : ControllerBase
         _analytics = analytics;
     }
 
+    [HttpGet("status")]
+    public async Task<IActionResult> GetStatus(CancellationToken ct)
+    {
+        var result = await _analytics.GetStatusAsync(ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("refresh-imported")]
     public async Task<IActionResult> RefreshImported([FromQuery] string? snapshotMonth, CancellationToken ct)
     {

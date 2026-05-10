@@ -49,6 +49,43 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
         _settings = settings.Value;
     }
 
+    public async Task<Result<FmcsaAnalyticsStatusDto>> GetStatusAsync(CancellationToken ct = default)
+    {
+        var analyticsDb = _serviceProvider.GetService<SafetyAnalyticsDbContext>();
+        if (analyticsDb == null)
+        {
+            return Result<FmcsaAnalyticsStatusDto>.Success(new FmcsaAnalyticsStatusDto
+            {
+                IsConfigured = false,
+            });
+        }
+
+        var batches = await analyticsDb.FmcsaAnalyticsImportBatches
+            .AsNoTracking()
+            .OrderByDescending(b => b.StartedAt)
+            .Take(10)
+            .Select(b => new FmcsaAnalyticsImportBatchDto
+            {
+                SnapshotMonth = b.SnapshotMonth,
+                SourceName = b.SourceName,
+                Status = b.Status,
+                RowsImported = b.RowsImported,
+                StartedAt = b.StartedAt,
+                CompletedAt = b.CompletedAt,
+                ErrorMessage = b.ErrorMessage,
+            })
+            .ToListAsync(ct);
+
+        return Result<FmcsaAnalyticsStatusDto>.Success(new FmcsaAnalyticsStatusDto
+        {
+            IsConfigured = true,
+            CarrierPeerSnapshotCount = await analyticsDb.FmcsaCarrierPeerSnapshots.CountAsync(ct),
+            BasicPeerMeasureCount = await analyticsDb.FmcsaBasicPeerMeasures.CountAsync(ct),
+            HasRunningImport = batches.Any(b => b.Status == "Running" && b.StartedAt > DateTime.UtcNow.AddHours(-4)),
+            LatestBatches = batches,
+        });
+    }
+
     public async Task<Result<FmcsaAnalyticsRefreshDto>> RefreshImportedCarrierAnalyticsAsync(string? snapshotMonth = null, CancellationToken ct = default)
     {
         var analyticsDb = _serviceProvider.GetService<SafetyAnalyticsDbContext>();
@@ -161,6 +198,16 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
             : snapshotMonth.Trim();
 
         var now = DateTime.UtcNow;
+        var runningImport = await analyticsDb.FmcsaAnalyticsImportBatches
+            .AsNoTracking()
+            .AnyAsync(b => b.SourceName == "FMCSA official SMS pass-property population" && b.Status == "Running" && b.StartedAt > now.AddHours(-4), ct);
+        if (runningImport)
+        {
+            return Result<FmcsaAnalyticsRefreshDto>.Failure(
+                "FMCSA_ANALYTICS_IMPORT_RUNNING",
+                "An SMS peer import is already running. Wait for it to complete before starting another one.");
+        }
+
         var pageSize = Math.Clamp(_settings.AnalyticsPageSize, 1, 50000);
         var maxRows = Math.Max(pageSize, maxRowsPerDataset ?? _settings.AnalyticsMaxRowsPerDataset);
         var batch = new FmcsaAnalyticsImportBatch
