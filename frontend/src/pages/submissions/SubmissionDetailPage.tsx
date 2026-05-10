@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText,
   RefreshCw, AlertTriangle, TrendingDown, Calculator, MoreHorizontal,
-  ShieldCheck,
+  ShieldCheck, ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
@@ -572,7 +572,7 @@ export function SubmissionDetailPage() {
                     <span className={`sd-pill ${QUOTE_STATUS_PILL[q.status]}`}>{QUOTE_STATUS_LABELS[q.status]}</span>
                   </div>
                   <div className="meta">
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>{q.quoteNumber}</span>
+                    <Link to={`/quotes/${q.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }} className="hover:underline">{q.quoteNumber}</Link>
                     <span className="sep">·</span>
                     <span>{new Date(q.effectiveDate).toLocaleDateString()} → {new Date(q.expirationDate).toLocaleDateString()}</span>
                     {q.hasCommissionOverride && <><span className="sep">·</span><span style={{ color: 'var(--warn-fg)' }}>commission override</span></>}
@@ -620,6 +620,9 @@ export function SubmissionDetailPage() {
                   {q.status === 'Bound' && (
                     <Link to={`/policies/${q.id}`} className="sd-btn sm outline">View Policy</Link>
                   )}
+                  <Link to={`/quotes/${q.id}`} className="sd-btn sm outline">
+                    <ExternalLink size={12} /> Detail
+                  </Link>
                   <Link to={`/quotes/${q.id}/writeup`} className="sd-btn sm ghost" title="UW Writeup">
                     <FileText size={12} />
                   </Link>
