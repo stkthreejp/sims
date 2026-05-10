@@ -237,6 +237,10 @@ export interface AutoSafetyOos {
   driverOosRate: number | null
   vehicleOosRate: number | null
   hazmatOosRate: number | null
+  overallNationalAverageRate: number | null
+  driverNationalAverageRate: number | null
+  vehicleNationalAverageRate: number | null
+  hazmatNationalAverageRate: number | null
 }
 
 export interface AutoSafetyAccidentSummary {

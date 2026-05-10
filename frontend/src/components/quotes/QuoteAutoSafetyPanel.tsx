@@ -157,12 +157,11 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               <Truck className="h-3.5 w-3.5" /> SAFER / OOS
             </div>
             <div className="grid grid-cols-4 gap-3">
-              <OosMetric label="Overall" count={oos.inspectionCount} oosCount={overallOosCount} rate={overallOosRate} onClick={() => setDetailSelection({ kind: 'overall-oos', title: 'Overall OOS Events' })} />
-              <OosMetric label="Driver" count={driverInspectionCount} oosCount={oos.driverOosCount} rate={oos.driverOosRate} onClick={() => setDetailSelection({ kind: 'driver-oos', title: 'Driver OOS Events' })} />
-              <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} onClick={() => setDetailSelection({ kind: 'vehicle-oos', title: 'Vehicle OOS Events' })} />
-              <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} onClick={() => setDetailSelection({ kind: 'hazmat-oos', title: 'Hazmat OOS Events' })} />
+              <OosMetric label="Overall" count={oos.inspectionCount} oosCount={overallOosCount} rate={overallOosRate} nationalAverage={oos.overallNationalAverageRate} onClick={() => setDetailSelection({ kind: 'overall-oos', title: 'Overall OOS Events' })} />
+              <OosMetric label="Driver" count={driverInspectionCount} oosCount={oos.driverOosCount} rate={oos.driverOosRate} nationalAverage={oos.driverNationalAverageRate} onClick={() => setDetailSelection({ kind: 'driver-oos', title: 'Driver OOS Events' })} />
+              <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} nationalAverage={oos.vehicleNationalAverageRate} onClick={() => setDetailSelection({ kind: 'vehicle-oos', title: 'Vehicle OOS Events' })} />
+              <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} nationalAverage={oos.hazmatNationalAverageRate} onClick={() => setDetailSelection({ kind: 'hazmat-oos', title: 'Hazmat OOS Events' })} />
             </div>
-            <p className="mt-3 text-xs text-slate-400">National average comparisons are next backend fields.</p>
           </div>
 
           <div className="rounded border bg-white p-3">
@@ -268,10 +267,8 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
                 <Clock3 className="h-3.5 w-3.5" /> History Snapshot
               </div>
               <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
-              <div className="mt-3 space-y-1 text-xs text-slate-400">
-                <div>BASIC history: next</div>
-                <div>MCS-150 changes: next</div>
-                <div>Snapshot report: next</div>
+              <div className="mt-3 rounded bg-slate-50 p-3 text-xs text-slate-500">
+                Monthly BASIC, MCS-150, and archived snapshot history will appear here as safety jobs accumulate historical snapshots.
               </div>
             </div>
           </div>
@@ -301,12 +298,25 @@ function SectionPill({ label, active, onClick }: { label: string; active: boolea
   )
 }
 
-function OosMetric({ label, count, oosCount, rate, onClick }: { label: string; count: number; oosCount: number; rate: number | null; onClick?: () => void }) {
+function OosMetric({ label, count, oosCount, rate, nationalAverage, onClick }: { label: string; count: number; oosCount: number; rate: number | null; nationalAverage: number | null; onClick?: () => void }) {
+  const difference = rate == null || nationalAverage == null ? null : Math.round((rate - nationalAverage) * 100) / 100
+  const differenceClass = difference == null
+    ? 'text-slate-400'
+    : difference > 0
+      ? 'text-red-600'
+      : difference < 0
+        ? 'text-emerald-600'
+        : 'text-slate-500'
+
   return (
     <button type="button" onClick={onClick} className="rounded bg-slate-50 p-2 text-left hover:bg-slate-100">
       <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-semibold text-slate-800">{rate == null ? '-' : `${rate}%`}</div>
       <div className="mt-1 text-xs text-slate-500">{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
+      <div className="mt-1 text-[11px] text-slate-400">
+        Natl {nationalAverage == null ? '-' : `${nationalAverage}%`}
+        {difference != null && <span className={`ml-1 ${differenceClass}`}>{difference > 0 ? '+' : ''}{difference}%</span>}
+      </div>
     </button>
   )
 }

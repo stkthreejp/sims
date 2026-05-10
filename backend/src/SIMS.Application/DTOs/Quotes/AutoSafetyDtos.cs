@@ -71,6 +71,10 @@ public class AutoSafetyOosDto
     public decimal? DriverOosRate { get; set; }
     public decimal? VehicleOosRate { get; set; }
     public decimal? HazmatOosRate { get; set; }
+    public decimal? OverallNationalAverageRate { get; set; }
+    public decimal? DriverNationalAverageRate { get; set; }
+    public decimal? VehicleNationalAverageRate { get; set; }
+    public decimal? HazmatNationalAverageRate { get; set; }
 }
 
 public class AutoSafetyAccidentSummaryDto

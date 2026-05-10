@@ -844,6 +844,10 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static AutoSafetyOosDto BuildOos(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
     {
+        const decimal overallNationalAverage = 20.18m;
+        const decimal driverNationalAverage = 6.67m;
+        const decimal vehicleNationalAverage = 22.26m;
+        const decimal hazmatNationalAverage = 4.44m;
         var count = inspections.Count;
         var driverOosReports = inspections
             .Where(i => i.DriverOutOfService)
@@ -899,6 +903,10 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             DriverOosRate = driverInspectionCount == 0 ? null : Math.Round(driverOos * 100m / driverInspectionCount, 2),
             VehicleOosRate = vehicleInspectionCount == 0 ? null : Math.Round(vehicleOos * 100m / vehicleInspectionCount, 2),
             HazmatOosRate = hazmatInspectionCount == 0 ? null : Math.Round(hazmatOos * 100m / hazmatInspectionCount, 2),
+            OverallNationalAverageRate = overallNationalAverage,
+            DriverNationalAverageRate = driverNationalAverage,
+            VehicleNationalAverageRate = vehicleNationalAverage,
+            HazmatNationalAverageRate = hazmatNationalAverage,
         };
     }
 
