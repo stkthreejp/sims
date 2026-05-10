@@ -379,15 +379,16 @@ function getBasicRisk(basic: AutoSafetyBasic): { color: 'green' | 'yellow' | 're
     if (basic.percentile >= 50) return { color: 'yellow', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Watch' }
     return { color: 'green', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Clear' }
   }
-  if (basic.scoreSource === 'Official SMS' && basic.measure != null) {
-    return { color: 'gray', value: 0, label: 'N/A', status: 'Inconclusive' }
-  }
 
   const eventPressure = Math.min(60, basic.eventCount * 1.5)
   const oosPressure = Math.min(40, basic.outOfServiceCount * 6)
   const value = Math.round(eventPressure + oosPressure)
-  if (value >= 70) return { color: 'yellow', value, label: `${value}`, status: 'Watch' }
-  return { color: 'green', value, label: `${value}`, status: basic.scoreSource === 'Official SMS' ? 'No alert' : 'Signal' }
+  if (value === 0 && basic.scoreSource === 'Official SMS' && basic.measure != null) {
+    return { color: 'gray', value: 0, label: 'N/A', status: 'Inconclusive' }
+  }
+  if (value >= 75) return { color: 'red', value, label: `${value}`, status: basic.percentile == null ? 'SIMS signal' : 'High' }
+  if (value >= 50) return { color: 'yellow', value, label: `${value}`, status: 'Watch' }
+  return { color: 'green', value, label: `${value}`, status: basic.scoreSource === 'Official SMS' ? 'SIMS signal' : 'Signal' }
 }
 
 function TrendChart({
