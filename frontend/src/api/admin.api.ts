@@ -46,6 +46,16 @@ export interface FmcsaAnalyticsRefresh {
   refreshedAt: string
 }
 
+export interface FmcsaInspectionEnrichment {
+  inspectionsChecked: number
+  inspectionsUpdated: number
+  detailPagesFound: number
+  geocodedCount: number
+  skippedCount: number
+  message: string
+  refreshedAt: string
+}
+
 // ── Task Types ────────────────────────────────────────────────────────────────
 
 export const adminTaskTypesApi = {
@@ -111,6 +121,9 @@ export const adminJobsApi = {
 
   importSmsFull: () =>
     apiClient.post<FmcsaAnalyticsRefresh>('/fmcsa/analytics/refresh-official-sms').then((r) => r.data),
+
+  enrichInspectionDetails: () =>
+    apiClient.post<FmcsaInspectionEnrichment>('/fmcsa/analytics/enrich-inspection-details', null, { params: { maxInspections: 100 } }).then((r) => r.data),
 }
 
 // ── Holiday Calendar ──────────────────────────────────────────────────────────

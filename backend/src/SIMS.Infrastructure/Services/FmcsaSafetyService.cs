@@ -481,6 +481,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 || GetInt(row, "vehicle_oos_total") is > 0;
             inspection.HazmatOutOfService = GetBool(row, "hazmat_oos", "hm_oos", "hazmat_out_of_service", "hazmat_oos_indicator", "hazmat_oos_flag")
                 || GetInt(row, "hazmat_oos_total") is > 0;
+            inspection.HazmatPlacardRequired = GetBool(row, "hazmat_placard_req", "hazmat_placard_required");
             inspection.DriverViolationCount = GetInt(row, "driver_violation_count", "drv_violation_count", "driver_violations", "driver_viol_total") ?? 0;
             inspection.VehicleViolationCount = GetInt(row, "vehicle_violation_count", "veh_violation_count", "vehicle_violations", "vehicle_viol_total") ?? 0;
             inspection.HazmatViolationCount = GetInt(row, "hazmat_violation_count", "hm_violation_count", "hazmat_violations", "hazmat_viol_total") ?? 0;
@@ -1072,6 +1073,10 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     Date = i.InspectionDate,
                     ReportNumber = i.ReportNumber,
                     State = i.State,
+                    CountyCode = i.InspectionCounty ?? i.CountyCodeState,
+                    Location = i.InspectionLocation,
+                    Conditions = BuildInspectionConditions(i),
+                    VehicleInfo = BuildInspectionVehicleInfo(i),
                     Description = BuildInspectionDescription(i, reportViolations),
                     IsOutOfService = i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService || oosCount > 0,
                     Basic = reportViolations.Count == 0 ? null : $"{reportViolations.Count} violations, {oosCount} OOS",
@@ -1094,6 +1099,28 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var oosSummary = oosTypes.Count == 0 ? null : $" ({string.Join(", ", oosTypes)})";
 
         return $"{level} with {violationSummary}{oosSummary}.";
+    }
+
+    private static string? BuildInspectionConditions(FmcsaInspection inspection)
+    {
+        var parts = new[]
+        {
+            !string.IsNullOrWhiteSpace(inspection.InspectionFacility) ? $"Facility: {inspection.InspectionFacility}" : null,
+            !string.IsNullOrWhiteSpace(inspection.StartTime) || !string.IsNullOrWhiteSpace(inspection.EndTime) ? $"Time: {inspection.StartTime} - {inspection.EndTime}".Trim() : null,
+            inspection.PostCrash.HasValue ? $"Post crash: {(inspection.PostCrash.Value ? "Yes" : "No")}" : null,
+            inspection.HazmatPlacardRequired.HasValue ? $"HM placard required: {(inspection.HazmatPlacardRequired.Value ? "Yes" : "No")}" : null,
+            !string.IsNullOrWhiteSpace(inspection.InspectionLevelDescription) ? $"Level: {inspection.InspectionLevelDescription}" : null,
+        }.Where(p => !string.IsNullOrWhiteSpace(p));
+
+        var value = string.Join(" | ", parts);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static string? BuildInspectionVehicleInfo(FmcsaInspection inspection)
+    {
+        var unit1 = BuildInspectionUnitInfo(inspection, "1");
+        var unit2 = BuildInspectionUnitInfo(inspection, "2");
+        return string.Join(" || ", new[] { unit1, unit2 }.Where(p => !string.IsNullOrWhiteSpace(p)));
     }
 
     private static string? BuildInspectionUnitInfo(FmcsaInspection inspection, string? unitNumber)
@@ -1415,7 +1442,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         {
             HasBaseCoordinate = insured?.Latitude != null && insured.Longitude != null,
             Precision = "State-level estimate",
-            Note = "Inspection rows include report state and sometimes county-code metadata, but not exact coordinates. Distances are estimated from the insured address to inspection-state centroids.",
+            Note = "Distances use geocoded inspection locations when available. Rows without inspection coordinates fall back to low-precision state-centroid estimates.",
             Bands = bands.ToList(),
         };
 
@@ -1436,7 +1463,22 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         foreach (var inspection in inspections)
         {
             var band = bands.Last();
-            if (!string.IsNullOrWhiteSpace(inspection.State) && StateCentroids.TryGetValue(inspection.State.Trim().ToUpperInvariant(), out var point))
+            if (inspection.Latitude != null && inspection.Longitude != null)
+            {
+                var miles = HaversineMiles(
+                    (double)insured.Latitude.Value,
+                    (double)insured.Longitude.Value,
+                    (double)inspection.Latitude.Value,
+                    (double)inspection.Longitude.Value);
+                band = miles switch
+                {
+                    < 50 => bands[0],
+                    < 100 => bands[1],
+                    < 250 => bands[2],
+                    _ => bands[3],
+                };
+            }
+            else if (!string.IsNullOrWhiteSpace(inspection.State) && StateCentroids.TryGetValue(inspection.State.Trim().ToUpperInvariant(), out var point))
             {
                 var miles = HaversineMiles((double)insured.Latitude.Value, (double)insured.Longitude.Value, point.Latitude, point.Longitude);
                 band = miles switch

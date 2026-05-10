@@ -9,6 +9,19 @@ public class FmcsaInspection : BaseEntity
     public DateOnly InspectionDate { get; set; }
     public string? State { get; set; }
     public string? CountyCodeState { get; set; }
+    public string? InspectionCounty { get; set; }
+    public string? InspectionLocation { get; set; }
+    public string? InspectionFacility { get; set; }
+    public string? StartTime { get; set; }
+    public string? EndTime { get; set; }
+    public bool? PostCrash { get; set; }
+    public bool? HazmatPlacardRequired { get; set; }
+    public string? InspectionLevelDescription { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
+    public string? GeocodePrecision { get; set; }
+    public string? DetailSourceUrl { get; set; }
+    public DateTime? DetailEnrichedAt { get; set; }
     public int? InspectionLevel { get; set; }
     public bool DriverOutOfService { get; set; }
     public bool VehicleOutOfService { get; set; }

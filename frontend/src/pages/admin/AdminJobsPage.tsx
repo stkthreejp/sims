@@ -17,10 +17,11 @@ export function AdminJobsPage() {
   const refreshImported = useJobMutation(adminJobsApi.refreshImportedSafety, 'Imported carrier analytics refreshed')
   const smsSample = useJobMutation(adminJobsApi.importSmsSample, 'SMS sample import started')
   const smsFull = useJobMutation(adminJobsApi.importSmsFull, 'Full SMS import started')
+  const enrichInspections = useJobMutation(adminJobsApi.enrichInspectionDetails, 'Inspection detail enrichment completed')
 
   if (isLoading) return <LoadingSpinner />
 
-  const running = data?.hasRunningImport || smsSample.isPending || smsFull.isPending || refreshImported.isPending
+  const running = data?.hasRunningImport || smsSample.isPending || smsFull.isPending || refreshImported.isPending || enrichInspections.isPending
 
   return (
     <div className="p-6 space-y-5">
@@ -64,6 +65,7 @@ export function AdminJobsPage() {
 
             <div className="p-5 flex flex-wrap gap-3">
               <JobButton label="Refresh Imported Carriers" onClick={() => refreshImported.mutate()} busy={refreshImported.isPending} disabled={running} />
+              <JobButton label="Enrich Inspection Details" onClick={() => enrichInspections.mutate()} busy={enrichInspections.isPending} disabled={running} />
               <JobButton label="Run SMS Sample Import" onClick={() => smsSample.mutate()} busy={smsSample.isPending} disabled={running} />
               <JobButton label="Run Full SMS Import" onClick={() => smsFull.mutate()} busy={smsFull.isPending} disabled={running} strong />
             </div>

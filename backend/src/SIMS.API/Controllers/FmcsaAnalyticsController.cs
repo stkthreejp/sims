@@ -11,10 +11,12 @@ namespace SIMS.API.Controllers;
 public class FmcsaAnalyticsController : ControllerBase
 {
     private readonly IFmcsaSafetyAnalyticsService _analytics;
+    private readonly IFmcsaInspectionEnrichmentService _inspectionEnrichment;
 
-    public FmcsaAnalyticsController(IFmcsaSafetyAnalyticsService analytics)
+    public FmcsaAnalyticsController(IFmcsaSafetyAnalyticsService analytics, IFmcsaInspectionEnrichmentService inspectionEnrichment)
     {
         _analytics = analytics;
+        _inspectionEnrichment = inspectionEnrichment;
     }
 
     [HttpGet("status")]
@@ -35,6 +37,13 @@ public class FmcsaAnalyticsController : ControllerBase
     public async Task<IActionResult> RefreshOfficialSms([FromQuery] string? snapshotMonth, [FromQuery] int? maxRowsPerDataset, CancellationToken ct)
     {
         var result = await _analytics.RefreshOfficialSmsPeerAnalyticsAsync(snapshotMonth, maxRowsPerDataset, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("enrich-inspection-details")]
+    public async Task<IActionResult> EnrichInspectionDetails([FromQuery] int? maxInspections, CancellationToken ct)
+    {
+        var result = await _inspectionEnrichment.EnrichRecentInspectionsAsync(maxInspections ?? 50, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 }
