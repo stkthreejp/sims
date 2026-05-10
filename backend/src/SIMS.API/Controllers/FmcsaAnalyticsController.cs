@@ -23,4 +23,11 @@ public class FmcsaAnalyticsController : ControllerBase
         var result = await _analytics.RefreshImportedCarrierAnalyticsAsync(snapshotMonth, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
+
+    [HttpPost("refresh-official-sms")]
+    public async Task<IActionResult> RefreshOfficialSms([FromQuery] string? snapshotMonth, [FromQuery] int? maxRowsPerDataset, CancellationToken ct)
+    {
+        var result = await _analytics.RefreshOfficialSmsPeerAnalyticsAsync(snapshotMonth, maxRowsPerDataset, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
 }

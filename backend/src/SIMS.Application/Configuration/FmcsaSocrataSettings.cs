@@ -16,4 +16,6 @@ public class FmcsaSocrataSettings
     public string? QcMobileWebKey { get; set; }
     public int PageSize { get; set; } = 5000;
     public int MaxRowsPerDataset { get; set; } = 25000;
+    public int AnalyticsPageSize { get; set; } = 5000;
+    public int AnalyticsMaxRowsPerDataset { get; set; } = 2000000;
 }

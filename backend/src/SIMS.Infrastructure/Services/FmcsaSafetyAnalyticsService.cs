@@ -1,11 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using SIMS.Application.Configuration;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Fmcsa;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities.Fmcsa;
 using SIMS.Domain.Entities.FmcsaAnalytics;
 using SIMS.Infrastructure.Data;
+using System.Globalization;
+using System.Text.Json;
 
 namespace SIMS.Infrastructure.Services;
 
@@ -21,14 +25,28 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
         "Hazardous Materials Compliance",
         "Driver Fitness"
     ];
+    private static readonly OfficialSmsBasicMapping[] OfficialSmsMappings =
+    [
+        new("Unsafe Driving", ["unsafe_driv_measure"], ["unsafe_driv_pct"], ["unsafe_driv_insp_w_viol", "unsafe_driv_total_viol"], ["unsafe_driv_oos"]),
+        new("Crash Indicator", ["crash_indicator_measure", "crash_measure"], ["crash_indicator_pct", "crash_pct"], ["crash_indicator_count", "crash_count"], ["crash_oos"]),
+        new("Hours-of-Service Compliance", ["hos_driv_measure", "hos_measure"], ["hos_driv_pct", "hos_pct"], ["hos_driv_insp_w_viol", "hos_total_viol"], ["hos_oos"]),
+        new("Vehicle Maintenance", ["veh_maint_measure"], ["veh_maint_pct"], ["veh_maint_insp_w_viol", "veh_maint_total_viol"], ["veh_maint_oos"]),
+        new("Controlled Substances/Alcohol", ["contr_subst_measure"], ["contr_subst_pct"], ["contr_subst_insp_w_viol", "contr_subst_total_viol"], ["contr_subst_oos"]),
+        new("Hazardous Materials Compliance", ["hm_measure", "hazmat_measure"], ["hm_pct", "hazmat_pct"], ["hm_insp_w_viol", "hazmat_insp_w_viol", "hm_total_viol"], ["hm_oos", "hazmat_oos"]),
+        new("Driver Fitness", ["driv_fit_measure"], ["driv_fit_pct"], ["driv_fit_insp_w_viol", "driv_fit_total_viol"], ["driv_fit_oos"]),
+    ];
 
     private readonly ApplicationDbContext _appDb;
     private readonly IServiceProvider _serviceProvider;
+    private readonly FmcsaSocrataClient _socrata;
+    private readonly FmcsaSocrataSettings _settings;
 
-    public FmcsaSafetyAnalyticsService(ApplicationDbContext appDb, IServiceProvider serviceProvider)
+    public FmcsaSafetyAnalyticsService(ApplicationDbContext appDb, IServiceProvider serviceProvider, FmcsaSocrataClient socrata, IOptions<FmcsaSocrataSettings> settings)
     {
         _appDb = appDb;
         _serviceProvider = serviceProvider;
+        _socrata = socrata;
+        _settings = settings.Value;
     }
 
     public async Task<Result<FmcsaAnalyticsRefreshDto>> RefreshImportedCarrierAnalyticsAsync(string? snapshotMonth = null, CancellationToken ct = default)
@@ -128,6 +146,166 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
         });
     }
 
+    public async Task<Result<FmcsaAnalyticsRefreshDto>> RefreshOfficialSmsPeerAnalyticsAsync(string? snapshotMonth = null, int? maxRowsPerDataset = null, CancellationToken ct = default)
+    {
+        var analyticsDb = _serviceProvider.GetService<SafetyAnalyticsDbContext>();
+        if (analyticsDb == null)
+        {
+            return Result<FmcsaAnalyticsRefreshDto>.Failure(
+                "SAFETY_ANALYTICS_NOT_CONFIGURED",
+                "Safety analytics database is not configured. Add ConnectionStrings:SafetyAnalyticsConnection.");
+        }
+
+        snapshotMonth = string.IsNullOrWhiteSpace(snapshotMonth)
+            ? DateTime.UtcNow.ToString("yyyy-MM", CultureInfo.InvariantCulture)
+            : snapshotMonth.Trim();
+
+        var now = DateTime.UtcNow;
+        var pageSize = Math.Clamp(_settings.AnalyticsPageSize, 1, 50000);
+        var maxRows = Math.Max(pageSize, maxRowsPerDataset ?? _settings.AnalyticsMaxRowsPerDataset);
+        var batch = new FmcsaAnalyticsImportBatch
+        {
+            SnapshotMonth = snapshotMonth,
+            SourceName = "FMCSA official SMS pass-property population",
+            Status = "Running",
+            StartedAt = now,
+        };
+        analyticsDb.FmcsaAnalyticsImportBatches.Add(batch);
+        await analyticsDb.SaveChangesAsync(ct);
+
+        var carriersSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var measureCount = 0;
+
+        try
+        {
+            for (var offset = 0; offset < maxRows; offset += pageSize)
+            {
+                var rows = await _socrata.GetSmsAbPassPropertyPageAsync(pageSize, offset, ct);
+                if (rows.Count == 0) break;
+
+                var counts = await UpsertOfficialSmsRowsAsync(analyticsDb, rows, snapshotMonth, carriersSeen, ct);
+                measureCount += counts.BasicMeasures;
+                if (rows.Count < pageSize) break;
+            }
+
+            for (var offset = 0; offset < maxRows; offset += pageSize)
+            {
+                var rows = await _socrata.GetSmsCPassPropertyPageAsync(pageSize, offset, ct);
+                if (rows.Count == 0) break;
+
+                var counts = await UpsertOfficialSmsRowsAsync(analyticsDb, rows, snapshotMonth, carriersSeen, ct);
+                measureCount += counts.BasicMeasures;
+                if (rows.Count < pageSize) break;
+            }
+
+            await RecalculatePercentilesAsync(analyticsDb, snapshotMonth, ct);
+
+            batch.Status = "Completed";
+            batch.CompletedAt = DateTime.UtcNow;
+            batch.RowsImported = carriersSeen.Count + measureCount;
+            await analyticsDb.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or DbUpdateException or JsonException)
+        {
+            batch.Status = "Failed";
+            batch.CompletedAt = DateTime.UtcNow;
+            batch.ErrorMessage = ex.GetBaseException().Message;
+            await analyticsDb.SaveChangesAsync(CancellationToken.None);
+
+            return Result<FmcsaAnalyticsRefreshDto>.Failure("FMCSA_ANALYTICS_IMPORT_FAILED", batch.ErrorMessage);
+        }
+
+        return Result<FmcsaAnalyticsRefreshDto>.Success(new FmcsaAnalyticsRefreshDto
+        {
+            SnapshotMonth = snapshotMonth,
+            CarrierCount = carriersSeen.Count,
+            BasicMeasureCount = measureCount,
+            RefreshedAt = batch.CompletedAt!.Value,
+        });
+    }
+
+    private static async Task<(int Carriers, int BasicMeasures)> UpsertOfficialSmsRowsAsync(
+        SafetyAnalyticsDbContext analyticsDb,
+        List<Dictionary<string, JsonElement>> rows,
+        string snapshotMonth,
+        HashSet<string> carriersSeen,
+        CancellationToken ct)
+    {
+        var dots = rows
+            .Select(GetDotNumber)
+            .Where(dot => !string.IsNullOrWhiteSpace(dot))
+            .Select(dot => dot!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (dots.Count == 0)
+            return (0, 0);
+
+        var existingCarriers = await analyticsDb.FmcsaCarrierPeerSnapshots
+            .Where(c => c.SnapshotMonth == snapshotMonth && dots.Contains(c.UsDotNumber))
+            .ToDictionaryAsync(c => c.UsDotNumber, StringComparer.OrdinalIgnoreCase, ct);
+        var existingMeasures = await analyticsDb.FmcsaBasicPeerMeasures
+            .Where(m => m.SnapshotMonth == snapshotMonth && dots.Contains(m.UsDotNumber))
+            .ToDictionaryAsync(m => $"{m.UsDotNumber}|{m.Basic}", StringComparer.OrdinalIgnoreCase, ct);
+
+        var carrierCount = 0;
+        var measureCount = 0;
+        foreach (var row in rows)
+        {
+            var dot = GetDotNumber(row);
+            if (string.IsNullOrWhiteSpace(dot))
+                continue;
+
+            if (!existingCarriers.TryGetValue(dot, out var carrier))
+            {
+                carrier = new FmcsaCarrierPeerSnapshot { SnapshotMonth = snapshotMonth, UsDotNumber = dot };
+                analyticsDb.FmcsaCarrierPeerSnapshots.Add(carrier);
+                existingCarriers[dot] = carrier;
+            }
+
+            carrier.LegalName = GetString(row, "legal_name", "carrier_name", "entity_name", "name") ?? carrier.LegalName;
+            carrier.State = GetString(row, "phy_state", "state", "carrier_state") ?? carrier.State;
+            carrier.PowerUnits = GetInt(row, "power_units", "nbr_power_unit", "nbr_power_units") ?? carrier.PowerUnits;
+            carrier.DriverCount = GetInt(row, "driver_count", "drivers", "nbr_drivers") ?? carrier.DriverCount;
+            carrier.Mileage = GetInt(row, "mileage", "mcs_150_mileage", "vmt") ?? carrier.Mileage;
+            carrier.MileageYear = GetInt(row, "mileage_year", "mcs_150_mileage_year", "vmt_year") ?? carrier.MileageYear;
+
+            if (carriersSeen.Add(dot))
+                carrierCount++;
+
+            foreach (var mapping in OfficialSmsMappings)
+            {
+                var officialMeasure = GetDecimal(row, mapping.MeasureFields);
+                var officialPercentile = GetDecimal(row, mapping.PercentileFields);
+                var eventCount = GetInt(row, mapping.EventCountFields);
+                var oosCount = GetInt(row, mapping.OosCountFields);
+                if (officialMeasure == null && officialPercentile == null && eventCount == null && oosCount == null)
+                    continue;
+
+                var key = $"{dot}|{mapping.Basic}";
+                if (!existingMeasures.TryGetValue(key, out var measure))
+                {
+                    measure = new FmcsaBasicPeerMeasure { SnapshotMonth = snapshotMonth, UsDotNumber = dot, Basic = mapping.Basic };
+                    analyticsDb.FmcsaBasicPeerMeasures.Add(measure);
+                    existingMeasures[key] = measure;
+                }
+
+                measure.OfficialMeasure = officialMeasure ?? measure.OfficialMeasure;
+                measure.SimsMeasure = officialMeasure ?? measure.SimsMeasure;
+                measure.SimsPercentile = officialPercentile ?? measure.SimsPercentile;
+                measure.InspectionWithViolationCount = eventCount ?? measure.InspectionWithViolationCount;
+                measure.ViolationCount = eventCount ?? measure.ViolationCount;
+                measure.OutOfServiceCount = oosCount ?? measure.OutOfServiceCount;
+                measure.WeightedViolationScore = officialMeasure ?? measure.WeightedViolationScore;
+                measure.Exposure = carrier.PowerUnits ?? 0;
+                measure.PeerGroupKey = "official-sms:all";
+                measureCount++;
+            }
+        }
+
+        await analyticsDb.SaveChangesAsync(ct);
+        return (carrierCount, measureCount);
+    }
+
     private static void UpsertCarrierSnapshot(
         SafetyAnalyticsDbContext analyticsDb,
         Dictionary<string, FmcsaCarrierPeerSnapshot> existing,
@@ -194,28 +372,33 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
 
     private static async Task RecalculatePercentilesAsync(SafetyAnalyticsDbContext analyticsDb, string snapshotMonth, CancellationToken ct)
     {
-        var measures = await analyticsDb.FmcsaBasicPeerMeasures
-            .Where(m => m.SnapshotMonth == snapshotMonth && m.SimsMeasure.HasValue)
-            .ToListAsync(ct);
-
-        foreach (var group in measures.GroupBy(m => new { m.Basic, m.PeerGroupKey }))
-        {
-            var ranked = group
-                .OrderBy(m => m.SimsMeasure!.Value)
-                .ThenBy(m => m.UsDotNumber)
-                .ToList();
-
-            for (var i = 0; i < ranked.Count; i++)
-            {
-                ranked[i].PeerRank = i + 1;
-                ranked[i].PeerPopulation = ranked.Count;
-                ranked[i].SimsPercentile = ranked.Count <= 1
-                    ? null
-                    : Math.Round((i + 1) * 100m / ranked.Count, 0);
-            }
-        }
-
-        await analyticsDb.SaveChangesAsync(ct);
+        await analyticsDb.Database.ExecuteSqlInterpolatedAsync($"""
+            WITH ranked AS (
+                SELECT
+                    id,
+                    row_number() OVER (
+                        PARTITION BY snapshot_month, basic, peer_group_key
+                        ORDER BY sims_measure, us_dot_number
+                    ) AS peer_rank,
+                    count(*) OVER (
+                        PARTITION BY snapshot_month, basic, peer_group_key
+                    ) AS peer_population
+                FROM fmcsa_basic_peer_measures
+                WHERE snapshot_month = {snapshotMonth}
+                  AND sims_measure IS NOT NULL
+                  AND is_deleted = false
+            )
+            UPDATE fmcsa_basic_peer_measures AS m
+            SET
+                peer_rank = ranked.peer_rank,
+                peer_population = ranked.peer_population,
+                sims_percentile = CASE
+                    WHEN ranked.peer_population <= 1 THEN NULL
+                    ELSE round((ranked.peer_rank::numeric * 100.0) / ranked.peer_population, 0)
+                END
+            FROM ranked
+            WHERE m.id = ranked.id
+            """, ct);
     }
 
     private static decimal CalculateExposure(string basic, FmcsaCarrierSnapshot carrier, List<FmcsaInspection> inspections)
@@ -268,4 +451,64 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
         !string.IsNullOrWhiteSpace(inspection.Vin) ||
         !string.IsNullOrWhiteSpace(inspection.Vin2) ||
         inspection.InspectionLevel is 1 or 2 or 5 or 6;
+
+    private static string? GetDotNumber(Dictionary<string, JsonElement> row) =>
+        NormalizeDigits(GetString(row, "dot_number", "usdot_number", "us_dot_number", "usdot", "dot"));
+
+    private static string? GetString(Dictionary<string, JsonElement> row, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!TryGetValue(row, name, out var value)) continue;
+            if (value.ValueKind == JsonValueKind.String) return NullIfBlank(value.GetString());
+            if (value.ValueKind is JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False) return value.ToString();
+        }
+
+        return null;
+    }
+
+    private static int? GetInt(Dictionary<string, JsonElement> row, params string[] names)
+    {
+        var raw = GetString(row, names);
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;
+    }
+
+    private static decimal? GetDecimal(Dictionary<string, JsonElement> row, params string[] names)
+    {
+        var raw = GetString(row, names);
+        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : null;
+    }
+
+    private static bool TryGetValue(Dictionary<string, JsonElement> row, string name, out JsonElement value)
+    {
+        if (row.TryGetValue(name, out value)) return true;
+        foreach (var key in row.Keys)
+        {
+            if (key.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = row[key];
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static string? NormalizeDigits(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        return string.IsNullOrWhiteSpace(digits) ? null : digits;
+    }
+
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record OfficialSmsBasicMapping(
+        string Basic,
+        string[] MeasureFields,
+        string[] PercentileFields,
+        string[] EventCountFields,
+        string[] OosCountFields);
 }

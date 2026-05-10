@@ -93,6 +93,19 @@ public class FmcsaSocrataClient
         return ExtractBasicRows(doc.RootElement).ToList();
     }
 
+    public Task<List<Dictionary<string, JsonElement>>> GetSmsAbPassPropertyPageAsync(int limit, int offset, CancellationToken ct) =>
+        GetRowsPageAsync(_settings.SmsAbPassPropertyDatasetId, limit, offset, ct);
+
+    public Task<List<Dictionary<string, JsonElement>>> GetSmsCPassPropertyPageAsync(int limit, int offset, CancellationToken ct) =>
+        GetRowsPageAsync(_settings.SmsCPassPropertyDatasetId, limit, offset, ct);
+
+    private Task<List<Dictionary<string, JsonElement>>> GetRowsPageAsync(string datasetId, int limit, int offset, CancellationToken ct)
+    {
+        limit = Math.Clamp(limit, 1, 50000);
+        offset = Math.Max(0, offset);
+        return SendAsync(datasetId, $"$limit={limit}&$offset={offset}", ct);
+    }
+
     private async Task<List<Dictionary<string, JsonElement>>> GetRowsByDotAsync(string datasetId, string dotNumber, CancellationToken ct)
     {
         var allRows = new List<Dictionary<string, JsonElement>>();
