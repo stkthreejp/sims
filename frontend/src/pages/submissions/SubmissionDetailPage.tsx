@@ -144,6 +144,10 @@ export function SubmissionDetailPage() {
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
   const [bindingQuoteId, setBindingQuoteId] = useState<string | null>(null)
   const [bindForm, setBindForm] = useState({ boundDate: '', effectiveDate: '', expirationDate: '' })
+
+  const openLossHistory = () => {
+    if (id) navigate(`/submissions/${id}/loss-history`)
+  }
   const [overrideQuoteId, setOverrideQuoteId] = useState<string | null>(null)
   const [overrideMode, setOverrideMode] = useState<'dollar' | 'rate'>('dollar')
   const [overrideInput, setOverrideInput] = useState('')
@@ -1009,7 +1013,7 @@ export function SubmissionDetailPage() {
         <section className="sd-card">
           <div className="sd-card-head">
             <h3>Loss history (5 yrs)</h3>
-            <Link to={`/submissions/${id}/loss-history`} className="sd-btn ghost sm">Open analysis</Link>
+            <button type="button" onClick={openLossHistory} className="sd-btn ghost sm">Open analysis</button>
           </div>
           {lossSummary?.yearCount ? (
             <div className="sd-card-body tight">
@@ -1043,7 +1047,7 @@ export function SubmissionDetailPage() {
           ) : (
             <div className="sd-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 118, gap: 10 }}>
               <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No loss history on file</p>
-              <Link to={`/submissions/${id}/loss-history`} className="sd-btn sm"><Plus size={13} /> Add loss year</Link>
+              <button type="button" onClick={openLossHistory} className="sd-btn sm"><Plus size={13} /> Add loss year</button>
             </div>
           )}
         </section>
