@@ -16,6 +16,7 @@ public class QuoteService : IQuoteService
     private readonly IWorkflowEngineService _workflowEngine;
     private readonly ICarrierCommissionService _carrierCommissions;
     private readonly IAgentCommissionService _agentCommissions;
+    private readonly IQuoteChecklistService _checklist;
 
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
@@ -24,12 +25,14 @@ public class QuoteService : IQuoteService
         IServiceProvider sp,
         IWorkflowEngineService workflowEngine,
         ICarrierCommissionService carrierCommissions,
-        IAgentCommissionService agentCommissions)
+        IAgentCommissionService agentCommissions,
+        IQuoteChecklistService checklist)
     {
         _sp = sp;
         _workflowEngine = workflowEngine;
         _carrierCommissions = carrierCommissions;
         _agentCommissions = agentCommissions;
+        _checklist = checklist;
     }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -161,6 +164,8 @@ public class QuoteService : IQuoteService
 
         Db.Set<Quote>().Add(quote);
         await Db.SaveChangesAsync();
+
+        await _checklist.SeedDefaultsAsync(quote.Id, quote.LineOfBusiness);
 
         await Db.Entry(quote).Reference(qt => qt.Submission).LoadAsync();
         await Db.Entry(quote).Reference(qt => qt.Carrier).LoadAsync();

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail } from '@/types/quote.types'
+import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail, QuoteChecklistItem } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const quotesApi = {
@@ -85,4 +85,11 @@ export const quotesApi = {
 
   deleteAttachment: (quoteId: string, attachmentId: string) =>
     apiClient.delete(`/quotes/${quoteId}/attachments/${attachmentId}`),
+
+  // Checklist
+  getChecklist: (quoteId: string) =>
+    apiClient.get<QuoteChecklistItem[]>(`/quotes/${quoteId}/checklist`).then((r) => r.data),
+
+  toggleChecklistItem: (quoteId: string, itemId: string, isCompleted: boolean) =>
+    apiClient.patch<QuoteChecklistItem>(`/quotes/${quoteId}/checklist/${itemId}/toggle`, { isCompleted }).then((r) => r.data),
 }

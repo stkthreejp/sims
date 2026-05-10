@@ -41,3 +41,9 @@ This is a solo developer project. **Commit directly to `main`** — do not creat
 Use the backend_ms.log and frontend_ms.log files in the root to check server status.
 Backend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\backend_ms.log' -Tail 20"`
 Frontend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\frontend_ms.log' -Tail 15"`
+
+## Codex workspace notes
+- Keep project helper scripts in `C:\Users\JeremiahPODonovan\SIMS\scripts`.
+- Keep scratch files, temporary outputs, and generated diagnostics in `C:\Users\JeremiahPODonovan\SIMS\temp` or `C:\tmp`.
+- Avoid writing project files outside the SIMS workspace unless explicitly requested.
+- It is acceptable to request network access up front for package restore, npm/NuGet installs, GitHub work, documentation lookup, or dependency troubleshooting.

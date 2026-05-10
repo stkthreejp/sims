@@ -329,6 +329,20 @@ export interface FmcsaAnalyticsRefresh {
   refreshedAt: string
 }
 
+export interface QuoteChecklistItem {
+  id: string
+  quoteId: string
+  triggerKey: string
+  label: string
+  isBlocker: boolean
+  sortOrder: number
+  isCompleted: boolean
+  completionSource: 'Manual' | 'System'
+  completedById: string | null
+  completedByName: string | null
+  completedAt: string | null
+}
+
 export interface Attachment {
   id: string
   quoteId: string

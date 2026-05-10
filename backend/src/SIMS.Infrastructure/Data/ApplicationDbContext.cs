@@ -34,6 +34,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<QuoteUWWriteup> QuoteUWWriteups => Set<QuoteUWWriteup>();
     public DbSet<QuoteUWWriteupCondition> QuoteUWWriteupConditions => Set<QuoteUWWriteupCondition>();
+    public DbSet<QuoteChecklistItem> QuoteChecklistItems => Set<QuoteChecklistItem>();
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
     public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
     public DbSet<EmailAttachment> EmailAttachments => Set<EmailAttachment>();
@@ -160,6 +161,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<HolidayCalendar>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UserDelegation>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<EscalationRule>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<QuoteChecklistItem>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaCarrierSnapshot>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaInspection>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaViolation>().HasQueryFilter(e => !e.IsDeleted);

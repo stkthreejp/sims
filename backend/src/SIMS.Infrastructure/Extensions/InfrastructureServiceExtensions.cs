@@ -69,6 +69,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IInsuredService, InsuredService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
+        services.AddScoped<IQuoteChecklistService, QuoteChecklistService>();
         services.AddScoped<IQuoteService, QuoteService>();
         services.AddScoped<IPolicyService, PolicyService>();
         services.AddScoped<IRatingEngineService, RatingEngineService>();

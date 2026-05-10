@@ -568,7 +568,7 @@ export function SubmissionDetailPage() {
                 <div className="badge">{LOB_SHORT[q.lineOfBusiness] ?? q.lineOfBusiness}</div>
                 <div className="body">
                   <div className="top">
-                    <span className="carrier">{q.carrierName}</span>
+                    <Link to={`/quotes/${q.id}`} className="carrier hover:underline">{q.carrierName}</Link>
                     <span className={`sd-pill ${QUOTE_STATUS_PILL[q.status]}`}>{QUOTE_STATUS_LABELS[q.status]}</span>
                   </div>
                   <div className="meta">
