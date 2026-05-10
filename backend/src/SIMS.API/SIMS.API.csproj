@@ -21,4 +21,7 @@
     <ProjectReference Include="..\SIMS.Application\SIMS.Application.csproj" />
     <ProjectReference Include="..\SIMS.Infrastructure\SIMS.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Update="Data\Seeds\oden-commercial-cancellation.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

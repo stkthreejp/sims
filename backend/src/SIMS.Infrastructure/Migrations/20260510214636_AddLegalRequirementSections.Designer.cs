@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIMS.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SIMS.Infrastructure.Data;
 namespace SIMS.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260510214636_AddLegalRequirementSections")]
+    partial class AddLegalRequirementSections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3104,25 +3107,6 @@ namespace SIMS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("GeocodePrecision")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("geocode_precision");
-
-                    b.Property<string>("GeocodeProvider")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("geocode_provider");
-
-                    b.Property<DateTime?>("GeocodedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("geocoded_at");
-
-                    b.Property<string>("GooglePlaceId")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("google_place_id");
-
                     b.Property<int>("InsuredType")
                         .HasColumnType("integer");
 
@@ -3135,16 +3119,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.Property<string>("LastName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<decimal?>("Latitude")
-                        .HasPrecision(9, 6)
-                        .HasColumnType("numeric(9,6)")
-                        .HasColumnName("latitude");
-
-                    b.Property<decimal?>("Longitude")
-                        .HasPrecision(9, 6)
-                        .HasColumnType("numeric(9,6)")
-                        .HasColumnName("longitude");
 
                     b.Property<string>("OperationType")
                         .HasMaxLength(200)
@@ -3194,72 +3168,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.HasIndex("CreatedById");
 
                     b.ToTable("insureds", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.LegalRequirementChangeLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ChangeType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ChangedById")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ChangedByName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FieldName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("text");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("RequirementSectionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ScanResultId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChangedById");
-
-                    b.HasIndex("ScanResultId");
-
-                    b.HasIndex("RequirementSectionId", "ChangedAt");
-
-                    b.ToTable("legal_requirement_change_logs", (string)null);
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.LegalRequirementSection", b =>
@@ -3346,170 +3254,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.HasIndex("State", "Category", "Topic");
 
                     b.ToTable("legal_requirement_sections", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.LegalSourceScanResult", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<decimal?>("ConfidenceScore")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("numeric(5,4)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("MatchStatus")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<Guid?>("RequirementSectionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ReviewStatus")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ReviewedById")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ReviewedByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("ScanRunId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceCitation")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<string>("SourceText")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("SourceUrl")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("SuggestedRequirementText")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Topic")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MatchStatus");
-
-                    b.HasIndex("RequirementSectionId");
-
-                    b.HasIndex("ReviewStatus");
-
-                    b.HasIndex("ReviewedById");
-
-                    b.HasIndex("ScanRunId");
-
-                    b.HasIndex("State", "Category", "Topic");
-
-                    b.ToTable("legal_source_scan_results", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.LegalSourceScanRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("PossibleChanges")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ResultsFound")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SourceName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("SourceType")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("StartedById")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StartedByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StartedById");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("SourceName", "StartedAt");
-
-                    b.ToTable("legal_source_scan_runs", (string)null);
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.Note", b =>
@@ -6615,66 +6359,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("CreatedBy");
                 });
 
-            modelBuilder.Entity("SIMS.Domain.Entities.LegalRequirementChangeLog", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.User", "ChangedBy")
-                        .WithMany()
-                        .HasForeignKey("ChangedById")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SIMS.Domain.Entities.LegalRequirementSection", "RequirementSection")
-                        .WithMany()
-                        .HasForeignKey("RequirementSectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SIMS.Domain.Entities.LegalSourceScanResult", "ScanResult")
-                        .WithMany()
-                        .HasForeignKey("ScanResultId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("ChangedBy");
-
-                    b.Navigation("RequirementSection");
-
-                    b.Navigation("ScanResult");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.LegalSourceScanResult", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.LegalRequirementSection", "RequirementSection")
-                        .WithMany()
-                        .HasForeignKey("RequirementSectionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SIMS.Domain.Entities.User", "ReviewedBy")
-                        .WithMany()
-                        .HasForeignKey("ReviewedById")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SIMS.Domain.Entities.LegalSourceScanRun", "ScanRun")
-                        .WithMany("Results")
-                        .HasForeignKey("ScanRunId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RequirementSection");
-
-                    b.Navigation("ReviewedBy");
-
-                    b.Navigation("ScanRun");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.LegalSourceScanRun", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.User", "StartedBy")
-                        .WithMany()
-                        .HasForeignKey("StartedById")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("StartedBy");
-                });
-
             modelBuilder.Entity("SIMS.Domain.Entities.Note", b =>
                 {
                     b.HasOne("SIMS.Domain.Entities.User", "CreatedBy")
@@ -7400,11 +7084,6 @@ namespace SIMS.Infrastructure.Migrations
             modelBuilder.Entity("SIMS.Domain.Entities.Insured", b =>
                 {
                     b.Navigation("Submissions");
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.LegalSourceScanRun", b =>
-                {
-                    b.Navigation("Results");
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.Permission", b =>

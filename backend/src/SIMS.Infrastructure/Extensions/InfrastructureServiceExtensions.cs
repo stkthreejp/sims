@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using System.Text.Json;
 
 namespace SIMS.Infrastructure.Extensions;
 
@@ -239,6 +240,8 @@ public static class InfrastructureServiceExtensions
         }
         await db.SaveChangesAsync();
 
+        await SeedLegalRequirementSectionsAsync(db);
+
         // Optional first-admin bootstrap. Never seed a hard-coded password.
         var adminUserName = configuration["AdminBootstrap:UserName"] ?? "admin";
         var adminPassword = configuration["AdminBootstrap:Password"];
@@ -264,4 +267,56 @@ public static class InfrastructureServiceExtensions
                     string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
     }
+
+    private static async Task SeedLegalRequirementSectionsAsync(ApplicationDbContext db)
+    {
+        if (await db.LegalRequirementSections.AnyAsync())
+            return;
+
+        var seedPath = Path.Combine(AppContext.BaseDirectory, "Data", "Seeds", "oden-commercial-cancellation.json");
+        if (!File.Exists(seedPath))
+            return;
+
+        var json = await File.ReadAllTextAsync(seedPath);
+        var seedRows = JsonSerializer.Deserialize<List<LegalRequirementSeedRow>>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        }) ?? [];
+
+        foreach (var row in seedRows)
+        {
+            db.LegalRequirementSections.Add(new LegalRequirementSection
+            {
+                State = row.State,
+                LineOfBusiness = row.LineOfBusiness,
+                Action = row.Action,
+                Category = row.Category,
+                Topic = row.Topic,
+                RequirementText = row.RequirementText,
+                Citations = row.Citations,
+                SourceName = row.SourceName,
+                SourceDocument = row.SourceDocument,
+                SourceCreatedAt = row.SourceCreatedAt,
+                ReviewStatus = row.ReviewStatus,
+                LastVerifiedAt = DateTime.UtcNow,
+                SortOrder = row.SortOrder
+            });
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    private sealed record LegalRequirementSeedRow(
+        string State,
+        string LineOfBusiness,
+        string Action,
+        string Category,
+        string Topic,
+        string RequirementText,
+        string[] Citations,
+        string SourceName,
+        string SourceDocument,
+        DateTime SourceCreatedAt,
+        string ReviewStatus,
+        int SortOrder);
 }
