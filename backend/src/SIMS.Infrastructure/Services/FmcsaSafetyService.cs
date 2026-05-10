@@ -144,14 +144,16 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     private readonly ILogger<FmcsaSafetyService> _logger;
     private readonly IHttpClientFactory _httpFactory;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IFmcsaSafetyAnalyticsService _analyticsService;
 
-    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata, ILogger<FmcsaSafetyService> logger, IHttpClientFactory httpFactory, IServiceProvider serviceProvider)
+    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata, ILogger<FmcsaSafetyService> logger, IHttpClientFactory httpFactory, IServiceProvider serviceProvider, IFmcsaSafetyAnalyticsService analyticsService)
     {
         _db = db;
         _socrata = socrata;
         _logger = logger;
         _httpFactory = httpFactory;
         _serviceProvider = serviceProvider;
+        _analyticsService = analyticsService;
     }
 
     public async Task<Result<AutoSafetySummaryDto>> GetQuoteAutoSafetyAsync(Guid quoteId, CancellationToken ct = default)
@@ -381,6 +383,10 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 "FMCSA_SAVE_FAILED",
                 BuildSaveFailureMessage(ex));
         }
+
+        var analyticsResult = await _analyticsService.RefreshImportedCarrierAnalyticsAsync(snapshotMonth, ct);
+        if (!analyticsResult.IsSuccess && analyticsResult.ErrorCode != "SAFETY_ANALYTICS_NOT_CONFIGURED")
+            _logger.LogWarning("FMCSA analytics refresh failed after USDOT {DotNumber} import: {ErrorCode} {ErrorMessage}", dotNumber, analyticsResult.ErrorCode, analyticsResult.ErrorMessage);
 
         var summary = await GetQuoteAutoSafetyAsync(quoteId, ct);
         if (!summary.IsSuccess)
