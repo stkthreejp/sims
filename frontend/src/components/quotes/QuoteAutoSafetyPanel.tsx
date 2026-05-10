@@ -236,6 +236,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
                 <BasicKpiTile
                   key={b.basic}
                   basic={b}
+                  powerUnits={data.powerUnits}
                   onClick={() => setDetailSelection({ kind: 'basic', title: `${b.basic} Details`, basic: b.basic })}
                 />
               ))}
@@ -336,8 +337,8 @@ function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
   )
 }
 
-function BasicKpiTile({ basic, onClick }: { basic: AutoSafetyBasic; onClick: () => void }) {
-  const risk = getBasicRisk(basic)
+function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; powerUnits: number | null; onClick: () => void }) {
+  const risk = getBasicRisk(basic, powerUnits)
   const dialValue = risk.value
   const color = risk.color === 'red' ? '#dc2626' : risk.color === 'yellow' ? '#d97706' : risk.color === 'green' ? '#059669' : '#94a3b8'
   const bgColor = risk.color === 'red' ? 'bg-red-50' : risk.color === 'yellow' ? 'bg-amber-50' : risk.color === 'green' ? 'bg-emerald-50' : 'bg-slate-50'
@@ -368,11 +369,16 @@ function BasicKpiTile({ basic, onClick }: { basic: AutoSafetyBasic; onClick: () 
         {basic.percentile == null ? '' : ` | ${basic.percentile}%`}
       </div>
       <div className="mt-1 text-xs text-slate-500">{basic.eventCount} events{basic.outOfServiceCount > 0 ? ` | ${basic.outOfServiceCount} OOS` : ''}</div>
+      {(basic.recentEventCount > 0 || basic.recentOutOfServiceCount > 0) && (
+        <div className="mt-1 text-[11px] text-slate-400">
+          12 mo: {basic.recentEventCount} events{basic.recentOutOfServiceCount > 0 ? ` | ${basic.recentOutOfServiceCount} OOS` : ''}
+        </div>
+      )}
     </button>
   )
 }
 
-function getBasicRisk(basic: AutoSafetyBasic): { color: 'green' | 'yellow' | 'red' | 'gray'; value: number; label: string; status: string } {
+function getBasicRisk(basic: AutoSafetyBasic, powerUnits: number | null): { color: 'green' | 'yellow' | 'red' | 'gray'; value: number; label: string; status: string } {
   if (basic.isPrioritized) return { color: 'red', value: 100, label: '!', status: 'Alert' }
   if (basic.percentile != null) {
     if (basic.percentile >= 75) return { color: 'red', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'High' }
@@ -380,9 +386,15 @@ function getBasicRisk(basic: AutoSafetyBasic): { color: 'green' | 'yellow' | 're
     return { color: 'green', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Clear' }
   }
 
-  const eventPressure = Math.min(60, basic.eventCount * 1.5)
-  const oosPressure = Math.min(40, basic.outOfServiceCount * 6)
-  const value = Math.round(eventPressure + oosPressure)
+  const exposure = Math.max(1, powerUnits ?? 10)
+  const eventRate = basic.eventCount / exposure
+  const oosRate = basic.outOfServiceCount / exposure
+  const recentEventRate = basic.recentEventCount / exposure
+  const recentOosRate = basic.recentOutOfServiceCount / exposure
+  const eventPressure = Math.min(35, eventRate * 28)
+  const oosPressure = Math.min(30, oosRate * 42)
+  const recentPressure = Math.min(30, recentEventRate * 32 + recentOosRate * 45)
+  const value = Math.round(eventPressure + oosPressure + recentPressure)
   if (value === 0 && basic.scoreSource === 'Official SMS' && basic.measure != null) {
     return { color: 'gray', value: 0, label: 'N/A', status: 'Inconclusive' }
   }

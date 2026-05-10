@@ -209,6 +209,8 @@ export interface AutoSafetyBasic {
   isPrioritized: boolean
   eventCount: number
   outOfServiceCount: number
+  recentEventCount: number
+  recentOutOfServiceCount: number
   trendDirection: string
   scoreSource: string
 }

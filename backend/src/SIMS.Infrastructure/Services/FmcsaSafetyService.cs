@@ -698,6 +698,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaViolation> violations)
     {
+        var recentStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-12));
         var grouped = violations
             .Where(v => !string.IsNullOrWhiteSpace(v.Basic))
             .GroupBy(v => v.Basic!)
@@ -711,6 +712,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     officialScores.TryGetValue(b, out var score);
                     grouped.TryGetValue(b, out var events);
                     events ??= [];
+                    var recentEvents = events.Where(v => v.Inspection.InspectionDate >= recentStart).ToList();
                     return new AutoSafetyBasicDto
                     {
                         Basic = b,
@@ -721,6 +723,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                             ? score.EventCount
                             : events.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
                         OutOfServiceCount = events.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
+                        RecentEventCount = recentEvents.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
+                        RecentOutOfServiceCount = recentEvents.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
                         TrendDirection = score?.TrendDirection ?? "Flat",
                         ScoreSource = score == null ? "SIMS signal" : "Official SMS",
                     };
@@ -735,11 +739,14 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         {
             grouped.TryGetValue(b, out var events);
             events ??= [];
+            var recentEvents = events.Where(v => v.Inspection.InspectionDate >= recentStart).ToList();
             return new AutoSafetyBasicDto
                 {
                     Basic = b,
                     EventCount = events.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
                     OutOfServiceCount = events.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
+                    RecentEventCount = recentEvents.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
+                    RecentOutOfServiceCount = recentEvents.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
                     TrendDirection = "Flat",
                     ScoreSource = "SIMS signal",
                 };

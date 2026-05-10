@@ -41,6 +41,8 @@ public class AutoSafetyBasicDto
     public bool IsPrioritized { get; set; }
     public int EventCount { get; set; }
     public int OutOfServiceCount { get; set; }
+    public int RecentEventCount { get; set; }
+    public int RecentOutOfServiceCount { get; set; }
     public string TrendDirection { get; set; } = "Flat";
     public string ScoreSource { get; set; } = "SIMS signal";
 }
