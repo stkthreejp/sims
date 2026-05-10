@@ -26,6 +26,13 @@ public static class InfrastructureServiceExtensions
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
                 npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
                    .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
+        var safetyAnalyticsConnection = configuration.GetConnectionString("SafetyAnalyticsConnection");
+        if (!string.IsNullOrWhiteSpace(safetyAnalyticsConnection))
+        {
+            services.AddDbContext<SafetyAnalyticsDbContext>(options =>
+                options.UseNpgsql(safetyAnalyticsConnection,
+                    npgsql => npgsql.MigrationsAssembly(typeof(SafetyAnalyticsDbContext).Assembly.FullName)));
+        }
 
         // Make the generic DbContext resolve to ApplicationDbContext for services that use it
         services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());

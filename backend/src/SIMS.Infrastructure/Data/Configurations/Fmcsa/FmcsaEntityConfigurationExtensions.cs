@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace SIMS.Infrastructure.Data.Configurations.Fmcsa;
 
-internal static class FmcsaEntityConfigurationExtensions
+public static class FmcsaEntityConfigurationExtensions
 {
     public static void ConfigureBaseEntity<T>(this EntityTypeBuilder<T> builder)
         where T : BaseEntity
