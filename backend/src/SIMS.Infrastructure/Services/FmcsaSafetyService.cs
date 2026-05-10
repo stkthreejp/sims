@@ -36,6 +36,22 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         ("12-6", 6, 12),
         ("6-0", 0, 6),
     ];
+    private static readonly Dictionary<string, (double Latitude, double Longitude)> StateCentroids = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["AL"] = (32.8067, -86.7911), ["AK"] = (61.3707, -152.4044), ["AZ"] = (33.7298, -111.4312), ["AR"] = (34.9697, -92.3731),
+        ["CA"] = (36.1162, -119.6816), ["CO"] = (39.0598, -105.3111), ["CT"] = (41.5978, -72.7554), ["DE"] = (39.3185, -75.5071),
+        ["FL"] = (27.7663, -81.6868), ["GA"] = (33.0406, -83.6431), ["HI"] = (21.0943, -157.4983), ["ID"] = (44.2405, -114.4788),
+        ["IL"] = (40.3495, -88.9861), ["IN"] = (39.8494, -86.2583), ["IA"] = (42.0115, -93.2105), ["KS"] = (38.5266, -96.7265),
+        ["KY"] = (37.6681, -84.6701), ["LA"] = (31.1695, -91.8678), ["ME"] = (44.6939, -69.3819), ["MD"] = (39.0639, -76.8021),
+        ["MA"] = (42.2302, -71.5301), ["MI"] = (43.3266, -84.5361), ["MN"] = (45.6945, -93.9002), ["MS"] = (32.7416, -89.6787),
+        ["MO"] = (38.4561, -92.2884), ["MT"] = (46.9219, -110.4544), ["NE"] = (41.1254, -98.2681), ["NV"] = (38.3135, -117.0554),
+        ["NH"] = (43.4525, -71.5639), ["NJ"] = (40.2989, -74.5210), ["NM"] = (34.8405, -106.2485), ["NY"] = (42.1657, -74.9481),
+        ["NC"] = (35.6301, -79.8064), ["ND"] = (47.5289, -99.7840), ["OH"] = (40.3888, -82.7649), ["OK"] = (35.5653, -96.9289),
+        ["OR"] = (44.5720, -122.0709), ["PA"] = (40.5908, -77.2098), ["RI"] = (41.6809, -71.5118), ["SC"] = (33.8569, -80.9450),
+        ["SD"] = (44.2998, -99.4388), ["TN"] = (35.7478, -86.6923), ["TX"] = (31.0545, -97.5635), ["UT"] = (40.1500, -111.8624),
+        ["VT"] = (44.0459, -72.7107), ["VA"] = (37.7693, -78.1700), ["WA"] = (47.4009, -121.4905), ["WV"] = (38.4912, -80.9545),
+        ["WI"] = (44.2685, -89.6165), ["WY"] = (42.7560, -107.3025), ["DC"] = (38.9072, -77.0369),
+    };
     private static readonly SmsBasicMapping[] SmsBasicMappings =
     [
         new("Unsafe Driving", "unsafe_driv_measure", "unsafe_driv_pct", "unsafe_driv_basic_alert", "unsafe_driv_rd_alert", "unsafe_driv_ac", "unsafe_driv_insp_w_viol"),
@@ -228,6 +244,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var accidentSummary = BuildAccidentSummary(crashes, carrier?.PowerUnits);
         var basics = BuildBasics(scoringRun, analyticsScores, violations, accidentSummary);
         var hotspots = BuildHotspots(inspections, violations);
+        var radiusSummary = BuildRadiusSummary(insured, inspections, violations);
         var severeEvents = BuildSevereEvents(violations);
         var flags = BuildFlags(basics, oos, carrier, scoringRun);
 
@@ -250,6 +267,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             Oos = oos,
             AccidentSummary = accidentSummary,
             GeographicHotspots = hotspots,
+            RadiusSummary = radiusSummary,
             RecentSevereEvents = severeEvents,
             InspectionTrend = BuildInspectionTrend(trendInspections, trendViolations, today),
             ViolationTrend = BuildViolationTrend(trendViolations, today),
@@ -455,6 +473,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
             inspection.InspectionDate = inspectionDate.Value;
             inspection.State = GetString(row, "state", "inspection_state", "insp_state", "report_state");
+            inspection.CountyCodeState = GetString(row, "county_code_state", "county_code", "county");
             inspection.InspectionLevel = GetInt(row, "inspection_level", "insp_level", "insp_level_id", "level");
             inspection.DriverOutOfService = GetBool(row, "driver_oos", "driver_out_of_service", "drv_oos", "driver_oos_indicator", "driver_oos_flag")
                 || GetInt(row, "driver_oos_total") is > 0;
@@ -1348,26 +1367,115 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static List<AutoSafetyHotspotDto> BuildHotspots(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
     {
-        var violationsByState = violations
+        var violationsByLocation = violations
             .Where(v => !string.IsNullOrWhiteSpace(v.Inspection.State))
-            .GroupBy(v => v.Inspection.State!)
+            .GroupBy(v => BuildInspectionLocationLabel(v.Inspection))
             .ToDictionary(g => g.Key, g => g.Count());
 
         return inspections
             .Where(i => !string.IsNullOrWhiteSpace(i.State))
-            .GroupBy(i => i.State!)
+            .GroupBy(BuildInspectionLocationLabel)
             .Select(g => new AutoSafetyHotspotDto
             {
                 State = g.Key,
                 InspectionCount = g.Count(),
-                ViolationCount = violationsByState.GetValueOrDefault(g.Key),
-                OutOfServiceCount = g.Count(i => i.DriverOutOfService || i.VehicleOutOfService),
+                ViolationCount = violationsByLocation.GetValueOrDefault(g.Key),
+                OutOfServiceCount = g.Count(i => i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService),
             })
             .OrderByDescending(h => h.OutOfServiceCount)
             .ThenByDescending(h => h.ViolationCount)
             .ThenByDescending(h => h.InspectionCount)
             .Take(5)
             .ToList();
+    }
+
+    private static string BuildInspectionLocationLabel(FmcsaInspection inspection)
+    {
+        var state = inspection.State?.Trim().ToUpperInvariant();
+        var countyCodeState = inspection.CountyCodeState?.Trim().ToUpperInvariant();
+
+        if (!string.IsNullOrWhiteSpace(countyCodeState) && !string.Equals(countyCodeState, state, StringComparison.OrdinalIgnoreCase))
+            return !string.IsNullOrWhiteSpace(state) ? $"{countyCodeState}, {state}" : countyCodeState;
+
+        return !string.IsNullOrWhiteSpace(state) ? state : "Unknown";
+    }
+
+    private static AutoSafetyRadiusSummaryDto BuildRadiusSummary(Insured? insured, List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
+    {
+        var bands = new[]
+        {
+            new AutoSafetyRadiusBandDto { Label = "<50 mi" },
+            new AutoSafetyRadiusBandDto { Label = "50-100 mi" },
+            new AutoSafetyRadiusBandDto { Label = "100-250 mi" },
+            new AutoSafetyRadiusBandDto { Label = "250+ mi" },
+            new AutoSafetyRadiusBandDto { Label = "Unknown" },
+        };
+
+        var summary = new AutoSafetyRadiusSummaryDto
+        {
+            HasBaseCoordinate = insured?.Latitude != null && insured.Longitude != null,
+            Precision = "State-level estimate",
+            Note = "Inspection rows include report state and sometimes county-code metadata, but not exact coordinates. Distances are estimated from the insured address to inspection-state centroids.",
+            Bands = bands.ToList(),
+        };
+
+        if (insured?.Latitude == null || insured.Longitude == null)
+        {
+            summary.Precision = "Unavailable";
+            summary.Note = "Insured coordinates are not cached yet. Select or save the insured address to geocode the base location.";
+            bands.Last().InspectionCount = inspections.Count;
+            bands.Last().OutOfServiceCount = CountInspectionOos(inspections, violations);
+            return summary;
+        }
+
+        var oosReports = violations
+            .Where(v => v.IsOutOfService || v.IsDriverDisqualifying)
+            .Select(v => v.ReportNumber)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var inspection in inspections)
+        {
+            var band = bands.Last();
+            if (!string.IsNullOrWhiteSpace(inspection.State) && StateCentroids.TryGetValue(inspection.State.Trim().ToUpperInvariant(), out var point))
+            {
+                var miles = HaversineMiles((double)insured.Latitude.Value, (double)insured.Longitude.Value, point.Latitude, point.Longitude);
+                band = miles switch
+                {
+                    < 50 => bands[0],
+                    < 100 => bands[1],
+                    < 250 => bands[2],
+                    _ => bands[3],
+                };
+            }
+
+            band.InspectionCount++;
+            if (inspection.DriverOutOfService || inspection.VehicleOutOfService || inspection.HazmatOutOfService || oosReports.Contains(inspection.ReportNumber))
+                band.OutOfServiceCount++;
+        }
+
+        return summary;
+    }
+
+    private static int CountInspectionOos(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
+    {
+        var oosReports = violations
+            .Where(v => v.IsOutOfService || v.IsDriverDisqualifying)
+            .Select(v => v.ReportNumber)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return inspections.Count(i => i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService || oosReports.Contains(i.ReportNumber));
+    }
+
+    private static double HaversineMiles(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double radiusMiles = 3958.8;
+        static double ToRadians(double degrees) => degrees * Math.PI / 180;
+
+        var dLat = ToRadians(lat2 - lat1);
+        var dLon = ToRadians(lon2 - lon1);
+        var a = Math.Pow(Math.Sin(dLat / 2), 2)
+            + Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) * Math.Pow(Math.Sin(dLon / 2), 2);
+        return radiusMiles * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
     }
 
     private static List<AutoSafetyEventDto> BuildSevereEvents(List<FmcsaViolation> violations)

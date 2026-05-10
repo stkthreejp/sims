@@ -15,6 +15,7 @@ public class FmcsaInspectionConfiguration : IEntityTypeConfiguration<FmcsaInspec
         builder.Property(x => x.ReportNumber).HasColumnName("report_number").HasMaxLength(50).IsRequired();
         builder.Property(x => x.InspectionDate).HasColumnName("inspection_date");
         builder.Property(x => x.State).HasColumnName("state").HasMaxLength(2);
+        builder.Property(x => x.CountyCodeState).HasColumnName("county_code_state").HasMaxLength(50);
         builder.Property(x => x.InspectionLevel).HasColumnName("inspection_level");
         builder.Property(x => x.DriverOutOfService).HasColumnName("driver_out_of_service");
         builder.Property(x => x.VehicleOutOfService).HasColumnName("vehicle_out_of_service");

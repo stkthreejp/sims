@@ -18,6 +18,7 @@ public class AutoSafetySummaryDto
     public AutoSafetyOosDto Oos { get; set; } = new();
     public AutoSafetyAccidentSummaryDto AccidentSummary { get; set; } = new();
     public List<AutoSafetyHotspotDto> GeographicHotspots { get; set; } = new();
+    public AutoSafetyRadiusSummaryDto RadiusSummary { get; set; } = new();
     public List<AutoSafetyEventDto> RecentSevereEvents { get; set; } = new();
     public List<AutoSafetyTrendBucketDto> InspectionTrend { get; set; } = new();
     public List<AutoSafetyTrendBucketDto> ViolationTrend { get; set; } = new();
@@ -91,6 +92,21 @@ public class AutoSafetyHotspotDto
     public string State { get; set; } = string.Empty;
     public int InspectionCount { get; set; }
     public int ViolationCount { get; set; }
+    public int OutOfServiceCount { get; set; }
+}
+
+public class AutoSafetyRadiusSummaryDto
+{
+    public bool HasBaseCoordinate { get; set; }
+    public string Precision { get; set; } = "Unavailable";
+    public string? Note { get; set; }
+    public List<AutoSafetyRadiusBandDto> Bands { get; set; } = new();
+}
+
+public class AutoSafetyRadiusBandDto
+{
+    public string Label { get; set; } = string.Empty;
+    public int InspectionCount { get; set; }
     public int OutOfServiceCount { get; set; }
 }
 

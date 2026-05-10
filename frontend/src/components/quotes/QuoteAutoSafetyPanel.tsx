@@ -186,6 +186,11 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
             <MapPin className="h-3.5 w-3.5" /> Radius Of Operations
           </div>
+          {data.radiusSummary?.note && (
+            <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <span className="font-semibold">{data.radiusSummary.precision}:</span> {data.radiusSummary.note}
+            </div>
+          )}
           {data.geographicHotspots.length === 0 ? (
             <p className="text-sm text-slate-400">No inspection location concentration yet.</p>
           ) : (
@@ -198,9 +203,16 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               ))}
             </div>
           )}
-          <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
-            {['<50 mi', '50-100 mi', '100-250 mi', '250+ mi'].map((band) => (
-              <div key={band} className="rounded bg-slate-50 px-2 py-1 text-center text-slate-400">{band}: -</div>
+          <div className="mt-3 grid grid-cols-5 gap-2 text-xs">
+            {(data.radiusSummary?.bands ?? []).map((band) => (
+              <div
+                key={band.label}
+                className="rounded bg-slate-50 px-2 py-2 text-center"
+              >
+                <div className="font-semibold text-slate-700">{band.label}</div>
+                <div className="mt-1 text-slate-500">{band.inspectionCount.toLocaleString()} insp</div>
+                {band.outOfServiceCount > 0 && <div className="mt-0.5 text-red-600">{band.outOfServiceCount.toLocaleString()} OOS</div>}
+              </div>
             ))}
           </div>
         </div>

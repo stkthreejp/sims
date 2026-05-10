@@ -8,6 +8,7 @@ public class FmcsaInspection : BaseEntity
     public string ReportNumber { get; set; } = string.Empty;
     public DateOnly InspectionDate { get; set; }
     public string? State { get; set; }
+    public string? CountyCodeState { get; set; }
     public int? InspectionLevel { get; set; }
     public bool DriverOutOfService { get; set; }
     public bool VehicleOutOfService { get; set; }

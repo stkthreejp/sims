@@ -258,6 +258,19 @@ export interface AutoSafetyHotspot {
   outOfServiceCount: number
 }
 
+export interface AutoSafetyRadiusBand {
+  label: string
+  inspectionCount: number
+  outOfServiceCount: number
+}
+
+export interface AutoSafetyRadiusSummary {
+  hasBaseCoordinate: boolean
+  precision: string
+  note: string | null
+  bands: AutoSafetyRadiusBand[]
+}
+
 export interface AutoSafetyEvent {
   date: string
   eventType: string
@@ -312,6 +325,7 @@ export interface AutoSafetySummary {
   oos: AutoSafetyOos
   accidentSummary: AutoSafetyAccidentSummary
   geographicHotspots: AutoSafetyHotspot[]
+  radiusSummary: AutoSafetyRadiusSummary
   recentSevereEvents: AutoSafetyEvent[]
   inspectionTrend: AutoSafetyTrendBucket[]
   violationTrend: AutoSafetyTrendBucket[]
