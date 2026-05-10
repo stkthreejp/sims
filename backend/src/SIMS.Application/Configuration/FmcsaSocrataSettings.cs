@@ -12,6 +12,8 @@ public class FmcsaSocrataSettings
     public string SmsCPassDatasetId { get; set; } = "h3zn-uid9";
     public string SmsAbPassPropertyDatasetId { get; set; } = "4y6x-dmck";
     public string SmsCPassPropertyDatasetId { get; set; } = "h9zy-gjn8";
+    public string QcMobileBaseUrl { get; set; } = "https://mobile.fmcsa.dot.gov";
+    public string? QcMobileWebKey { get; set; }
     public int PageSize { get; set; } = 5000;
     public int MaxRowsPerDataset { get; set; } = 25000;
 }

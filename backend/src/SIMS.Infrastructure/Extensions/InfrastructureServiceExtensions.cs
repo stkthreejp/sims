@@ -127,6 +127,12 @@ public static class InfrastructureServiceExtensions
             c.Timeout = TimeSpan.FromSeconds(
                 int.TryParse(configuration["HttpClients:FmcsaSocrataTimeoutSeconds"], out var fmcsaTimeout) ? fmcsaTimeout : 60);
         });
+        services.AddHttpClient("fmcsa_qcmobile", c =>
+        {
+            c.BaseAddress = new Uri(configuration["Fmcsa:Socrata:QcMobileBaseUrl"] ?? "https://mobile.fmcsa.dot.gov");
+            c.Timeout = TimeSpan.FromSeconds(
+                int.TryParse(configuration["HttpClients:FmcsaQCMobileTimeoutSeconds"], out var fmcsaTimeout) ? fmcsaTimeout : 30);
+        });
         services.AddHttpClient("nhtsa_vpic", c =>
         {
             c.BaseAddress = new Uri("https://vpic.nhtsa.dot.gov");

@@ -75,6 +75,24 @@ public class FmcsaSocrataClient
         return ("Official SMS", []);
     }
 
+    public async Task<List<Dictionary<string, JsonElement>>> GetQcMobileBasicsByDotAsync(string dotNumber, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_settings.QcMobileWebKey))
+            return [];
+
+        var client = _httpFactory.CreateClient("fmcsa_qcmobile");
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/qc/services/carriers/{WebUtility.UrlEncode(dotNumber)}/basics?webKey={WebUtility.UrlEncode(_settings.QcMobileWebKey)}");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var response = await client.SendAsync(request, ct);
+        var content = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"FMCSA QCMobile error {(int)response.StatusCode}: {content}", null, response.StatusCode);
+
+        using var doc = JsonDocument.Parse(content);
+        return ExtractBasicRows(doc.RootElement).ToList();
+    }
+
     private async Task<List<Dictionary<string, JsonElement>>> GetRowsByDotAsync(string datasetId, string dotNumber, CancellationToken ct)
     {
         var allRows = new List<Dictionary<string, JsonElement>>();
@@ -189,4 +207,54 @@ public class FmcsaSocrataClient
 
     private static bool IsLikelyBadColumn(HttpRequestException ex) =>
         ex.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound;
+
+    private static IEnumerable<Dictionary<string, JsonElement>> ExtractBasicRows(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (TryGetObjectProperty(element, "carrierBasic", out var carrierBasic))
+            {
+                foreach (var nestedRow in ExtractBasicRows(carrierBasic))
+                    yield return nestedRow;
+                yield break;
+            }
+
+            var basicRow = element.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone(), StringComparer.OrdinalIgnoreCase);
+            if (basicRow.ContainsKey("basicId") || basicRow.ContainsKey("basicShortDesc") || basicRow.ContainsKey("basicDesc"))
+            {
+                yield return basicRow;
+                yield break;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                foreach (var nested in ExtractBasicRows(property.Value))
+                    yield return nested;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                foreach (var nestedRow in ExtractBasicRows(item))
+                    yield return nestedRow;
+            }
+        }
+    }
+
+    private static bool TryGetObjectProperty(JsonElement element, string name, out JsonElement value)
+    {
+        if (element.TryGetProperty(name, out value)) return value.ValueKind == JsonValueKind.Object;
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Object)
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
 }

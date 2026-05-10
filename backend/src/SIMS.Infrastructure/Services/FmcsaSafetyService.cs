@@ -42,6 +42,19 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         new("Controlled Substances/Alcohol", "contr_subst_measure", "contr_subst_pct", "contr_subst_basic_alert", "contr_subst_rd_alert", "contr_subst_ac", "contr_subst_insp_w_viol"),
         new("Vehicle Maintenance", "veh_maint_measure", "veh_maint_pct", "veh_maint_basic_alert", "veh_maint_rd_alert", "veh_maint_ac", "veh_maint_insp_w_viol"),
     ];
+    private static readonly IReadOnlyDictionary<string, string> QcMobileBasicNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Unsafe Driving"] = "Unsafe Driving",
+        ["US"] = "Unsafe Driving",
+        ["Fatigued Driving"] = "Hours-of-Service Compliance",
+        ["Hours-of-Service Compliance"] = "Hours-of-Service Compliance",
+        ["HOS Compliance"] = "Hours-of-Service Compliance",
+        ["Driver Fitness"] = "Driver Fitness",
+        ["Controlled Substances/Alcohol"] = "Controlled Substances/Alcohol",
+        ["Controlled Substance/Alcohol"] = "Controlled Substances/Alcohol",
+        ["Drugs/Alcohol"] = "Controlled Substances/Alcohol",
+        ["Vehicle Maintenance"] = "Vehicle Maintenance",
+    };
     private static readonly IReadOnlyDictionary<string, string> WeatherConditions = new Dictionary<string, string>
     {
         ["1"] = "No adverse conditions",
@@ -224,7 +237,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             DataRefreshedAt = new[] { carrier?.ImportedAt, scoringRun?.GeneratedAt, inspections.Select(i => (DateTime?)i.ImportedAt).Max(), violations.Select(v => (DateTime?)v.ImportedAt).Max(), crashes.Select(c => (DateTime?)c.ImportedAt).Max() }
                 .Where(d => d.HasValue)
                 .Max(),
-            Iss = BuildIssPlaceholder(),
+            Iss = BuildIss(basics),
             SummaryFlags = flags,
             Basics = basics,
             Oos = oos,
@@ -317,6 +330,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         List<Dictionary<string, JsonElement>> violationRows;
         List<Dictionary<string, JsonElement>> crashRows;
         (string Source, List<Dictionary<string, JsonElement>> Rows) smsRows;
+        List<Dictionary<string, JsonElement>> qcMobileBasicRows;
 
         try
         {
@@ -327,6 +341,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 ct);
             crashRows = await _socrata.GetCrashesByDotAsync(dotNumber, ct);
             smsRows = await _socrata.GetSmsScoresByDotAsync(dotNumber, ct);
+            qcMobileBasicRows = await _socrata.GetQcMobileBasicsByDotAsync(dotNumber, ct);
         }
         catch (HttpRequestException ex)
         {
@@ -350,6 +365,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             violationCount = await UpsertViolationsAsync(dotNumber, inspectionRows, violationRows, now, ct);
             crashCount = await UpsertCrashesAsync(dotNumber, crashRows, now, ct);
             await UpsertOfficialSmsScoresAsync(dotNumber, snapshotMonth, smsRows.Source, smsRows.Rows, now, ct);
+            await UpsertQcMobileBasicScoresAsync(dotNumber, snapshotMonth, qcMobileBasicRows, now, ct);
 
             await _db.SaveChangesAsync(ct);
         }
@@ -625,6 +641,44 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             score.Percentile = GetDecimal(row, smsBasic.Percentile);
             score.IsPrioritized = GetBool(row, smsBasic.Alert, smsBasic.RoadsideAlert, smsBasic.AlertCode);
             score.EventCount = GetInt(row, smsBasic.EventCount) ?? 0;
+            score.TrendDirection = "Flat";
+        }
+    }
+
+    private async Task UpsertQcMobileBasicScoresAsync(string dotNumber, string snapshotMonth, List<Dictionary<string, JsonElement>> rows, DateTime now, CancellationToken ct)
+    {
+        if (rows.Count == 0)
+            return;
+
+        var scoringRun = await _db.FmcsaScoringRuns
+            .Include(r => r.BasicScores)
+            .FirstOrDefaultAsync(r => r.UsDotNumber == dotNumber && r.SnapshotMonth == snapshotMonth, ct);
+        if (scoringRun == null)
+        {
+            scoringRun = new FmcsaScoringRun { UsDotNumber = dotNumber, SnapshotMonth = snapshotMonth };
+            _db.FmcsaScoringRuns.Add(scoringRun);
+        }
+
+        scoringRun.MethodologyVersion = $"{CurrentMethodologyVersion} - FMCSA QCMobile BASICs";
+        scoringRun.GeneratedAt = now;
+
+        foreach (var row in rows)
+        {
+            var basic = NormalizeQcMobileBasic(row);
+            if (string.IsNullOrWhiteSpace(basic))
+                continue;
+
+            var score = scoringRun.BasicScores.FirstOrDefault(s => s.Basic.Equals(basic, StringComparison.OrdinalIgnoreCase));
+            if (score == null)
+            {
+                score = new FmcsaBasicScore { Basic = basic };
+                scoringRun.BasicScores.Add(score);
+            }
+
+            score.Measure = GetDecimal(row, "measure", "basicMeasure", "performanceMeasure") ?? score.Measure;
+            score.Percentile = GetDecimal(row, "percentile", "basicPercentile", "performancePercentile");
+            score.IsPrioritized = GetBool(row, "rdDeficient", "rdsvDeficient", "svDeficient", "basicAlert", "alert") || score.IsPrioritized;
+            score.EventCount = GetInt(row, "totalViolation", "totalViolations", "totalInspectionWithViolation") ?? score.EventCount;
             score.TrendDirection = "Flat";
         }
     }
@@ -1243,12 +1297,40 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         return flags.Distinct().Take(6).ToList();
     }
 
-    private static AutoSafetyIssDto BuildIssPlaceholder() => new()
+    private static AutoSafetyIssDto BuildIss(List<AutoSafetyBasicDto> basics)
     {
-        Status = "Unknown",
-        Label = "ISS source pending",
-        Source = "Pending ISS source",
-    };
+        var officialPercentiles = basics
+            .Where(b => b.ScoreSource == "Official SMS" && b.Percentile.HasValue)
+            .Select(b => b.Percentile!.Value)
+            .ToList();
+
+        if (officialPercentiles.Count == 0)
+        {
+            return new AutoSafetyIssDto
+            {
+                Status = "Unknown",
+                Label = "ISS source pending",
+                Source = "Official ISS is not available from the public Socrata feed; configure FMCSA QCMobile to estimate from official BASIC percentiles.",
+            };
+        }
+
+        var score = (int)Math.Round(officialPercentiles.Max(), MidpointRounding.AwayFromZero);
+        var status = score >= 75 ? "Red" : score >= 50 ? "Yellow" : "Green";
+        var recommendation = status switch
+        {
+            "Red" => "Inspect",
+            "Yellow" => "Optional",
+            _ => "Pass",
+        };
+
+        return new AutoSafetyIssDto
+        {
+            Score = score,
+            Status = status,
+            Label = $"{recommendation} estimate",
+            Source = "SIMS estimate from official FMCSA BASIC percentiles; official ISS values require FMCSA ISS/Portal data.",
+        };
+    }
 
     private static string DetermineRiskLevel(List<AutoSafetyBasicDto> basics, AutoSafetyOosDto oos, List<AutoSafetyEventDto> severeEvents)
     {
@@ -1282,11 +1364,24 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var normalized = value.Trim();
         return normalized switch
         {
+            "Fatigued Driving" => "Hours-of-Service Compliance",
             "HOS Compliance" => "Hours-of-Service Compliance",
+            "Controlled Substance/Alcohol" => "Controlled Substances/Alcohol",
             "Controlled Substances" => "Controlled Substances/Alcohol",
+            "Drugs/Alcohol" => "Controlled Substances/Alcohol",
             "HM Compliance" => "Hazardous Materials Compliance",
             _ => normalized,
         };
+    }
+
+    private static string? NormalizeQcMobileBasic(Dictionary<string, JsonElement> row)
+    {
+        var basicName = GetString(row, "basicDesc", "basicShortDesc", "basic", "basicName");
+        var normalized = NormalizeBasic(basicName);
+        if (!string.IsNullOrWhiteSpace(normalized) && QcMobileBasicNames.TryGetValue(normalized, out var match))
+            return match;
+
+        return normalized != null && QcMobileBasicNames.TryGetValue(normalized, out match) ? match : null;
     }
 
     private static string? GetString(Dictionary<string, JsonElement> row, params string[] names)
