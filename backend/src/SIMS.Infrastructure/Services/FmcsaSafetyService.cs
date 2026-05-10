@@ -224,6 +224,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             DataRefreshedAt = new[] { carrier?.ImportedAt, scoringRun?.GeneratedAt, inspections.Select(i => (DateTime?)i.ImportedAt).Max(), violations.Select(v => (DateTime?)v.ImportedAt).Max(), crashes.Select(c => (DateTime?)c.ImportedAt).Max() }
                 .Where(d => d.HasValue)
                 .Max(),
+            Iss = BuildIssPlaceholder(),
             SummaryFlags = flags,
             Basics = basics,
             Oos = oos,
@@ -1241,6 +1242,13 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         if (scoringRun == null) flags.Add("Calculated score not available");
         return flags.Distinct().Take(6).ToList();
     }
+
+    private static AutoSafetyIssDto BuildIssPlaceholder() => new()
+    {
+        Status = "Unknown",
+        Label = "ISS source pending",
+        Source = "Pending ISS source",
+    };
 
     private static string DetermineRiskLevel(List<AutoSafetyBasicDto> basics, AutoSafetyOosDto oos, List<AutoSafetyEventDto> severeEvents)
     {

@@ -12,6 +12,7 @@ public class AutoSafetySummaryDto
     public int? PowerUnits { get; set; }
     public int? DriverCount { get; set; }
     public DateTime? DataRefreshedAt { get; set; }
+    public AutoSafetyIssDto Iss { get; set; } = new();
     public List<string> SummaryFlags { get; set; } = new();
     public List<AutoSafetyBasicDto> Basics { get; set; } = new();
     public AutoSafetyOosDto Oos { get; set; } = new();
@@ -42,6 +43,14 @@ public class AutoSafetyBasicDto
     public int OutOfServiceCount { get; set; }
     public string TrendDirection { get; set; } = "Flat";
     public string ScoreSource { get; set; } = "SIMS signal";
+}
+
+public class AutoSafetyIssDto
+{
+    public int? Score { get; set; }
+    public string Status { get; set; } = "Unknown";
+    public string? Label { get; set; }
+    public string Source { get; set; } = "Pending ISS source";
 }
 
 public class AutoSafetyOosDto

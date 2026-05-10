@@ -4,7 +4,7 @@ import axios from 'axios'
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
-import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
+import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyIss, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
 
 type Props = {
   quoteId: string
@@ -123,11 +123,12 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-3">
         <Metric label="Carrier" value={data.carrierName ?? 'Unknown'} />
         <Metric label="USDOT" value={data.usDotNumber ?? 'None'} />
         <Metric label="Power Units" value={data.powerUnits?.toLocaleString() ?? '-'} />
         <Metric label="Drivers" value={data.driverCount?.toLocaleString() ?? '-'} />
+        <IssStoplight iss={data.iss} />
       </div>
 
       {data.summaryFlags.length > 0 && (
@@ -307,12 +308,39 @@ function OosMetric({ label, count, oosCount, rate, onClick }: { label: string; c
   )
 }
 
+function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
+  const status = iss?.status ?? 'Unknown'
+  const lights = [
+    { key: 'Red', className: status === 'Red' ? 'bg-red-500' : 'bg-slate-200' },
+    { key: 'Yellow', className: status === 'Yellow' ? 'bg-amber-400' : 'bg-slate-200' },
+    { key: 'Green', className: status === 'Green' ? 'bg-emerald-500' : 'bg-slate-200' },
+  ]
+  return (
+    <div className="rounded border bg-white p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-[11px] font-semibold uppercase text-slate-500">ISS</div>
+          <div className="mt-1 truncate text-sm font-semibold text-slate-800" title={iss?.label ?? 'Pending'}>
+            {iss?.score == null ? 'Pending' : iss.score}
+          </div>
+        </div>
+        <div className="flex h-12 w-7 flex-col items-center justify-center gap-1 rounded border border-slate-300 bg-slate-50">
+          {lights.map((light) => <span key={light.key} className={`h-2.5 w-2.5 rounded-full ${light.className}`} />)}
+        </div>
+      </div>
+      <div className="mt-1 truncate text-[11px] text-slate-400" title={iss?.label ?? iss?.source ?? 'Pending ISS source'}>
+        {iss?.label ?? iss?.source ?? 'Pending ISS source'}
+      </div>
+    </div>
+  )
+}
+
 function BasicKpiTile({ basic, onClick }: { basic: AutoSafetyBasic; onClick: () => void }) {
   const risk = getBasicRisk(basic)
-  const dialValue = basic.percentile ?? risk.value
-  const color = risk.color === 'red' ? '#dc2626' : risk.color === 'yellow' ? '#d97706' : '#059669'
-  const bgColor = risk.color === 'red' ? 'bg-red-50' : risk.color === 'yellow' ? 'bg-amber-50' : 'bg-emerald-50'
-  const textColor = risk.color === 'red' ? 'text-red-700' : risk.color === 'yellow' ? 'text-amber-700' : 'text-emerald-700'
+  const dialValue = risk.value
+  const color = risk.color === 'red' ? '#dc2626' : risk.color === 'yellow' ? '#d97706' : risk.color === 'green' ? '#059669' : '#94a3b8'
+  const bgColor = risk.color === 'red' ? 'bg-red-50' : risk.color === 'yellow' ? 'bg-amber-50' : risk.color === 'green' ? 'bg-emerald-50' : 'bg-slate-50'
+  const textColor = risk.color === 'red' ? 'text-red-700' : risk.color === 'yellow' ? 'text-amber-700' : risk.color === 'green' ? 'text-emerald-700' : 'text-slate-500'
   const dash = `${Math.max(0, Math.min(100, dialValue))}, 100`
 
   return (
@@ -327,7 +355,7 @@ function BasicKpiTile({ basic, onClick }: { basic: AutoSafetyBasic; onClick: () 
             <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e2e8f0" strokeWidth="4" />
             <circle cx="18" cy="18" r="15.5" fill="none" stroke={color} strokeWidth="4" strokeDasharray={dash} pathLength="100" strokeLinecap="round" />
           </svg>
-          <span className={`absolute text-[10px] font-bold ${textColor}`}>{basic.percentile == null ? risk.label : `${Math.round(basic.percentile)}`}</span>
+          <span className={`absolute text-[10px] font-bold ${textColor}`}>{risk.label}</span>
         </div>
       </div>
       <div className="mt-2 flex items-center gap-1 text-xs">
@@ -343,12 +371,15 @@ function BasicKpiTile({ basic, onClick }: { basic: AutoSafetyBasic; onClick: () 
   )
 }
 
-function getBasicRisk(basic: AutoSafetyBasic): { color: 'green' | 'yellow' | 'red'; value: number; label: string; status: string } {
+function getBasicRisk(basic: AutoSafetyBasic): { color: 'green' | 'yellow' | 'red' | 'gray'; value: number; label: string; status: string } {
   if (basic.isPrioritized) return { color: 'red', value: 100, label: '!', status: 'Alert' }
   if (basic.percentile != null) {
     if (basic.percentile >= 75) return { color: 'red', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'High' }
     if (basic.percentile >= 50) return { color: 'yellow', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Watch' }
     return { color: 'green', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Clear' }
+  }
+  if (basic.scoreSource === 'Official SMS' && basic.measure != null) {
+    return { color: 'gray', value: 0, label: 'N/A', status: 'Inconclusive' }
   }
 
   const eventPressure = Math.min(60, basic.eventCount * 1.5)

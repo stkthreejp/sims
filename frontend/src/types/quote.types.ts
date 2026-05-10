@@ -213,6 +213,13 @@ export interface AutoSafetyBasic {
   scoreSource: string
 }
 
+export interface AutoSafetyIss {
+  score: number | null
+  status: 'Unknown' | 'Green' | 'Yellow' | 'Red'
+  label: string | null
+  source: string
+}
+
 export interface AutoSafetyOos {
   inspectionCount: number
   overallOosCount: number
@@ -291,6 +298,7 @@ export interface AutoSafetySummary {
   powerUnits: number | null
   driverCount: number | null
   dataRefreshedAt: string | null
+  iss: AutoSafetyIss
   summaryFlags: string[]
   basics: AutoSafetyBasic[]
   oos: AutoSafetyOos
