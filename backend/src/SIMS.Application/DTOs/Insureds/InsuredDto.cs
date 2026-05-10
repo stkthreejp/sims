@@ -26,6 +26,15 @@ public class InsuredDto
     public string State { get; set; } = string.Empty;
     public string ZipCode { get; set; } = string.Empty;
     public string? County { get; set; }
+    [Range(-90, 90)]
+    public decimal? Latitude { get; set; }
+
+    [Range(-180, 180)]
+    public decimal? Longitude { get; set; }
+    public string? GeocodePrecision { get; set; }
+    public string? GeocodeProvider { get; set; }
+    public string? GooglePlaceId { get; set; }
+    public DateTime? GeocodedAt { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public int PolicyCount { get; set; }
@@ -87,6 +96,18 @@ public class InsuredCreateDto
 
     [MaxLength(100)]
     public string? County { get; set; }
+
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
+
+    [MaxLength(50)]
+    public string? GeocodePrecision { get; set; }
+
+    [MaxLength(50)]
+    public string? GeocodeProvider { get; set; }
+
+    [MaxLength(200)]
+    public string? GooglePlaceId { get; set; }
 }
 
 public class InsuredUpdateDto : InsuredCreateDto

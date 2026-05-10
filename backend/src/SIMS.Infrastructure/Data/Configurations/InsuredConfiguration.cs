@@ -24,6 +24,12 @@ public class InsuredConfiguration : IEntityTypeConfiguration<Insured>
         builder.Property(i => i.State).IsRequired().HasMaxLength(2);
         builder.Property(i => i.ZipCode).IsRequired().HasMaxLength(10);
         builder.Property(i => i.County).HasMaxLength(100);
+        builder.Property(i => i.Latitude).HasColumnName("latitude").HasPrecision(9, 6);
+        builder.Property(i => i.Longitude).HasColumnName("longitude").HasPrecision(9, 6);
+        builder.Property(i => i.GeocodePrecision).HasColumnName("geocode_precision").HasMaxLength(50);
+        builder.Property(i => i.GeocodeProvider).HasColumnName("geocode_provider").HasMaxLength(50);
+        builder.Property(i => i.GooglePlaceId).HasColumnName("google_place_id").HasMaxLength(200);
+        builder.Property(i => i.GeocodedAt).HasColumnName("geocoded_at");
         builder.Property(i => i.OperationType).HasColumnName("operation_type").HasMaxLength(200);
         builder.Property(i => i.UsDotNumber).HasColumnName("us_dot_number").HasMaxLength(20);
         builder.Property(i => i.CreditScore).HasColumnName("credit_score");

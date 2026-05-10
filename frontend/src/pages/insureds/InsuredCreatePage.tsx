@@ -98,12 +98,24 @@ export function InsuredCreatePage() {
           <input type="hidden" {...register('addressLine1', { required: 'Required' })} />
           <AddressAutocomplete
             value={addressLine1Value}
-            onChange={(val) => setValue('addressLine1', val, { shouldValidate: true })}
-            onSelect={({ addressLine1, city, state, zipCode }) => {
+            onChange={(val) => {
+              setValue('addressLine1', val, { shouldValidate: true })
+              setValue('latitude', undefined)
+              setValue('longitude', undefined)
+              setValue('geocodePrecision', undefined)
+              setValue('geocodeProvider', undefined)
+              setValue('googlePlaceId', undefined)
+            }}
+            onSelect={({ addressLine1, city, state, zipCode, latitude, longitude, geocodePrecision, geocodeProvider, googlePlaceId }) => {
               setValue('addressLine1', addressLine1, { shouldValidate: true })
               setValue('city', city, { shouldValidate: true })
               if (state) setValue('state', state)
               setValue('zipCode', zipCode, { shouldValidate: true })
+              setValue('latitude', latitude)
+              setValue('longitude', longitude)
+              setValue('geocodePrecision', geocodePrecision)
+              setValue('geocodeProvider', geocodeProvider)
+              setValue('googlePlaceId', googlePlaceId)
             }}
             hasError={!!errors.addressLine1}
             className="mb-2"

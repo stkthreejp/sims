@@ -34,6 +34,12 @@ public class Insured : BaseEntity
     public string State { get; set; } = string.Empty;
     public string ZipCode { get; set; } = string.Empty;
     public string? County { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
+    public string? GeocodePrecision { get; set; }
+    public string? GeocodeProvider { get; set; }
+    public string? GooglePlaceId { get; set; }
+    public DateTime? GeocodedAt { get; set; }
 
     public bool IsActive { get; set; } = true;
     public Guid CreatedById { get; set; }

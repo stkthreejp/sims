@@ -47,6 +47,12 @@ export interface Insured {
   state: string
   zipCode: string
   county: string | null
+  latitude: number | null
+  longitude: number | null
+  geocodePrecision: string | null
+  geocodeProvider: string | null
+  googlePlaceId: string | null
+  geocodedAt: string | null
   isActive: boolean
   createdAt: string
   policyCount: number
@@ -72,6 +78,11 @@ export interface InsuredCreate {
   state: string
   zipCode: string
   county?: string
+  latitude?: number
+  longitude?: number
+  geocodePrecision?: string
+  geocodeProvider?: string
+  googlePlaceId?: string
 }
 
 export interface InsuredUpdate extends InsuredCreate {

@@ -28,6 +28,13 @@ function fmtMoneyK(n: number | null | undefined): string {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
+function staticMapUrl(lat: number, lng: number) {
+  const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  if (!key) return null
+  const center = `${lat},${lng}`
+  return `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=14&size=520x160&scale=2&markers=color:blue%7C${center}&key=${key}`
+}
+
 function initials(name: string): string {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
@@ -499,6 +506,32 @@ export function InsuredDetailPage() {
               <Field label="Mailing">
                 <span style={{ color: 'var(--ink-3)' }}>Same as above</span>
               </Field>
+              {insured.latitude != null && insured.longitude != null && (
+                <div style={{ border: '1px solid var(--line-2)', borderRadius: 'var(--r)', overflow: 'hidden', background: 'var(--surface-2)' }}>
+                  {staticMapUrl(insured.latitude, insured.longitude) ? (
+                    <img
+                      src={staticMapUrl(insured.latitude, insured.longitude)!}
+                      alt="Insured location map"
+                      style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <div style={{ height: 96, display: 'grid', placeItems: 'center', color: 'var(--ink-4)', fontSize: 12.5 }}>
+                      Location cached
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 10px', fontSize: 11.5, color: 'var(--ink-3)' }}>
+                    <span>{insured.geocodePrecision ?? insured.geocodeProvider ?? 'Geocoded'}</span>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${insured.latitude},${insured.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: 'var(--accent-ink)', fontWeight: 600, textDecoration: 'none' }}
+                    >
+                      Open map
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Card>

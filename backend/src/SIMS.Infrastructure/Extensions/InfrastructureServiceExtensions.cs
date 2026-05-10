@@ -68,6 +68,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IInsuredService, InsuredService>();
+        services.AddScoped<IGeocodingService, GoogleGeocodingService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<IQuoteChecklistService, QuoteChecklistService>();
         services.AddScoped<IQuoteService, QuoteService>();
@@ -146,6 +147,12 @@ public static class InfrastructureServiceExtensions
         {
             c.BaseAddress = new Uri("https://vpic.nhtsa.dot.gov");
             c.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddHttpClient("google_geocoding", c =>
+        {
+            c.BaseAddress = new Uri("https://maps.googleapis.com");
+            c.Timeout = TimeSpan.FromSeconds(
+                int.TryParse(configuration["HttpClients:GoogleGeocodingTimeoutSeconds"], out var googleTimeout) ? googleTimeout : 10);
         });
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();

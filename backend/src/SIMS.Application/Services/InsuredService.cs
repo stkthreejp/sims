@@ -4,6 +4,7 @@ using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace SIMS.Application.Services;
 
@@ -106,6 +107,7 @@ public class InsuredService : IInsuredService
             County = dto.County,
             CreatedById = createdById,
         };
+        await ApplyGeocodeAsync(insured, dto);
 
         db.Set<Insured>().Add(insured);
         await db.SaveChangesAsync();
@@ -119,6 +121,13 @@ public class InsuredService : IInsuredService
         var insured = await db.Set<Insured>().FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted);
         if (insured == null)
             return Result<InsuredDto>.Failure("NOT_FOUND", "Insured not found.");
+
+        var addressChanged =
+            !string.Equals(insured.AddressLine1, dto.AddressLine1, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(insured.AddressLine2 ?? string.Empty, dto.AddressLine2 ?? string.Empty, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(insured.City, dto.City, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(insured.State, dto.State, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(insured.ZipCode, dto.ZipCode, StringComparison.OrdinalIgnoreCase);
 
         insured.InsuredType = dto.InsuredType;
         insured.FirstName = dto.FirstName;
@@ -138,6 +147,8 @@ public class InsuredService : IInsuredService
         insured.County = dto.County;
         insured.IsActive = dto.IsActive;
         insured.UpdatedAt = DateTime.UtcNow;
+        if (addressChanged || dto.Latitude.HasValue || dto.Longitude.HasValue || !insured.Latitude.HasValue || !insured.Longitude.HasValue)
+            await ApplyGeocodeAsync(insured, dto, clearOnMiss: addressChanged);
 
         await db.SaveChangesAsync();
 
@@ -178,6 +189,12 @@ public class InsuredService : IInsuredService
         State = i.State,
         ZipCode = i.ZipCode,
         County = i.County,
+        Latitude = i.Latitude,
+        Longitude = i.Longitude,
+        GeocodePrecision = i.GeocodePrecision,
+        GeocodeProvider = i.GeocodeProvider,
+        GooglePlaceId = i.GooglePlaceId,
+        GeocodedAt = i.GeocodedAt,
         IsActive = i.IsActive,
         CreatedAt = i.CreatedAt,
         PolicyCount = i.Submissions?.Count ?? 0
@@ -188,5 +205,44 @@ public class InsuredService : IInsuredService
         if (string.IsNullOrWhiteSpace(value)) return null;
         var digits = new string(value.Where(char.IsDigit).ToArray());
         return string.IsNullOrWhiteSpace(digits) ? null : digits;
+    }
+
+    private async Task ApplyGeocodeAsync(Insured insured, InsuredCreateDto dto, bool clearOnMiss = false)
+    {
+        if (dto.Latitude.HasValue && dto.Longitude.HasValue)
+        {
+            insured.Latitude = dto.Latitude.Value;
+            insured.Longitude = dto.Longitude.Value;
+            insured.GeocodePrecision = dto.GeocodePrecision;
+            insured.GeocodeProvider = string.IsNullOrWhiteSpace(dto.GeocodeProvider) ? "GooglePlaces" : dto.GeocodeProvider;
+            insured.GooglePlaceId = dto.GooglePlaceId;
+            insured.GeocodedAt = DateTime.UtcNow;
+            return;
+        }
+
+        var geocoder = _serviceProvider.GetService<IGeocodingService>();
+        var result = geocoder == null
+            ? null
+            : await geocoder.GeocodeAsync(new GeocodeRequest(dto.AddressLine1, dto.AddressLine2, dto.City, dto.State, dto.ZipCode));
+        if (result != null)
+        {
+            insured.Latitude = result.Latitude;
+            insured.Longitude = result.Longitude;
+            insured.GeocodePrecision = result.Precision;
+            insured.GeocodeProvider = result.Provider;
+            insured.GooglePlaceId = result.GooglePlaceId;
+            insured.GeocodedAt = DateTime.UtcNow;
+            return;
+        }
+
+        if (!clearOnMiss)
+            return;
+
+        insured.Latitude = null;
+        insured.Longitude = null;
+        insured.GeocodePrecision = null;
+        insured.GeocodeProvider = null;
+        insured.GooglePlaceId = null;
+        insured.GeocodedAt = null;
     }
 }

@@ -5,6 +5,11 @@ export interface AddressComponents {
   city: string
   state: string
   zipCode: string
+  latitude?: number
+  longitude?: number
+  geocodePrecision?: string
+  geocodeProvider?: string
+  googlePlaceId?: string
 }
 
 interface Props {
@@ -74,7 +79,7 @@ export function AddressAutocomplete({
     const autocomplete = new g.maps.places.Autocomplete(inputRef.current, {
       types: ['address'],
       componentRestrictions: { country: 'us' },
-      fields: ['address_components'],
+      fields: ['address_components', 'geometry', 'place_id', 'types'],
     })
 
     const listener = autocomplete.addListener('place_changed', () => {
@@ -94,9 +99,23 @@ export function AddressAutocomplete({
       const state = get('administrative_area_level_1')?.short_name ?? ''
       const zipCode = get('postal_code')?.long_name ?? ''
       const addressLine1 = [streetNumber, route].filter(Boolean).join(' ')
+      const location = place.geometry?.location
+      const latitude = location ? location.lat() : undefined
+      const longitude = location ? location.lng() : undefined
+      const precision = Array.isArray(place.types) && place.types.length > 0 ? place.types[0] : undefined
 
       onChange(addressLine1)
-      onSelect({ addressLine1, city, state, zipCode })
+      onSelect({
+        addressLine1,
+        city,
+        state,
+        zipCode,
+        latitude,
+        longitude,
+        geocodePrecision: precision,
+        geocodeProvider: latitude != null && longitude != null ? 'GooglePlaces' : undefined,
+        googlePlaceId: place.place_id,
+      })
     })
 
     return () => {
