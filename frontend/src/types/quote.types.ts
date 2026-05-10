@@ -322,6 +322,13 @@ export interface AutoSafetyRefresh {
   refreshedAt: string
 }
 
+export interface FmcsaAnalyticsRefresh {
+  snapshotMonth: string
+  carrierCount: number
+  basicMeasureCount: number
+  refreshedAt: string
+}
+
 export interface Attachment {
   id: string
   quoteId: string

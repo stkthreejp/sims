@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail } from '@/types/quote.types'
+import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail, FmcsaAnalyticsRefresh } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const quotesApi = {
@@ -47,6 +47,9 @@ export const quotesApi = {
 
   refreshAutoSafety: (id: string) =>
     apiClient.post<AutoSafetyRefresh>(`/quotes/${id}/auto-safety/refresh`).then((r) => r.data),
+
+  refreshOfficialSmsAnalyticsSample: () =>
+    apiClient.post<FmcsaAnalyticsRefresh>('/fmcsa/analytics/refresh-official-sms', null, { params: { maxRowsPerDataset: 5000 } }).then((r) => r.data),
 
   delete: (id: string) =>
     apiClient.delete(`/quotes/${id}`),
