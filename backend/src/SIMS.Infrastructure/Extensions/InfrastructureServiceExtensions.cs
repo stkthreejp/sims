@@ -121,6 +121,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IShadowRatingService, ShadowRatingService>();
         services.AddScoped<IUWWriteupService, UWWriteupService>();
         services.AddScoped<IFmcsaSafetyService, FmcsaSafetyService>();
+        services.AddScoped<IFmcsaSafetyAnalyticsService, FmcsaSafetyAnalyticsService>();
         services.AddScoped<FmcsaSocrataClient>();
         services.AddHttpClient("gemini", c => c.Timeout = TimeSpan.FromSeconds(
             int.TryParse(configuration["HttpClients:GeminiTimeoutSeconds"], out var geminiTimeout) ? geminiTimeout : 60));

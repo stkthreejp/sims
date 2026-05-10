@@ -3,12 +3,14 @@ using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Fmcsa;
+using SIMS.Domain.Entities.FmcsaAnalytics;
 using SIMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace SIMS.Infrastructure.Services;
 
@@ -141,13 +143,15 @@ public class FmcsaSafetyService : IFmcsaSafetyService
     private readonly FmcsaSocrataClient _socrata;
     private readonly ILogger<FmcsaSafetyService> _logger;
     private readonly IHttpClientFactory _httpFactory;
+    private readonly IServiceProvider _serviceProvider;
 
-    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata, ILogger<FmcsaSafetyService> logger, IHttpClientFactory httpFactory)
+    public FmcsaSafetyService(ApplicationDbContext db, FmcsaSocrataClient socrata, ILogger<FmcsaSafetyService> logger, IHttpClientFactory httpFactory, IServiceProvider serviceProvider)
     {
         _db = db;
         _socrata = socrata;
         _logger = logger;
         _httpFactory = httpFactory;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<Result<AutoSafetySummaryDto>> GetQuoteAutoSafetyAsync(Guid quoteId, CancellationToken ct = default)
@@ -183,6 +187,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .OrderByDescending(r => r.SnapshotMonth)
             .ThenByDescending(r => r.GeneratedAt)
             .FirstOrDefaultAsync(ct);
+        var analyticsScores = await GetAnalyticsBasicScoresAsync(dotNumber, ct);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var windowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-24));
@@ -217,7 +222,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             });
         }
 
-        var basics = BuildBasics(scoringRun, violations);
+        var basics = BuildBasics(scoringRun, analyticsScores, violations);
         var oos = BuildOos(inspections, violations);
         var accidentSummary = BuildAccidentSummary(crashes, carrier?.PowerUnits);
         var hotspots = BuildHotspots(inspections, violations);
@@ -696,13 +701,35 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         }
     }
 
-    private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaViolation> violations)
+    private async Task<List<FmcsaBasicPeerMeasure>> GetAnalyticsBasicScoresAsync(string dotNumber, CancellationToken ct)
+    {
+        var analyticsDb = _serviceProvider.GetService<SafetyAnalyticsDbContext>();
+        if (analyticsDb == null)
+            return [];
+
+        var latestSnapshot = await analyticsDb.FmcsaBasicPeerMeasures
+            .Where(m => m.UsDotNumber == dotNumber)
+            .OrderByDescending(m => m.SnapshotMonth)
+            .Select(m => m.SnapshotMonth)
+            .FirstOrDefaultAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(latestSnapshot))
+            return [];
+
+        return await analyticsDb.FmcsaBasicPeerMeasures
+            .AsNoTracking()
+            .Where(m => m.UsDotNumber == dotNumber && m.SnapshotMonth == latestSnapshot)
+            .ToListAsync(ct);
+    }
+
+    private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaBasicPeerMeasure> analyticsScores, List<FmcsaViolation> violations)
     {
         var recentStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-12));
         var grouped = violations
             .Where(v => !string.IsNullOrWhiteSpace(v.Basic))
             .GroupBy(v => v.Basic!)
             .ToDictionary(g => g.Key, g => g.ToList());
+        var analytics = analyticsScores.ToDictionary(s => s.Basic, StringComparer.OrdinalIgnoreCase);
 
         if (scoringRun?.BasicScores.Count > 0)
         {
@@ -710,14 +737,22 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             return Basics.Select(b =>
                 {
                     officialScores.TryGetValue(b, out var score);
+                    analytics.TryGetValue(b, out var peerScore);
                     grouped.TryGetValue(b, out var events);
                     events ??= [];
                     var recentEvents = events.Where(v => v.Inspection.InspectionDate >= recentStart).ToList();
+                    var source = score?.Percentile != null
+                        ? "Official SMS"
+                        : peerScore?.SimsPercentile != null
+                            ? "SIMS peer percentile"
+                            : score != null
+                                ? "Official SMS measure"
+                                : "SIMS signal";
                     return new AutoSafetyBasicDto
                     {
                         Basic = b,
-                        Measure = score?.Measure,
-                        Percentile = score?.Percentile,
+                        Measure = score?.Measure ?? peerScore?.OfficialMeasure ?? peerScore?.SimsMeasure,
+                        Percentile = score?.Percentile ?? peerScore?.SimsPercentile,
                         IsPrioritized = score?.IsPrioritized ?? false,
                         EventCount = score?.EventCount > 0
                             ? score.EventCount
@@ -726,7 +761,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                         RecentEventCount = recentEvents.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
                         RecentOutOfServiceCount = recentEvents.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
                         TrendDirection = score?.TrendDirection ?? "Flat",
-                        ScoreSource = score == null ? "SIMS signal" : "Official SMS",
+                        ScoreSource = source,
                     };
                 })
                 .OrderByDescending(s => s.IsPrioritized)
@@ -737,18 +772,21 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
         return Basics.Select(b =>
         {
+            analytics.TryGetValue(b, out var peerScore);
             grouped.TryGetValue(b, out var events);
             events ??= [];
             var recentEvents = events.Where(v => v.Inspection.InspectionDate >= recentStart).ToList();
             return new AutoSafetyBasicDto
                 {
                     Basic = b,
+                    Measure = peerScore?.OfficialMeasure ?? peerScore?.SimsMeasure,
+                    Percentile = peerScore?.SimsPercentile,
                     EventCount = events.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
                     OutOfServiceCount = events.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
                     RecentEventCount = recentEvents.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
                     RecentOutOfServiceCount = recentEvents.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
                     TrendDirection = "Flat",
-                    ScoreSource = "SIMS signal",
+                    ScoreSource = peerScore?.SimsPercentile != null ? "SIMS peer percentile" : "SIMS signal",
                 };
         }).ToList();
     }
@@ -1311,15 +1349,18 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             return BuildIssResult(100, "Safety", "FMCSA BASIC alert or serious violation indicator present.");
         }
 
-        var officialPercentiles = basics
-            .Where(b => b.ScoreSource == "Official SMS" && b.Percentile.HasValue)
+        var availablePercentiles = basics
+            .Where(b => b.Percentile.HasValue)
             .Select(b => b.Percentile!.Value)
             .ToList();
 
-        if (officialPercentiles.Count > 0)
+        if (availablePercentiles.Count > 0)
         {
-            var score = Math.Clamp((int)Math.Round(officialPercentiles.Max(), MidpointRounding.AwayFromZero), 1, 100);
-            return BuildIssResult(score, "Safety", "Estimated from the highest official FMCSA BASIC percentile available.");
+            var score = Math.Clamp((int)Math.Round(availablePercentiles.Max(), MidpointRounding.AwayFromZero), 1, 100);
+            var source = basics.Any(b => b.ScoreSource == "Official SMS" && b.Percentile.HasValue)
+                ? "the highest official FMCSA BASIC percentile available"
+                : "the highest SIMS peer percentile available";
+            return BuildIssResult(score, "Safety", $"Estimated from {source}.");
         }
 
         if (carrier?.PowerUnits is int powerUnits)
