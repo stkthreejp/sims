@@ -224,9 +224,9 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             });
         }
 
-        var basics = BuildBasics(scoringRun, analyticsScores, violations);
         var oos = BuildOos(inspections, violations);
         var accidentSummary = BuildAccidentSummary(crashes, carrier?.PowerUnits);
+        var basics = BuildBasics(scoringRun, analyticsScores, violations, accidentSummary);
         var hotspots = BuildHotspots(inspections, violations);
         var severeEvents = BuildSevereEvents(violations);
         var flags = BuildFlags(basics, oos, carrier, scoringRun);
@@ -728,7 +728,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .ToListAsync(ct);
     }
 
-    private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaBasicPeerMeasure> analyticsScores, List<FmcsaViolation> violations)
+    private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaBasicPeerMeasure> analyticsScores, List<FmcsaViolation> violations, AutoSafetyAccidentSummaryDto accidentSummary)
     {
         var recentStart = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-12));
         var grouped = violations
@@ -740,16 +740,19 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         if (scoringRun?.BasicScores.Count > 0)
         {
             var officialScores = scoringRun.BasicScores.ToDictionary(s => s.Basic, StringComparer.OrdinalIgnoreCase);
-            return Basics.Select(b =>
+            var basics = Basics.Select(b =>
                 {
                     officialScores.TryGetValue(b, out var score);
                     analytics.TryGetValue(b, out var peerScore);
                     grouped.TryGetValue(b, out var events);
                     events ??= [];
                     var recentEvents = events.Where(v => v.Inspection.InspectionDate >= recentStart).ToList();
+                    var peerPercentile = HasUsablePeerScore(peerScore, events)
+                        ? peerScore?.SimsPercentile
+                        : null;
                     var source = score?.Percentile != null
                         ? "Official SMS"
-                        : peerScore?.SimsPercentile != null
+                        : peerPercentile != null
                             ? "SIMS peer percentile"
                             : score != null
                                 ? "Official SMS measure"
@@ -758,7 +761,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     {
                         Basic = b,
                         Measure = score?.Measure ?? peerScore?.OfficialMeasure ?? peerScore?.SimsMeasure,
-                        Percentile = score?.Percentile ?? peerScore?.SimsPercentile,
+                        Percentile = score?.Percentile ?? peerPercentile,
                         IsPrioritized = score?.IsPrioritized ?? false,
                         EventCount = score?.EventCount > 0
                             ? score.EventCount
@@ -774,27 +777,69 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 .ThenByDescending(s => s.Percentile ?? 0)
                 .ThenBy(s => Array.IndexOf(Basics, s.Basic))
                 .ToList();
+
+            ApplyCrashIndicatorSignal(basics, accidentSummary);
+            return basics;
         }
 
-        return Basics.Select(b =>
+        var signalBasics = Basics.Select(b =>
         {
             analytics.TryGetValue(b, out var peerScore);
             grouped.TryGetValue(b, out var events);
             events ??= [];
             var recentEvents = events.Where(v => v.Inspection.InspectionDate >= recentStart).ToList();
+            var peerPercentile = HasUsablePeerScore(peerScore, events)
+                ? peerScore?.SimsPercentile
+                : null;
             return new AutoSafetyBasicDto
                 {
                     Basic = b,
                     Measure = peerScore?.OfficialMeasure ?? peerScore?.SimsMeasure,
-                    Percentile = peerScore?.SimsPercentile,
+                    Percentile = peerPercentile,
                     EventCount = events.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
                     OutOfServiceCount = events.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
                     RecentEventCount = recentEvents.Select(v => new { v.ReportNumber, Group = v.ViolationGroup ?? v.ViolationCode }).Distinct().Count(),
                     RecentOutOfServiceCount = recentEvents.Count(v => v.IsOutOfService || v.IsDriverDisqualifying),
                     TrendDirection = "Flat",
-                    ScoreSource = peerScore?.SimsPercentile != null ? "SIMS peer percentile" : "SIMS signal",
+                    ScoreSource = peerPercentile != null ? "SIMS peer percentile" : "SIMS signal",
                 };
         }).ToList();
+
+        ApplyCrashIndicatorSignal(signalBasics, accidentSummary);
+        return signalBasics;
+    }
+
+    private static void ApplyCrashIndicatorSignal(List<AutoSafetyBasicDto> basics, AutoSafetyAccidentSummaryDto accidentSummary)
+    {
+        if (accidentSummary.TotalReportableCount <= 0)
+            return;
+
+        var crash = basics.FirstOrDefault(b => b.Basic == "Crash Indicator");
+        if (crash == null || crash.Percentile.HasValue || crash.IsPrioritized)
+            return;
+
+        crash.EventCount = Math.Max(crash.EventCount, accidentSummary.TotalReportableCount);
+        crash.RecentEventCount = Math.Max(crash.RecentEventCount, accidentSummary.TotalReportableCount);
+        crash.Measure ??= accidentSummary.AccidentToPowerUnitRatio.HasValue
+            ? Math.Round(accidentSummary.AccidentToPowerUnitRatio.Value / 100m, 2)
+            : null;
+
+        if (crash.ScoreSource == "SIMS signal")
+            crash.ScoreSource = "SIMS crash signal";
+    }
+
+    private static bool HasUsablePeerScore(FmcsaBasicPeerMeasure? peerScore, List<FmcsaViolation> events)
+    {
+        if (peerScore?.SimsPercentile == null)
+            return false;
+
+        return events.Count > 0
+            || peerScore.ViolationCount > 0
+            || peerScore.InspectionWithViolationCount > 0
+            || peerScore.OutOfServiceCount > 0
+            || peerScore.WeightedViolationScore > 0
+            || (peerScore.OfficialMeasure ?? 0) > 0
+            || (peerScore.SimsMeasure ?? 0) > 0;
     }
 
     private static AutoSafetyOosDto BuildOos(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)

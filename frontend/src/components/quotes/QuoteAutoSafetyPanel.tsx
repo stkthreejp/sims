@@ -403,6 +403,10 @@ function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; 
 
 function getBasicRisk(basic: AutoSafetyBasic, powerUnits: number | null): { color: 'green' | 'yellow' | 'red' | 'gray'; value: number; label: string; status: string } {
   if (basic.isPrioritized) return { color: 'red', value: 100, label: '!', status: 'Alert' }
+  const hasNoEvents = basic.eventCount === 0 && basic.outOfServiceCount === 0 && basic.recentEventCount === 0 && basic.recentOutOfServiceCount === 0
+  if (basic.basic === 'Hazardous Materials Compliance' && hasNoEvents) {
+    return { color: 'gray', value: 0, label: 'N/A', status: 'Inconclusive' }
+  }
   if (basic.percentile != null) {
     if (basic.percentile >= 75) return { color: 'red', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'High' }
     if (basic.percentile >= 50) return { color: 'yellow', value: basic.percentile, label: `${Math.round(basic.percentile)}`, status: 'Watch' }
@@ -410,6 +414,13 @@ function getBasicRisk(basic: AutoSafetyBasic, powerUnits: number | null): { colo
   }
 
   const exposure = Math.max(1, powerUnits ?? 10)
+  if (basic.basic === 'Crash Indicator' && basic.eventCount > 0) {
+    const value = Math.min(100, Math.round((basic.eventCount / exposure) * 310))
+    if (value >= 75) return { color: 'red', value, label: `${value}`, status: 'SIMS signal' }
+    if (value >= 50) return { color: 'yellow', value, label: `${value}`, status: 'Watch' }
+    return { color: 'green', value, label: `${value}`, status: 'Signal' }
+  }
+
   const eventRate = basic.eventCount / exposure
   const oosRate = basic.outOfServiceCount / exposure
   const recentEventRate = basic.recentEventCount / exposure
