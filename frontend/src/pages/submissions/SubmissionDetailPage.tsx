@@ -31,12 +31,18 @@ import { usePermissions } from '@/hooks/usePermissions'
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const LOB_SHORT: Record<string, string> = {
-  CommercialAuto: 'Auto',
+  AutoLiability: 'AL',
+  AutoPhysicalDamage: 'APD',
+  CommercialAuto: 'CA',
   GeneralLiability: 'GL',
-  WorkersComp: 'WC',
   InlandMarine: 'IM',
+  WorkersCompensation: 'WC',
   Property: 'Prop',
-  Cargo: 'Cargo',
+  BusinessOwners: 'BOP',
+  ProfessionalLiability: 'PL',
+  Umbrella: 'UMB',
+  Cyber: 'CYB',
+  ExcessLiability: 'XS',
 }
 
 const AUTO_SAFETY_LOBS = new Set<PolicyLineOfBusiness>(['AutoLiability', 'AutoPhysicalDamage', 'CommercialAuto'])
@@ -570,6 +576,11 @@ export function SubmissionDetailPage() {
                   <div className="top">
                     <Link to={`/quotes/${q.id}`} className="carrier hover:underline">{q.carrierName}</Link>
                     <span className={`sd-pill ${QUOTE_STATUS_PILL[q.status]}`}>{QUOTE_STATUS_LABELS[q.status]}</span>
+                    <div className="prem" style={{ marginLeft: 'auto' }}>
+                      {q.totalPremium == null || q.totalPremium === 0
+                        ? <div className="v" style={{ color: 'var(--ink-4)' }}>—</div>
+                        : <div className="v">{fmtMoney(q.totalPremium)}</div>}
+                    </div>
                   </div>
                   <div className="meta">
                     <Link to={`/quotes/${q.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }} className="hover:underline">{q.quoteNumber}</Link>
@@ -577,11 +588,6 @@ export function SubmissionDetailPage() {
                     <span>{new Date(q.effectiveDate).toLocaleDateString()} → {new Date(q.expirationDate).toLocaleDateString()}</span>
                     {q.hasCommissionOverride && <><span className="sep">·</span><span style={{ color: 'var(--warn-fg)' }}>commission override</span></>}
                   </div>
-                </div>
-                <div className="prem">
-                  {q.totalPremium == null || q.totalPremium === 0
-                    ? <div className="v" style={{ color: 'var(--ink-4)' }}>—</div>
-                    : <div className="v">{fmtMoney(q.totalPremium)}</div>}
                 </div>
                 <div className="acts">
                   <button
