@@ -341,6 +341,7 @@ function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
 
 function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; powerUnits: number | null; onClick: () => void }) {
   const risk = getBasicRisk(basic, powerUnits)
+  const source = getBasicSourceLabel(basic.scoreSource)
   const dialValue = risk.value
   const color = risk.color === 'red' ? '#dc2626' : risk.color === 'yellow' ? '#d97706' : risk.color === 'green' ? '#059669' : '#94a3b8'
   const bgColor = risk.color === 'red' ? 'bg-red-50' : risk.color === 'yellow' ? 'bg-amber-50' : risk.color === 'green' ? 'bg-emerald-50' : 'bg-slate-50'
@@ -352,7 +353,9 @@ function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; 
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold text-slate-700" title={basic.basic}>{basic.basic}</div>
-          <div className="mt-1 text-[10px] font-semibold uppercase text-slate-400">{basic.scoreSource}</div>
+          <span className={`mt-1 inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${source.className}`}>
+            {source.label}
+          </span>
         </div>
         <div className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${bgColor}`}>
           <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
@@ -378,6 +381,16 @@ function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; 
       )}
     </button>
   )
+}
+
+function getBasicSourceLabel(source: string): { label: string; className: string } {
+  if (source === 'Official SMS' || source === 'Official SMS measure') {
+    return { label: 'Official', className: 'border-blue-200 bg-blue-50 text-blue-700' }
+  }
+  if (source === 'SIMS peer percentile') {
+    return { label: 'SIMS peer', className: 'border-violet-200 bg-violet-50 text-violet-700' }
+  }
+  return { label: 'SIMS signal', className: 'border-slate-200 bg-slate-50 text-slate-600' }
 }
 
 function getBasicRisk(basic: AutoSafetyBasic, powerUnits: number | null): { color: 'green' | 'yellow' | 'red' | 'gray'; value: number; label: string; status: string } {
