@@ -12,10 +12,12 @@ public class FmcsaInspectionConfiguration : IEntityTypeConfiguration<FmcsaInspec
         builder.HasKey(x => x.Id);
         builder.ConfigureBaseEntity();
         builder.Property(x => x.UsDotNumber).HasColumnName("us_dot_number").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.ExternalInspectionId).HasColumnName("external_inspection_id").HasMaxLength(20);
         builder.Property(x => x.ReportNumber).HasColumnName("report_number").HasMaxLength(50).IsRequired();
         builder.Property(x => x.InspectionDate).HasColumnName("inspection_date");
         builder.Property(x => x.State).HasColumnName("state").HasMaxLength(2);
         builder.Property(x => x.CountyCodeState).HasColumnName("county_code_state").HasMaxLength(50);
+        builder.Property(x => x.CountyCode).HasColumnName("county_code").HasMaxLength(10);
         builder.Property(x => x.InspectionCounty).HasColumnName("inspection_county").HasMaxLength(100);
         builder.Property(x => x.InspectionLocation).HasColumnName("inspection_location").HasMaxLength(200);
         builder.Property(x => x.InspectionFacility).HasColumnName("inspection_facility").HasMaxLength(50);
@@ -48,6 +50,7 @@ public class FmcsaInspectionConfiguration : IEntityTypeConfiguration<FmcsaInspec
         builder.Property(x => x.Vin2).HasColumnName("vin_2").HasMaxLength(50);
         builder.Property(x => x.ImportedAt).HasColumnName("imported_at");
         builder.HasIndex(x => new { x.UsDotNumber, x.InspectionDate });
+        builder.HasIndex(x => new { x.UsDotNumber, x.ExternalInspectionId });
         builder.HasIndex(x => new { x.UsDotNumber, x.ReportNumber }).IsUnique();
     }
 }

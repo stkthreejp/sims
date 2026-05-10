@@ -351,6 +351,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         }
 
         List<Dictionary<string, JsonElement>> carrierRows;
+        List<Dictionary<string, JsonElement>> vehicleInspectionRows;
         List<Dictionary<string, JsonElement>> inspectionRows;
         List<Dictionary<string, JsonElement>> violationRows;
         List<Dictionary<string, JsonElement>> crashRows;
@@ -360,6 +361,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         try
         {
             carrierRows = await _socrata.GetCensusByDotAsync(dotNumber, ct);
+            vehicleInspectionRows = await _socrata.GetVehicleInspectionFileByDotAsync(dotNumber, ct);
             inspectionRows = await _socrata.GetInspectionsByDotAsync(dotNumber, ct);
             violationRows = await _socrata.GetViolationsByInspectionIdsAsync(
                 inspectionRows.Select(r => GetString(r, "unique_id", "inspection_id")).Where(id => !string.IsNullOrWhiteSpace(id))!,
@@ -386,7 +388,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         try
         {
             carrierCount = await UpsertCarrierSnapshotsAsync(dotNumber, snapshotMonth, carrierRows, now, ct);
-            inspectionCount = await UpsertInspectionsAsync(dotNumber, inspectionRows, now, ct);
+            inspectionCount = await UpsertVehicleInspectionFileAsync(dotNumber, vehicleInspectionRows, now, ct);
+            inspectionCount += await UpsertInspectionsAsync(dotNumber, inspectionRows, now, ct);
             violationCount = await UpsertViolationsAsync(dotNumber, inspectionRows, violationRows, now, ct);
             crashCount = await UpsertCrashesAsync(dotNumber, crashRows, now, ct);
             await UpsertOfficialSmsScoresAsync(dotNumber, snapshotMonth, smsRows.Source, smsRows.Rows, now, ct);
@@ -471,6 +474,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                 _db.FmcsaInspections.Add(inspection);
             }
 
+            inspection.ExternalInspectionId ??= GetString(row, "unique_id", "inspection_id");
             inspection.InspectionDate = inspectionDate.Value;
             inspection.State = GetString(row, "state", "inspection_state", "insp_state", "report_state");
             inspection.CountyCodeState = GetString(row, "county_code_state", "county_code", "county");
@@ -495,6 +499,53 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             inspection.UnitLicense2 = GetString(row, "unit_license2", "unit_license_2");
             inspection.UnitLicenseState2 = GetString(row, "unit_license_state2", "unit_license_state_2");
             inspection.Vin2 = GetString(row, "vin2", "vin_2");
+            inspection.ImportedAt = now;
+            count++;
+        }
+
+        return count;
+    }
+
+    private async Task<int> UpsertVehicleInspectionFileAsync(string dotNumber, List<Dictionary<string, JsonElement>> rows, DateTime now, CancellationToken ct)
+    {
+        var count = 0;
+        foreach (var row in rows)
+        {
+            var reportNumber = GetString(row, "report_number");
+            if (string.IsNullOrWhiteSpace(reportNumber)) continue;
+
+            var inspectionDate = GetDate(row, "insp_date", "inspection_date");
+            if (inspectionDate == null) continue;
+
+            var inspection = await _db.FmcsaInspections
+                .FirstOrDefaultAsync(i => i.UsDotNumber == dotNumber && i.ReportNumber == reportNumber, ct);
+            if (inspection == null)
+            {
+                inspection = new FmcsaInspection { UsDotNumber = dotNumber, ReportNumber = reportNumber };
+                _db.FmcsaInspections.Add(inspection);
+            }
+
+            inspection.ExternalInspectionId = GetString(row, "inspection_id") ?? inspection.ExternalInspectionId;
+            inspection.InspectionDate = inspectionDate.Value;
+            inspection.State = GetString(row, "report_state") ?? inspection.State;
+            inspection.CountyCodeState = GetString(row, "county_code_state") ?? inspection.CountyCodeState;
+            inspection.CountyCode = GetString(row, "county_code") ?? inspection.CountyCode;
+            inspection.InspectionCounty = ResolveCountyName(inspection.CountyCodeState ?? inspection.State, inspection.CountyCode) ?? inspection.InspectionCounty;
+            inspection.InspectionLocation = GetString(row, "location_desc") ?? inspection.InspectionLocation;
+            inspection.InspectionFacility = FormatInspectionFacility(GetString(row, "insp_facility")) ?? inspection.InspectionFacility;
+            inspection.StartTime = FormatMilitaryTime(GetString(row, "insp_start_time")) ?? inspection.StartTime;
+            inspection.EndTime = FormatMilitaryTime(GetString(row, "insp_end_time")) ?? inspection.EndTime;
+            inspection.PostCrash = GetNullableBool(row, "post_acc_ind") ?? inspection.PostCrash;
+            inspection.HazmatPlacardRequired = GetNullableBool(row, "hazmat_placard_req") ?? inspection.HazmatPlacardRequired;
+            inspection.InspectionLevel = GetInt(row, "insp_level_id") ?? inspection.InspectionLevel;
+            inspection.InspectionLevelDescription = FormatInspectionLevel(inspection.InspectionLevel) ?? inspection.InspectionLevelDescription;
+            inspection.DriverOutOfService = GetInt(row, "driver_oos_total") is > 0 || inspection.DriverOutOfService;
+            inspection.VehicleOutOfService = GetInt(row, "vehicle_oos_total") is > 0 || inspection.VehicleOutOfService;
+            inspection.HazmatOutOfService = GetInt(row, "hazmat_oos_total") is > 0 || inspection.HazmatOutOfService;
+            inspection.DriverViolationCount = GetInt(row, "driver_viol_total") ?? inspection.DriverViolationCount;
+            inspection.VehicleViolationCount = GetInt(row, "vehicle_viol_total") ?? inspection.VehicleViolationCount;
+            inspection.HazmatViolationCount = GetInt(row, "hazmat_viol_total") ?? inspection.HazmatViolationCount;
+            inspection.DetailEnrichedAt = now;
             inspection.ImportedAt = now;
             count++;
         }
@@ -1418,6 +1469,11 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
     private static string BuildInspectionLocationLabel(FmcsaInspection inspection)
     {
+        if (!string.IsNullOrWhiteSpace(inspection.InspectionCounty))
+            return !string.IsNullOrWhiteSpace(inspection.State)
+                ? $"{inspection.InspectionCounty}, {inspection.State}"
+                : inspection.InspectionCounty;
+
         var state = inspection.State?.Trim().ToUpperInvariant();
         var countyCodeState = inspection.CountyCodeState?.Trim().ToUpperInvariant();
 
@@ -1425,6 +1481,35 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             return !string.IsNullOrWhiteSpace(state) ? $"{countyCodeState}, {state}" : countyCodeState;
 
         return !string.IsNullOrWhiteSpace(state) ? state : "Unknown";
+    }
+
+    private static string? ResolveCountyName(string? state, string? countyCode) =>
+        FmcsaCountyLookup.GetCountyName(state, countyCode);
+
+    private static string? FormatInspectionFacility(string? value) => value?.Trim().ToUpperInvariant() switch
+    {
+        "F" => "Fixed",
+        "R" => "Roadside",
+        _ => string.IsNullOrWhiteSpace(value) ? null : value.Trim(),
+    };
+
+    private static string? FormatInspectionLevel(int? value) => value switch
+    {
+        1 => "1 - Full",
+        2 => "2 - Walk-Around",
+        3 => "3 - Driver-Only",
+        4 => "4 - Special Study",
+        5 => "5 - Terminal",
+        99 => "99 - Invalid",
+        _ => value?.ToString(CultureInfo.InvariantCulture),
+    };
+
+    private static string? FormatMilitaryTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var digits = new string(value.Where(char.IsDigit).ToArray()).PadLeft(4, '0');
+        if (digits == "9999") return null;
+        return digits.Length == 4 ? $"{digits[..2]}:{digits[2..]}" : value.Trim();
     }
 
     private static AutoSafetyRadiusSummaryDto BuildRadiusSummary(Insured? insured, List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
@@ -1714,6 +1799,24 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             || raw.Equals("yes", StringComparison.OrdinalIgnoreCase)
             || raw.Equals("1", StringComparison.OrdinalIgnoreCase)
             || raw.Equals("x", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool? GetNullableBool(Dictionary<string, JsonElement> row, params string[] names)
+    {
+        var raw = GetString(row, names);
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        if (raw.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("y", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("yes", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("1", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("x", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (raw.Equals("false", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("n", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("no", StringComparison.OrdinalIgnoreCase)
+            || raw.Equals("0", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return null;
     }
 
     private static bool GetCrashFlag(Dictionary<string, JsonElement> row, params string[] names)

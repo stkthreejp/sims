@@ -544,7 +544,7 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
                       items={[
                         ['Place', item.location],
                         ['Agency', item.agency],
-                        ['County', item.countyCode ? `Code ${item.countyCode}` : null],
+                        ['County', item.countyCode],
                       ]}
                     />
                   )}

@@ -5,10 +5,12 @@ namespace SIMS.Domain.Entities.Fmcsa;
 public class FmcsaInspection : BaseEntity
 {
     public string UsDotNumber { get; set; } = string.Empty;
+    public string? ExternalInspectionId { get; set; }
     public string ReportNumber { get; set; } = string.Empty;
     public DateOnly InspectionDate { get; set; }
     public string? State { get; set; }
     public string? CountyCodeState { get; set; }
+    public string? CountyCode { get; set; }
     public string? InspectionCounty { get; set; }
     public string? InspectionLocation { get; set; }
     public string? InspectionFacility { get; set; }

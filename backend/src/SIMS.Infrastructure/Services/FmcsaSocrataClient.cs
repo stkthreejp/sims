@@ -22,6 +22,9 @@ public class FmcsaSocrataClient
     public Task<List<Dictionary<string, JsonElement>>> GetCensusByDotAsync(string dotNumber, CancellationToken ct) =>
         GetRowsByDotAsync(_settings.CensusDatasetId, dotNumber, ct);
 
+    public Task<List<Dictionary<string, JsonElement>>> GetVehicleInspectionFileByDotAsync(string dotNumber, CancellationToken ct) =>
+        GetRowsByDotAsync(_settings.VehicleInspectionDatasetId, dotNumber, ct);
+
     public Task<List<Dictionary<string, JsonElement>>> GetInspectionsByDotAsync(string dotNumber, CancellationToken ct) =>
         GetRowsByDotAsync(_settings.InspectionsDatasetId, dotNumber, ct);
 
