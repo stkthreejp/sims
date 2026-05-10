@@ -23,7 +23,7 @@ if (-not (Test-Path -LiteralPath $tempDir)) {
 $sourcePath = Join-Path $tempDir "CheckSafetyAnalytics.cs"
 $projectPath = Join-Path $tempDir "CheckSafetyAnalytics.csproj"
 
-@"
+@'
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -35,9 +35,9 @@ $projectPath = Join-Path $tempDir "CheckSafetyAnalytics.csproj"
     <PackageReference Include="Npgsql" Version="8.0.6" />
   </ItemGroup>
 </Project>
-"@ | Set-Content -Path $projectPath -Encoding UTF8
+'@ | Set-Content -Path $projectPath -Encoding UTF8
 
-@"
+@'
 using Npgsql;
 
 var connectionString = Environment.GetEnvironmentVariable("SAFETY_ANALYTICS_CONNECTION");
@@ -59,9 +59,9 @@ var tables = new[]
 
 foreach (var table in tables)
 {
-    await using var cmd = new NpgsqlCommand($"""select count(*) from {table}""", conn);
+    await using var cmd = new NpgsqlCommand($"select count(*) from {table}", conn);
     var count = await cmd.ExecuteScalarAsync();
-    Console.WriteLine($""{table}: {count}"");
+    Console.WriteLine($"{table}: {count}");
 }
 
 Console.WriteLine();
@@ -79,15 +79,16 @@ var found = false;
 while (await reader.ReadAsync())
 {
     found = true;
-    Console.WriteLine($""{reader.GetString(0)} | {reader.GetString(1)} | {reader.GetString(2)} | rows {reader.GetInt32(5)} | started {reader.GetDateTime(3):u}"");
+    Console.WriteLine($"{reader.GetString(0)} | {reader.GetString(1)} | {reader.GetString(2)} | rows {reader.GetInt32(5)} | started {reader.GetDateTime(3):u}");
     if (!reader.IsDBNull(6) && !string.IsNullOrWhiteSpace(reader.GetString(6)))
-        Console.WriteLine($""  error: {reader.GetString(6)}"");
+        Console.WriteLine($"  error: {reader.GetString(6)}");
 }
 
 if (!found)
     Console.WriteLine("No import batches found.");
 
 return 0;
-"@ | Set-Content -Path $sourcePath -Encoding UTF8
+'@ | Set-Content -Path $sourcePath -Encoding UTF8
 
 dotnet run --project $projectPath
+exit $LASTEXITCODE

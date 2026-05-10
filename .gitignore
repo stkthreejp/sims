@@ -35,6 +35,7 @@ Thumbs.db
 *.err
 backend_ms.log
 frontend_ms.log
+temp/
 
 # Local tool homes/caches
 .appdata/
