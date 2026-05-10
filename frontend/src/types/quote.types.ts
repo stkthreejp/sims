@@ -217,6 +217,8 @@ export interface AutoSafetyIss {
   score: number | null
   status: 'Unknown' | 'Green' | 'Yellow' | 'Red'
   label: string | null
+  basis: string
+  explanation: string | null
   source: string
 }
 

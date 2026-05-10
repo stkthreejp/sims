@@ -50,6 +50,8 @@ public class AutoSafetyIssDto
     public int? Score { get; set; }
     public string Status { get; set; } = "Unknown";
     public string? Label { get; set; }
+    public string Basis { get; set; } = "Pending";
+    public string? Explanation { get; set; }
     public string Source { get; set; } = "Pending ISS source";
 }
 

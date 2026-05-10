@@ -310,6 +310,7 @@ function OosMetric({ label, count, oosCount, rate, onClick }: { label: string; c
 
 function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
   const status = iss?.status ?? 'Unknown'
+  const recommendation = iss?.label?.replace(' estimate', '') ?? 'Pending'
   const lights = [
     { key: 'Red', className: status === 'Red' ? 'bg-red-500' : 'bg-slate-200' },
     { key: 'Yellow', className: status === 'Yellow' ? 'bg-amber-400' : 'bg-slate-200' },
@@ -319,17 +320,17 @@ function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
     <div className="rounded border bg-white p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div className="text-[11px] font-semibold uppercase text-slate-500">ISS</div>
-          <div className="mt-1 truncate text-sm font-semibold text-slate-800" title={iss?.label ?? 'Pending'}>
-            {iss?.score == null ? 'Pending' : iss.score}
+          <div className="text-[11px] font-semibold uppercase text-slate-500">SIMS ISS</div>
+          <div className="mt-1 truncate text-sm font-semibold text-slate-800" title={`${recommendation}${iss?.score == null ? '' : ` (${iss.score})`}`}>
+            {iss?.score == null ? recommendation : `${recommendation} ${iss.score}`}
           </div>
         </div>
         <div className="flex h-12 w-7 flex-col items-center justify-center gap-1 rounded border border-slate-300 bg-slate-50">
           {lights.map((light) => <span key={light.key} className={`h-2.5 w-2.5 rounded-full ${light.className}`} />)}
         </div>
       </div>
-      <div className="mt-1 truncate text-[11px] text-slate-400" title={iss?.label ?? iss?.source ?? 'Pending ISS source'}>
-        {iss?.label ?? iss?.source ?? 'Pending ISS source'}
+      <div className="mt-1 truncate text-[11px] text-slate-500" title={iss?.explanation ?? iss?.source ?? 'Pending ISS source'}>
+        Basis: {iss?.basis ?? 'Pending'}
       </div>
     </div>
   )

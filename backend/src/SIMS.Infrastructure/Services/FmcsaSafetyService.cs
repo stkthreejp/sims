@@ -237,7 +237,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             DataRefreshedAt = new[] { carrier?.ImportedAt, scoringRun?.GeneratedAt, inspections.Select(i => (DateTime?)i.ImportedAt).Max(), violations.Select(v => (DateTime?)v.ImportedAt).Max(), crashes.Select(c => (DateTime?)c.ImportedAt).Max() }
                 .Where(d => d.HasValue)
                 .Max(),
-            Iss = BuildIss(basics),
+            Iss = BuildIss(basics, carrier, inspections, violations),
             SummaryFlags = flags,
             Basics = basics,
             Oos = oos,
@@ -1297,24 +1297,50 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         return flags.Distinct().Take(6).ToList();
     }
 
-    private static AutoSafetyIssDto BuildIss(List<AutoSafetyBasicDto> basics)
+    private static AutoSafetyIssDto BuildIss(List<AutoSafetyBasicDto> basics, FmcsaCarrierSnapshot? carrier, List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
     {
+        if (basics.Any(b => b.IsPrioritized))
+        {
+            return BuildIssResult(100, "Safety", "FMCSA BASIC alert or serious violation indicator present.");
+        }
+
         var officialPercentiles = basics
             .Where(b => b.ScoreSource == "Official SMS" && b.Percentile.HasValue)
             .Select(b => b.Percentile!.Value)
             .ToList();
 
-        if (officialPercentiles.Count == 0)
+        if (officialPercentiles.Count > 0)
         {
-            return new AutoSafetyIssDto
-            {
-                Status = "Unknown",
-                Label = "ISS source pending",
-                Source = "Official ISS is not available from the public Socrata feed; configure FMCSA QCMobile to estimate from official BASIC percentiles.",
-            };
+            var score = Math.Clamp((int)Math.Round(officialPercentiles.Max(), MidpointRounding.AwayFromZero), 1, 100);
+            return BuildIssResult(score, "Safety", "Estimated from the highest official FMCSA BASIC percentile available.");
         }
 
-        var score = (int)Math.Round(officialPercentiles.Max(), MidpointRounding.AwayFromZero);
+        if (carrier?.PowerUnits is int powerUnits)
+        {
+            var inspectionCount = inspections.Count;
+            var oosCount = violations.Count(v => v.IsOutOfService || v.IsDriverDisqualifying)
+                + inspections.Count(i => i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService);
+            var score = 50 + Math.Min(35, powerUnits / 2) - Math.Min(25, inspectionCount * 4) + Math.Min(20, oosCount * 3);
+            score = Math.Clamp(score, 1, 95);
+
+            return BuildIssResult(
+                score,
+                "Insufficient Data",
+                "Estimated from fleet size, inspection volume, and OOS activity because official BASIC percentiles are not available.");
+        }
+
+        return new AutoSafetyIssDto
+        {
+            Status = "Unknown",
+            Label = "Pending",
+            Basis = "Pending",
+            Explanation = "Not enough FMCSA data is available to estimate an ISS recommendation.",
+            Source = "Official ISS is not available from the public Socrata feed; configure FMCSA QCMobile for official BASIC percentiles.",
+        };
+    }
+
+    private static AutoSafetyIssDto BuildIssResult(int score, string basis, string explanation)
+    {
         var status = score >= 75 ? "Red" : score >= 50 ? "Yellow" : "Green";
         var recommendation = status switch
         {
@@ -1328,7 +1354,9 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             Score = score,
             Status = status,
             Label = $"{recommendation} estimate",
-            Source = "SIMS estimate from official FMCSA BASIC percentiles; official ISS values require FMCSA ISS/Portal data.",
+            Basis = basis,
+            Explanation = explanation,
+            Source = "SIMS estimate using FMCSA safety data; official ISS values require FMCSA ISS/Portal data.",
         };
     }
 
