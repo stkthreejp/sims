@@ -118,6 +118,7 @@ export const TEMPLATE_TAGS: Record<TemplateEntityType, TagGroup[]> = {
         { name: 'CancellationProcessedBy', description: 'User who processed cancellation' },
         { name: 'CancellationProcessedAt', description: 'Date cancellation was processed' },
         { name: 'CancellationNotes', description: 'Cancellation transaction notes' },
+        { name: 'CancellationComplianceChecklist', description: 'Saved cancellation compliance review checklist' },
       ],
     },
     {

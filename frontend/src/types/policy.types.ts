@@ -141,6 +141,10 @@ export interface LegalComplianceRequirement {
   lastVerifiedAt: string
 }
 
+export interface LegalRequirementSnapshot extends LegalComplianceRequirement {
+  state: string
+}
+
 export interface CancellationComplianceChecklistItem {
   key: string
   label: string

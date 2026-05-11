@@ -7,7 +7,7 @@ import { policiesApi } from '@/api/policies.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_STATUS_COLORS } from '@/types/policy.types'
-import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, Policy } from '@/types/policy.types'
+import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyTransaction } from '@/types/policy.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -319,25 +319,7 @@ export function PolicyDetailPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {policy.transactions.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50">
-                  <td className="px-5 py-2.5 font-mono text-xs text-slate-600">{t.transactionNumber}</td>
-                  <td className="px-5 py-2.5 text-slate-700">{t.transactionType}</td>
-                  <td className="px-5 py-2.5">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                      t.status === 'Issued' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {t.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-2.5 text-slate-500">{new Date(t.effectiveDate).toLocaleDateString()}</td>
-                  <td className="px-5 py-2.5 text-right">
-                    <span className={t.premiumChange >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {t.premiumChange >= 0 ? '+' : ''}{formatCurrency(t.premiumChange)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-2.5 text-right font-medium text-slate-700">{formatCurrency(t.newTotalPremium)}</td>
-                  <td className="px-5 py-2.5 text-slate-500">{t.processedByName}</td>
-                </tr>
+                <TransactionRows key={t.id} transaction={t} />
               ))}
             </tbody>
           </table>
@@ -467,6 +449,81 @@ export function PolicyDetailPage() {
         <DocumentsSection entityType="Policy" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
       </div>
     </div>
+  )
+}
+
+function TransactionRows({ transaction: t }: { transaction: PolicyTransaction }) {
+  return (
+    <>
+      <tr className="hover:bg-slate-50">
+        <td className="px-5 py-2.5 font-mono text-xs text-slate-600">{t.transactionNumber}</td>
+        <td className="px-5 py-2.5 text-slate-700">{t.transactionType}</td>
+        <td className="px-5 py-2.5">
+          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+            t.status === 'Issued' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+          }`}>
+            {t.status}
+          </span>
+        </td>
+        <td className="px-5 py-2.5 text-slate-500">{new Date(t.effectiveDate).toLocaleDateString()}</td>
+        <td className="px-5 py-2.5 text-right">
+          <span className={t.premiumChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+            {t.premiumChange >= 0 ? '+' : ''}{formatCurrency(t.premiumChange)}
+          </span>
+        </td>
+        <td className="px-5 py-2.5 text-right font-medium text-slate-700">{formatCurrency(t.newTotalPremium)}</td>
+        <td className="px-5 py-2.5 text-slate-500">{t.processedByName}</td>
+      </tr>
+      {t.transactionType === 'Cancellation' && (
+        <CancellationTransactionDetails transaction={t} />
+      )}
+    </>
+  )
+}
+
+function CancellationTransactionDetails({ transaction }: { transaction: PolicyTransaction }) {
+  const legalSnapshot = parseLegalSnapshot(transaction.cancellationLegalRequirementSnapshotJson)
+
+  return (
+    <tr className="bg-red-50/40">
+      <td colSpan={7} className="px-5 py-4">
+        <div className="grid gap-4 text-sm md:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
+          <div>
+            <div className="font-semibold text-slate-900">Cancellation Review</div>
+            <div className="mt-2 grid gap-2 text-slate-700 sm:grid-cols-2">
+              <div><span className="text-slate-500">Reason:</span> {transaction.cancellationReason || 'Not recorded'}</div>
+              <div><span className="text-slate-500">Method:</span> {transaction.cancellationMethod || 'Not recorded'}</div>
+            </div>
+            {transaction.notes && <p className="mt-2 text-slate-600">{transaction.notes}</p>}
+            <div className="mt-3 space-y-1">
+              {transaction.cancellationComplianceChecklist.length === 0 ? (
+                <p className="text-slate-500">No checklist was saved with this transaction.</p>
+              ) : transaction.cancellationComplianceChecklist.map((item) => (
+                <div key={item.key} className="flex items-start gap-2 text-slate-700">
+                  <span className={item.isCompleted ? 'text-green-700' : 'text-slate-400'}>{item.isCompleted ? '[x]' : '[ ]'}</span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded border bg-white p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Saved Legal Snapshot</div>
+            {legalSnapshot.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">No legal requirement snapshot was saved.</p>
+            ) : (
+              <div className="mt-2 max-h-52 space-y-2 overflow-auto pr-1">
+                {legalSnapshot.map((row) => (
+                  <div key={row.id} className="text-sm">
+                    <div className="font-medium text-slate-800">{row.topic}</div>
+                    <div className="text-xs text-slate-500">{row.category}{row.state ? ` - ${row.state}` : ''}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+    </tr>
   )
 }
 
@@ -773,6 +830,27 @@ function toDateInput(value: string) {
 
 function truncateText(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
+}
+
+function parseLegalSnapshot(value: string | null): LegalRequirementSnapshot[] {
+  if (!value) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+
+    return parsed.map((row) => ({
+      id: row.id ?? row.Id ?? '',
+      state: row.state ?? row.State ?? '',
+      category: row.category ?? row.Category ?? '',
+      topic: row.topic ?? row.Topic ?? '',
+      requirementText: row.requirementText ?? row.RequirementText ?? '',
+      citations: row.citations ?? row.Citations ?? [],
+      lastVerifiedAt: row.lastVerifiedAt ?? row.LastVerifiedAt ?? '',
+    })).filter((row) => row.id || row.topic)
+  } catch {
+    return []
+  }
 }
 
 function buildCancellationChecklist(guidance?: LegalComplianceGuidance): CancellationComplianceChecklistItem[] {

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using SIMS.Application.Common;
 using SIMS.Application.Interfaces.Services;
@@ -312,6 +313,7 @@ public class DocumentGenerationService : IDocumentGenerationService
             : string.Empty;
         d["CancellationProcessedAt"] = cancellation?.ProcessedAt.ToString("MM/dd/yyyy") ?? string.Empty;
         d["CancellationNotes"] = cancellation?.Notes ?? string.Empty;
+        d["CancellationComplianceChecklist"] = FormatChecklist(cancellation?.CancellationComplianceChecklistJson);
 
         d["InsuredName"] = insured.DisplayName;
         d["InsuredDBA"] = insured.Dba ?? string.Empty;
@@ -346,13 +348,33 @@ public class DocumentGenerationService : IDocumentGenerationService
         d["UnderwriterName"] = uw.FullName;
         d["UnderwriterEmail"] = uw.Email ?? string.Empty;
 
-        await AddLegalCancellationDataAsync(d, insured.State);
+        await AddLegalCancellationDataAsync(d, insured.State, cancellation?.CancellationLegalRequirementSnapshotJson);
     }
 
-    private async Task AddLegalCancellationDataAsync(Dictionary<string, string> d, string state)
+    private async Task AddLegalCancellationDataAsync(Dictionary<string, string> d, string state, string? snapshotJson)
     {
         var legalState = NormalizeState(state);
         d["LegalCancellationState"] = legalState;
+
+        var snapshotRows = DeserializeLegalSnapshot(snapshotJson);
+        if (snapshotRows.Count > 0)
+        {
+            d["LegalNoticeRequirements"] = FormatLegalRows(snapshotRows.Where(r => r.Category == "NOTICE REQUIREMENTS"));
+            d["LegalReasonRequirements"] = FormatLegalRows(snapshotRows.Where(r => r.Category == "REASONS"));
+            d["LegalProofOfNoticeRequirements"] = FormatLegalRows(snapshotRows.Where(r => r.Topic.Contains("Proof", StringComparison.OrdinalIgnoreCase)));
+            d["LegalLienholderRequirements"] = FormatLegalRows(snapshotRows.Where(r =>
+                r.Topic.Contains("Lienholder", StringComparison.OrdinalIgnoreCase) ||
+                r.Topic.Contains("Mortgagee", StringComparison.OrdinalIgnoreCase)));
+            d["LegalStateAuthorityRequirements"] = FormatLegalRows(snapshotRows.Where(r =>
+                r.Topic.Contains("State Authority", StringComparison.OrdinalIgnoreCase) ||
+                r.RequirementText.Contains("Department", StringComparison.OrdinalIgnoreCase) ||
+                r.RequirementText.Contains("DMV", StringComparison.OrdinalIgnoreCase)));
+            d["LegalReturnPremiumRequirements"] = FormatLegalRows(snapshotRows.Where(r =>
+                r.Topic.Contains("Return of Unearned Premium", StringComparison.OrdinalIgnoreCase) ||
+                r.RequirementText.Contains("unearned premium", StringComparison.OrdinalIgnoreCase)));
+            d["LegalCancellationRequirements"] = FormatLegalRows(snapshotRows);
+            return;
+        }
 
         var rows = string.IsNullOrWhiteSpace(legalState)
             ? new List<LegalRequirementSection>()
@@ -364,20 +386,29 @@ public class DocumentGenerationService : IDocumentGenerationService
                 .ThenBy(r => r.SortOrder)
                 .ToListAsync();
 
-        d["LegalNoticeRequirements"] = FormatLegalRows(rows.Where(r => r.Category == "NOTICE REQUIREMENTS"));
-        d["LegalReasonRequirements"] = FormatLegalRows(rows.Where(r => r.Category == "REASONS"));
-        d["LegalProofOfNoticeRequirements"] = FormatLegalRows(rows.Where(r => r.Topic.Contains("Proof", StringComparison.OrdinalIgnoreCase)));
-        d["LegalLienholderRequirements"] = FormatLegalRows(rows.Where(r =>
+        var rowDtos = rows.Select(r => new LegalRequirementSnapshotRow(
+            r.Id,
+            r.State,
+            r.Category,
+            r.Topic,
+            r.RequirementText,
+            r.Citations,
+            r.LastVerifiedAt)).ToList();
+
+        d["LegalNoticeRequirements"] = FormatLegalRows(rowDtos.Where(r => r.Category == "NOTICE REQUIREMENTS"));
+        d["LegalReasonRequirements"] = FormatLegalRows(rowDtos.Where(r => r.Category == "REASONS"));
+        d["LegalProofOfNoticeRequirements"] = FormatLegalRows(rowDtos.Where(r => r.Topic.Contains("Proof", StringComparison.OrdinalIgnoreCase)));
+        d["LegalLienholderRequirements"] = FormatLegalRows(rowDtos.Where(r =>
             r.Topic.Contains("Lienholder", StringComparison.OrdinalIgnoreCase) ||
             r.Topic.Contains("Mortgagee", StringComparison.OrdinalIgnoreCase)));
-        d["LegalStateAuthorityRequirements"] = FormatLegalRows(rows.Where(r =>
+        d["LegalStateAuthorityRequirements"] = FormatLegalRows(rowDtos.Where(r =>
             r.Topic.Contains("State Authority", StringComparison.OrdinalIgnoreCase) ||
             r.RequirementText.Contains("Department", StringComparison.OrdinalIgnoreCase) ||
             r.RequirementText.Contains("DMV", StringComparison.OrdinalIgnoreCase)));
-        d["LegalReturnPremiumRequirements"] = FormatLegalRows(rows.Where(r =>
+        d["LegalReturnPremiumRequirements"] = FormatLegalRows(rowDtos.Where(r =>
             r.Topic.Contains("Return of Unearned Premium", StringComparison.OrdinalIgnoreCase) ||
             r.RequirementText.Contains("unearned premium", StringComparison.OrdinalIgnoreCase)));
-        d["LegalCancellationRequirements"] = FormatLegalRows(rows);
+        d["LegalCancellationRequirements"] = FormatLegalRows(rowDtos);
     }
 
     private async Task AddSubmissionDataAsync(Dictionary<string, string> d, Guid submissionId)
@@ -460,13 +491,42 @@ public class DocumentGenerationService : IDocumentGenerationService
         return string.Join(", ", parts);
     }
 
-    private static string FormatLegalRows(IEnumerable<LegalRequirementSection> rows)
+    private static string FormatLegalRows(IEnumerable<LegalRequirementSnapshotRow> rows)
     {
         return string.Join("<br/><br/>", rows.Select(r =>
         {
             var citations = r.Citations.Length > 0 ? $" [{string.Join("; ", r.Citations)}]" : string.Empty;
             return $"<strong>{r.Topic}</strong>: {r.RequirementText}{citations}";
         }));
+    }
+
+    private static string FormatChecklist(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return string.Empty;
+
+        try
+        {
+            var items = JsonSerializer.Deserialize<List<CancellationChecklistSnapshotRow>>(json) ?? [];
+            return string.Join("<br/>", items.Select(i => $"{(i.IsCompleted ? "[x]" : "[ ]")} {i.Label}"));
+        }
+        catch (JsonException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static IReadOnlyList<LegalRequirementSnapshotRow> DeserializeLegalSnapshot(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<LegalRequirementSnapshotRow>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private static string NormalizeState(string? value)
@@ -497,4 +557,19 @@ public class DocumentGenerationService : IDocumentGenerationService
 
     private static string SanitizeFileName(string name) =>
         Regex.Replace(name, @"[^\w\-]", "_").Trim('_');
+
+    private sealed record LegalRequirementSnapshotRow(
+        Guid Id,
+        string State,
+        string Category,
+        string Topic,
+        string RequirementText,
+        string[] Citations,
+        DateTime LastVerifiedAt);
+
+    private sealed record CancellationChecklistSnapshotRow(
+        string Key,
+        string Label,
+        bool IsCompleted,
+        Guid[] RequirementSectionIds);
 }
