@@ -1526,6 +1526,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var summary = new AutoSafetyRadiusSummaryDto
         {
             HasBaseCoordinate = insured?.Latitude != null && insured.Longitude != null,
+            BaseLatitude = insured?.Latitude,
+            BaseLongitude = insured?.Longitude,
             Precision = "Mixed precision",
             Note = "Distances use stored/geocoded inspection locations first. Rows without inspection coordinates fall back to low-precision state-centroid estimates.",
             Bands = bands.ToList(),
@@ -1615,11 +1617,74 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             summary.Note = "Some inspections use stored/geocoded locations. Rows without inspection coordinates use county estimates when available, then low-precision state-centroid estimates.";
         }
 
+        summary.MapPoints = BuildRadiusMapPoints(inspections, oosReports);
         return summary;
     }
 
     private static bool IsCountyEstimate(string? precision) =>
         precision?.StartsWith("County estimate", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static List<AutoSafetyMapPointDto> BuildRadiusMapPoints(List<FmcsaInspection> inspections, HashSet<string> oosReports)
+    {
+        return inspections
+            .Select(i => TryBuildRadiusMapPoint(i, oosReports))
+            .Where(p => p != null)
+            .Select(p => p!)
+            .GroupBy(p => new
+            {
+                p.Label,
+                Lat = Math.Round(p.Latitude, 4),
+                Lng = Math.Round(p.Longitude, 4),
+                p.Precision,
+            })
+            .Select(g => new AutoSafetyMapPointDto
+            {
+                Label = g.Key.Label,
+                Latitude = g.First().Latitude,
+                Longitude = g.First().Longitude,
+                Precision = g.Key.Precision,
+                InspectionCount = g.Sum(p => p.InspectionCount),
+                OutOfServiceCount = g.Sum(p => p.OutOfServiceCount),
+            })
+            .OrderByDescending(p => p.OutOfServiceCount)
+            .ThenByDescending(p => p.InspectionCount)
+            .Take(8)
+            .ToList();
+    }
+
+    private static AutoSafetyMapPointDto? TryBuildRadiusMapPoint(FmcsaInspection inspection, HashSet<string> oosReports)
+    {
+        decimal latitude;
+        decimal longitude;
+        string precision;
+
+        if (inspection.Latitude != null && inspection.Longitude != null)
+        {
+            latitude = inspection.Latitude.Value;
+            longitude = inspection.Longitude.Value;
+            precision = IsCountyEstimate(inspection.GeocodePrecision) ? "County estimate" : "Inspection geocode";
+        }
+        else if (!string.IsNullOrWhiteSpace(inspection.State) && StateCentroids.TryGetValue(inspection.State.Trim().ToUpperInvariant(), out var point))
+        {
+            latitude = (decimal)point.Latitude;
+            longitude = (decimal)point.Longitude;
+            precision = "State estimate";
+        }
+        else
+        {
+            return null;
+        }
+
+        return new AutoSafetyMapPointDto
+        {
+            Label = BuildInspectionLocationLabel(inspection),
+            Latitude = latitude,
+            Longitude = longitude,
+            Precision = precision,
+            InspectionCount = 1,
+            OutOfServiceCount = inspection.DriverOutOfService || inspection.VehicleOutOfService || inspection.HazmatOutOfService || oosReports.Contains(inspection.ReportNumber) ? 1 : 0,
+        };
+    }
 
     private static int CountInspectionOos(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
     {

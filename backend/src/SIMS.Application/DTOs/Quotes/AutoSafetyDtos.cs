@@ -98,10 +98,23 @@ public class AutoSafetyHotspotDto
 public class AutoSafetyRadiusSummaryDto
 {
     public bool HasBaseCoordinate { get; set; }
+    public decimal? BaseLatitude { get; set; }
+    public decimal? BaseLongitude { get; set; }
     public string Precision { get; set; } = "Unavailable";
     public string? Note { get; set; }
     public List<AutoSafetyRadiusPrecisionDto> PrecisionCounts { get; set; } = new();
+    public List<AutoSafetyMapPointDto> MapPoints { get; set; } = new();
     public List<AutoSafetyRadiusBandDto> Bands { get; set; } = new();
+}
+
+public class AutoSafetyMapPointDto
+{
+    public string Label { get; set; } = string.Empty;
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public string Precision { get; set; } = string.Empty;
+    public int InspectionCount { get; set; }
+    public int OutOfServiceCount { get; set; }
 }
 
 public class AutoSafetyRadiusPrecisionDto

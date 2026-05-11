@@ -4,6 +4,7 @@ import axios from 'axios'
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
+import { getGoogleMapsApiKey } from '@/lib/clientConfig'
 import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyIss, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
 
 type Props = {
@@ -12,6 +13,25 @@ type Props = {
 
 type AutoSafetyTab = 'safer' | 'radius' | 'events' | 'history'
 type DetailSelection = { kind: string; title: string; basic?: string } | null
+
+function buildRadiusMapUrl(summary: NonNullable<Awaited<ReturnType<typeof quotesApi.getAutoSafety>>['radiusSummary']>) {
+  const key = getGoogleMapsApiKey()
+  if (!key || summary.baseLatitude == null || summary.baseLongitude == null || summary.mapPoints.length === 0) return null
+
+  const params = new URLSearchParams({
+    size: '960x280',
+    scale: '2',
+    maptype: 'roadmap',
+    key,
+  })
+  params.append('markers', `color:blue|label:B|${summary.baseLatitude},${summary.baseLongitude}`)
+  summary.mapPoints.slice(0, 8).forEach((point, index) => {
+    const color = point.outOfServiceCount > 0 ? 'red' : point.precision === 'State estimate' ? 'orange' : 'green'
+    params.append('markers', `color:${color}|label:${index + 1}|${point.latitude},${point.longitude}`)
+  })
+
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`
+}
 
 const riskStyle: Record<AutoSafetyRiskLevel, string> = {
   Unknown: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -93,6 +113,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
 
   const oos = data.oos
   const accident = data.accidentSummary
+  const radiusMapUrl = buildRadiusMapUrl(data.radiusSummary)
   const overallOosCount = oos.overallOosCount ?? Math.max(oos.driverOosCount, oos.vehicleOosCount)
   const overallOosRate = oos.overallOosRate ?? (oos.inspectionCount === 0 ? null : Math.round(overallOosCount * 10000 / oos.inspectionCount) / 100)
   const driverInspectionCount = oos.driverInspectionCount ?? oos.inspectionCount
@@ -202,11 +223,29 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
                 ))}
             </div>
           )}
+          {radiusMapUrl && (
+            <div className="mb-3 overflow-hidden rounded border border-slate-200 bg-slate-50">
+              <img
+                src={radiusMapUrl}
+                alt="Inspection radius map"
+                className="h-[180px] w-full object-cover"
+              />
+            </div>
+          )}
           {data.geographicHotspots.length === 0 ? (
             <p className="text-sm text-slate-400">No inspection location concentration yet.</p>
           ) : (
             <div className="grid grid-cols-5 gap-2">
-              {data.geographicHotspots.map((h) => (
+              {data.radiusSummary.mapPoints.length > 0 ? data.radiusSummary.mapPoints.slice(0, 5).map((h, idx) => (
+                <div key={`${h.label}-${idx}`} className="rounded bg-slate-50 p-2">
+                  <div className="flex items-center gap-1 text-sm font-semibold text-slate-800">
+                    <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-200 text-[10px] text-slate-700">{idx + 1}</span>
+                    <span className="truncate">{h.label}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">{h.inspectionCount} insp - {h.outOfServiceCount} OOS</div>
+                  <div className="mt-0.5 text-[11px] text-slate-400">{h.precision}</div>
+                </div>
+              )) : data.geographicHotspots.map((h) => (
                 <div key={h.state} className="rounded bg-slate-50 p-2">
                   <div className="text-sm font-semibold text-slate-800">{h.state}</div>
                   <div className="text-xs text-slate-500">{h.inspectionCount} insp - {h.violationCount} viol</div>

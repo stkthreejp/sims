@@ -269,11 +269,23 @@ export interface AutoSafetyRadiusPrecision {
   count: number
 }
 
+export interface AutoSafetyMapPoint {
+  label: string
+  latitude: number
+  longitude: number
+  precision: string
+  inspectionCount: number
+  outOfServiceCount: number
+}
+
 export interface AutoSafetyRadiusSummary {
   hasBaseCoordinate: boolean
+  baseLatitude: number | null
+  baseLongitude: number | null
   precision: string
   note: string | null
   precisionCounts: AutoSafetyRadiusPrecision[]
+  mapPoints: AutoSafetyMapPoint[]
   bands: AutoSafetyRadiusBand[]
 }
 
