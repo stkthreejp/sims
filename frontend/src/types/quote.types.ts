@@ -311,8 +311,14 @@ export interface AutoSafetyDetail {
   vehicleInfo: string | null
   crashEvents: string | null
   basic: string | null
+  violationCode: string | null
+  violationGroup: string | null
+  unitNumber: string | null
+  severityWeight: number | null
+  oosWeight: number | null
   description: string
   isOutOfService: boolean
+  isDriverDisqualifying: boolean
   isFatal: boolean
   isInjury: boolean
   isTow: boolean

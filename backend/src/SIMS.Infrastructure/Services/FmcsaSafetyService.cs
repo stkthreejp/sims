@@ -1120,16 +1120,43 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .ThenBy(v => v.ReportNumber)
             .Select(v => new AutoSafetyDetailDto
             {
-                Category = category,
+                Category = BuildViolationCategory(category, v),
                 Date = v.Inspection.InspectionDate,
                 ReportNumber = v.ReportNumber,
                 State = v.Inspection.State,
+                CountyCode = v.Inspection.InspectionCounty ?? v.Inspection.CountyCodeState ?? v.Inspection.CountyCode,
+                Location = v.Inspection.InspectionLocation,
+                Conditions = BuildInspectionConditions(v.Inspection),
                 Basic = v.Basic,
+                ViolationCode = v.ViolationCode,
+                ViolationGroup = v.ViolationGroup,
+                UnitNumber = v.UnitNumber,
+                SeverityWeight = v.SeverityWeight,
+                OosWeight = v.OosWeight,
                 VehicleInfo = BuildInspectionUnitInfo(v.Inspection, v.UnitNumber),
-                Description = v.Description ?? v.ViolationCode,
+                Description = BuildViolationDetailDescription(v),
                 IsOutOfService = v.IsOutOfService || v.IsDriverDisqualifying,
+                IsDriverDisqualifying = v.IsDriverDisqualifying,
             })
             .ToList();
+    }
+
+    private static string BuildViolationCategory(string category, FmcsaViolation violation)
+    {
+        if (violation.IsDriverDisqualifying) return "Driver disqualifying";
+        if (violation.IsOutOfService) return $"{category} - Out of service";
+        return category;
+    }
+
+    private static string BuildViolationDetailDescription(FmcsaViolation violation)
+    {
+        var description = violation.Description;
+        if (string.IsNullOrWhiteSpace(description))
+            return violation.ViolationCode;
+
+        return string.IsNullOrWhiteSpace(violation.ViolationCode)
+            ? description
+            : $"{violation.ViolationCode} - {description}";
     }
 
     private static string? BuildViolationCode(Dictionary<string, JsonElement> row)
@@ -1189,6 +1216,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     Location = i.InspectionLocation,
                     Conditions = BuildInspectionConditions(i),
                     VehicleInfo = BuildInspectionVehicleInfo(i),
+                    CrashEvents = BuildInspectionViolationSummary(reportViolations),
                     Description = BuildInspectionDescription(i, reportViolations),
                     IsOutOfService = i.DriverOutOfService || i.VehicleOutOfService || i.HazmatOutOfService || oosCount > 0,
                     Basic = reportViolations.Count == 0 ? null : $"{reportViolations.Count} violations, {oosCount} OOS",
@@ -1211,6 +1239,27 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var oosSummary = oosTypes.Count == 0 ? null : $" ({string.Join(", ", oosTypes)})";
 
         return $"{level} with {violationSummary}{oosSummary}.";
+    }
+
+    private static string? BuildInspectionViolationSummary(List<FmcsaViolation> violations)
+    {
+        if (violations.Count == 0)
+            return null;
+
+        var parts = violations
+            .OrderByDescending(v => v.IsOutOfService || v.IsDriverDisqualifying)
+            .ThenByDescending(v => v.SeverityWeight)
+            .Take(5)
+            .Select(v =>
+            {
+                var status = v.IsDriverDisqualifying ? "Driver disq" : v.IsOutOfService ? "OOS" : "Violation";
+                var unit = string.IsNullOrWhiteSpace(v.UnitNumber) ? null : $"Unit {v.UnitNumber}";
+                var code = string.IsNullOrWhiteSpace(v.ViolationCode) ? null : v.ViolationCode;
+                var desc = string.IsNullOrWhiteSpace(v.Description) ? null : v.Description;
+                return string.Join(" - ", new[] { status, unit, code, desc }.Where(p => !string.IsNullOrWhiteSpace(p)));
+            });
+
+        return string.Join(" | ", parts);
     }
 
     private static string? BuildInspectionConditions(FmcsaInspection inspection)

@@ -155,8 +155,14 @@ public class AutoSafetyDetailDto
     public string? VehicleInfo { get; set; }
     public string? CrashEvents { get; set; }
     public string? Basic { get; set; }
+    public string? ViolationCode { get; set; }
+    public string? ViolationGroup { get; set; }
+    public string? UnitNumber { get; set; }
+    public int? SeverityWeight { get; set; }
+    public decimal? OosWeight { get; set; }
     public string Description { get; set; } = string.Empty;
     public bool IsOutOfService { get; set; }
+    public bool IsDriverDisqualifying { get; set; }
     public bool IsFatal { get; set; }
     public bool IsInjury { get; set; }
     public bool IsTow { get; set; }

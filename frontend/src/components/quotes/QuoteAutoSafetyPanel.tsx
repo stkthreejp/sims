@@ -793,7 +793,7 @@ function TrendChart({
 function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: string; items: AutoSafetyDetail[]; isLoading: boolean; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-slate-900/20 p-4">
-      <div className="mt-16 max-h-[72vh] w-full max-w-2xl overflow-y-auto rounded border border-slate-200 bg-white shadow-xl">
+      <div className="mt-16 max-h-[72vh] w-full max-w-3xl overflow-y-auto rounded border border-slate-200 bg-white shadow-xl">
         <div className="sticky top-0 flex items-center justify-between border-b bg-white px-4 py-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
@@ -814,13 +814,30 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
               <div key={`${item.reportNumber}-${idx}`} className="px-4 py-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-slate-800">{item.category}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-800">{item.category}</span>
+                      {item.isOutOfService && <span className="rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">OOS</span>}
+                      {item.isDriverDisqualifying && <span className="rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">Driver disq</span>}
+                      {item.basic && <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{item.basic}</span>}
+                    </div>
                     <div className="mt-0.5 text-xs text-slate-500">{formatDate(item.date)} · Report {item.reportNumber} · {item.source}</div>
                   </div>
                   <div className="text-xs font-medium text-slate-500">{[item.city, item.state].filter(Boolean).join(', ') || '-'}</div>
                 </div>
-                <div className="mt-2 text-slate-600">{item.description}</div>
+                <div className="mt-2 rounded border border-slate-100 bg-white px-3 py-2 text-slate-700">{item.description}</div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
+                  {(item.violationCode || item.violationGroup || item.unitNumber || item.severityWeight != null || item.oosWeight != null) && (
+                    <DetailSection
+                      title="Violation"
+                      items={[
+                        ['Code', item.violationCode],
+                        ['Group', item.violationGroup],
+                        ['Unit', item.unitNumber],
+                        ['Severity', item.severityWeight == null ? null : String(item.severityWeight)],
+                        ['OOS weight', item.oosWeight == null ? null : String(item.oosWeight)],
+                      ]}
+                    />
+                  )}
                   {(item.location || item.agency || item.countyCode) && (
                     <DetailSection
                       title="Location"
@@ -831,11 +848,10 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
                       ]}
                     />
                   )}
-                  {item.conditions && <DetailSection title="Crash Conditions" items={splitDetailItems(item.conditions)} />}
+                  {item.conditions && <DetailSection title={item.violationCode ? 'Inspection' : 'Crash Conditions'} items={splitDetailItems(item.conditions)} />}
                   {item.vehicleInfo && <DetailSection title="Vehicle Information" items={splitDetailItems(item.vehicleInfo)} />}
-                  {item.crashEvents && <DetailSection title="Crash Events" items={splitDetailItems(item.crashEvents)} />}
+                  {item.crashEvents && <DetailSection title={item.violationCode ? 'Related Violations' : 'Crash Events'} items={splitDetailItems(item.crashEvents)} wide />}
                 </div>
-                {item.basic && <div className="mt-2 text-xs text-slate-400">{item.basic}</div>}
               </div>
             ))}
           </div>
@@ -845,11 +861,11 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
   )
 }
 
-function DetailSection({ title, items }: { title: string; items: Array<[string, string | null | undefined]> }) {
+function DetailSection({ title, items, wide = false }: { title: string; items: Array<[string, string | null | undefined]>; wide?: boolean }) {
   const visible = items.filter(([, value]) => !!value)
   if (visible.length === 0) return null
   return (
-    <div className="rounded border border-slate-100 bg-slate-50/70 px-3 py-2">
+    <div className={`rounded border border-slate-100 bg-slate-50/70 px-3 py-2 ${wide ? 'col-span-2' : ''}`}>
       <div className="mb-1.5 text-[11px] font-semibold uppercase text-slate-500">{title}</div>
       <div className="space-y-1">
         {visible.map(([label, value]) => (
