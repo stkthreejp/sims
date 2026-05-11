@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpenCheck, Check, ClipboardList, Database, Eye, History, RefreshCw, Search, Upload, X } from 'lucide-react'
+import { BookOpenCheck, Check, ClipboardList, Database, Eye, History, Pencil, Plus, RefreshCw, Search, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   legalRequirementsApi,
@@ -8,6 +8,7 @@ import {
   type LegalRequirementSection,
   type LegalSourceScanResult,
   type LegalSourceScanRun,
+  type LegalTrackedSourceInput,
   type LegalTrackedSource,
 } from '@/api/legalRequirements.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -25,6 +26,7 @@ export function LegalRequirementsPage() {
   const [search, setSearch] = useState('')
   const [scanReviewStatus, setScanReviewStatus] = useState('Pending')
   const [selectedScanResult, setSelectedScanResult] = useState<LegalSourceScanResult | null>(null)
+  const [sourceEditor, setSourceEditor] = useState<LegalTrackedSource | 'new' | null>(null)
   const [selectedScanRunId, setSelectedScanRunId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
@@ -101,6 +103,17 @@ export function LegalRequirementsPage() {
       setActiveTab('sources')
     },
     onError: () => toast.error('Source could not be checked'),
+  })
+  const saveSourceMutation = useMutation({
+    mutationFn: ({ source, input }: { source: LegalTrackedSource | 'new'; input: LegalTrackedSourceInput }) =>
+      source === 'new' ? legalRequirementsApi.createSource(input) : legalRequirementsApi.updateSource(source.id, input),
+    onSuccess: () => {
+      toast.success('Tracked source saved')
+      invalidateLegalQueries(queryClient)
+      setSourceEditor(null)
+      setActiveTab('sources')
+    },
+    onError: () => toast.error('Tracked source could not be saved'),
   })
 
   if (summaryQuery.isLoading) return <LoadingSpinner />
@@ -189,6 +202,8 @@ export function LegalRequirementsPage() {
                 sources={sourcesQuery.data ?? []}
                 scanningSourceId={scanSourceMutation.isPending ? scanSourceMutation.variables ?? null : null}
                 onScan={(sourceId) => scanSourceMutation.mutate(sourceId)}
+                onAdd={() => setSourceEditor('new')}
+                onEdit={setSourceEditor}
               />
             )
         )}
@@ -235,6 +250,15 @@ export function LegalRequirementsPage() {
           onClose={() => setSelectedScanResult(null)}
         />
       )}
+      {sourceEditor && (
+        <SourceEditorModal
+          source={sourceEditor}
+          states={summary?.states ?? []}
+          saving={saveSourceMutation.isPending}
+          onClose={() => setSourceEditor(null)}
+          onSave={(input) => saveSourceMutation.mutate({ source: sourceEditor, input })}
+        />
+      )}
     </div>
   )
 }
@@ -243,64 +267,229 @@ function SourcePanel({
   sources,
   scanningSourceId,
   onScan,
+  onAdd,
+  onEdit,
 }: {
   sources: LegalTrackedSource[]
   scanningSourceId: string | null
   onScan: (sourceId: string) => void
+  onAdd: () => void
+  onEdit: (source: LegalTrackedSource) => void
 }) {
-  if (sources.length === 0) {
-    return <EmptyPanel text="No tracked sources match the current filters." />
+  return (
+    <div>
+      <div className="flex items-center justify-end border-b px-4 py-3">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Plus className="h-4 w-4" />
+          Add Source
+        </button>
+      </div>
+
+      {sources.length === 0 ? (
+        <EmptyPanel text="No tracked sources match the current filters." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">State</th>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Cadence</th>
+                <th className="px-4 py-3">Last Checked</th>
+                <th className="px-4 py-3">Last Changed</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {sources.map((source) => {
+                const scanning = scanningSourceId === source.id
+                return (
+                  <tr key={source.id} className="align-top">
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{source.state}</td>
+                    <td className="min-w-[280px] px-4 py-3">
+                      <div className="font-medium text-slate-800">{source.name}</div>
+                      <div className="mt-1 text-xs text-slate-500">{source.sourceType}</div>
+                      {source.notes && <div className="mt-2 max-w-xl leading-5 text-slate-600">{source.notes}</div>}
+                      {source.url && <div className="mt-2 break-all text-xs text-blue-700">{source.url}</div>}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{source.scanCadence}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastCheckedAt ? formatDate(source.lastCheckedAt) : '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastChangedAt ? formatDate(source.lastChangedAt) : '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <StatusPill status={source.isEnabled ? source.lastStatus : 'Disabled'} />
+                      {source.lastErrorMessage && <div className="mt-2 max-w-xs text-xs text-red-600">{source.lastErrorMessage}</div>}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(source)}
+                          className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onScan(source.id)}
+                          disabled={!source.isEnabled || scanningSourceId !== null}
+                          className="inline-flex items-center gap-2 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
+                          Check
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SourceEditorModal({
+  source,
+  states,
+  saving,
+  onClose,
+  onSave,
+}: {
+  source: LegalTrackedSource | 'new'
+  states: string[]
+  saving: boolean
+  onClose: () => void
+  onSave: (input: LegalTrackedSourceInput) => void
+}) {
+  const [stateValue, setStateValue] = useState(source === 'new' ? 'All' : source.state)
+  const [name, setName] = useState(source === 'new' ? '' : source.name)
+  const [sourceType, setSourceType] = useState(source === 'new' ? 'Statute/Regulation' : source.sourceType)
+  const [url, setUrl] = useState(source === 'new' ? '' : source.url ?? '')
+  const [scanCadence, setScanCadence] = useState(source === 'new' ? 'Monthly' : source.scanCadence)
+  const [isEnabled, setIsEnabled] = useState(source === 'new' ? true : source.isEnabled)
+  const [notes, setNotes] = useState(source === 'new' ? '' : source.notes ?? '')
+  const stateOptions = Array.from(new Set(['All', ...states, stateValue])).filter(Boolean)
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    onSave({
+      state: stateValue,
+      name,
+      sourceType,
+      url: url.trim() || null,
+      isEnabled,
+      scanCadence,
+      notes: notes.trim() || null,
+    })
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <th className="px-4 py-3">State</th>
-            <th className="px-4 py-3">Source</th>
-            <th className="px-4 py-3">Cadence</th>
-            <th className="px-4 py-3">Last Checked</th>
-            <th className="px-4 py-3">Last Changed</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {sources.map((source) => {
-            const scanning = scanningSourceId === source.id
-            return (
-              <tr key={source.id} className="align-top">
-                <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{source.state}</td>
-                <td className="min-w-[280px] px-4 py-3">
-                  <div className="font-medium text-slate-800">{source.name}</div>
-                  <div className="mt-1 text-xs text-slate-500">{source.sourceType}</div>
-                  {source.notes && <div className="mt-2 max-w-xl leading-5 text-slate-600">{source.notes}</div>}
-                  {source.url && <div className="mt-2 break-all text-xs text-blue-700">{source.url}</div>}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-700">{source.scanCadence}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastCheckedAt ? formatDate(source.lastCheckedAt) : '-'}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastChangedAt ? formatDate(source.lastChangedAt) : '-'}</td>
-                <td className="whitespace-nowrap px-4 py-3">
-                  <StatusPill status={source.isEnabled ? source.lastStatus : 'Disabled'} />
-                  {source.lastErrorMessage && <div className="mt-2 max-w-xs text-xs text-red-600">{source.lastErrorMessage}</div>}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => onScan(source.id)}
-                    disabled={!source.isEnabled || scanningSourceId !== null}
-                    className="inline-flex items-center gap-2 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
-                    Check
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
+      <form onSubmit={submit} className="w-full max-w-2xl rounded border bg-white shadow-xl">
+        <div className="flex items-center justify-between gap-4 border-b px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">{source === 'new' ? 'Add Source' : 'Edit Source'}</h2>
+          <button type="button" onClick={onClose} className="rounded p-2 text-slate-500 hover:bg-slate-100" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+          <label className="block text-sm font-medium text-slate-700">
+            State
+            <select
+              value={stateValue}
+              onChange={(event) => setStateValue(event.target.value)}
+              className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              {stateOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Source Type
+            <select
+              value={sourceType}
+              onChange={(event) => setSourceType(event.target.value)}
+              className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              {['Oden Export', 'Statute/Regulation', 'DOI Bulletin', 'OpenLaw API', 'LegiScan API', 'Other'].map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
+            Source Name
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              maxLength={160}
+              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
+            URL or API Endpoint
+            <input
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://"
+              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Cadence
+            <select
+              value={scanCadence}
+              onChange={(event) => setScanCadence(event.target.value)}
+              className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              {['Manual', 'Weekly', 'Monthly', 'Quarterly'].map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2 pt-6 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={isEnabled}
+              onChange={(event) => setIsEnabled(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            Enabled
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
+            Notes
+            <textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              rows={4}
+              maxLength={2000}
+              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            Save
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

@@ -47,6 +47,16 @@ export interface LegalTrackedSource {
   notes: string | null
 }
 
+export type LegalTrackedSourceInput = {
+  state: string
+  name: string
+  sourceType: string
+  url: string | null
+  isEnabled: boolean
+  scanCadence: string
+  notes: string | null
+}
+
 export interface LegalSourceScanRun {
   id: string
   sourceName: string
@@ -126,6 +136,16 @@ export const legalRequirementsApi = {
         state: filters.state || undefined,
       },
     })
+    return data
+  },
+
+  async createSource(input: LegalTrackedSourceInput) {
+    const { data } = await apiClient.post<LegalTrackedSource>('/legal-requirements/sources', input)
+    return data
+  },
+
+  async updateSource(sourceId: string, input: LegalTrackedSourceInput) {
+    const { data } = await apiClient.put<LegalTrackedSource>(`/legal-requirements/sources/${sourceId}`, input)
     return data
   },
 

@@ -129,6 +129,80 @@ public class LegalRequirementsController : ControllerBase
         return Ok(sources);
     }
 
+    [HttpPost("sources")]
+    public async Task<ActionResult<LegalTrackedSourceDto>> CreateSource([FromBody] LegalTrackedSourceUpsertDto dto)
+    {
+        var validationError = ValidateSource(dto);
+        if (validationError != null)
+            return BadRequest(new { errorMessage = validationError });
+
+        var state = dto.State.Trim();
+        var name = dto.Name.Trim();
+        var sourceType = dto.SourceType.Trim();
+
+        var exists = await _db.LegalTrackedSources.AnyAsync(s =>
+            s.State == state &&
+            s.Name == name &&
+            s.SourceType == sourceType);
+
+        if (exists)
+            return BadRequest(new { errorMessage = "A tracked source with the same state, name, and type already exists." });
+
+        var source = new LegalTrackedSource
+        {
+            State = state,
+            Name = name,
+            SourceType = sourceType,
+            Url = TrimToNull(dto.Url),
+            IsEnabled = dto.IsEnabled,
+            ScanCadence = dto.ScanCadence.Trim(),
+            LastStatus = "NotChecked",
+            Notes = TrimToNull(dto.Notes)
+        };
+
+        _db.LegalTrackedSources.Add(source);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetSources), new { state = source.State }, ToDto(source));
+    }
+
+    [HttpPut("sources/{sourceId:guid}")]
+    public async Task<ActionResult<LegalTrackedSourceDto>> UpdateSource(Guid sourceId, [FromBody] LegalTrackedSourceUpsertDto dto)
+    {
+        var source = await _db.LegalTrackedSources.FirstOrDefaultAsync(s => s.Id == sourceId);
+        if (source == null)
+            return NotFound();
+
+        var validationError = ValidateSource(dto);
+        if (validationError != null)
+            return BadRequest(new { errorMessage = validationError });
+
+        var state = dto.State.Trim();
+        var name = dto.Name.Trim();
+        var sourceType = dto.SourceType.Trim();
+
+        var exists = await _db.LegalTrackedSources.AnyAsync(s =>
+            s.Id != sourceId &&
+            s.State == state &&
+            s.Name == name &&
+            s.SourceType == sourceType);
+
+        if (exists)
+            return BadRequest(new { errorMessage = "A tracked source with the same state, name, and type already exists." });
+
+        source.State = state;
+        source.Name = name;
+        source.SourceType = sourceType;
+        source.Url = TrimToNull(dto.Url);
+        source.IsEnabled = dto.IsEnabled;
+        source.ScanCadence = dto.ScanCadence.Trim();
+        source.Notes = TrimToNull(dto.Notes);
+
+        await _db.SaveChangesAsync();
+
+        return Ok(ToDto(source));
+    }
+
     [HttpPost("sources/{sourceId:guid}/scan")]
     public async Task<ActionResult<LegalSourceScanRunDto>> ScanSource(Guid sourceId)
     {
@@ -606,6 +680,45 @@ public class LegalRequirementsController : ControllerBase
     {
         return value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
+
+    private static string? ValidateSource(LegalTrackedSourceUpsertDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.State))
+            return "State is required.";
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            return "Source name is required.";
+        if (string.IsNullOrWhiteSpace(dto.SourceType))
+            return "Source type is required.";
+        if (string.IsNullOrWhiteSpace(dto.ScanCadence))
+            return "Scan cadence is required.";
+        if (!string.IsNullOrWhiteSpace(dto.Url) &&
+            !Uri.TryCreate(dto.Url.Trim(), UriKind.Absolute, out _))
+            return "URL must be a valid absolute URL.";
+
+        return null;
+    }
+
+    private static string? TrimToNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static LegalTrackedSourceDto ToDto(LegalTrackedSource source)
+    {
+        return new LegalTrackedSourceDto(
+            source.Id,
+            source.State,
+            source.Name,
+            source.SourceType,
+            source.Url,
+            source.IsEnabled,
+            source.ScanCadence,
+            source.LastCheckedAt,
+            source.LastChangedAt,
+            source.LastStatus,
+            source.LastErrorMessage,
+            source.Notes);
+    }
 }
 
 public sealed record LegalRequirementSectionDto(
@@ -650,6 +763,15 @@ public sealed record LegalTrackedSourceDto(
     DateTime? LastChangedAt,
     string LastStatus,
     string? LastErrorMessage,
+    string? Notes);
+
+public sealed record LegalTrackedSourceUpsertDto(
+    string State,
+    string Name,
+    string SourceType,
+    string? Url,
+    bool IsEnabled,
+    string ScanCadence,
     string? Notes);
 
 public sealed record LegalSourceScanRunDto(
