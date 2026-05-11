@@ -36,7 +36,16 @@ export interface FmcsaAnalyticsStatus {
   carrierPeerSnapshotCount: number
   basicPeerMeasureCount: number
   hasRunningImport: boolean
+  scheduledJobs: FmcsaScheduledJob[]
   latestBatches: FmcsaAnalyticsImportBatch[]
+}
+
+export interface FmcsaScheduledJob {
+  name: string
+  enabled: boolean
+  schedule: string
+  nextRunAtUtc: string | null
+  status: string
 }
 
 export interface FmcsaAnalyticsRefresh {

@@ -70,6 +70,7 @@ export function AdminJobsPage() {
               <JobButton label="Run Full SMS Import" onClick={() => smsFull.mutate()} busy={smsFull.isPending} disabled={running} strong />
             </div>
 
+            {data.scheduledJobs.length > 0 && <ScheduleTable jobs={data.scheduledJobs} />}
             <BatchTable batches={data.latestBatches} />
           </>
         )}
@@ -96,6 +97,30 @@ function useJobMutation(action: () => Promise<unknown>, successMessage: string) 
       toast.error(message)
     },
   })
+}
+
+function ScheduleTable({ jobs }: { jobs: Array<{ name: string; enabled: boolean; schedule: string; nextRunAtUtc: string | null; status: string }> }) {
+  return (
+    <div className="border-t">
+      <div className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Schedule</div>
+      <div className="grid grid-cols-1 gap-3 px-5 pb-5 md:grid-cols-3">
+        {jobs.map((job) => (
+          <div key={job.name} className="rounded border bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-800">{job.name}</div>
+                <div className="mt-1 text-xs text-slate-500">{job.schedule}</div>
+              </div>
+              <StatusPill status={job.enabled ? job.status : 'Off'} />
+            </div>
+            <div className="mt-3 text-xs text-slate-500">
+              Next run: <span className="font-medium text-slate-700">{job.nextRunAtUtc ? formatDateTime(job.nextRunAtUtc) : '-'}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function JobButton({ label, onClick, busy, disabled, strong = false }: { label: string; onClick: () => void; busy: boolean; disabled: boolean; strong?: boolean }) {

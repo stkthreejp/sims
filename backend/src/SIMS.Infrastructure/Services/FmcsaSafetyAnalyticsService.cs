@@ -40,13 +40,15 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
     private readonly IServiceProvider _serviceProvider;
     private readonly FmcsaSocrataClient _socrata;
     private readonly FmcsaSocrataSettings _settings;
+    private readonly FmcsaJobSettings _jobSettings;
 
-    public FmcsaSafetyAnalyticsService(ApplicationDbContext appDb, IServiceProvider serviceProvider, FmcsaSocrataClient socrata, IOptions<FmcsaSocrataSettings> settings)
+    public FmcsaSafetyAnalyticsService(ApplicationDbContext appDb, IServiceProvider serviceProvider, FmcsaSocrataClient socrata, IOptions<FmcsaSocrataSettings> settings, IOptions<FmcsaJobSettings> jobSettings)
     {
         _appDb = appDb;
         _serviceProvider = serviceProvider;
         _socrata = socrata;
         _settings = settings.Value;
+        _jobSettings = jobSettings.Value;
     }
 
     public async Task<Result<FmcsaAnalyticsStatusDto>> GetStatusAsync(CancellationToken ct = default)
@@ -82,6 +84,7 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
             CarrierPeerSnapshotCount = await analyticsDb.FmcsaCarrierPeerSnapshots.CountAsync(ct),
             BasicPeerMeasureCount = await analyticsDb.FmcsaBasicPeerMeasures.CountAsync(ct),
             HasRunningImport = batches.Any(b => b.Status == "Running" && b.StartedAt > DateTime.UtcNow.AddHours(-4)),
+            ScheduledJobs = BuildScheduledJobs(),
             LatestBatches = batches,
         });
     }
@@ -269,6 +272,59 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
             BasicMeasureCount = measureCount,
             RefreshedAt = batch.CompletedAt!.Value,
         });
+    }
+
+    private List<FmcsaScheduledJobDto> BuildScheduledJobs()
+    {
+        var now = DateTime.UtcNow;
+        return
+        [
+            new()
+            {
+                Name = "Imported carrier analytics",
+                Enabled = _jobSettings.Enabled && _jobSettings.RunImportedCarrierAnalytics,
+                Schedule = $"Daily at {_jobSettings.DailyRunTimeUtc} UTC",
+                NextRunAtUtc = _jobSettings.Enabled && _jobSettings.RunImportedCarrierAnalytics
+                    ? NextDailyRun(now, ParseTime(_jobSettings.DailyRunTimeUtc))
+                    : null,
+                Status = _jobSettings.Enabled && _jobSettings.RunImportedCarrierAnalytics ? "Scheduled" : "Off",
+            },
+            new()
+            {
+                Name = "Inspection detail enrichment",
+                Enabled = _jobSettings.Enabled && _jobSettings.RunInspectionEnrichment,
+                Schedule = $"Daily at {_jobSettings.DailyRunTimeUtc} UTC",
+                NextRunAtUtc = _jobSettings.Enabled && _jobSettings.RunInspectionEnrichment
+                    ? NextDailyRun(now, ParseTime(_jobSettings.DailyRunTimeUtc))
+                    : null,
+                Status = _jobSettings.Enabled && _jobSettings.RunInspectionEnrichment ? "Scheduled" : "Off",
+            },
+            new()
+            {
+                Name = "Official SMS peer import",
+                Enabled = _jobSettings.Enabled && _jobSettings.RunOfficialSmsPeerImport,
+                Schedule = $"Monthly on day {Math.Clamp(_jobSettings.MonthlySmsImportDay, 1, 28)} at {_jobSettings.MonthlySmsImportTimeUtc} UTC",
+                NextRunAtUtc = _jobSettings.Enabled && _jobSettings.RunOfficialSmsPeerImport
+                    ? NextMonthlyRun(now, Math.Clamp(_jobSettings.MonthlySmsImportDay, 1, 28), ParseTime(_jobSettings.MonthlySmsImportTimeUtc))
+                    : null,
+                Status = _jobSettings.Enabled && _jobSettings.RunOfficialSmsPeerImport ? "Scheduled" : "Off",
+            },
+        ];
+    }
+
+    private static TimeSpan ParseTime(string value)
+        => TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var parsed) ? parsed : TimeSpan.FromHours(6);
+
+    private static DateTime NextDailyRun(DateTime now, TimeSpan runTime)
+    {
+        var next = now.Date.Add(runTime);
+        return next > now ? next : next.AddDays(1);
+    }
+
+    private static DateTime NextMonthlyRun(DateTime now, int day, TimeSpan runTime)
+    {
+        var next = new DateTime(now.Year, now.Month, day, 0, 0, 0, DateTimeKind.Utc).Add(runTime);
+        return next > now ? next : next.AddMonths(1);
     }
 
     private static async Task<(int Carriers, int BasicMeasures)> UpsertOfficialSmsRowsAsync(

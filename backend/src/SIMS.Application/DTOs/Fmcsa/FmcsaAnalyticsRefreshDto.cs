@@ -14,7 +14,17 @@ public class FmcsaAnalyticsStatusDto
     public int CarrierPeerSnapshotCount { get; set; }
     public int BasicPeerMeasureCount { get; set; }
     public bool HasRunningImport { get; set; }
+    public List<FmcsaScheduledJobDto> ScheduledJobs { get; set; } = new();
     public List<FmcsaAnalyticsImportBatchDto> LatestBatches { get; set; } = new();
+}
+
+public class FmcsaScheduledJobDto
+{
+    public string Name { get; set; } = string.Empty;
+    public bool Enabled { get; set; }
+    public string Schedule { get; set; } = string.Empty;
+    public DateTime? NextRunAtUtc { get; set; }
+    public string Status { get; set; } = string.Empty;
 }
 
 public class FmcsaAnalyticsImportBatchDto

@@ -109,6 +109,7 @@ public static class InfrastructureServiceExtensions
         // QBO
         services.Configure<QboSettings>(configuration.GetSection("Qbo"));
         services.Configure<FmcsaSocrataSettings>(configuration.GetSection("Fmcsa:Socrata"));
+        services.Configure<FmcsaJobSettings>(configuration.GetSection("Fmcsa:Jobs"));
         services.AddScoped<IQboTokenService, QboTokenService>();
         services.AddScoped<IQboApiClient, QboApiClient>();
         services.AddScoped<IJournalDriver, CsvJournalDriver>();
@@ -162,6 +163,7 @@ public static class InfrastructureServiceExtensions
         services.AddHostedService<TaskEscalationWorker>();
         services.AddHostedService<QboSyncRetryWorker>();
         services.AddHostedService<ShadowRateDailyReportWorker>();
+        services.AddHostedService<FmcsaScheduledJobsWorker>();
 
         return services;
     }
@@ -273,21 +275,36 @@ public static class InfrastructureServiceExtensions
 
     private static async Task SeedLegalRequirementSectionsAsync(ApplicationDbContext db)
     {
-        if (await db.LegalRequirementSections.AnyAsync())
+        var seedDir = Path.Combine(AppContext.BaseDirectory, "Data", "Seeds");
+        if (!Directory.Exists(seedDir))
             return;
 
-        var seedPath = Path.Combine(AppContext.BaseDirectory, "Data", "Seeds", "oden-commercial-cancellation.json");
-        if (!File.Exists(seedPath))
-            return;
-
-        var json = await File.ReadAllTextAsync(seedPath);
-        var seedRows = JsonSerializer.Deserialize<List<LegalRequirementSeedRow>>(json, new JsonSerializerOptions
+        var seedRows = new List<LegalRequirementSeedRow>();
+        foreach (var seedPath in Directory.EnumerateFiles(seedDir, "oden-commercial-*.json"))
         {
-            PropertyNameCaseInsensitive = true
-        }) ?? [];
+            var json = await File.ReadAllTextAsync(seedPath);
+            seedRows.AddRange(JsonSerializer.Deserialize<List<LegalRequirementSeedRow>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? []);
+        }
+
+        if (seedRows.Count == 0)
+            return;
+
+        var existingKeys = await db.LegalRequirementSections
+            .Select(r => new { r.State, r.LineOfBusiness, r.Action, r.Category, r.Topic })
+            .ToListAsync();
+        var existing = existingKeys
+            .Select(r => $"{r.State}|{r.LineOfBusiness}|{r.Action}|{r.Category}|{r.Topic}")
+            .ToHashSet();
 
         foreach (var row in seedRows)
         {
+            var key = $"{row.State}|{row.LineOfBusiness}|{row.Action}|{row.Category}|{row.Topic}";
+            if (existing.Contains(key))
+                continue;
+
             db.LegalRequirementSections.Add(new LegalRequirementSection
             {
                 State = row.State,
@@ -304,6 +321,7 @@ public static class InfrastructureServiceExtensions
                 LastVerifiedAt = DateTime.UtcNow,
                 SortOrder = row.SortOrder
             });
+            existing.Add(key);
         }
 
         await db.SaveChangesAsync();
@@ -334,6 +352,14 @@ public static class InfrastructureServiceExtensions
                 SourceType = "Oden Export",
                 ScanCadence = "Manual",
                 Notes = "Initial source of truth. Upload the latest Oden HTML export from the Source Scans tab."
+            },
+            new LegalTrackedSource
+            {
+                State = "All",
+                Name = "Oden Online Nonrenewal Chart",
+                SourceType = "Oden Export",
+                ScanCadence = "Manual",
+                Notes = "Initial nonrenewal source of truth. Upload the latest Oden HTML export from the Source Scans tab."
             },
             new LegalTrackedSource
             {
