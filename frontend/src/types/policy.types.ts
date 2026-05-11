@@ -46,6 +46,8 @@ export interface PolicyTransaction {
   priorPolicyId: string | null
   cancellationReason: string | null
   cancellationMethod: string | null
+  cancellationComplianceChecklist: CancellationComplianceChecklistItem[]
+  cancellationLegalRequirementSnapshotJson: string | null
   premiumChange: number
   newTotalPremium: number
   processedByName: string
@@ -60,6 +62,7 @@ export interface Policy {
   submissionNumber: string
   insuredId: string
   insuredName: string
+  insuredState: string
   carrierId: string
   carrierName: string
   lineOfBusiness: PolicyLineOfBusiness
@@ -104,4 +107,43 @@ export interface IssueEndorsement {
 export interface NonRenewPolicy {
   nonRenewedDate: string
   reason?: string
+}
+
+export interface CancelPolicy {
+  cancelledDate: string
+  reason: string
+  method: string
+  premiumChange: number
+  complianceChecklist: CancellationComplianceChecklistItem[]
+  legalRequirementSectionIds: string[]
+  notes?: string
+}
+
+export interface LegalComplianceGuidance {
+  state: string
+  lineOfBusiness: string
+  action: string
+  requirements: LegalComplianceRequirement[]
+  noticeRequirements: LegalComplianceRequirement[]
+  reasonRequirements: LegalComplianceRequirement[]
+  proofOfNoticeRequirements: LegalComplianceRequirement[]
+  lienholderRequirements: LegalComplianceRequirement[]
+  stateAuthorityRequirements: LegalComplianceRequirement[]
+  returnPremiumRequirements: LegalComplianceRequirement[]
+}
+
+export interface LegalComplianceRequirement {
+  id: string
+  category: string
+  topic: string
+  requirementText: string
+  citations: string[]
+  lastVerifiedAt: string
+}
+
+export interface CancellationComplianceChecklistItem {
+  key: string
+  label: string
+  isCompleted: boolean
+  requirementSectionIds: string[]
 }

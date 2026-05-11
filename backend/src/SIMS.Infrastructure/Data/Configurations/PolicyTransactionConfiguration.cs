@@ -16,6 +16,8 @@ public class PolicyTransactionConfiguration : IEntityTypeConfiguration<PolicyTra
         builder.Property(t => t.NewTotalPremium).HasPrecision(18, 2);
         builder.Property(t => t.CancellationReason).HasMaxLength(500);
         builder.Property(t => t.CancellationMethod).HasMaxLength(50);
+        builder.Property(t => t.CancellationComplianceChecklistJson).HasColumnType("text");
+        builder.Property(t => t.CancellationLegalRequirementSnapshotJson).HasColumnType("text");
         builder.Property(t => t.EndorsementDescription).HasMaxLength(2000);
         builder.Property(t => t.Notes).HasMaxLength(2000);
 

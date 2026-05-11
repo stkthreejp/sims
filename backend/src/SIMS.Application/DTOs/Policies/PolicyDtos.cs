@@ -26,6 +26,7 @@ public class PolicyDto
     public string SubmissionNumber { get; set; } = string.Empty;
     public Guid InsuredId { get; set; }
     public string InsuredName { get; set; } = string.Empty;
+    public string InsuredState { get; set; } = string.Empty;
     public Guid CarrierId { get; set; }
     public string CarrierName { get; set; } = string.Empty;
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
@@ -72,6 +73,8 @@ public class PolicyTransactionDto
     public Guid? PriorPolicyId { get; set; }
     public string? CancellationReason { get; set; }
     public string? CancellationMethod { get; set; }
+    public IReadOnlyList<CancellationComplianceChecklistItemDto> CancellationComplianceChecklist { get; set; } = [];
+    public string? CancellationLegalRequirementSnapshotJson { get; set; }
     public decimal PremiumChange { get; set; }
     public decimal NewTotalPremium { get; set; }
     public string ProcessedByName { get; set; } = string.Empty;
@@ -98,4 +101,47 @@ public class NonRenewPolicyDto
 {
     public DateOnly NonRenewedDate { get; set; }
     public string? Reason { get; set; }
+}
+
+public class CancelPolicyDto
+{
+    public DateOnly CancelledDate { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string Method { get; set; } = "Written Notice";
+    public decimal PremiumChange { get; set; }
+    public IReadOnlyList<CancellationComplianceChecklistItemDto> ComplianceChecklist { get; set; } = [];
+    public Guid[] LegalRequirementSectionIds { get; set; } = [];
+    public string? Notes { get; set; }
+}
+
+public class LegalComplianceGuidanceDto
+{
+    public string State { get; set; } = string.Empty;
+    public string LineOfBusiness { get; set; } = string.Empty;
+    public string Action { get; set; } = "Cancellation";
+    public IReadOnlyList<LegalComplianceRequirementDto> Requirements { get; set; } = [];
+    public IReadOnlyList<LegalComplianceRequirementDto> NoticeRequirements { get; set; } = [];
+    public IReadOnlyList<LegalComplianceRequirementDto> ReasonRequirements { get; set; } = [];
+    public IReadOnlyList<LegalComplianceRequirementDto> ProofOfNoticeRequirements { get; set; } = [];
+    public IReadOnlyList<LegalComplianceRequirementDto> LienholderRequirements { get; set; } = [];
+    public IReadOnlyList<LegalComplianceRequirementDto> StateAuthorityRequirements { get; set; } = [];
+    public IReadOnlyList<LegalComplianceRequirementDto> ReturnPremiumRequirements { get; set; } = [];
+}
+
+public class LegalComplianceRequirementDto
+{
+    public Guid Id { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public string Topic { get; set; } = string.Empty;
+    public string RequirementText { get; set; } = string.Empty;
+    public string[] Citations { get; set; } = [];
+    public DateTime LastVerifiedAt { get; set; }
+}
+
+public class CancellationComplianceChecklistItemDto
+{
+    public string Key { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public bool IsCompleted { get; set; }
+    public Guid[] RequirementSectionIds { get; set; } = [];
 }

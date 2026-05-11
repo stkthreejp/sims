@@ -19,6 +19,8 @@ public class PolicyTransaction : BaseEntity
     // Cancellation
     public string? CancellationReason { get; set; }
     public string? CancellationMethod { get; set; }
+    public string? CancellationComplianceChecklistJson { get; set; }
+    public string? CancellationLegalRequirementSnapshotJson { get; set; }
 
     // Financials
     public decimal PremiumChange { get; set; }

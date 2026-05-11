@@ -52,6 +52,7 @@ public class PoliciesController : ControllerBase
     // --- Endorsements ---
 
     [HttpPost("{id:guid}/endorsements")]
+    [Authorize(Policy = AppPermissions.PoliciesEndorse)]
     public async Task<IActionResult> AddEndorsement(Guid id, [FromBody] CreateEndorsementDto dto)
     {
         var result = await _policies.AddEndorsementAsync(id, dto, CurrentAccess);
@@ -59,6 +60,7 @@ public class PoliciesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/endorsements/{txnId:guid}/issue")]
+    [Authorize(Policy = AppPermissions.PoliciesEndorse)]
     public async Task<IActionResult> IssueEndorsement(Guid id, Guid txnId, [FromBody] IssueEndorsementDto dto)
     {
         var result = await _policies.IssueEndorsementAsync(id, txnId, dto, CurrentAccess);
@@ -68,16 +70,37 @@ public class PoliciesController : ControllerBase
     // --- Renewal ---
 
     [HttpPost("{id:guid}/renew")]
+    [Authorize(Policy = AppPermissions.PoliciesRenew)]
     public async Task<IActionResult> CreateRenewalQuote(Guid id)
     {
         var result = await _policies.CreateRenewalQuoteAsync(id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    // --- Cancellation guidance ---
+
+    [HttpGet("{id:guid}/cancellation-guidance")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public async Task<IActionResult> GetCancellationGuidance(Guid id)
+    {
+        var result = await _policies.GetCancellationGuidanceAsync(id, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    // --- Cancellation ---
+
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelPolicyDto dto)
+    {
+        var result = await _policies.CancelAsync(id, dto, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // --- Non-renewal ---
 
     [HttpPost("{id:guid}/non-renew")]
-    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
     public async Task<IActionResult> NonRenew(Guid id, [FromBody] NonRenewPolicyDto dto)
     {
         var result = await _policies.NonRenewAsync(id, dto, CurrentAccess);

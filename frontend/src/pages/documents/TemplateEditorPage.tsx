@@ -8,7 +8,7 @@ import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
 
-const ENTITY_TYPES: TemplateEntityType[] = ['General', 'Policy', 'Submission', 'Carrier', 'Agent']
+const ENTITY_TYPES: TemplateEntityType[] = ['General', 'Quote', 'Policy', 'Submission', 'Carrier', 'Agent']
 
 interface LocationState {
   importedHtml?: string
@@ -25,7 +25,7 @@ export function TemplateEditorPage() {
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [entityType, setEntityType] = useState<TemplateEntityType>('General')
+  const [entityType, setEntityType] = useState<TemplateEntityType>('Policy')
   const [isActive, setIsActive] = useState(true)
   const [content, setContent] = useState('<p></p>')
   const [isDirty, setIsDirty] = useState(false)

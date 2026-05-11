@@ -11,6 +11,7 @@ import { quotesApi } from '@/api/quotes.api'
 import { LOB_LABELS, type PolicyLineOfBusiness, type QuoteStatus } from '@/types/quote.types'
 import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -393,6 +394,7 @@ function NotesCard({ quoteId }: { quoteId: string }) {
 function DocumentsCard({ quoteId }: { quoteId: string }) {
   const qc = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
 
   const { data: attachments = [] } = useQuery({
     queryKey: ['quote-attachments', quoteId],
@@ -451,6 +453,10 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
         right={
           <>
             <input ref={fileInputRef} type="file" className="hidden" onChange={onFileChange} />
+            <Btn variant="outline" onClick={() => setShowGenerateModal(true)}>
+              <FileOutput className="h-3.5 w-3.5" />
+              Generate
+            </Btn>
             <Btn variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending}>
               <Upload className="h-3.5 w-3.5" />
               {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
@@ -458,6 +464,13 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
           </>
         }
       />
+      {showGenerateModal && (
+        <GenerateDocumentModal
+          entityType="Quote"
+          entityId={quoteId}
+          onClose={() => setShowGenerateModal(false)}
+        />
+      )}
       {attachments.length === 0 ? (
         <p className="px-5 py-6 text-sm text-slate-400">No documents yet.</p>
       ) : (

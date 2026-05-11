@@ -13,13 +13,14 @@ import { formatDateTime } from '@/lib/utils'
 
 const ENTITY_TYPE_COLORS: Record<TemplateEntityType, string> = {
   General:    'bg-slate-100 text-slate-600',
+  Quote:      'bg-cyan-100 text-cyan-700',
   Policy:     'bg-blue-100 text-blue-700',
   Submission: 'bg-yellow-100 text-yellow-700',
   Carrier:    'bg-purple-100 text-purple-700',
   Agent:      'bg-green-100 text-green-700',
 }
 
-const ALL_TYPES: (TemplateEntityType | 'All')[] = ['All', 'General', 'Policy', 'Submission', 'Carrier', 'Agent']
+const ALL_TYPES: (TemplateEntityType | 'All')[] = ['All', 'General', 'Quote', 'Policy', 'Submission', 'Carrier', 'Agent']
 
 export function DocumentLibraryPage() {
   const navigate = useNavigate()

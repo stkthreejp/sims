@@ -7,6 +7,7 @@ using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
+using System.Text.Json;
 
 namespace SIMS.Application.Services;
 
@@ -222,6 +223,74 @@ public class PolicyService : IPolicyService
         return await quoteService.CreateAsync(renewalDto, access.UserId);
     }
 
+    public async Task<Result<PolicyDto>> CancelAsync(Guid policyId, CancelPolicyDto dto, UserAccessScope access)
+    {
+        var policy = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can be cancelled.");
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return Result<PolicyDto>.Failure("REASON_REQUIRED", "Cancellation reason is required.");
+        if (dto.CancelledDate < policy.EffectiveDate || dto.CancelledDate > policy.ExpirationDate)
+            return Result<PolicyDto>.Failure("INVALID_DATE", "Cancellation date must be within the policy term.");
+        if (dto.ComplianceChecklist.Count == 0 || dto.ComplianceChecklist.Any(i => !i.IsCompleted))
+            return Result<PolicyDto>.Failure("COMPLIANCE_REVIEW_REQUIRED", "Complete the cancellation compliance checklist before cancelling the policy.");
+
+        var state = NormalizeState(policy.Submission?.Insured?.State);
+        var legalRequirementIds = dto.LegalRequirementSectionIds
+            .Concat(dto.ComplianceChecklist.SelectMany(i => i.RequirementSectionIds))
+            .Distinct()
+            .ToArray();
+        var legalRequirements = legalRequirementIds.Length == 0
+            ? await GetCancellationRequirementQuery(state).ToListAsync()
+            : await GetCancellationRequirementQuery(state)
+                .Where(r => legalRequirementIds.Contains(r.Id))
+                .ToListAsync();
+        var legalSnapshot = legalRequirements.Select(r => new
+        {
+            r.Id,
+            r.State,
+            r.Category,
+            r.Topic,
+            r.RequirementText,
+            r.Citations,
+            r.LastVerifiedAt
+        }).ToList();
+
+        policy.Status = PolicyStatus.Cancelled;
+        policy.CancelledDate = dto.CancelledDate;
+        policy.TotalPremium += dto.PremiumChange;
+        policy.UpdatedAt = DateTime.UtcNow;
+
+        Db.Set<PolicyTransaction>().Add(new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            TransactionType = TransactionType.Cancellation,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = await GenerateTransactionNumberAsync(),
+            EffectiveDate = dto.CancelledDate,
+            CancellationReason = dto.Reason.Trim(),
+            CancellationMethod = string.IsNullOrWhiteSpace(dto.Method) ? "Written Notice" : dto.Method.Trim(),
+            CancellationComplianceChecklistJson = JsonSerializer.Serialize(dto.ComplianceChecklist),
+            CancellationLegalRequirementSnapshotJson = JsonSerializer.Serialize(legalSnapshot),
+            PremiumChange = dto.PremiumChange,
+            NewTotalPremium = policy.TotalPremium,
+            ProcessedById = access.UserId,
+            ProcessedAt = DateTime.UtcNow,
+            Notes = dto.Notes
+        });
+
+        await Db.SaveChangesAsync();
+        return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
     public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
@@ -242,6 +311,60 @@ public class PolicyService : IPolicyService
         await Db.SaveChangesAsync();
 
         return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
+    public async Task<Result<LegalComplianceGuidanceDto>> GetCancellationGuidanceAsync(Guid policyId, UserAccessScope access)
+    {
+        var policy = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<LegalComplianceGuidanceDto>.Failure("NOT_FOUND", "Policy not found.");
+
+        var state = NormalizeState(policy.Submission?.Insured?.State);
+        if (string.IsNullOrWhiteSpace(state))
+            return Result<LegalComplianceGuidanceDto>.Failure("STATE_REQUIRED", "Insured state is required for cancellation guidance.");
+
+        var rows = await GetCancellationRequirementQuery(state)
+            .Select(r => new LegalComplianceRequirementDto
+            {
+                Id = r.Id,
+                Category = r.Category,
+                Topic = r.Topic,
+                RequirementText = r.RequirementText,
+                Citations = r.Citations,
+                LastVerifiedAt = r.LastVerifiedAt
+            })
+            .ToListAsync();
+
+        return Result<LegalComplianceGuidanceDto>.Success(new LegalComplianceGuidanceDto
+        {
+            State = state,
+            LineOfBusiness = policy.LineOfBusiness.ToString(),
+            Action = "Cancellation",
+            Requirements = rows,
+            NoticeRequirements = rows.Where(r => r.Category == "NOTICE REQUIREMENTS").ToList(),
+            ReasonRequirements = rows.Where(r => r.Category == "REASONS").ToList(),
+            ProofOfNoticeRequirements = rows.Where(r => ContainsAny(r.Topic, "Proof")).ToList(),
+            LienholderRequirements = rows.Where(r => ContainsAny(r.Topic, "Lienholder", "Mortgagee")).ToList(),
+            StateAuthorityRequirements = rows.Where(r =>
+                ContainsAny(r.Topic, "State Authority") ||
+                ContainsAny(r.RequirementText, "Department", "DMV", "Motor Vehicle")).ToList(),
+            ReturnPremiumRequirements = rows.Where(r =>
+                ContainsAny(r.Topic, "Return of Unearned Premium") ||
+                ContainsAny(r.RequirementText, "unearned premium")).ToList()
+        });
+    }
+
+    private IQueryable<LegalRequirementSection> GetCancellationRequirementQuery(string state)
+    {
+        return Db.Set<LegalRequirementSection>()
+            .Where(r => r.State == state && r.Action == "Cancellation")
+            .OrderBy(r => r.Category == "NOTICE REQUIREMENTS" ? 0 :
+                          r.Category == "REASONS" ? 1 :
+                          r.Category == "INSURER REQUIREMENTS" ? 2 : 3)
+            .ThenBy(r => r.SortOrder);
     }
 
     private async Task<string> GenerateTransactionNumberAsync()
@@ -286,6 +409,7 @@ public class PolicyService : IPolicyService
             SubmissionNumber = p.Submission?.SubmissionNumber ?? "",
             InsuredId = p.Submission?.InsuredId ?? Guid.Empty,
             InsuredName = p.Submission?.Insured?.DisplayName ?? "",
+            InsuredState = p.Submission?.Insured?.State ?? "",
             CarrierId = p.CarrierId,
             CarrierName = p.Carrier?.Name ?? "",
             LineOfBusiness = p.LineOfBusiness,
@@ -319,6 +443,37 @@ public class PolicyService : IPolicyService
         };
     }
 
+    private static string NormalizeState(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var trimmed = value.Trim();
+        if (trimmed.Length != 2) return trimmed;
+
+        return trimmed.ToUpperInvariant() switch
+        {
+            "AL" => "Alabama",
+            "AR" => "Arkansas",
+            "FL" => "Florida",
+            "GA" => "Georgia",
+            "LA" => "Louisiana",
+            "MD" => "Maryland",
+            "MS" => "Mississippi",
+            "NC" => "North Carolina",
+            "OK" => "Oklahoma",
+            "PA" => "Pennsylvania",
+            "SC" => "South Carolina",
+            "TN" => "Tennessee",
+            "TX" => "Texas",
+            "VA" => "Virginia",
+            _ => trimmed
+        };
+    }
+
+    private static bool ContainsAny(string value, params string[] needles)
+    {
+        return needles.Any(n => value.Contains(n, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static PolicyTransactionDto MapToTransactionDto(PolicyTransaction t) => new()
     {
         Id = t.Id,
@@ -331,6 +486,8 @@ public class PolicyService : IPolicyService
         PriorPolicyId = t.PriorPolicyId,
         CancellationReason = t.CancellationReason,
         CancellationMethod = t.CancellationMethod,
+        CancellationComplianceChecklist = DeserializeChecklist(t.CancellationComplianceChecklistJson),
+        CancellationLegalRequirementSnapshotJson = t.CancellationLegalRequirementSnapshotJson,
         PremiumChange = t.PremiumChange,
         NewTotalPremium = t.NewTotalPremium,
         ProcessedByName = t.ProcessedBy != null
@@ -339,4 +496,18 @@ public class PolicyService : IPolicyService
         ProcessedAt = t.ProcessedAt,
         Notes = t.Notes,
     };
+
+    private static IReadOnlyList<CancellationComplianceChecklistItemDto> DeserializeChecklist(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<IReadOnlyList<CancellationComplianceChecklistItemDto>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
 }

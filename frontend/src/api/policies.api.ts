@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Policy, PolicyListItem, PolicyTransaction, CreateEndorsement, IssueEndorsement, NonRenewPolicy } from '@/types/policy.types'
+import type { Policy, PolicyListItem, PolicyTransaction, CreateEndorsement, IssueEndorsement, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance } from '@/types/policy.types'
 import type { Quote } from '@/types/quote.types'
 import type { Note } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
@@ -22,6 +22,12 @@ export const policiesApi = {
 
   createRenewalQuote: (id: string) =>
     apiClient.post<Quote>(`/policies/${id}/renew`).then((r) => r.data),
+
+  getCancellationGuidance: (id: string) =>
+    apiClient.get<LegalComplianceGuidance>(`/policies/${id}/cancellation-guidance`).then((r) => r.data),
+
+  cancel: (id: string, data: CancelPolicy) =>
+    apiClient.post<Policy>(`/policies/${id}/cancel`, data).then((r) => r.data),
 
   nonRenew: (id: string, data: NonRenewPolicy) =>
     apiClient.post<Policy>(`/policies/${id}/non-renew`, data).then((r) => r.data),
