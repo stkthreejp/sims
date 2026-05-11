@@ -1546,7 +1546,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .Select(v => v.ReportNumber)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var geocodedCount = 0;
+        var inspectionGeocodeCount = 0;
+        var countyEstimateCount = 0;
         var stateEstimateCount = 0;
         var unknownCount = 0;
 
@@ -1555,7 +1556,11 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             var band = bands.Last();
             if (inspection.Latitude != null && inspection.Longitude != null)
             {
-                geocodedCount++;
+                if (IsCountyEstimate(inspection.GeocodePrecision))
+                    countyEstimateCount++;
+                else
+                    inspectionGeocodeCount++;
+
                 var miles = HaversineMiles(
                     (double)insured.Latitude.Value,
                     (double)insured.Longitude.Value,
@@ -1593,24 +1598,28 @@ public class FmcsaSafetyService : IFmcsaSafetyService
 
         summary.PrecisionCounts =
         [
-            new AutoSafetyRadiusPrecisionDto { Label = "Inspection geocode", Count = geocodedCount },
+            new AutoSafetyRadiusPrecisionDto { Label = "Inspection geocode", Count = inspectionGeocodeCount },
+            new AutoSafetyRadiusPrecisionDto { Label = "County estimate", Count = countyEstimateCount },
             new AutoSafetyRadiusPrecisionDto { Label = "State estimate", Count = stateEstimateCount },
             new AutoSafetyRadiusPrecisionDto { Label = "Unknown", Count = unknownCount },
         ];
 
-        if (geocodedCount == inspections.Count)
+        if (inspectionGeocodeCount == inspections.Count)
         {
             summary.Precision = "Inspection geocode";
             summary.Note = "Distances use stored/geocoded inspection locations.";
         }
-        else if (stateEstimateCount > 0)
+        else if (countyEstimateCount > 0 || stateEstimateCount > 0)
         {
             summary.Precision = "Mixed precision";
-            summary.Note = "Some inspections use stored/geocoded locations. Rows without inspection coordinates use low-precision state-centroid estimates.";
+            summary.Note = "Some inspections use stored/geocoded locations. Rows without inspection coordinates use county estimates when available, then low-precision state-centroid estimates.";
         }
 
         return summary;
     }
+
+    private static bool IsCountyEstimate(string? precision) =>
+        precision?.StartsWith("County estimate", StringComparison.OrdinalIgnoreCase) == true;
 
     private static int CountInspectionOos(List<FmcsaInspection> inspections, List<FmcsaViolation> violations)
     {

@@ -36,7 +36,7 @@ public class FmcsaInspectionEnrichmentService : IFmcsaInspectionEnrichmentServic
             .OrderByDescending(i => i.InspectionDate)
             .Where(i =>
                 i.DetailEnrichedAt == null ||
-                (i.Latitude == null && i.InspectionLocation != null && i.InspectionCounty != null))
+                (i.Latitude == null && i.State != null && (i.InspectionLocation != null || i.InspectionCounty != null || i.CountyCode != null)))
             .Take(maxInspections)
             .ToListAsync(ct);
 
@@ -96,6 +96,16 @@ public class FmcsaInspectionEnrichmentService : IFmcsaInspectionEnrichmentServic
         {
             inspection.InspectionLevelDescription = levelDescription;
             updated = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(inspection.InspectionCounty))
+        {
+            var county = FmcsaCountyLookup.GetCountyName(inspection.CountyCodeState ?? inspection.State, inspection.CountyCode);
+            if (!string.IsNullOrWhiteSpace(county))
+            {
+                inspection.InspectionCounty = county;
+                updated = true;
+            }
         }
 
         return updated;
@@ -159,28 +169,70 @@ public class FmcsaInspectionEnrichmentService : IFmcsaInspectionEnrichmentServic
         if (inspection.Latitude != null && inspection.Longitude != null)
             return false;
 
-        if (string.IsNullOrWhiteSpace(inspection.InspectionLocation) || string.IsNullOrWhiteSpace(inspection.State))
+        if (string.IsNullOrWhiteSpace(inspection.State))
             return false;
 
-        var city = !string.IsNullOrWhiteSpace(inspection.InspectionCounty)
-            ? $"{inspection.InspectionCounty} County"
-            : inspection.State;
+        var candidates = BuildGeocodeCandidates(inspection);
+        foreach (var candidate in candidates)
+        {
+            var geocode = await _geocoding.GeocodeAsync(candidate.Request, ct);
+            if (geocode == null)
+                continue;
 
-        var geocode = await _geocoding.GeocodeAsync(new GeocodeRequest(
-            inspection.InspectionLocation,
-            null,
-            city,
-            inspection.State,
-            string.Empty), ct);
+            inspection.Latitude = geocode.Latitude;
+            inspection.Longitude = geocode.Longitude;
+            inspection.GeocodePrecision = string.IsNullOrWhiteSpace(geocode.Precision)
+                ? candidate.Precision
+                : $"{candidate.Precision}:{geocode.Precision}";
+            return true;
+        }
 
-        if (geocode == null)
-            return false;
-
-        inspection.Latitude = geocode.Latitude;
-        inspection.Longitude = geocode.Longitude;
-        inspection.GeocodePrecision = geocode.Precision;
-        return true;
+        return false;
     }
+
+    private static List<GeocodeCandidate> BuildGeocodeCandidates(FmcsaInspection inspection)
+    {
+        var candidates = new List<GeocodeCandidate>();
+        var county = inspection.InspectionCounty;
+        var state = inspection.State ?? string.Empty;
+
+        if (HasUsableInspectionLocation(inspection.InspectionLocation))
+        {
+            candidates.Add(new GeocodeCandidate(
+                "Inspection location",
+                new GeocodeRequest(
+                    inspection.InspectionLocation!,
+                    null,
+                    !string.IsNullOrWhiteSpace(county) ? $"{county} County" : string.Empty,
+                    state,
+                    string.Empty)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(county))
+        {
+            candidates.Add(new GeocodeCandidate(
+                "County estimate",
+                new GeocodeRequest(
+                    $"{county} County",
+                    null,
+                    string.Empty,
+                    state,
+                    string.Empty)));
+        }
+
+        return candidates;
+    }
+
+    private static bool HasUsableInspectionLocation(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim().ToUpperInvariant();
+        return normalized is not "NOT REPORTED" and not "NOT LISTED" and not "ROAD SIDE" and not "ROADSIDE";
+    }
+
+    private sealed record GeocodeCandidate(string Precision, GeocodeRequest Request);
 
     private static InspectionDetail ParseInspectionDetail(string html)
     {
