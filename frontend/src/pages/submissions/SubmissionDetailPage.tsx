@@ -2,9 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowLeft, Plus, Pencil, Trash2, CheckCircle, X, Check, FileText,
-  RefreshCw, AlertTriangle, TrendingDown, Calculator, MoreHorizontal,
-  ShieldCheck, ExternalLink,
+  ArrowLeft, Plus, Pencil, Trash2, X, Check, FileText,
+  RefreshCw, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
@@ -20,10 +19,8 @@ import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SET
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
-import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
+import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
-import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
 import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
@@ -45,8 +42,6 @@ const LOB_SHORT: Record<string, string> = {
   Cyber: 'CYB',
   ExcessLiability: 'XS',
 }
-
-const AUTO_SAFETY_LOBS = new Set<PolicyLineOfBusiness>(['AutoLiability', 'AutoPhysicalDamage', 'CommercialAuto'])
 
 const STATUS_PILL: Record<SubmissionStatus, string> = {
   New: 'new',
@@ -149,17 +144,10 @@ export function SubmissionDetailPage() {
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
-  const [bindingQuoteId, setBindingQuoteId] = useState<string | null>(null)
-  const [bindForm, setBindForm] = useState({ boundDate: '', effectiveDate: '', expirationDate: '' })
 
   const openLossHistory = () => {
     if (id) navigate(`/submissions/${id}/loss-history`)
   }
-  const [overrideQuoteId, setOverrideQuoteId] = useState<string | null>(null)
-  const [overrideMode, setOverrideMode] = useState<'dollar' | 'rate'>('dollar')
-  const [overrideInput, setOverrideInput] = useState('')
-  const [ratingOpenForQuoteId, setRatingOpenForQuoteId] = useState<string | null>(null)
-  const [autoSafetyOpenForQuoteId, setAutoSafetyOpenForQuoteId] = useState<string | null>(null)
   const [supplementalOpen, setSupplementalOpen] = useState(false)
   const emptyDriverForm = (): SubmissionDriverCreate => ({ driverNumber: 1, name: '', dateOfBirth: undefined, licenseNumber: undefined, licenseState: undefined, dateHired: undefined })
   const [showDriverForm, setShowDriverForm] = useState(false)
@@ -365,29 +353,6 @@ export function SubmissionDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to delete quote'),
   })
 
-  const bindMutation = useMutation({
-    mutationFn: ({ quoteId, data }: { quoteId: string; data: QuoteBind }) => quotesApi.bind(quoteId, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', id] })
-      qc.invalidateQueries({ queryKey: ['submissions', id] })
-      setBindingQuoteId(null)
-      toast.success('Quote bound — policy created')
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to bind quote'),
-  })
-
-  const commissionOverrideMutation = useMutation({
-    mutationFn: ({ quoteId, data }: { quoteId: string; data: CommissionOverrideRequest }) =>
-      quotesApi.commissionOverride(quoteId, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', id] })
-      setOverrideQuoteId(null)
-      setOverrideInput('')
-      toast.success('Commission give-back applied — premium updated')
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to apply commission override'),
-  })
-
   const saveDriverMutation = useMutation({
     mutationFn: (dto: SubmissionDriverCreate) =>
       editingDriverId
@@ -502,14 +467,6 @@ export function SubmissionDetailPage() {
     })
   }
 
-  const handleBind = () => {
-    if (!bindingQuoteId || !bindForm.boundDate || !bindForm.effectiveDate || !bindForm.expirationDate) {
-      toast.error('All bind dates are required')
-      return
-    }
-    bindMutation.mutate({ quoteId: bindingQuoteId, data: bindForm })
-  }
-
   const setQF = (k: keyof QuoteForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const val = e.target.value
     setQuoteForm((prev) => {
@@ -611,6 +568,7 @@ export function SubmissionDetailPage() {
                     <Link to={`/quotes/${q.id}`} className="carrier hover:underline">{q.carrierName}</Link>
                     <span className={`sd-pill ${QUOTE_STATUS_PILL[q.status]}`}>{QUOTE_STATUS_LABELS[q.status]}</span>
                     <div className="prem" style={{ marginLeft: 'auto' }}>
+                      <div className="s">Quoted premium</div>
                       {q.totalPremium == null || q.totalPremium === 0
                         ? <div className="v" style={{ color: 'var(--ink-4)' }}>—</div>
                         : <div className="v">{fmtMoney(q.totalPremium)}</div>}
@@ -624,48 +582,9 @@ export function SubmissionDetailPage() {
                   </div>
                 </div>
                 <div className="acts">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setRatingOpenForQuoteId((cur) => cur === q.id ? null : q.id) }}
-                    className={`sd-btn sm ${ratingOpenForQuoteId === q.id ? 'primary' : 'outline'}`}
-                    title="Rating engine"
-                  >
-                    <Calculator size={12} /> Rate
-                  </button>
-                  {AUTO_SAFETY_LOBS.has(q.lineOfBusiness) && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setAutoSafetyOpenForQuoteId((cur) => cur === q.id ? null : q.id) }}
-                      className={`sd-btn sm ${autoSafetyOpenForQuoteId === q.id ? 'primary' : 'outline'}`}
-                      title="FMCSA auto safety"
-                    >
-                      <ShieldCheck size={12} /> Safety
-                    </button>
-                  )}
-                  {q.status !== 'Bound' && q.status !== 'Cancelled' && q.status !== 'Expired' && canCreatePolicies && !q.hasCommissionOverride && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setOverrideQuoteId(q.id); setOverrideMode('dollar'); setOverrideInput('') }}
-                      className="sd-btn sm outline"
-                      title="Reduce commission"
-                    >
-                      <TrendingDown size={12} /> Reduce
-                    </button>
-                  )}
-                  {q.status !== 'Bound' && q.status !== 'Cancelled' && q.status !== 'Expired' && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setBindingQuoteId(q.id); setBindForm({ boundDate: '', effectiveDate: q.effectiveDate, expirationDate: q.expirationDate }) }}
-                      className="sd-btn sm success"
-                    >
-                      <CheckCircle size={12} /> Bind
-                    </button>
-                  )}
                   {q.status === 'Bound' && (
                     <Link to={`/policies/${q.id}`} className="sd-btn sm outline">View Policy</Link>
                   )}
-                  <Link to={`/quotes/${q.id}`} className="sd-btn sm outline">
-                    <ExternalLink size={12} /> Detail
-                  </Link>
-                  <Link to={`/quotes/${q.id}/writeup`} className="sd-btn sm ghost" title="UW Writeup">
-                    <FileText size={12} />
-                  </Link>
                   {q.status !== 'Bound' && (
                     <button
                       onClick={(e) => { e.stopPropagation(); if (confirm('Delete this quote?')) deleteQuoteMutation.mutate(q.id) }}
@@ -677,85 +596,6 @@ export function SubmissionDetailPage() {
                   )}
                 </div>
               </div>
-
-              {/* Commission override panel */}
-              {overrideQuoteId === q.id && (
-                <div style={{ padding: '14px 16px', background: 'var(--warn-bg)', borderTop: '1px solid #f0dbb0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <TrendingDown size={14} style={{ color: 'var(--warn-fg)' }} />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--warn-fg)' }}>Reduce Agent Commission — lower premium for competitive pricing</span>
-                  </div>
-                  <p style={{ fontSize: 11.5, color: 'var(--warn-fg)', marginBottom: 12, marginTop: 0 }}>
-                    Carrier net and SMM commission are unchanged. Agent gives back part of their commission, reducing total premium.
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', borderRadius: 6, border: '1px solid #e8c97a', overflow: 'hidden', fontSize: 12 }}>
-                      <button onClick={() => setOverrideMode('dollar')} style={{ padding: '6px 12px', background: overrideMode === 'dollar' ? '#c07d10' : '#fff', color: overrideMode === 'dollar' ? '#fff' : 'var(--warn-fg)', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>$ Give-Back</button>
-                      <button onClick={() => setOverrideMode('rate')} style={{ padding: '6px 12px', background: overrideMode === 'rate' ? '#c07d10' : '#fff', color: overrideMode === 'rate' ? '#fff' : 'var(--warn-fg)', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>% New Rate</button>
-                    </div>
-                    <input
-                      type="number" min="0"
-                      step={overrideMode === 'dollar' ? '1' : '0.01'}
-                      value={overrideInput}
-                      onChange={(e) => setOverrideInput(e.target.value)}
-                      placeholder={overrideMode === 'dollar' ? 'e.g. 500' : 'e.g. 8.5'}
-                      style={{ width: 120, border: '1px solid #e8c97a', borderRadius: 6, padding: '6px 8px', fontSize: 13, fontFamily: 'inherit' }}
-                    />
-                    <button
-                      onClick={() => {
-                        const val = parseFloat(overrideInput)
-                        if (isNaN(val) || val <= 0) { toast.error('Enter a valid amount'); return }
-                        const data: CommissionOverrideRequest = overrideMode === 'dollar' ? { givebackAmount: val } : { newAgentRate: val / 100 }
-                        commissionOverrideMutation.mutate({ quoteId: q.id, data })
-                      }}
-                      disabled={commissionOverrideMutation.isPending}
-                      className="sd-btn sm"
-                      style={{ background: '#c07d10', color: '#fff', border: 0 }}
-                    >
-                      <Check size={12} /> Apply
-                    </button>
-                    <button onClick={() => setOverrideQuoteId(null)} className="sd-btn sm outline"><X size={12} /> Cancel</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Rating panel */}
-              {ratingOpenForQuoteId === q.id && (
-                <QuoteRatingPanel
-                  quoteId={q.id}
-                  submissionId={q.submissionId}
-                  lineOfBusiness={q.lineOfBusiness}
-                  isBound={q.status === 'Bound'}
-                />
-              )}
-
-              {/* Auto safety panel */}
-              {autoSafetyOpenForQuoteId === q.id && AUTO_SAFETY_LOBS.has(q.lineOfBusiness) && (
-                <QuoteAutoSafetyPanel quoteId={q.id} />
-              )}
-
-              {/* Bind form */}
-              {bindingQuoteId === q.id && (
-                <div style={{ padding: '14px 16px', background: 'var(--good-bg)', borderTop: '1px solid #b8dfc4' }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--good-fg)', marginBottom: 12, marginTop: 0 }}>Bind Quote — confirm policy dates</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
-                    {[
-                      { label: 'Bound Date *', key: 'boundDate' },
-                      { label: 'Effective Date *', key: 'effectiveDate' },
-                      { label: 'Expiration Date *', key: 'expirationDate' },
-                    ].map(({ label, key }) => (
-                      <div key={key}>
-                        <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: 'var(--ink-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</label>
-                        <input type="date" value={bindForm[key as keyof typeof bindForm]} onChange={(e) => setBindForm((b) => ({ ...b, [key]: e.target.value }))} style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px', fontSize: 13, fontFamily: 'inherit' }} />
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={handleBind} disabled={bindMutation.isPending} className="sd-btn success sm"><CheckCircle size={12} /> Confirm Bind</button>
-                    <button onClick={() => setBindingQuoteId(null)} className="sd-btn outline sm"><X size={12} /> Cancel</button>
-                  </div>
-                </div>
-              )}
             </div>
           ))}
         </div>

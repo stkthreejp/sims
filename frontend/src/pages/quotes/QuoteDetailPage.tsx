@@ -2,18 +2,20 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowLeft, Check, CheckCircle2, ChevronRight, Copy, Download,
+  ArrowLeft, Calculator, Check, CheckCircle2, ChevronRight, Copy, Download,
   Edit2, FileOutput, FileText, MoreHorizontal, Pin, Plus, RefreshCw,
   ShieldCheck, Trash2, TrendingDown, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
-import { LOB_LABELS, type PolicyLineOfBusiness, type QuoteStatus } from '@/types/quote.types'
+import { LOB_LABELS, type CommissionOverrideRequest, type PolicyLineOfBusiness, type QuoteStatus } from '@/types/quote.types'
 import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
+import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { attachmentsApi } from '@/api/attachments.api'
 import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
+import { usePermissions } from '@/hooks/usePermissions'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -526,7 +528,13 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
 export function QuoteDetailPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const { canCreatePolicies } = usePermissions()
   const [showBind, setShowBind] = useState(false)
+  const [showRating, setShowRating] = useState(false)
+  const [showReduce, setShowReduce] = useState(false)
+  const [overrideMode, setOverrideMode] = useState<'dollar' | 'rate'>('dollar')
+  const [overrideInput, setOverrideInput] = useState('')
 
   const { data: quote, isLoading, isError } = useQuery({
     queryKey: ['quotes', quoteId],
@@ -552,6 +560,18 @@ export function QuoteDetailPage() {
     enabled: !!quoteId,
   })
 
+  const commissionOverrideMutation = useMutation({
+    mutationFn: (data: CommissionOverrideRequest) => quotesApi.commissionOverride(quoteId!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quotes', quoteId] })
+      qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', quote?.submissionId] })
+      setShowReduce(false)
+      setOverrideInput('')
+      toast.success('Commission give-back applied')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to apply commission override'),
+  })
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -572,6 +592,7 @@ export function QuoteDetailPage() {
   const isAuto = AUTO_LOBS.has(quote.lineOfBusiness)
   const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted).length
   const canBind = (quote.status === 'Quoted' || quote.status === 'Submitted') && openBlockers === 0
+  const canReduce = quote.status !== 'Bound' && quote.status !== 'Cancelled' && quote.status !== 'Expired' && canCreatePolicies && !quote.commissionOverride
   const otherQuotes = siblingQuotes.filter((q) => q.id !== quote.id)
 
   // Commission: use override if present, else computed amounts
@@ -627,6 +648,14 @@ export function QuoteDetailPage() {
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">
+            <Btn variant={showRating ? 'primary' : 'outline'} onClick={() => setShowRating((v) => !v)}>
+              <Calculator className="h-3.5 w-3.5" /> Rate
+            </Btn>
+            {canReduce && (
+              <Btn variant={showReduce ? 'primary' : 'outline'} onClick={() => { setShowReduce((v) => !v); setOverrideMode('dollar'); setOverrideInput('') }}>
+                <TrendingDown className="h-3.5 w-3.5" /> Reduce
+              </Btn>
+            )}
             <Btn variant="outline">
               <Copy className="h-3.5 w-3.5" /> Duplicate
             </Btn>
@@ -646,6 +675,76 @@ export function QuoteDetailPage() {
 
         {/* Stage bar */}
         <StageBar status={quote.status} issuedDate={quote.issuedDate} />
+
+        {showRating && (
+          <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <QuoteRatingPanel
+              quoteId={quoteId!}
+              submissionId={quote.submissionId}
+              lineOfBusiness={quote.lineOfBusiness}
+              isBound={quote.status === 'Bound'}
+            />
+          </div>
+        )}
+
+        {showReduce && (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-amber-700" />
+              <div>
+                <h2 className="text-sm font-semibold text-amber-900">Reduce agent commission</h2>
+                <p className="text-xs text-amber-700">Carrier net and SMM commission stay unchanged. Agent give-back reduces total premium.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex overflow-hidden rounded-md border border-amber-300 bg-white text-sm">
+                <button
+                  type="button"
+                  onClick={() => setOverrideMode('dollar')}
+                  className={`px-3 py-2 ${overrideMode === 'dollar' ? 'bg-amber-700 text-white' : 'text-amber-800'}`}
+                >
+                  $ Give-back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOverrideMode('rate')}
+                  className={`border-l border-amber-200 px-3 py-2 ${overrideMode === 'rate' ? 'bg-amber-700 text-white' : 'text-amber-800'}`}
+                >
+                  % New rate
+                </button>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step={overrideMode === 'dollar' ? '1' : '0.01'}
+                value={overrideInput}
+                onChange={(e) => setOverrideInput(e.target.value)}
+                placeholder={overrideMode === 'dollar' ? 'e.g. 500' : 'e.g. 8.5'}
+                className="w-36 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <Btn
+                variant="primary"
+                disabled={commissionOverrideMutation.isPending}
+                onClick={() => {
+                  const val = Number.parseFloat(overrideInput)
+                  if (!Number.isFinite(val) || val <= 0) {
+                    toast.error('Enter a valid amount')
+                    return
+                  }
+                  const data: CommissionOverrideRequest = overrideMode === 'dollar'
+                    ? { givebackAmount: val }
+                    : { newAgentRate: val / 100 }
+                  commissionOverrideMutation.mutate(data)
+                }}
+              >
+                <Check className="h-3.5 w-3.5" /> Apply
+              </Btn>
+              <Btn variant="outline" onClick={() => setShowReduce(false)}>
+                <X className="h-3.5 w-3.5" /> Cancel
+              </Btn>
+            </div>
+          </div>
+        )}
 
         {/* Summary strip */}
         <div className="mb-5 grid grid-cols-4 gap-3 max-[900px]:grid-cols-2 max-[600px]:grid-cols-1">
