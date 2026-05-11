@@ -311,7 +311,7 @@ public static class InfrastructureServiceExtensions
                 LineOfBusiness = row.LineOfBusiness,
                 Action = row.Action,
                 Category = row.Category,
-                Topic = row.Topic,
+                Topic = TrimToMaxLength(row.Topic, 160),
                 RequirementText = row.RequirementText,
                 Citations = row.Citations,
                 SourceName = row.SourceName,
@@ -340,6 +340,14 @@ public static class InfrastructureServiceExtensions
         DateTime SourceCreatedAt,
         string ReviewStatus,
         int SortOrder);
+
+    private static string TrimToMaxLength(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+            return value;
+
+        return value[..maxLength];
+    }
 
     private static async Task SeedLegalTrackedSourcesAsync(ApplicationDbContext db)
     {
