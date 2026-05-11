@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, FileText, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import { getGoogleMapsApiKey } from '@/lib/clientConfig'
@@ -73,6 +73,20 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.errorMessage ?? 'FMCSA refresh failed'
+      toast.error(msg)
+    },
+  })
+  const reportMutation = useMutation({
+    mutationFn: () => quotesApi.generateAutoSafetyReport(quoteId),
+    onSuccess: (attachment) => {
+      qc.invalidateQueries({ queryKey: ['quote-attachments', quoteId] })
+      qc.invalidateQueries({ queryKey: ['attachments', 'Policy', quoteId] })
+      toast.success('Auto safety report saved', {
+        description: `${attachment.fileName} is now in Documents.`,
+      })
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.errorMessage ?? 'Auto safety report could not be created'
       toast.error(msg)
     },
   })
@@ -148,6 +162,14 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           {data.snapshotMonth ? `Snapshot ${data.snapshotMonth}` : 'No scored snapshot'}{data.methodologyVersion ? ` - ${data.methodologyVersion}` : ''}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => reportMutation.mutate()}
+            disabled={reportMutation.isPending}
+            className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            {reportMutation.isPending ? 'Saving' : 'Save Report'}
+          </button>
           <button
             onClick={() => refreshMutation.mutate()}
             disabled={refreshMutation.isPending}

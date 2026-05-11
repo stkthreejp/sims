@@ -16,14 +16,16 @@ public class QuotesController : ControllerBase
     private readonly IRatingEngineService _ratingEngine;
     private readonly IShadowRatingService _shadowRating;
     private readonly IFmcsaSafetyService _fmcsaSafety;
+    private readonly IAutoSafetyReportService _autoSafetyReport;
 
     public QuotesController(IQuoteService quoteService, IRatingEngineService ratingEngine,
-        IShadowRatingService shadowRating, IFmcsaSafetyService fmcsaSafety)
+        IShadowRatingService shadowRating, IFmcsaSafetyService fmcsaSafety, IAutoSafetyReportService autoSafetyReport)
     {
         _quoteService = quoteService;
         _ratingEngine = ratingEngine;
         _shadowRating = shadowRating;
         _fmcsaSafety = fmcsaSafety;
+        _autoSafetyReport = autoSafetyReport;
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -109,6 +111,17 @@ public class QuotesController : ControllerBase
         if (!quote.IsSuccess) return NotFound();
 
         var result = await _fmcsaSafety.RefreshQuoteAutoSafetyAsync(id);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/auto-safety/report")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> GenerateAutoSafetyReport(Guid id)
+    {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
+        var result = await _autoSafetyReport.GenerateQuoteReportAsync(id, CurrentUserId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

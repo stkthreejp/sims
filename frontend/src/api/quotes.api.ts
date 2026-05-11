@@ -48,6 +48,9 @@ export const quotesApi = {
   refreshAutoSafety: (id: string) =>
     apiClient.post<AutoSafetyRefresh>(`/quotes/${id}/auto-safety/refresh`).then((r) => r.data),
 
+  generateAutoSafetyReport: (id: string) =>
+    apiClient.post<Attachment>(`/quotes/${id}/auto-safety/report`).then((r) => r.data),
+
   delete: (id: string) =>
     apiClient.delete(`/quotes/${id}`),
 

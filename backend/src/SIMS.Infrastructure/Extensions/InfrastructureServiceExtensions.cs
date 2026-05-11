@@ -124,6 +124,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IShadowRatingService, ShadowRatingService>();
         services.AddScoped<IUWWriteupService, UWWriteupService>();
         services.AddScoped<IFmcsaSafetyService, FmcsaSafetyService>();
+        services.AddScoped<IAutoSafetyReportService, AutoSafetyReportService>();
         services.AddScoped<IFmcsaSafetyAnalyticsService, FmcsaSafetyAnalyticsService>();
         services.AddScoped<IFmcsaInspectionEnrichmentService, FmcsaInspectionEnrichmentService>();
         services.AddScoped<FmcsaSocrataClient>();

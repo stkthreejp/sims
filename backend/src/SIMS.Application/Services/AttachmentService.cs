@@ -136,6 +136,70 @@ public class AttachmentService : IAttachmentService
         return Result<AttachmentDto>.Success(MapToDto(attachment));
     }
 
+    public async Task<Result<AttachmentDto>> CreateGeneratedAsync(
+        DocumentEntityType entityType,
+        Guid entityId,
+        Stream content,
+        string fileName,
+        string contentType,
+        long fileSizeBytes,
+        DocumentType documentType,
+        string? description,
+        Guid userId)
+    {
+        if (!await CanAccessEntityAsync(entityType, entityId, userId))
+            return Result<AttachmentDto>.Failure("ATTACHMENT_ACCESS_DENIED", "You do not have access to this attachment target.");
+
+        if (fileSizeBytes == 0)
+            return Result<AttachmentDto>.Failure("EMPTY_FILE", "File is empty.");
+
+        if (fileSizeBytes > _maxFileSize)
+            return Result<AttachmentDto>.Failure("FILE_TOO_LARGE", $"File exceeds the {_maxFileSize / 1024 / 1024}MB limit.");
+
+        var safeFileName = System.Text.RegularExpressions.Regex.Replace(
+            Path.GetFileName(fileName), @"[^\w.\-() ]", "_");
+        if (string.IsNullOrWhiteSpace(safeFileName))
+            return Result<AttachmentDto>.Failure("UNSUPPORTED_FILE_TYPE", "File name is required.");
+
+        var extension = Path.GetExtension(safeFileName).ToLowerInvariant();
+        if (!_allowedExtensions.Contains(extension) || !_contentTypesByExtension.TryGetValue(extension, out var expectedContentType))
+            return Result<AttachmentDto>.Failure("UNSUPPORTED_FILE_TYPE", "This file type is not allowed.");
+
+        if (!string.Equals(contentType, expectedContentType, StringComparison.OrdinalIgnoreCase))
+            return Result<AttachmentDto>.Failure("UNSUPPORTED_FILE_TYPE", "File content type is not allowed.");
+
+        if (content.CanSeek)
+            content.Position = 0;
+
+        var blobPath = await _blob.UploadAsync(content, safeFileName, contentType);
+
+        var attachment = new Attachment
+        {
+            EntityType = entityType,
+            DocumentType = documentType,
+            FileName = safeFileName,
+            BlobPath = blobPath,
+            ContentType = contentType,
+            FileSizeBytes = fileSizeBytes,
+            Description = description,
+            UploadedById = userId,
+        };
+
+        switch (entityType)
+        {
+            case DocumentEntityType.Policy:     attachment.QuoteId = entityId;      break;
+            case DocumentEntityType.Submission: attachment.SubmissionId = entityId; break;
+            case DocumentEntityType.Carrier:    attachment.CarrierId = entityId;    break;
+            case DocumentEntityType.Agent:      attachment.AgentId = entityId;      break;
+        }
+
+        _db.Set<Attachment>().Add(attachment);
+        await _db.SaveChangesAsync();
+        await _db.Entry(attachment).Reference(a => a.UploadedBy).LoadAsync();
+
+        return Result<AttachmentDto>.Success(MapToDto(attachment));
+    }
+
     public async Task<Result<string>> GetDownloadUrlAsync(Guid id, Guid userId)
     {
         var attachment = await _db.Set<Attachment>().AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);

@@ -9,6 +9,7 @@ public interface IAttachmentService
 {
     Task<IEnumerable<AttachmentDto>> GetByEntityAsync(DocumentEntityType entityType, Guid entityId, Guid userId);
     Task<Result<AttachmentDto>> UploadAsync(DocumentEntityType entityType, Guid entityId, IFormFile file, DocumentType documentType, string? description, Guid userId);
+    Task<Result<AttachmentDto>> CreateGeneratedAsync(DocumentEntityType entityType, Guid entityId, Stream content, string fileName, string contentType, long fileSizeBytes, DocumentType documentType, string? description, Guid userId);
     Task<Result<string>> GetDownloadUrlAsync(Guid id, Guid userId);
     Task<Result> DeleteAsync(Guid id, Guid userId);
 }
