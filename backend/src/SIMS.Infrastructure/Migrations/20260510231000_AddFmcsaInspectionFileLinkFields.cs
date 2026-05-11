@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using SIMS.Infrastructure.Data;
 
 #nullable disable
 
 namespace SIMS.Infrastructure.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260510231000_AddFmcsaInspectionFileLinkFields")]
     public partial class AddFmcsaInspectionFileLinkFields : Migration
     {
         /// <inheritdoc />

@@ -1,11 +1,15 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using SIMS.Infrastructure.Data;
 
 #nullable disable
 
 namespace SIMS.Infrastructure.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260510225000_AddFmcsaInspectionDetailEnrichment")]
     public partial class AddFmcsaInspectionDetailEnrichment : Migration
     {
         /// <inheritdoc />

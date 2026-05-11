@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using SIMS.Infrastructure.Data;
 
 #nullable disable
 
 namespace SIMS.Infrastructure.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260510223500_AddFmcsaInspectionCountyCodeState")]
     public partial class AddFmcsaInspectionCountyCodeState : Migration
     {
         /// <inheritdoc />
