@@ -23,12 +23,28 @@ export interface LegalRequirementsSummary {
   sectionCount: number
   sectionsByState: Record<string, number>
   sectionsByReviewStatus: Record<string, number>
+  trackedSourceCount: number
   scanRunCount: number
   pendingScanResultCount: number
   changeLogCount: number
   sourceName: string
   sourceDocument: string
   sourceCreatedAt: string | null
+}
+
+export interface LegalTrackedSource {
+  id: string
+  state: string
+  name: string
+  sourceType: string
+  url: string | null
+  isEnabled: boolean
+  scanCadence: string
+  lastCheckedAt: string | null
+  lastChangedAt: string | null
+  lastStatus: string
+  lastErrorMessage: string | null
+  notes: string | null
 }
 
 export interface LegalSourceScanRun {
@@ -52,6 +68,8 @@ export interface LegalSourceScanResult {
   state: string
   category: string
   topic: string
+  currentRequirementText: string | null
+  currentCitations: string[]
   matchStatus: string
   sourceUrl: string
   sourceCitation: string
@@ -102,11 +120,26 @@ export const legalRequirementsApi = {
     return data
   },
 
-  async getScanResults(filters: { state?: string; reviewStatus?: string }) {
+  async getSources(filters: { state?: string }) {
+    const { data } = await apiClient.get<LegalTrackedSource[]>('/legal-requirements/sources', {
+      params: {
+        state: filters.state || undefined,
+      },
+    })
+    return data
+  },
+
+  async scanSource(sourceId: string) {
+    const { data } = await apiClient.post<LegalSourceScanRun>(`/legal-requirements/sources/${sourceId}/scan`)
+    return data
+  },
+
+  async getScanResults(filters: { state?: string; reviewStatus?: string; scanRunId?: string }) {
     const { data } = await apiClient.get<LegalSourceScanResult[]>('/legal-requirements/scan-results', {
       params: {
         state: filters.state || undefined,
         reviewStatus: filters.reviewStatus || undefined,
+        scanRunId: filters.scanRunId || undefined,
       },
     })
     return data

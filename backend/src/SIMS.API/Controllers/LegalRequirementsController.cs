@@ -89,6 +89,7 @@ public class LegalRequirementsController : ControllerBase
             rows.Count,
             rows.GroupBy(r => r.State).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => g.Count()),
             rows.GroupBy(r => r.ReviewStatus).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => g.Count()),
+            await _db.LegalTrackedSources.AsNoTracking().CountAsync(),
             await _db.LegalSourceScanRuns.AsNoTracking().CountAsync(),
             await _db.LegalSourceScanResults.AsNoTracking().CountAsync(r => r.ReviewStatus == "Pending"),
             await _db.LegalRequirementChangeLogs.AsNoTracking().CountAsync(),
@@ -97,6 +98,79 @@ public class LegalRequirementsController : ControllerBase
             rows.FirstOrDefault()?.SourceCreatedAt);
 
         return Ok(summary);
+    }
+
+    [HttpGet("sources")]
+    public async Task<ActionResult<IReadOnlyList<LegalTrackedSourceDto>>> GetSources([FromQuery] string? state)
+    {
+        var query = _db.LegalTrackedSources.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(state))
+            query = query.Where(s => s.State == state || s.State == "All");
+
+        var sources = await query
+            .OrderBy(s => s.State == "All" ? string.Empty : s.State)
+            .ThenBy(s => s.Name)
+            .Select(s => new LegalTrackedSourceDto(
+                s.Id,
+                s.State,
+                s.Name,
+                s.SourceType,
+                s.Url,
+                s.IsEnabled,
+                s.ScanCadence,
+                s.LastCheckedAt,
+                s.LastChangedAt,
+                s.LastStatus,
+                s.LastErrorMessage,
+                s.Notes))
+            .ToListAsync();
+
+        return Ok(sources);
+    }
+
+    [HttpPost("sources/{sourceId:guid}/scan")]
+    public async Task<ActionResult<LegalSourceScanRunDto>> ScanSource(Guid sourceId)
+    {
+        var source = await _db.LegalTrackedSources.FirstOrDefaultAsync(s => s.Id == sourceId);
+        if (source == null)
+            return NotFound();
+
+        if (!source.IsEnabled)
+            return BadRequest(new { errorMessage = "Tracked source is disabled." });
+
+        var now = DateTime.UtcNow;
+        var run = new LegalSourceScanRun
+        {
+            SourceName = source.Name,
+            SourceType = source.SourceType,
+            Status = "Completed",
+            StartedAt = now,
+            CompletedAt = now,
+            ResultsFound = 0,
+            PossibleChanges = 0,
+            StartedById = CurrentUserId,
+            StartedByName = CurrentUserName
+        };
+
+        source.LastCheckedAt = now;
+        source.LastStatus = "Completed";
+        source.LastErrorMessage = null;
+
+        _db.LegalSourceScanRuns.Add(run);
+        await _db.SaveChangesAsync();
+
+        return Ok(new LegalSourceScanRunDto(
+            run.Id,
+            run.SourceName,
+            run.SourceType,
+            run.Status,
+            run.StartedAt,
+            run.CompletedAt,
+            run.ResultsFound,
+            run.PossibleChanges,
+            run.ErrorMessage,
+            run.StartedByName));
     }
 
     [HttpGet("scan-runs")]
@@ -125,11 +199,13 @@ public class LegalRequirementsController : ControllerBase
     [HttpGet("scan-results")]
     public async Task<ActionResult<IReadOnlyList<LegalSourceScanResultDto>>> GetScanResults(
         [FromQuery] string? reviewStatus,
-        [FromQuery] string? state)
+        [FromQuery] string? state,
+        [FromQuery] Guid? scanRunId)
     {
         var query = _db.LegalSourceScanResults
             .AsNoTracking()
             .Include(r => r.ScanRun)
+            .Include(r => r.RequirementSection)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(reviewStatus))
@@ -138,9 +214,12 @@ public class LegalRequirementsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(state))
             query = query.Where(r => r.State == state);
 
+        if (scanRunId.HasValue)
+            query = query.Where(r => r.ScanRunId == scanRunId.Value);
+
         var results = await query
             .OrderByDescending(r => r.CreatedAt)
-            .Take(100)
+            .Take(scanRunId.HasValue ? 500 : 100)
             .Select(r => new LegalSourceScanResultDto(
                 r.Id,
                 r.ScanRunId,
@@ -149,6 +228,8 @@ public class LegalRequirementsController : ControllerBase
                 r.State,
                 r.Category,
                 r.Topic,
+                r.RequirementSection != null ? r.RequirementSection.RequirementText : null,
+                r.RequirementSection != null ? r.RequirementSection.Citations : Array.Empty<string>(),
                 r.MatchStatus,
                 r.SourceUrl,
                 r.SourceCitation,
@@ -283,6 +364,19 @@ public class LegalRequirementsController : ControllerBase
         }
 
         run.PossibleChanges = possibleChanges;
+        var odenSource = await _db.LegalTrackedSources.FirstOrDefaultAsync(s =>
+            s.Name == "Oden Online Cancellation Chart" &&
+            s.SourceType == "Oden Export");
+
+        if (odenSource != null)
+        {
+            odenSource.LastCheckedAt = DateTime.UtcNow;
+            odenSource.LastStatus = "Completed";
+            odenSource.LastErrorMessage = null;
+            if (possibleChanges > 0)
+                odenSource.LastChangedAt = DateTime.UtcNow;
+        }
+
         await _db.SaveChangesAsync();
 
         return Ok(new LegalSourceScanRunDto(
@@ -350,6 +444,8 @@ public class LegalRequirementsController : ControllerBase
             result.State,
             result.Category,
             result.Topic,
+            requirement.RequirementText,
+            requirement.Citations,
             result.MatchStatus,
             result.SourceUrl,
             result.SourceCitation,
@@ -534,12 +630,27 @@ public sealed record LegalRequirementsSummaryDto(
     int SectionCount,
     Dictionary<string, int> SectionsByState,
     Dictionary<string, int> SectionsByReviewStatus,
+    int TrackedSourceCount,
     int ScanRunCount,
     int PendingScanResultCount,
     int ChangeLogCount,
     string SourceName,
     string SourceDocument,
     DateTime? SourceCreatedAt);
+
+public sealed record LegalTrackedSourceDto(
+    Guid Id,
+    string State,
+    string Name,
+    string SourceType,
+    string? Url,
+    bool IsEnabled,
+    string ScanCadence,
+    DateTime? LastCheckedAt,
+    DateTime? LastChangedAt,
+    string LastStatus,
+    string? LastErrorMessage,
+    string? Notes);
 
 public sealed record LegalSourceScanRunDto(
     Guid Id,
@@ -561,6 +672,8 @@ public sealed record LegalSourceScanResultDto(
     string State,
     string Category,
     string Topic,
+    string? CurrentRequirementText,
+    string[] CurrentCitations,
     string MatchStatus,
     string SourceUrl,
     string SourceCitation,

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpenCheck, Check, ClipboardList, History, RefreshCw, Search, Upload, X } from 'lucide-react'
+import { BookOpenCheck, Check, ClipboardList, Database, Eye, History, RefreshCw, Search, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   legalRequirementsApi,
@@ -8,18 +8,24 @@ import {
   type LegalRequirementSection,
   type LegalSourceScanResult,
   type LegalSourceScanRun,
+  type LegalTrackedSource,
 } from '@/api/legalRequirements.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 
 const ALL = 'All'
-type TabKey = 'requirements' | 'scans' | 'changes'
+type TabKey = 'requirements' | 'sources' | 'scans' | 'changes'
+type DiffKind = 'same' | 'added' | 'removed'
+type DiffPart = { text: string; kind: DiffKind }
 
 export function LegalRequirementsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('requirements')
   const [state, setState] = useState(ALL)
   const [category, setCategory] = useState(ALL)
   const [search, setSearch] = useState('')
+  const [scanReviewStatus, setScanReviewStatus] = useState('Pending')
+  const [selectedScanResult, setSelectedScanResult] = useState<LegalSourceScanResult | null>(null)
+  const [selectedScanRunId, setSelectedScanRunId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
@@ -42,11 +48,19 @@ export function LegalRequirementsPage() {
     queryFn: legalRequirementsApi.getScanRuns,
   })
 
+  const sourcesQuery = useQuery({
+    queryKey: ['legal-requirements', 'sources', state],
+    queryFn: () => legalRequirementsApi.getSources({
+      state: state === ALL ? undefined : state,
+    }),
+  })
+
   const scanResultsQuery = useQuery({
-    queryKey: ['legal-requirements', 'scan-results', state],
+    queryKey: ['legal-requirements', 'scan-results', state, scanReviewStatus, selectedScanRunId],
     queryFn: () => legalRequirementsApi.getScanResults({
       state: state === ALL ? undefined : state,
-      reviewStatus: undefined,
+      reviewStatus: scanReviewStatus === ALL ? undefined : scanReviewStatus,
+      scanRunId: selectedScanRunId ?? undefined,
     }),
   })
 
@@ -61,7 +75,7 @@ export function LegalRequirementsPage() {
   const summary = summaryQuery.data
   const noticeCount = useMemo(() => sections.filter((s) => s.category === 'NOTICE REQUIREMENTS').length, [sections])
   const reasonCount = useMemo(() => sections.filter((s) => s.category === 'REASONS').length, [sections])
-  const isRefreshing = summaryQuery.isFetching || sectionsQuery.isFetching || scanRunsQuery.isFetching || scanResultsQuery.isFetching || changeLogQuery.isFetching
+  const isRefreshing = summaryQuery.isFetching || sectionsQuery.isFetching || scanRunsQuery.isFetching || sourcesQuery.isFetching || scanResultsQuery.isFetching || changeLogQuery.isFetching
   const importMutation = useMutation({
     mutationFn: legalRequirementsApi.importOden,
     onSuccess: (run) => {
@@ -79,6 +93,15 @@ export function LegalRequirementsPage() {
     },
     onError: () => toast.error('Simulated change could not be created'),
   })
+  const scanSourceMutation = useMutation({
+    mutationFn: legalRequirementsApi.scanSource,
+    onSuccess: (run) => {
+      toast.success(`${run.sourceName} checked`)
+      invalidateLegalQueries(queryClient)
+      setActiveTab('sources')
+    },
+    onError: () => toast.error('Source could not be checked'),
+  })
 
   if (summaryQuery.isLoading) return <LoadingSpinner />
 
@@ -94,6 +117,7 @@ export function LegalRequirementsPage() {
               summaryQuery.refetch()
               sectionsQuery.refetch()
               scanRunsQuery.refetch()
+              sourcesQuery.refetch()
               scanResultsQuery.refetch()
               changeLogQuery.refetch()
             }}
@@ -121,13 +145,14 @@ export function LegalRequirementsPage() {
       <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <Metric label="Tracked states" value={(summary?.states.length ?? 0).toLocaleString()} />
         <Metric label="Requirement sections" value={(summary?.sectionCount ?? 0).toLocaleString()} />
-        <Metric label="Pending scan items" value={(summary?.pendingScanResultCount ?? 0).toLocaleString()} />
+        <Metric label="Tracked sources" value={(summary?.trackedSourceCount ?? 0).toLocaleString()} />
         <Metric label="Change log entries" value={(summary?.changeLogCount ?? 0).toLocaleString()} />
       </section>
 
       <div className="rounded border bg-white">
         <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
           <TabButton active={activeTab === 'requirements'} onClick={() => setActiveTab('requirements')} icon={BookOpenCheck} label="Requirements" />
+          <TabButton active={activeTab === 'sources'} onClick={() => setActiveTab('sources')} icon={Database} label="Sources" />
           <TabButton active={activeTab === 'scans'} onClick={() => setActiveTab('scans')} icon={ClipboardList} label="Source Scans" />
           <TabButton active={activeTab === 'changes'} onClick={() => setActiveTab('changes')} icon={History} label="Change Log" />
         </div>
@@ -136,6 +161,9 @@ export function LegalRequirementsPage() {
           <SelectFilter label="State" value={state} values={[ALL, ...(summary?.states ?? [])]} onChange={setState} />
           {activeTab === 'requirements' && (
             <SelectFilter label="Category" value={category} values={[ALL, ...(summary?.categories ?? [])]} onChange={setCategory} />
+          )}
+          {activeTab === 'scans' && (
+            <SelectFilter label="Review" value={scanReviewStatus} values={['Pending', ALL, 'Reviewed', 'Approved', 'Rejected']} onChange={setScanReviewStatus} />
           )}
           {activeTab === 'requirements' && (
             <label className="relative min-w-[260px] flex-1">
@@ -153,6 +181,17 @@ export function LegalRequirementsPage() {
         {activeTab === 'requirements' && (
           sectionsQuery.isLoading ? <PanelLoader /> : <RequirementTable sections={sections} />
         )}
+        {activeTab === 'sources' && (
+          sourcesQuery.isLoading
+            ? <PanelLoader />
+            : (
+              <SourcePanel
+                sources={sourcesQuery.data ?? []}
+                scanningSourceId={scanSourceMutation.isPending ? scanSourceMutation.variables ?? null : null}
+                onScan={(sourceId) => scanSourceMutation.mutate(sourceId)}
+              />
+            )
+        )}
         {activeTab === 'scans' && (
           scanRunsQuery.isLoading || scanResultsQuery.isLoading
             ? <PanelLoader />
@@ -164,6 +203,13 @@ export function LegalRequirementsPage() {
                 importing={importMutation.isPending}
                 onSimulate={() => simulateMutation.mutate()}
                 simulating={simulateMutation.isPending}
+                onReview={setSelectedScanResult}
+                selectedRunId={selectedScanRunId}
+                onSelectRun={(runId) => {
+                  setSelectedScanRunId(runId)
+                  setScanReviewStatus(ALL)
+                }}
+                onClearRun={() => setSelectedScanRunId(null)}
               />
             )
         )}
@@ -182,6 +228,79 @@ export function LegalRequirementsPage() {
           {summary?.sourceCreatedAt ? `, created ${formatDate(summary.sourceCreatedAt)}` : ''}
         </div>
       </section>
+
+      {selectedScanResult && (
+        <ScanReviewDrawer
+          result={selectedScanResult}
+          onClose={() => setSelectedScanResult(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function SourcePanel({
+  sources,
+  scanningSourceId,
+  onScan,
+}: {
+  sources: LegalTrackedSource[]
+  scanningSourceId: string | null
+  onScan: (sourceId: string) => void
+}) {
+  if (sources.length === 0) {
+    return <EmptyPanel text="No tracked sources match the current filters." />
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3">State</th>
+            <th className="px-4 py-3">Source</th>
+            <th className="px-4 py-3">Cadence</th>
+            <th className="px-4 py-3">Last Checked</th>
+            <th className="px-4 py-3">Last Changed</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {sources.map((source) => {
+            const scanning = scanningSourceId === source.id
+            return (
+              <tr key={source.id} className="align-top">
+                <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{source.state}</td>
+                <td className="min-w-[280px] px-4 py-3">
+                  <div className="font-medium text-slate-800">{source.name}</div>
+                  <div className="mt-1 text-xs text-slate-500">{source.sourceType}</div>
+                  {source.notes && <div className="mt-2 max-w-xl leading-5 text-slate-600">{source.notes}</div>}
+                  {source.url && <div className="mt-2 break-all text-xs text-blue-700">{source.url}</div>}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700">{source.scanCadence}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastCheckedAt ? formatDate(source.lastCheckedAt) : '-'}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastChangedAt ? formatDate(source.lastChangedAt) : '-'}</td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  <StatusPill status={source.isEnabled ? source.lastStatus : 'Disabled'} />
+                  {source.lastErrorMessage && <div className="mt-2 max-w-xs text-xs text-red-600">{source.lastErrorMessage}</div>}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => onScan(source.id)}
+                    disabled={!source.isEnabled || scanningSourceId !== null}
+                    className="inline-flex items-center gap-2 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
+                    Check
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -228,6 +347,10 @@ function ScanPanel({
   importing,
   onSimulate,
   simulating,
+  onReview,
+  selectedRunId,
+  onSelectRun,
+  onClearRun,
 }: {
   runs: LegalSourceScanRun[]
   results: LegalSourceScanResult[]
@@ -235,7 +358,14 @@ function ScanPanel({
   importing: boolean
   onSimulate: () => void
   simulating: boolean
+  onReview: (result: LegalSourceScanResult) => void
+  selectedRunId: string | null
+  onSelectRun: (runId: string) => void
+  onClearRun: () => void
 }) {
+  const selectedRun = runs.find((run) => run.id === selectedRunId)
+  const runCounts = countScanResults(results)
+
   return (
     <div>
       <div className="border-b p-4">
@@ -262,6 +392,31 @@ function ScanPanel({
             </button>
           </div>
         </div>
+        {selectedRun && (
+          <div className="mt-4 rounded border bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-800">{selectedRun.sourceName} run detail</div>
+                <div className="mt-1 text-xs text-slate-500">{formatDate(selectedRun.startedAt)} - {selectedRun.sourceType}</div>
+              </div>
+              <button
+                type="button"
+                onClick={onClearRun}
+                className="rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-white"
+              >
+                Show all runs
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
+              <MiniMetric label="Results" value={results.length.toLocaleString()} />
+              <MiniMetric label="No Change" value={(runCounts.NoChange ?? 0).toLocaleString()} />
+              <MiniMetric label="Possible" value={(runCounts.PossibleChange ?? 0).toLocaleString()} />
+              <MiniMetric label="New" value={(runCounts.NewRequirement ?? 0).toLocaleString()} />
+              <MiniMetric label="Pending" value={(runCounts.Pending ?? 0).toLocaleString()} />
+            </div>
+          </div>
+        )}
+
         {runs.length === 0 ? (
           <div className="mt-3 text-sm text-slate-500">No source scans have been run yet.</div>
         ) : (
@@ -279,7 +434,7 @@ function ScanPanel({
               </thead>
               <tbody className="divide-y">
                 {runs.map((run) => (
-                  <tr key={run.id}>
+                  <tr key={run.id} className={run.id === selectedRunId ? 'bg-blue-50/60' : undefined}>
                     <td className="px-3 py-2">
                       <div className="font-medium text-slate-800">{run.sourceName}</div>
                       <div className="text-xs text-slate-500">{run.sourceType}</div>
@@ -288,7 +443,16 @@ function ScanPanel({
                     <td className="px-3 py-2">{run.resultsFound.toLocaleString()}</td>
                     <td className="px-3 py-2">{run.possibleChanges.toLocaleString()}</td>
                     <td className="px-3 py-2 text-slate-600">{formatDate(run.startedAt)}</td>
-                    <td className="px-3 py-2 text-slate-600">{run.startedByName ?? '-'}</td>
+                    <td className="px-3 py-2 text-slate-600">
+                      <div>{run.startedByName ?? '-'}</div>
+                      <button
+                        type="button"
+                        onClick={() => onSelectRun(run.id)}
+                        className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-800"
+                      >
+                        View results
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -302,32 +466,22 @@ function ScanPanel({
         {results.length === 0 ? (
           <div className="mt-3 text-sm text-slate-500">No scan results are waiting for review.</div>
         ) : (
-          <ScanResultTable results={results} />
+          <ScanResultTable results={results} onReview={onReview} />
         )}
       </div>
     </div>
   )
 }
 
-function ScanResultTable({ results }: { results: LegalSourceScanResult[] }) {
-  const queryClient = useQueryClient()
-  const approve = useMutation({
-    mutationFn: (id: string) => legalRequirementsApi.approveScanResult(id),
-    onSuccess: () => {
-      toast.success('Scan result approved')
-      invalidateLegalQueries(queryClient)
-    },
-    onError: () => toast.error('Scan result could not be approved'),
-  })
-  const reject = useMutation({
-    mutationFn: (id: string) => legalRequirementsApi.rejectScanResult(id),
-    onSuccess: () => {
-      toast.success('Scan result rejected')
-      invalidateLegalQueries(queryClient)
-    },
-    onError: () => toast.error('Scan result could not be rejected'),
-  })
+function countScanResults(results: LegalSourceScanResult[]) {
+  return results.reduce<Record<string, number>>((acc, result) => {
+    acc[result.matchStatus] = (acc[result.matchStatus] ?? 0) + 1
+    acc[result.reviewStatus] = (acc[result.reviewStatus] ?? 0) + 1
+    return acc
+  }, {})
+}
 
+function ScanResultTable({ results, onReview }: { results: LegalSourceScanResult[]; onReview: (result: LegalSourceScanResult) => void }) {
   return (
     <div className="mt-3 overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -336,8 +490,8 @@ function ScanResultTable({ results }: { results: LegalSourceScanResult[] }) {
             <th className="px-3 py-2">State</th>
             <th className="px-3 py-2">Topic</th>
             <th className="px-3 py-2">Match</th>
-            <th className="px-3 py-2">Source Text</th>
-            <th className="px-3 py-2">Suggested Text</th>
+            <th className="px-3 py-2">Current</th>
+            <th className="px-3 py-2">Proposed</th>
             <th className="px-3 py-2">Status</th>
             <th className="px-3 py-2">Actions</th>
           </tr>
@@ -351,24 +505,169 @@ function ScanResultTable({ results }: { results: LegalSourceScanResult[] }) {
                 <div className="text-xs uppercase tracking-wide text-slate-400">{cleanLabel(result.category)}</div>
               </td>
               <td className="px-3 py-2"><StatusPill status={result.matchStatus} /></td>
-              <td className="min-w-[300px] px-3 py-2 leading-6 text-slate-700">{result.sourceText}</td>
-              <td className="min-w-[300px] px-3 py-2 leading-6 text-slate-700">{result.suggestedRequirementText ?? '-'}</td>
+              <td className="min-w-[260px] px-3 py-2 leading-6 text-slate-600">{truncate(result.currentRequirementText ?? '-')}</td>
+              <td className="min-w-[260px] px-3 py-2 leading-6 text-slate-700">{truncate(result.suggestedRequirementText ?? result.sourceText)}</td>
               <td className="px-3 py-2"><StatusPill status={result.reviewStatus} /></td>
               <td className="whitespace-nowrap px-3 py-2">
-                {result.reviewStatus === 'Pending' ? (
-                  <div className="flex gap-2">
-                    <IconButton label="Approve" onClick={() => approve.mutate(result.id)} disabled={approve.isPending || reject.isPending} icon={Check} tone="approve" />
-                    <IconButton label="Reject" onClick={() => reject.mutate(result.id)} disabled={approve.isPending || reject.isPending} icon={X} tone="reject" />
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-400">Reviewed</span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => onReview(result)}
+                  className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Review
+                </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  )
+}
+
+function ScanReviewDrawer({ result, onClose }: { result: LegalSourceScanResult; onClose: () => void }) {
+  const [comment, setComment] = useState('')
+  const queryClient = useQueryClient()
+  const approve = useMutation({
+    mutationFn: () => legalRequirementsApi.approveScanResult(result.id, comment),
+    onSuccess: () => {
+      toast.success('Scan result approved')
+      invalidateLegalQueries(queryClient)
+      onClose()
+    },
+    onError: () => toast.error('Scan result could not be approved'),
+  })
+  const reject = useMutation({
+    mutationFn: () => legalRequirementsApi.rejectScanResult(result.id, comment),
+    onSuccess: () => {
+      toast.success('Scan result rejected')
+      invalidateLegalQueries(queryClient)
+      onClose()
+    },
+    onError: () => toast.error('Scan result could not be rejected'),
+  })
+  const proposedText = result.suggestedRequirementText ?? result.sourceText
+  const canReview = result.reviewStatus === 'Pending'
+  const busy = approve.isPending || reject.isPending
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/25">
+      <aside className="flex h-full w-full max-w-5xl flex-col bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold text-slate-900">{result.state} {result.topic}</h2>
+              <StatusPill status={result.matchStatus} />
+              <StatusPill status={result.reviewStatus} />
+            </div>
+            <div className="mt-1 text-sm text-slate-500">{cleanLabel(result.category)} - {result.sourceName}</div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded p-2 text-slate-500 hover:bg-slate-100" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <DiffPane
+              title="Current Requirement"
+              text={result.currentRequirementText ?? 'No existing requirement matched this source result.'}
+              citations={result.currentCitations}
+              diffParts={buildWordDiff(result.currentRequirementText ?? '', proposedText, 'removed')}
+              muted
+            />
+            <DiffPane
+              title="Proposed Requirement"
+              text={proposedText}
+              citations={splitCitationText(result.sourceCitation)}
+              diffParts={buildWordDiff(result.currentRequirementText ?? '', proposedText, 'added')}
+            />
+          </div>
+
+          <div className="mt-4 rounded border bg-slate-50 p-4">
+            <div className="text-sm font-semibold text-slate-800">Source Text</div>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{result.sourceText}</p>
+            {result.confidenceScore !== null && (
+              <div className="mt-3 text-xs text-slate-500">Confidence: {(result.confidenceScore * 100).toFixed(0)}%</div>
+            )}
+          </div>
+
+          <label className="mt-4 block">
+            <span className="text-sm font-semibold text-slate-800">Reviewer note</span>
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              rows={4}
+              placeholder="Add context for the change log"
+              className="mt-2 w-full rounded border border-slate-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Close
+          </button>
+          {canReview && (
+            <>
+              <button
+                type="button"
+                onClick={() => reject.mutate()}
+                disabled={busy}
+                className="inline-flex items-center gap-2 rounded border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+                Reject
+              </button>
+              <button
+                type="button"
+                onClick={() => approve.mutate()}
+                disabled={busy}
+                className="inline-flex items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                <Check className="h-4 w-4" />
+                Approve
+              </button>
+            </>
+          )}
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+function DiffPane({
+  title,
+  text,
+  citations,
+  diffParts,
+  muted = false,
+}: {
+  title: string
+  text: string
+  citations: string[]
+  diffParts?: DiffPart[]
+  muted?: boolean
+}) {
+  return (
+    <section className={`rounded border p-4 ${muted ? 'bg-slate-50' : 'bg-white'}`}>
+      <div className="text-sm font-semibold text-slate-800">{title}</div>
+      {diffParts && diffParts.length > 0 ? (
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+          {diffParts.map((part, index) => (
+            <span key={`${part.text}-${index}`} className={diffClass(part.kind)}>
+              {part.text}
+            </span>
+          ))}
+        </p>
+      ) : (
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{text}</p>
+      )}
+      <div className="mt-4">
+        <CitationList citations={citations} />
+      </div>
+    </section>
   )
 }
 
@@ -440,6 +739,15 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border bg-white px-3 py-2">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-base font-semibold text-slate-800">{value}</div>
+    </div>
+  )
+}
+
 function SelectFilter({ label, value, values, onChange }: { label: string; value: string; values: string[]; onChange: (value: string) => void }) {
   return (
     <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -503,6 +811,81 @@ function EmptyPanel({ text }: { text: string }) {
 
 function cleanLabel(value: string) {
   return value === ALL ? value : value.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function truncate(value: string) {
+  return value.length > 260 ? `${value.slice(0, 260)}...` : value
+}
+
+function splitCitationText(value: string) {
+  return value.split(';').map((item) => item.trim()).filter(Boolean)
+}
+
+function buildWordDiff(current: string, proposed: string, side: 'removed' | 'added'): DiffPart[] {
+  const left = tokenizeForDiff(current)
+  const right = tokenizeForDiff(proposed)
+  if (left.length === 0 && right.length === 0) return []
+  if (normalizeForDiff(current) === normalizeForDiff(proposed)) {
+    return [{ text: side === 'removed' ? current : proposed, kind: 'same' }]
+  }
+
+  const dp: number[][] = Array.from({ length: left.length + 1 }, () => Array(right.length + 1).fill(0))
+  for (let i = left.length - 1; i >= 0; i--) {
+    for (let j = right.length - 1; j >= 0; j--) {
+      dp[i][j] = left[i] === right[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
+    }
+  }
+
+  const parts: DiffPart[] = []
+  let i = 0
+  let j = 0
+  while (i < left.length && j < right.length) {
+    if (left[i] === right[j]) {
+      pushDiffPart(parts, left[i], 'same')
+      i++
+      j++
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      if (side === 'removed') pushDiffPart(parts, left[i], 'removed')
+      i++
+    } else {
+      if (side === 'added') pushDiffPart(parts, right[j], 'added')
+      j++
+    }
+  }
+
+  while (i < left.length) {
+    if (side === 'removed') pushDiffPart(parts, left[i], 'removed')
+    i++
+  }
+  while (j < right.length) {
+    if (side === 'added') pushDiffPart(parts, right[j], 'added')
+    j++
+  }
+
+  return parts
+}
+
+function tokenizeForDiff(value: string) {
+  return value.match(/\S+\s*/g) ?? []
+}
+
+function normalizeForDiff(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function pushDiffPart(parts: DiffPart[], text: string, kind: DiffKind) {
+  const last = parts[parts.length - 1]
+  if (last && last.kind === kind) {
+    last.text += text
+    return
+  }
+  parts.push({ text, kind })
+}
+
+function diffClass(kind: DiffKind) {
+  if (kind === 'added') return 'rounded bg-green-100 px-0.5 text-green-900'
+  if (kind === 'removed') return 'rounded bg-red-100 px-0.5 text-red-900 line-through decoration-red-500'
+  return ''
 }
 
 function formatDate(value: string) {

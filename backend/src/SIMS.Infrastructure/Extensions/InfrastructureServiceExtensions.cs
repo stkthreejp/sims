@@ -242,6 +242,7 @@ public static class InfrastructureServiceExtensions
         await db.SaveChangesAsync();
 
         await SeedLegalRequirementSectionsAsync(db);
+        await SeedLegalTrackedSourcesAsync(db);
 
         // Optional first-admin bootstrap. Never seed a hard-coded password.
         var adminUserName = configuration["AdminBootstrap:UserName"] ?? "admin";
@@ -320,4 +321,64 @@ public static class InfrastructureServiceExtensions
         DateTime SourceCreatedAt,
         string ReviewStatus,
         int SortOrder);
+
+    private static async Task SeedLegalTrackedSourcesAsync(ApplicationDbContext db)
+    {
+        var sources = new[]
+        {
+            new LegalTrackedSource
+            {
+                State = "All",
+                Name = "Oden Online Cancellation Chart",
+                SourceType = "Oden Export",
+                ScanCadence = "Manual",
+                Notes = "Initial source of truth. Upload the latest Oden HTML export from the Source Scans tab."
+            },
+            new LegalTrackedSource
+            {
+                State = "Alabama",
+                Name = "Alabama DOI Bulletins",
+                SourceType = "DOI Bulletin",
+                ScanCadence = "Monthly",
+                Notes = "Placeholder for state DOI bulletin monitoring."
+            },
+            new LegalTrackedSource
+            {
+                State = "Florida",
+                Name = "Florida Cancellation Statutes and Rules",
+                SourceType = "Statute/Regulation",
+                ScanCadence = "Monthly",
+                Notes = "Placeholder for statute and regulation monitoring."
+            },
+            new LegalTrackedSource
+            {
+                State = "Texas",
+                Name = "Texas Cancellation Statutes and Rules",
+                SourceType = "Statute/Regulation",
+                ScanCadence = "Monthly",
+                Notes = "Placeholder for statute and regulation monitoring."
+            },
+            new LegalTrackedSource
+            {
+                State = "North Carolina",
+                Name = "North Carolina Cancellation Statutes and Rules",
+                SourceType = "Statute/Regulation",
+                ScanCadence = "Monthly",
+                Notes = "Placeholder for statute and regulation monitoring."
+            }
+        };
+
+        foreach (var source in sources)
+        {
+            var exists = await db.LegalTrackedSources.AnyAsync(s =>
+                s.State == source.State &&
+                s.Name == source.Name &&
+                s.SourceType == source.SourceType);
+
+            if (!exists)
+                db.LegalTrackedSources.Add(source);
+        }
+
+        await db.SaveChangesAsync();
+    }
 }

@@ -59,6 +59,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<EscalationRule> EscalationRules => Set<EscalationRule>();
     public DbSet<TaskAuditEntry> TaskAuditEntries => Set<TaskAuditEntry>();
     public DbSet<LegalRequirementSection> LegalRequirementSections => Set<LegalRequirementSection>();
+    public DbSet<LegalTrackedSource> LegalTrackedSources => Set<LegalTrackedSource>();
     public DbSet<LegalSourceScanRun> LegalSourceScanRuns => Set<LegalSourceScanRun>();
     public DbSet<LegalSourceScanResult> LegalSourceScanResults => Set<LegalSourceScanResult>();
     public DbSet<LegalRequirementChangeLog> LegalRequirementChangeLogs => Set<LegalRequirementChangeLog>();
@@ -167,6 +168,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<EscalationRule>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<QuoteChecklistItem>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegalRequirementSection>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<LegalTrackedSource>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegalSourceScanRun>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegalSourceScanResult>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegalRequirementChangeLog>().HasQueryFilter(e => !e.IsDeleted);
