@@ -444,7 +444,10 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
   const [mapError, setMapError] = useState<string | null>(null)
 
   const usablePoints = useMemo(
-    () => summary.mapPoints.filter((point) => point.latitude != null && point.longitude != null).slice(0, 8),
+    () => [...summary.mapPoints]
+      .filter((point) => point.latitude != null && point.longitude != null)
+      .sort((a, b) => b.inspectionCount - a.inspectionCount)
+      .slice(0, 20),
     [summary.mapPoints]
   )
 
@@ -481,30 +484,56 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
+          clickableIcons: false,
+          gestureHandling: 'cooperative',
         })
         mapInstanceRef.current = map
 
         const bounds = new g.maps.LatLngBounds()
         bounds.extend(base)
 
-        new g.maps.Marker({
+        const baseMarker = new g.maps.Marker({
           position: base,
           map,
-          label: 'B',
+          label: { text: 'HQ', color: '#ffffff', fontSize: '11px', fontWeight: '700' },
           title: 'Insured base location',
+          icon: {
+            path: g.maps.SymbolPath.CIRCLE,
+            fillColor: '#2563eb',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            scale: 12,
+          },
+          zIndex: 20,
         })
+        const baseInfo = new g.maps.InfoWindow({
+          content: '<strong>Insured base location</strong><br>Radius starts here.',
+        })
+        baseMarker.addListener('click', () => baseInfo.open({ anchor: baseMarker, map }))
 
         usablePoints.forEach((point, index) => {
           const position = { lat: point.latitude, lng: point.longitude }
           bounds.extend(position)
+          const hasOos = point.outOfServiceCount > 0
+          const scale = Math.max(7, Math.min(16, 6 + Math.sqrt(point.inspectionCount)))
           const marker = new g.maps.Marker({
             position,
             map,
-            label: `${index + 1}`,
+            label: { text: `${index + 1}`, color: '#ffffff', fontSize: '10px', fontWeight: '700' },
             title: `${point.label} - ${point.inspectionCount} inspections, ${point.outOfServiceCount} OOS`,
+            icon: {
+              path: g.maps.SymbolPath.CIRCLE,
+              fillColor: hasOos ? '#dc2626' : '#059669',
+              fillOpacity: 0.9,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+              scale,
+            },
+            zIndex: hasOos ? 15 : 10,
           })
           const info = new g.maps.InfoWindow({
-            content: `<strong>${escapeHtml(point.label)}</strong><br>${point.inspectionCount} inspections / ${point.outOfServiceCount} OOS<br>${escapeHtml(point.precision)}`,
+            content: `<strong>${escapeHtml(point.label)}</strong><br>${point.inspectionCount} inspections / ${point.outOfServiceCount} OOS<br>Precision: ${escapeHtml(point.precision)}`,
           })
           marker.addListener('click', () => info.open({ anchor: marker, map }))
         })
@@ -516,9 +545,9 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
           editable: true,
           draggable: false,
           fillColor: '#2563eb',
-          fillOpacity: 0.08,
+          fillOpacity: 0.1,
           strokeColor: '#2563eb',
-          strokeOpacity: 0.55,
+          strokeOpacity: 0.7,
           strokeWeight: 2,
         })
         circleRef.current = circle
@@ -581,13 +610,26 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
           <span className="text-xs text-slate-500">mi</span>
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-3 py-2 text-[11px] text-slate-500">
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> Insured base</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Inspection point</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> OOS activity</span>
+        {summary.precisionCounts
+          .filter((p) => p.count > 0)
+          .slice(0, 4)
+          .map((p) => (
+            <span key={p.label} className="rounded bg-slate-50 px-1.5 py-0.5">
+              {p.label}: {p.count.toLocaleString()}
+            </span>
+          ))}
+      </div>
       {mapError ? (
         <div className="p-3 text-xs text-amber-700">{mapError}</div>
       ) : (
-        <div ref={mapRef} className="h-[260px] w-full" />
+        <div ref={mapRef} className="h-[300px] w-full" />
       )}
       <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
-        Drag the circle edge to resize. Counts are based on grouped map points, so estimated county/state points are directional.
+        Drag the circle edge to resize. Marker size follows inspection count. County/state points are directional when exact inspection coordinates are not available.
       </div>
     </div>
   )
@@ -647,6 +689,7 @@ function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
 function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; powerUnits: number | null; onClick: () => void }) {
   const risk = getBasicRisk(basic, powerUnits)
   const source = getBasicSourceLabel(basic.scoreSource)
+  const confidence = getBasicConfidenceLabel(basic)
   const dialValue = risk.value
   const color = risk.color === 'red' ? '#dc2626' : risk.color === 'yellow' ? '#d97706' : risk.color === 'green' ? '#059669' : '#94a3b8'
   const bgColor = risk.color === 'red' ? 'bg-red-50' : risk.color === 'yellow' ? 'bg-amber-50' : risk.color === 'green' ? 'bg-emerald-50' : 'bg-slate-50'
@@ -658,9 +701,14 @@ function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; 
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold text-slate-700" title={basic.basic}>{basic.basic}</div>
-          <span className={`mt-1 inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${source.className}`}>
-            {source.label}
-          </span>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${source.className}`}>
+              {source.label}
+            </span>
+            <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${confidence.className}`} title={confidence.title}>
+              {confidence.label}
+            </span>
+          </div>
         </div>
         <div className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${bgColor}`}>
           <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
@@ -696,6 +744,35 @@ function getBasicSourceLabel(source: string): { label: string; className: string
     return { label: 'SIMS peer', className: 'border-violet-200 bg-violet-50 text-violet-700' }
   }
   return { label: 'SIMS signal', className: 'border-slate-200 bg-slate-50 text-slate-600' }
+}
+
+function getBasicConfidenceLabel(basic: AutoSafetyBasic): { label: string; title: string; className: string } {
+  if (basic.scoreSource === 'Official SMS' && basic.percentile != null) {
+    return {
+      label: 'High conf',
+      title: 'Official SMS percentile is available for this BASIC.',
+      className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    }
+  }
+  if (basic.scoreSource === 'Official SMS' || basic.scoreSource === 'Official SMS measure') {
+    return {
+      label: 'Med conf',
+      title: 'Official SMS measure is available, but percentile is not public.',
+      className: 'border-sky-200 bg-sky-50 text-sky-700',
+    }
+  }
+  if (basic.scoreSource === 'SIMS peer percentile') {
+    return {
+      label: 'Med conf',
+      title: 'SIMS percentile is estimated from the imported peer dataset.',
+      className: 'border-violet-200 bg-violet-50 text-violet-700',
+    }
+  }
+  return {
+    label: 'Directional',
+    title: 'SIMS signal is based on imported inspections, violations, crashes, and recent OOS activity.',
+    className: 'border-amber-200 bg-amber-50 text-amber-700',
+  }
 }
 
 function getBasicRisk(basic: AutoSafetyBasic, powerUnits: number | null): { color: 'green' | 'yellow' | 'red' | 'gray'; value: number; label: string; status: string } {
