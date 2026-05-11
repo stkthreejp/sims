@@ -26,6 +26,11 @@ const MAPS_SCRIPT_ID = 'google-maps-places'
 function loadMapsScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') return
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    if (!apiKey) {
+      reject(new Error('Google Maps API key is not configured'))
+      return
+    }
 
     // Already loaded
     if ((window as any).google?.maps?.places) {
@@ -43,7 +48,7 @@ function loadMapsScript(): Promise<void> {
 
     const script = document.createElement('script')
     script.id = MAPS_SCRIPT_ID
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`
     script.async = true
     script.defer = true
     script.onload = () => resolve()
@@ -61,6 +66,7 @@ export function AddressAutocomplete({
   hasError = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [loadError, setLoadError] = useState(false)
   const [ready, setReady] = useState(
     () => !!(window as any).google?.maps?.places
   )
@@ -68,8 +74,14 @@ export function AddressAutocomplete({
   useEffect(() => {
     if (ready) return
     loadMapsScript()
-      .then(() => setReady(true))
-      .catch(() => console.warn('Google Maps failed to load'))
+      .then(() => {
+        setLoadError(false)
+        setReady(true)
+      })
+      .catch(() => {
+        setLoadError(true)
+        console.warn('Google Maps failed to load')
+      })
   }, [ready])
 
   useEffect(() => {
@@ -125,14 +137,21 @@ export function AddressAutocomplete({
   }, [ready])
 
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      autoComplete="off"
-      className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${hasError ? 'border-red-400' : 'border-slate-300'} ${className}`}
-    />
+    <div className={className}>
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${hasError ? 'border-red-400' : 'border-slate-300'}`}
+      />
+      {loadError && (
+        <p className="mt-1 text-xs text-amber-700">
+          Address lookup is unavailable. Enter the address manually and save to geocode from the backend.
+        </p>
+      )}
+    </div>
   )
 }
