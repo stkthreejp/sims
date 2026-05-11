@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { getGoogleMapsApiKey } from '@/lib/clientConfig'
 
 export interface AddressComponents {
   addressLine1: string
@@ -26,7 +27,7 @@ const MAPS_SCRIPT_ID = 'google-maps-places'
 function loadMapsScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') return
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    const apiKey = getGoogleMapsApiKey()
     if (!apiKey) {
       reject(new Error('Google Maps API key is not configured'))
       return

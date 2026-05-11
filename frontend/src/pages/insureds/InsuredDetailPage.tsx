@@ -13,6 +13,7 @@ import { SUBMISSION_STATUS_LABELS, type SubmissionStatus } from '@/types/submiss
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, type PolicyListItem } from '@/types/policy.types'
 import { usePermissions } from '@/hooks/usePermissions'
+import { getGoogleMapsApiKey } from '@/lib/clientConfig'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ function fmtMoneyK(n: number | null | undefined): string {
 }
 
 function staticMapUrl(lat: number, lng: number) {
-  const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  const key = getGoogleMapsApiKey()
   if (!key) return null
   const center = `${lat},${lng}`
   return `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=14&size=520x160&scale=2&markers=color:blue%7C${center}&key=${key}`
