@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import type { Attachment, DocumentType } from '@/types/attachment.types'
 
 export type DocumentTemplate = {
   id: string
@@ -10,10 +11,12 @@ export type GenerateDocumentRequest = {
   templateId: string
   entityType: string
   entityId: string
+  documentType?: DocumentType
 }
 
 export type GenerateDocumentResponse = {
   url: string
+  attachment: Attachment
 }
 
 export const documentGenerationApi = {

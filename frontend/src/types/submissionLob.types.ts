@@ -190,6 +190,40 @@ export interface SubmissionPriorCarrierCreate {
   premium?: number
 }
 
+// GL endorsement/surcharge options
+export const GL_OCC_LIMIT_OPTIONS = [
+  { value: 300_000,   label: '$300,000' },
+  { value: 500_000,   label: '$500,000' },
+  { value: 1_000_000, label: '$1,000,000' },
+] as const
+
+export const GL_PCO_LIMIT_OPTIONS = [
+  { value: 1_000_000, label: '$1,000,000' },
+  { value: 2_000_000, label: '$2,000,000' },
+] as const
+
+export const GL_MED_LIMIT_OPTIONS = [
+  { value: 5_000,  label: '$5,000' },
+  { value: 10_000, label: '$10,000' },
+  { value: 15_000, label: '$15,000' },
+  { value: 25_000, label: '$25,000' },
+] as const
+
+export const GL_CLASS_CODE_OPTIONS = [
+  { value: '97111', label: '97111 – Logging and Lumbering' },
+  { value: '99793', label: '99793 – Truckers – Common/Contract' },
+  { value: '43822', label: '43822 – Forestry Services' },
+  { value: '49451', label: '49451 – Vacant Land – Other' },
+  { value: '61226', label: '61226 – Buildings/Premises – Office NOC' },
+  { value: '61224', label: '61224 – Buildings/Premises – Office (Emp)' },
+  { value: '91581', label: '91581 – Sub-contracted Work' },
+  { value: '91590', label: '91590 – Contractors Permanent Yard' },
+  { value: '94007', label: '94007 – Excavation' },
+  { value: '95410', label: '95410 – Grading of Land' },
+  { value: '58873', label: '58873 – Saw Mills or Planing Mills' },
+  { value: '59738', label: '59738 – Tie, Post or Pole Yard' },
+] as const
+
 export interface SubmissionGLCoverages {
   id: string
   submissionId: string
@@ -202,6 +236,13 @@ export interface SubmissionGLCoverages {
   totalSubcontractorCost: number | null
   classifications: SubmissionGLClassification[]
   updatedAt: string
+  // GL rating inputs — endorsements & surcharges
+  aiIndividualCount: number
+  aiBlanket: boolean
+  wosIndividualCount: number
+  wosBlanket: boolean
+  primaryNonContributory: boolean
+  includeTria: boolean
 }
 
 export interface SubmissionGLCoveragesUpsert {
@@ -212,6 +253,13 @@ export interface SubmissionGLCoveragesUpsert {
   damageToRentedPremises?: number
   medicalExpense?: number
   totalSubcontractorCost?: number
+  // GL rating inputs — endorsements & surcharges
+  aiIndividualCount: number
+  aiBlanket: boolean
+  wosIndividualCount: number
+  wosBlanket: boolean
+  primaryNonContributory: boolean
+  includeTria: boolean
 }
 
 export interface SubmissionGLClassification {

@@ -43,6 +43,12 @@ public class SubmissionGLController : ControllerBase
         gl.DamageToRentedPremises = dto.DamageToRentedPremises;
         gl.MedicalExpense = dto.MedicalExpense;
         gl.TotalSubcontractorCost = dto.TotalSubcontractorCost;
+        gl.AiIndividualCount = dto.AiIndividualCount;
+        gl.AiBlanket = dto.AiBlanket;
+        gl.WosIndividualCount = dto.WosIndividualCount;
+        gl.WosBlanket = dto.WosBlanket;
+        gl.PrimaryNonContributory = dto.PrimaryNonContributory;
+        gl.IncludeTria = dto.IncludeTria;
         await _db.SaveChangesAsync();
         return Ok(MapCoveragesToDto(gl));
     }
@@ -107,6 +113,12 @@ public class SubmissionGLController : ControllerBase
         DamageToRentedPremises = g.DamageToRentedPremises, MedicalExpense = g.MedicalExpense,
         TotalSubcontractorCost = g.TotalSubcontractorCost,
         UpdatedAt = g.UpdatedAt,
+        AiIndividualCount = g.AiIndividualCount,
+        AiBlanket = g.AiBlanket,
+        WosIndividualCount = g.WosIndividualCount,
+        WosBlanket = g.WosBlanket,
+        PrimaryNonContributory = g.PrimaryNonContributory,
+        IncludeTria = g.IncludeTria,
     };
 
     private static SubmissionGLClassificationDto MapClassificationToDto(SubmissionGLClassification c) => new()

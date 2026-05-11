@@ -24,6 +24,10 @@ public class RatingEngineService : IRatingEngineService
                     .ThenInclude(e => e.EquipmentType)
             .Include(q => q.Submission)
                 .ThenInclude(s => s.Vehicles)
+            .Include(q => q.Submission)
+                .ThenInclude(s => s.GLCoverages)
+            .Include(q => q.Submission)
+                .ThenInclude(s => s.GLClassifications)
             .FirstOrDefaultAsync(q => q.Id == quoteId);
 
         if (quote is null)
@@ -53,7 +57,12 @@ public class RatingEngineService : IRatingEngineService
 
         // ── Dispatch to formula ──────────────────────────────────────────────
         FormulaOutput output;
-        if (formulaKey == "APD_v1")
+        if (formulaKey == "GL_v1")
+        {
+            var err = TryRateGl(quote, modifier, out output);
+            if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
+        }
+        else if (formulaKey == "APD_v1")
         {
             var err = TryRateApd(quote, version, modifier, out output);
             if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
@@ -121,6 +130,127 @@ public class RatingEngineService : IRatingEngineService
             .FirstOrDefaultAsync();
 
         return Result<RatingResultDto>.Success(MapSnapshotToDto(snapshot, snapshot.RatingPlanVersion, ratedByName));
+    }
+
+    // ── GL_v1 ────────────────────────────────────────────────────────────────
+
+    private static (string code, string msg)? TryRateGl(
+        Domain.Entities.Quote quote, decimal modifier, out FormulaOutput output)
+    {
+        output = default;
+
+        var cov = quote.Submission.GLCoverages;
+        if (cov is null)
+            return ("NO_GL_COVERAGES", "GL coverages have not been set up for this submission.");
+
+        if (cov.EachOccurrence is null or 0)
+            return ("MISSING_FIELD", "Each Occurrence limit is required for GL rating.");
+        if (cov.MedicalExpense is null or 0)
+            return ("MISSING_FIELD", "Medical Expense limit is required for GL rating.");
+
+        var occLimit = (int)cov.EachOccurrence.Value;
+        var medLimit = (int)cov.MedicalExpense.Value;
+
+        // Default PCO limit to 1M if not specified (standard Brace program default)
+        var pcoLimit = cov.ProductsCompletedOps is > 0 ? (int)cov.ProductsCompletedOps.Value : 1_000_000;
+
+        var classifications = quote.Submission.GLClassifications
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.LocationNumber)
+            .ToList();
+
+        if (classifications.Count == 0)
+            return ("NO_CLASSIFICATIONS", "No GL classifications found on this submission.");
+
+        foreach (var c in classifications)
+        {
+            if (string.IsNullOrWhiteSpace(c.ClassCode))
+                return ("MISSING_FIELD", $"Classification #{c.LocationNumber} has no class code.");
+            if (!GlV1Formula.SupportedClassCodes.Contains(c.ClassCode))
+                return ("INELIGIBLE", $"Class code {c.ClassCode} is not eligible under this rating plan.");
+            if (c.Exposure is null or 0)
+                return ("MISSING_FIELD", $"Classification #{c.LocationNumber} ({c.ClassCode}) has no exposure.");
+        }
+
+        var inputs = classifications
+            .Select(c => new GlV1Formula.ClassInput(c.ClassCode!, c.Exposure!.Value))
+            .ToList();
+
+        GlV1Formula.RatingResult result;
+        try
+        {
+            result = GlV1Formula.Rate(
+                inputs, occLimit, pcoLimit, medLimit,
+                modifier,
+                cov.AiIndividualCount, cov.AiBlanket,
+                cov.WosIndividualCount, cov.WosBlanket,
+                cov.PrimaryNonContributory, cov.IncludeTria);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ("LOOKUP_FAIL", ex.Message);
+        }
+
+        var lines = classifications.Zip(result.Lines, (c, line) =>
+        {
+            var factors = new
+            {
+                co_rate_334 = line.CoRate334,
+                co_rate_336 = line.CoRate336,
+                ilf_po      = line.IlfPo,
+                ilf_pco     = line.IlfPco,
+                med_ilf     = line.MedIlf,
+            };
+            var inputs2 = new
+            {
+                class_code    = c.ClassCode,
+                description   = c.Description,
+                premium_basis = c.PremiumBasis,
+                exposure      = c.Exposure,
+                exposure_units = line.ExposureUnits,
+                occ_limit     = occLimit,
+                pco_limit     = pcoLimit,
+                med_limit     = medLimit,
+            };
+            return new QuoteRatingLine
+            {
+                Id             = Guid.NewGuid(),
+                ExposureRef    = $"GL-{c.LocationNumber:D3}-{c.ClassCode}",
+                Inputs         = JsonSerializer.Serialize(inputs2),
+                FactorsApplied = JsonSerializer.Serialize(factors),
+                LinePremium    = line.LineTotal,
+                CreatedAt      = DateTime.UtcNow,
+                UpdatedAt      = DateTime.UtcNow,
+            };
+        }).ToList();
+
+        // Append summary lines for endorsements and TRIA
+        if (result.EndorsementTotal > 0)
+            lines.Add(new QuoteRatingLine
+            {
+                Id             = Guid.NewGuid(),
+                ExposureRef    = "GL-ENDT",
+                Inputs         = JsonSerializer.Serialize(new { ai_individual = result.AiIndividualPremium, ai_blanket = result.AiBlanketPremium, wos_individual = result.WosIndividualPremium, wos_blanket = result.WosBlanketPremium, pnc = result.PncPremium }),
+                FactorsApplied = "{}",
+                LinePremium    = result.EndorsementTotal,
+                CreatedAt      = DateTime.UtcNow,
+                UpdatedAt      = DateTime.UtcNow,
+            });
+
+        if (result.TriaPremium > 0)
+            lines.Add(new QuoteRatingLine
+            {
+                Id             = Guid.NewGuid(),
+                ExposureRef    = "GL-TRIA",
+                Inputs         = JsonSerializer.Serialize(new { tria_rate = 0.025m, modified_premium = result.ModifiedPremium }),
+                FactorsApplied = "{}",
+                LinePremium    = result.TriaPremium,
+                CreatedAt      = DateTime.UtcNow,
+                UpdatedAt      = DateTime.UtcNow,
+            });
+
+        output = new FormulaOutput(result.ManualPremium, result.GrandTotal, lines);
+        return null;
     }
 
     // ── IM_v1 ────────────────────────────────────────────────────────────────

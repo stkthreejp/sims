@@ -18,6 +18,13 @@ public class SubmissionGLCoveragesConfiguration : IEntityTypeConfiguration<Submi
         builder.Property(g => g.MedicalExpense).HasPrecision(18, 2);
         builder.Property(g => g.TotalSubcontractorCost).HasPrecision(18, 2);
 
+        builder.Property(g => g.AiIndividualCount).HasColumnName("ai_individual_count").HasDefaultValue(0);
+        builder.Property(g => g.AiBlanket).HasColumnName("ai_blanket").HasDefaultValue(false);
+        builder.Property(g => g.WosIndividualCount).HasColumnName("wos_individual_count").HasDefaultValue(0);
+        builder.Property(g => g.WosBlanket).HasColumnName("wos_blanket").HasDefaultValue(false);
+        builder.Property(g => g.PrimaryNonContributory).HasColumnName("primary_non_contributory").HasDefaultValue(false);
+        builder.Property(g => g.IncludeTria).HasColumnName("include_tria").HasDefaultValue(false);
+
         builder.HasOne(g => g.Submission).WithOne(s => s.GLCoverages)
             .HasForeignKey<SubmissionGLCoverages>(g => g.SubmissionId).OnDelete(DeleteBehavior.Cascade);
     }

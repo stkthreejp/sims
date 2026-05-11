@@ -188,6 +188,8 @@ export function PolicyDetailPage() {
         <GenerateDocumentModal
           entityType="Policy"
           entityId={id!}
+          attachmentEntityType="Policy"
+          attachmentEntityId={policy.boundQuoteId}
           onClose={() => setShowGenerateModal(false)}
         />
       )}
@@ -452,7 +454,7 @@ export function PolicyDetailPage() {
 
       {/* Documents */}
       <div className="bg-white border rounded-lg p-5">
-        <DocumentsSection entityType="Policy" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
+        <DocumentsSection entityType="Policy" entityId={policy.boundQuoteId} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
       </div>
     </div>
   )

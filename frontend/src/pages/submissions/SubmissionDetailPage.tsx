@@ -17,7 +17,8 @@ import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi
 import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES } from '@/types/submissionLob.types'
-import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
+import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate, type QuoteBind, type CommissionOverrideRequest } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -179,6 +180,9 @@ export function SubmissionDetailPage() {
   const emptySupplementalForm = (): SubmissionSupplementalUpsert => ({ commoditiesHauled: [], terminalLocations: [], safetyProgramInPlace: false, filingsRequired: [], ownerOperator: false })
   const [supplementalForm, setSupplementalForm] = useState<SubmissionSupplementalUpsert>(emptySupplementalForm())
   const [supplementalDirty, setSupplementalDirty] = useState(false)
+  const emptyGlCovForm = (): SubmissionGLCoveragesUpsert => ({ aiIndividualCount: 0, aiBlanket: false, wosIndividualCount: 0, wosBlanket: false, primaryNonContributory: false, includeTria: false })
+  const [glCovForm, setGlCovForm] = useState<SubmissionGLCoveragesUpsert>(emptyGlCovForm())
+  const [glCovDirty, setGlCovDirty] = useState(false)
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -286,6 +290,26 @@ export function SubmissionDetailPage() {
       })
     }
   }, [supplemental])
+
+  useEffect(() => {
+    if (glCoverages) {
+      setGlCovForm({
+        generalAggregate: glCoverages.generalAggregate ?? undefined,
+        productsCompletedOps: glCoverages.productsCompletedOps ?? undefined,
+        eachOccurrence: glCoverages.eachOccurrence ?? undefined,
+        personalAndAdvInjury: glCoverages.personalAndAdvInjury ?? undefined,
+        damageToRentedPremises: glCoverages.damageToRentedPremises ?? undefined,
+        medicalExpense: glCoverages.medicalExpense ?? undefined,
+        totalSubcontractorCost: glCoverages.totalSubcontractorCost ?? undefined,
+        aiIndividualCount: glCoverages.aiIndividualCount ?? 0,
+        aiBlanket: glCoverages.aiBlanket ?? false,
+        wosIndividualCount: glCoverages.wosIndividualCount ?? 0,
+        wosBlanket: glCoverages.wosBlanket ?? false,
+        primaryNonContributory: glCoverages.primaryNonContributory ?? false,
+        includeTria: glCoverages.includeTria ?? false,
+      })
+    }
+  }, [glCoverages])
 
   const selectedCarrier = carriers.find((c) => c.id === quoteForm.carrierId)
   const availableLobs = selectedCarrier
@@ -440,6 +464,16 @@ export function SubmissionDetailPage() {
       toast.success('Supplemental info saved')
     },
     onError: () => toast.error('Failed to save supplemental info'),
+  })
+
+  const saveGlCovMutation = useMutation({
+    mutationFn: (dto: SubmissionGLCoveragesUpsert) => submissionGLApi.upsertCoverages(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-gl-coverages', id] })
+      setGlCovDirty(false)
+      toast.success('GL coverages saved')
+    },
+    onError: () => toast.error('Failed to save GL coverages'),
   })
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -1381,14 +1415,37 @@ export function SubmissionDetailPage() {
 
           {activeLob === 'gl' && (
             <div className="sd-card-body">
-              <div className="sd-fields">
-                {glCoverages ? (
-                  <>
-                    {glCoverages.eachOccurrence != null && <div className="sd-field"><span className="lbl">Each Occurrence</span><span className="val">{fmtMoney(glCoverages.eachOccurrence)}</span></div>}
-                    {glCoverages.generalAggregate != null && <div className="sd-field"><span className="lbl">General Aggregate</span><span className="val">{fmtMoney(glCoverages.generalAggregate)}</span></div>}
-                  </>
-                ) : (
-                  <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No GL coverage data on file.</p>
+              {/* Coverage limits */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coverage Limits</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  <div><label style={labelStyle}>Each Occurrence *</label><select value={glCovForm.eachOccurrence ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, eachOccurrence: e.target.value ? parseInt(e.target.value) : undefined, generalAggregate: e.target.value ? parseInt(e.target.value) * 2 : undefined, personalAndAdvInjury: e.target.value ? parseInt(e.target.value) : undefined })); setGlCovDirty(true) }} style={inputStyle}><option value="">— Select —</option>{GL_OCC_LIMIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                  <div><label style={labelStyle}>General Aggregate</label><input type="number" readOnly value={glCovForm.generalAggregate ?? ''} style={{ ...inputStyle, background: 'var(--surface-2)', color: 'var(--ink-3)' }} /></div>
+                  <div><label style={labelStyle}>Prod/Completed Ops Agg</label><select value={glCovForm.productsCompletedOps ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, productsCompletedOps: e.target.value ? parseInt(e.target.value) : undefined })); setGlCovDirty(true) }} style={inputStyle}><option value="">— Select —</option>{GL_PCO_LIMIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                  <div><label style={labelStyle}>Medical Expense *</label><select value={glCovForm.medicalExpense ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, medicalExpense: e.target.value ? parseInt(e.target.value) : undefined })); setGlCovDirty(true) }} style={inputStyle}><option value="">— Select —</option>{GL_MED_LIMIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                  <div><label style={labelStyle}>Damage to Rented Premises</label><input type="number" value={glCovForm.damageToRentedPremises ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, damageToRentedPremises: parseFloat(e.target.value) || undefined })); setGlCovDirty(true) }} style={inputStyle} placeholder="e.g. 100000" /></div>
+                  <div><label style={labelStyle}>Total Subcontractor Cost</label><input type="number" value={glCovForm.totalSubcontractorCost ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, totalSubcontractorCost: parseFloat(e.target.value) || undefined })); setGlCovDirty(true) }} style={inputStyle} placeholder="For class 91581" /></div>
+                </div>
+              </div>
+              {/* Endorsements & surcharges */}
+              <div style={{ paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Endorsements & Surcharges</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  <div><label style={labelStyle}>AI Individual (qty × $50)</label><input type="number" min={0} value={glCovForm.aiIndividualCount} onChange={(e) => { setGlCovForm((f) => ({ ...f, aiIndividualCount: parseInt(e.target.value) || 0 })); setGlCovDirty(true) }} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>WOS Individual (qty × $50)</label><input type="number" min={0} value={glCovForm.wosIndividualCount} onChange={(e) => { setGlCovForm((f) => ({ ...f, wosIndividualCount: parseInt(e.target.value) || 0 })); setGlCovDirty(true) }} style={inputStyle} /></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.aiBlanket} onChange={(e) => { setGlCovForm((f) => ({ ...f, aiBlanket: e.target.checked })); setGlCovDirty(true) }} /> AI Blanket ($250)</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.wosBlanket} onChange={(e) => { setGlCovForm((f) => ({ ...f, wosBlanket: e.target.checked })); setGlCovDirty(true) }} /> WOS Blanket ($250)</label>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.primaryNonContributory} onChange={(e) => { setGlCovForm((f) => ({ ...f, primaryNonContributory: e.target.checked })); setGlCovDirty(true) }} /> Primary Non-Contributory ($250)</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.includeTria} onChange={(e) => { setGlCovForm((f) => ({ ...f, includeTria: e.target.checked })); setGlCovDirty(true) }} /> Include TRIA (2.5%)</label>
+                  </div>
+                </div>
+                {glCovDirty && (
+                  <div style={{ marginTop: 12 }}>
+                    <button onClick={() => saveGlCovMutation.mutate(glCovForm)} disabled={saveGlCovMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save GL Coverages</button>
+                  </div>
                 )}
               </div>
             </div>

@@ -12,6 +12,14 @@ public class SubmissionGLCoveragesDto
     public decimal? MedicalExpense { get; set; }
     public decimal? TotalSubcontractorCost { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    // GL rating inputs — endorsements & surcharges
+    public int AiIndividualCount { get; set; }
+    public bool AiBlanket { get; set; }
+    public int WosIndividualCount { get; set; }
+    public bool WosBlanket { get; set; }
+    public bool PrimaryNonContributory { get; set; }
+    public bool IncludeTria { get; set; }
 }
 
 public class SubmissionGLCoveragesUpsertDto
@@ -23,6 +31,14 @@ public class SubmissionGLCoveragesUpsertDto
     public decimal? DamageToRentedPremises { get; set; }
     public decimal? MedicalExpense { get; set; }
     public decimal? TotalSubcontractorCost { get; set; }
+
+    // GL rating inputs — endorsements & surcharges
+    public int AiIndividualCount { get; set; }
+    public bool AiBlanket { get; set; }
+    public int WosIndividualCount { get; set; }
+    public bool WosBlanket { get; set; }
+    public bool PrimaryNonContributory { get; set; }
+    public bool IncludeTria { get; set; }
 }
 
 public class SubmissionGLClassificationDto

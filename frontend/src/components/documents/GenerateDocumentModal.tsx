@@ -1,17 +1,25 @@
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { documentGenerationApi } from '@/api/documentGeneration.api'
+import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES_BY_ENTITY, type DocumentEntityType, type DocumentType } from '@/types/attachment.types'
 
 type Props = {
   entityType: string
   entityId: string
+  attachmentEntityType?: DocumentEntityType
+  attachmentEntityId?: string
   onClose: () => void
 }
 
-export function GenerateDocumentModal({ entityType, entityId, onClose }: Props) {
+export function GenerateDocumentModal({ entityType, entityId, attachmentEntityType, attachmentEntityId, onClose }: Props) {
+  const qc = useQueryClient()
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const storageEntityType = attachmentEntityType ?? storageEntityForTemplate(entityType)
+  const storageEntityId = attachmentEntityId ?? entityId
+  const documentTypes = storageEntityType ? DOCUMENT_TYPES_BY_ENTITY[storageEntityType] : []
+  const [documentType, setDocumentType] = useState<DocumentType>(defaultDocumentType(entityType, documentTypes))
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['document-templates', entityType],
@@ -20,10 +28,14 @@ export function GenerateDocumentModal({ entityType, entityId, onClose }: Props) 
 
   const generateMutation = useMutation({
     mutationFn: () =>
-      documentGenerationApi.generate({ templateId: selectedTemplateId, entityType, entityId }),
+      documentGenerationApi.generate({ templateId: selectedTemplateId, entityType, entityId, documentType }),
     onSuccess: (data) => {
+      if (storageEntityType) {
+        qc.invalidateQueries({ queryKey: ['attachments', storageEntityType, storageEntityId] })
+      }
+      qc.invalidateQueries({ queryKey: ['quote-attachments', storageEntityId] })
       window.open(data.url, '_blank', 'noopener,noreferrer')
-      toast.success('Document generated')
+      toast.success('Document generated and saved')
       onClose()
     },
     onError: (e: any) =>
@@ -66,6 +78,20 @@ export function GenerateDocumentModal({ entityType, entityId, onClose }: Props) 
               </select>
             )}
           </div>
+          {documentTypes.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Save As *</label>
+              <select
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value as DocumentType)}
+                className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {documentTypes.map((t) => (
+                  <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 px-5 py-4 border-t bg-slate-50 rounded-b-lg">
@@ -87,4 +113,20 @@ export function GenerateDocumentModal({ entityType, entityId, onClose }: Props) 
       </div>
     </div>
   )
+}
+
+function storageEntityForTemplate(entityType: string): DocumentEntityType | undefined {
+  if (entityType === 'Quote' || entityType === 'Policy') return 'Policy'
+  if (entityType === 'Submission' || entityType === 'Carrier' || entityType === 'Agent') return entityType
+  return undefined
+}
+
+function defaultDocumentType(entityType: string, documentTypes: DocumentType[]): DocumentType {
+  const preferred = entityType === 'Quote' ? 'ProposalQuoteLetter'
+    : entityType === 'Policy' ? 'PolicyForm'
+    : 'Correspondence'
+
+  return documentTypes.includes(preferred as DocumentType)
+    ? preferred as DocumentType
+    : documentTypes[0] ?? 'Other'
 }

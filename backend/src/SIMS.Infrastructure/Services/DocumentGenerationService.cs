@@ -15,22 +15,27 @@ namespace SIMS.Infrastructure.Services;
 public class DocumentGenerationService : IDocumentGenerationService
 {
     private readonly IServiceProvider _sp;
-    private readonly IBlobStorageService _blob;
+    private readonly IAttachmentService _attachments;
 
-    public DocumentGenerationService(IServiceProvider sp, IBlobStorageService blob)
+    public DocumentGenerationService(IServiceProvider sp, IAttachmentService attachments)
     {
         _sp = sp;
-        _blob = blob;
+        _attachments = attachments;
     }
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
-    public async Task<Result<string>> GenerateAsync(Guid templateId, TemplateEntityType entityType, Guid entityId)
+    public async Task<Result<GeneratedDocumentDto>> GenerateAsync(
+        Guid templateId,
+        TemplateEntityType entityType,
+        Guid entityId,
+        DocumentType? documentType,
+        Guid userId)
     {
         // ── 1. Load template ──────────────────────────────────────────────────
         var template = await Db.Set<DocumentTemplate>().FindAsync(templateId);
         if (template == null)
-            return Result<string>.Failure("NOT_FOUND", "Template not found.");
+            return Result<GeneratedDocumentDto>.Failure("NOT_FOUND", "Template not found.");
 
         // ── 2. Build tag data dictionary ──────────────────────────────────────
         Dictionary<string, string> data;
@@ -40,7 +45,7 @@ public class DocumentGenerationService : IDocumentGenerationService
         }
         catch (Exception ex)
         {
-            return Result<string>.Failure("DATA_ERROR", $"Could not load entity data: {ex.Message}");
+            return Result<GeneratedDocumentDto>.Failure("DATA_ERROR", $"Could not load entity data: {ex.Message}");
         }
 
         // ── 3. Fill {{tags}} in HTML ──────────────────────────────────────────
@@ -57,17 +62,36 @@ public class DocumentGenerationService : IDocumentGenerationService
         }
         catch (Exception ex)
         {
-            return Result<string>.Failure("CONVERSION_ERROR", $"PDF conversion failed: {ex.Message}");
+            return Result<GeneratedDocumentDto>.Failure("CONVERSION_ERROR", $"PDF conversion failed: {ex.Message}");
         }
 
         // ── 6. Store in Azure Blob ────────────────────────────────────────────
         var fileName = $"{SanitizeFileName(template.Name)}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
+        var attachmentTarget = await ResolveAttachmentTargetAsync(entityType, entityId);
+        if (attachmentTarget == null)
+            return Result<GeneratedDocumentDto>.Failure("UNSUPPORTED_ENTITY", "Generated documents cannot be stored for this entity type.");
+
         using var stream = new MemoryStream(pdfBytes);
-        var blobPath = await _blob.UploadAsync(stream, fileName, "application/pdf");
+        var attachmentResult = await _attachments.CreateGeneratedAsync(
+            attachmentTarget.Value.EntityType,
+            attachmentTarget.Value.EntityId,
+            stream,
+            fileName,
+            "application/pdf",
+            pdfBytes.LongLength,
+            documentType ?? DefaultDocumentType(entityType, template.Name),
+            $"Generated from template \"{template.Name}\" on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC.",
+            userId);
 
         // ── 7. Return signed download URL ─────────────────────────────────────
-        var url = await _blob.GetDownloadUrlAsync(blobPath, fileName, TimeSpan.FromHours(2));
-        return Result<string>.Success(url);
+        if (!attachmentResult.IsSuccess || attachmentResult.Value == null)
+            return Result<GeneratedDocumentDto>.Failure(attachmentResult.ErrorCode ?? "ATTACHMENT_SAVE_FAILED", attachmentResult.ErrorMessage ?? "Generated document could not be stored.");
+
+        var urlResult = await _attachments.GetDownloadUrlAsync(attachmentResult.Value.Id, userId);
+        if (!urlResult.IsSuccess || string.IsNullOrWhiteSpace(urlResult.Value))
+            return Result<GeneratedDocumentDto>.Failure(urlResult.ErrorCode ?? "DOWNLOAD_URL_FAILED", urlResult.ErrorMessage ?? "Generated document was stored, but a download URL could not be created.");
+
+        return Result<GeneratedDocumentDto>.Success(new GeneratedDocumentDto(urlResult.Value, attachmentResult.Value));
     }
 
     // ── Tag replacement ───────────────────────────────────────────────────────
@@ -152,6 +176,44 @@ public class DocumentGenerationService : IDocumentGenerationService
         using var pdfStream = new MemoryStream();
         pdfDoc.Save(pdfStream);
         return pdfStream.ToArray();
+    }
+
+    private async Task<(DocumentEntityType EntityType, Guid EntityId)?> ResolveAttachmentTargetAsync(
+        TemplateEntityType entityType,
+        Guid entityId)
+    {
+        return entityType switch
+        {
+            TemplateEntityType.Quote => (DocumentEntityType.Policy, entityId),
+            TemplateEntityType.Policy => await ResolvePolicyAttachmentTargetAsync(entityId),
+            TemplateEntityType.Submission => (DocumentEntityType.Submission, entityId),
+            TemplateEntityType.Carrier => (DocumentEntityType.Carrier, entityId),
+            TemplateEntityType.Agent => (DocumentEntityType.Agent, entityId),
+            _ => null,
+        };
+    }
+
+    private async Task<(DocumentEntityType EntityType, Guid EntityId)?> ResolvePolicyAttachmentTargetAsync(Guid policyId)
+    {
+        var boundQuoteId = await Db.Set<Policy>()
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .Select(p => (Guid?)p.BoundQuoteId)
+            .FirstOrDefaultAsync();
+
+        return boundQuoteId.HasValue ? (DocumentEntityType.Policy, boundQuoteId.Value) : null;
+    }
+
+    private static DocumentType DefaultDocumentType(TemplateEntityType entityType, string templateName)
+    {
+        var name = templateName.ToLowerInvariant();
+        if (name.Contains("cancel") || name.Contains("nonrenew") || name.Contains("non-renew"))
+            return DocumentType.CancellationNonRenewal;
+        if (name.Contains("endorse"))
+            return DocumentType.Endorsement;
+        if (entityType == TemplateEntityType.Quote)
+            return DocumentType.ProposalQuoteLetter;
+
+        return entityType == TemplateEntityType.Policy ? DocumentType.PolicyForm : DocumentType.Correspondence;
     }
 
     // ── Data dictionary builders ──────────────────────────────────────────────
