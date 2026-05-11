@@ -1526,8 +1526,8 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var summary = new AutoSafetyRadiusSummaryDto
         {
             HasBaseCoordinate = insured?.Latitude != null && insured.Longitude != null,
-            Precision = "State-level estimate",
-            Note = "Distances use geocoded inspection locations when available. Rows without inspection coordinates fall back to low-precision state-centroid estimates.",
+            Precision = "Mixed precision",
+            Note = "Distances use stored/geocoded inspection locations first. Rows without inspection coordinates fall back to low-precision state-centroid estimates.",
             Bands = bands.ToList(),
         };
 
@@ -1537,6 +1537,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             summary.Note = "Insured coordinates are not cached yet. Select or save the insured address to geocode the base location.";
             bands.Last().InspectionCount = inspections.Count;
             bands.Last().OutOfServiceCount = CountInspectionOos(inspections, violations);
+            summary.PrecisionCounts = [new AutoSafetyRadiusPrecisionDto { Label = "Unknown", Count = inspections.Count }];
             return summary;
         }
 
@@ -1545,11 +1546,16 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .Select(v => v.ReportNumber)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var geocodedCount = 0;
+        var stateEstimateCount = 0;
+        var unknownCount = 0;
+
         foreach (var inspection in inspections)
         {
             var band = bands.Last();
             if (inspection.Latitude != null && inspection.Longitude != null)
             {
+                geocodedCount++;
                 var miles = HaversineMiles(
                     (double)insured.Latitude.Value,
                     (double)insured.Longitude.Value,
@@ -1565,6 +1571,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             }
             else if (!string.IsNullOrWhiteSpace(inspection.State) && StateCentroids.TryGetValue(inspection.State.Trim().ToUpperInvariant(), out var point))
             {
+                stateEstimateCount++;
                 var miles = HaversineMiles((double)insured.Latitude.Value, (double)insured.Longitude.Value, point.Latitude, point.Longitude);
                 band = miles switch
                 {
@@ -1574,10 +1581,32 @@ public class FmcsaSafetyService : IFmcsaSafetyService
                     _ => bands[3],
                 };
             }
+            else
+            {
+                unknownCount++;
+            }
 
             band.InspectionCount++;
             if (inspection.DriverOutOfService || inspection.VehicleOutOfService || inspection.HazmatOutOfService || oosReports.Contains(inspection.ReportNumber))
                 band.OutOfServiceCount++;
+        }
+
+        summary.PrecisionCounts =
+        [
+            new AutoSafetyRadiusPrecisionDto { Label = "Inspection geocode", Count = geocodedCount },
+            new AutoSafetyRadiusPrecisionDto { Label = "State estimate", Count = stateEstimateCount },
+            new AutoSafetyRadiusPrecisionDto { Label = "Unknown", Count = unknownCount },
+        ];
+
+        if (geocodedCount == inspections.Count)
+        {
+            summary.Precision = "Inspection geocode";
+            summary.Note = "Distances use stored/geocoded inspection locations.";
+        }
+        else if (stateEstimateCount > 0)
+        {
+            summary.Precision = "Mixed precision";
+            summary.Note = "Some inspections use stored/geocoded locations. Rows without inspection coordinates use low-precision state-centroid estimates.";
         }
 
         return summary;

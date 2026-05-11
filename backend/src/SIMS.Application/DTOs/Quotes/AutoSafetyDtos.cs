@@ -100,7 +100,14 @@ public class AutoSafetyRadiusSummaryDto
     public bool HasBaseCoordinate { get; set; }
     public string Precision { get; set; } = "Unavailable";
     public string? Note { get; set; }
+    public List<AutoSafetyRadiusPrecisionDto> PrecisionCounts { get; set; } = new();
     public List<AutoSafetyRadiusBandDto> Bands { get; set; } = new();
+}
+
+public class AutoSafetyRadiusPrecisionDto
+{
+    public string Label { get; set; } = string.Empty;
+    public int Count { get; set; }
 }
 
 public class AutoSafetyRadiusBandDto

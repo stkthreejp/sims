@@ -191,6 +191,17 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               <span className="font-semibold">{data.radiusSummary.precision}:</span> {data.radiusSummary.note}
             </div>
           )}
+          {data.radiusSummary?.precisionCounts?.some((p) => p.count > 0) && (
+            <div className="mb-3 flex flex-wrap gap-2 text-xs">
+              {data.radiusSummary.precisionCounts
+                .filter((p) => p.count > 0)
+                .map((p) => (
+                  <span key={p.label} className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600">
+                    {p.label}: <span className="font-semibold text-slate-800">{p.count.toLocaleString()}</span>
+                  </span>
+                ))}
+            </div>
+          )}
           {data.geographicHotspots.length === 0 ? (
             <p className="text-sm text-slate-400">No inspection location concentration yet.</p>
           ) : (

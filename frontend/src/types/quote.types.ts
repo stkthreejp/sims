@@ -264,10 +264,16 @@ export interface AutoSafetyRadiusBand {
   outOfServiceCount: number
 }
 
+export interface AutoSafetyRadiusPrecision {
+  label: string
+  count: number
+}
+
 export interface AutoSafetyRadiusSummary {
   hasBaseCoordinate: boolean
   precision: string
   note: string | null
+  precisionCounts: AutoSafetyRadiusPrecision[]
   bands: AutoSafetyRadiusBand[]
 }
 
