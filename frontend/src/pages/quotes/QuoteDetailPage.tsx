@@ -12,6 +12,7 @@ import { LOB_LABELS, type PolicyLineOfBusiness, type QuoteStatus } from '@/types
 import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
+import { attachmentsApi } from '@/api/attachments.api'
 import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -420,15 +421,9 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
   })
 
   const downloadMutation = useMutation({
-    mutationFn: (id: string) => quotesApi.downloadAttachment(quoteId, id),
-    onSuccess: (res, id) => {
-      const file = attachments.find((a) => a.id === id)
-      const url = URL.createObjectURL(res.data)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = file?.fileName ?? 'download'
-      a.click()
-      URL.revokeObjectURL(url)
+    mutationFn: (id: string) => attachmentsApi.getDownloadUrl(id),
+    onSuccess: (url) => {
+      window.open(url, '_blank', 'noopener,noreferrer')
     },
     onError: () => toast.error('Download failed'),
   })
