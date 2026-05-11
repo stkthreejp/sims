@@ -22,6 +22,7 @@ type DiffPart = { text: string; kind: DiffKind }
 export function LegalRequirementsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('requirements')
   const [state, setState] = useState(ALL)
+  const [action, setAction] = useState(ALL)
   const [category, setCategory] = useState(ALL)
   const [search, setSearch] = useState('')
   const [scanReviewStatus, setScanReviewStatus] = useState('Pending')
@@ -37,9 +38,10 @@ export function LegalRequirementsPage() {
   })
 
   const sectionsQuery = useQuery({
-    queryKey: ['legal-requirements', 'sections', state, category, search],
+    queryKey: ['legal-requirements', 'sections', state, action, category, search],
     queryFn: () => legalRequirementsApi.getSections({
       state: state === ALL ? undefined : state,
+      action: action === ALL ? undefined : action,
       category: category === ALL ? undefined : category,
       search: search.trim() || undefined,
     }),
@@ -122,7 +124,7 @@ export function LegalRequirementsPage() {
     <div className="p-6 space-y-5">
       <PageHeader
         title="Cancellation Compliance"
-        subtitle="Commercial P&C cancellation requirements, source scans, and change history"
+        subtitle="Commercial P&C cancellation and non-renewal requirements, source scans, and change history"
         action={
           <button
             type="button"
@@ -172,6 +174,9 @@ export function LegalRequirementsPage() {
 
         <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
           <SelectFilter label="State" value={state} values={[ALL, ...(summary?.states ?? [])]} onChange={setState} />
+          {activeTab === 'requirements' && (
+            <SelectFilter label="Action" value={action} values={[ALL, ...(summary?.actions ?? [])]} onChange={setAction} />
+          )}
           {activeTab === 'requirements' && (
             <SelectFilter label="Category" value={category} values={[ALL, ...(summary?.categories ?? [])]} onChange={setCategory} />
           )}
@@ -239,7 +244,7 @@ export function LegalRequirementsPage() {
           Source
         </div>
         <div className="mt-2 text-sm text-slate-600">
-          {summary?.sourceName ?? 'Oden Online'}: {summary?.sourceDocument ?? 'COMMERCIAL INSURANCE - CANCELLATION - P&C'}
+          {summary?.sourceName ?? 'Oden Online'}: {summary?.sourceDocument ?? 'COMMERCIAL INSURANCE - CANCELLATION / NONRENEWAL - P&C'}
           {summary?.sourceCreatedAt ? `, created ${formatDate(summary.sourceCreatedAt)}` : ''}
         </div>
       </section>
@@ -505,6 +510,7 @@ function RequirementTable({ sections }: { sections: LegalRequirementSection[] })
         <thead>
           <tr className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <th className="px-4 py-3">State</th>
+            <th className="px-4 py-3">Action</th>
             <th className="px-4 py-3">Category</th>
             <th className="px-4 py-3">Topic</th>
             <th className="px-4 py-3">Requirement</th>
@@ -516,6 +522,7 @@ function RequirementTable({ sections }: { sections: LegalRequirementSection[] })
           {sections.map((section) => (
             <tr key={section.id} className="align-top">
               <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{section.state}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-slate-700">{cleanAction(section.action)}</td>
               <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{cleanLabel(section.category)}</td>
               <td className="min-w-[180px] px-4 py-3 text-slate-700">{section.topic}</td>
               <td className="min-w-[420px] px-4 py-3 leading-6 text-slate-700">{section.requirementText}</td>
@@ -1000,6 +1007,10 @@ function EmptyPanel({ text }: { text: string }) {
 
 function cleanLabel(value: string) {
   return value === ALL ? value : value.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function cleanAction(value: string) {
+  return value === 'NonRenewal' ? 'Non-Renewal' : cleanLabel(value)
 }
 
 function truncate(value: string) {

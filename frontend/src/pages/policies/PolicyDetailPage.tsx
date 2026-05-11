@@ -83,6 +83,12 @@ export function PolicyDetailPage() {
     enabled: !!id && canCancelPolicies,
   })
 
+  const { data: nonRenewalGuidance } = useQuery({
+    queryKey: ['policies', id, 'non-renewal-guidance'],
+    queryFn: () => policiesApi.getNonRenewalGuidance(id!),
+    enabled: !!id && canCancelPolicies,
+  })
+
   const addEndorsementMutation = useMutation({
     mutationFn: (data: { effectiveDate: string; premiumChange: number; endorsementDescription?: string; notes?: string }) =>
       policiesApi.addEndorsement(id!, data),
@@ -208,7 +214,7 @@ export function PolicyDetailPage() {
       {actionModal === 'nonRenew' && (
         <NonRenewPolicyModal
           policy={policy}
-          guidance={cancellationGuidance}
+          guidance={nonRenewalGuidance}
           saving={nonRenewMutation.isPending}
           onClose={() => setActionModal(null)}
           onSave={(data) => nonRenewMutation.mutate(data)}
@@ -689,7 +695,7 @@ function NonRenewPolicyModal({
           </Field>
           <ModalActions saving={saving} onClose={onClose} submitLabel="Mark Non-Renewed" />
         </div>
-        <LegalGuidancePanel guidance={guidance} mode="Cancellation and non-renewal reference" />
+        <LegalGuidancePanel guidance={guidance} mode="Non-renewal" />
       </form>
     </ActionModal>
   )

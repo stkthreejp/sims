@@ -23,5 +23,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Update="Data\Seeds\oden-commercial-cancellation.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="Data\Seeds\oden-commercial-nonrenewal.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -26,6 +26,9 @@ export const policiesApi = {
   getCancellationGuidance: (id: string) =>
     apiClient.get<LegalComplianceGuidance>(`/policies/${id}/cancellation-guidance`).then((r) => r.data),
 
+  getNonRenewalGuidance: (id: string) =>
+    apiClient.get<LegalComplianceGuidance>(`/policies/${id}/non-renewal-guidance`).then((r) => r.data),
+
   cancel: (id: string, data: CancelPolicy) =>
     apiClient.post<Policy>(`/policies/${id}/cancel`, data).then((r) => r.data),
 

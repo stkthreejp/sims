@@ -87,6 +87,14 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("{id:guid}/non-renewal-guidance")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public async Task<IActionResult> GetNonRenewalGuidance(Guid id)
+    {
+        var result = await _policies.GetNonRenewalGuidanceAsync(id, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // --- Cancellation ---
 
     [HttpPost("{id:guid}/cancel")]

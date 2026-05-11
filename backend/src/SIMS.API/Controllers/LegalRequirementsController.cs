@@ -32,6 +32,7 @@ public class LegalRequirementsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<LegalRequirementSectionDto>>> GetSections(
         [FromQuery] string? state,
+        [FromQuery] string? action,
         [FromQuery] string? category,
         [FromQuery] string? search)
     {
@@ -39,6 +40,9 @@ public class LegalRequirementsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(state))
             query = query.Where(r => r.State == state);
+
+        if (!string.IsNullOrWhiteSpace(action))
+            query = query.Where(r => r.Action == action);
 
         if (!string.IsNullOrWhiteSpace(category))
             query = query.Where(r => r.Category == category);
@@ -80,11 +84,12 @@ public class LegalRequirementsController : ControllerBase
     {
         var rows = await _db.LegalRequirementSections
             .AsNoTracking()
-            .Select(r => new { r.State, r.Category, r.ReviewStatus, r.SourceName, r.SourceDocument, r.SourceCreatedAt })
+            .Select(r => new { r.State, r.Action, r.Category, r.ReviewStatus, r.SourceName, r.SourceDocument, r.SourceCreatedAt })
             .ToListAsync();
 
         var summary = new LegalRequirementsSummaryDto(
             rows.Select(r => r.State).Distinct().Order().ToArray(),
+            rows.Select(r => r.Action).Distinct().Order().ToArray(),
             rows.Select(r => r.Category).Distinct().Order().ToArray(),
             rows.Count,
             rows.GroupBy(r => r.State).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => g.Count()),
@@ -366,14 +371,16 @@ public class LegalRequirementsController : ControllerBase
 
         using var reader = new StreamReader(file.OpenReadStream());
         var html = await reader.ReadToEndAsync();
-        var importedSections = OdenCancellationChartParser.Parse(html);
+        var importedSections = OdenChartParser.Parse(html);
 
         if (importedSections.Count == 0)
-            return BadRequest(new { errorMessage = "No cancellation requirement sections were found in the Oden export." });
+            return BadRequest(new { errorMessage = "No requirement sections were found in the Oden export." });
+
+        var importedAction = importedSections.Select(s => s.Action).Distinct().SingleOrDefault() ?? "Cancellation";
 
         var run = new LegalSourceScanRun
         {
-            SourceName = "Oden Online",
+            SourceName = OdenSourceName(importedAction),
             SourceType = "Manual HTML Export",
             Status = "Completed",
             StartedAt = DateTime.UtcNow,
@@ -439,7 +446,7 @@ public class LegalRequirementsController : ControllerBase
 
         run.PossibleChanges = possibleChanges;
         var odenSource = await _db.LegalTrackedSources.FirstOrDefaultAsync(s =>
-            s.Name == "Oden Online Cancellation Chart" &&
+            s.Name == OdenSourceName(importedAction) &&
             s.SourceType == "Oden Export");
 
         if (odenSource != null)
@@ -536,6 +543,7 @@ public class LegalRequirementsController : ControllerBase
     public async Task<IActionResult> ApproveScanResult(Guid scanResultId, [FromBody] LegalScanResultReviewDto dto)
     {
         var result = await _db.LegalSourceScanResults
+            .Include(r => r.ScanRun)
             .Include(r => r.RequirementSection)
             .FirstOrDefaultAsync(r => r.Id == scanResultId);
 
@@ -547,17 +555,18 @@ public class LegalRequirementsController : ControllerBase
 
         if (result.RequirementSection == null)
         {
+            var action = InferAction(result.ScanRun.SourceName, result.SourceText);
             var newSection = new LegalRequirementSection
             {
                 State = result.State,
                 LineOfBusiness = "Commercial P&C",
-                Action = "Cancellation",
+                Action = action,
                 Category = result.Category,
                 Topic = result.Topic,
                 RequirementText = result.SuggestedRequirementText ?? result.SourceText,
                 Citations = SplitCitations(result.SourceCitation),
-                SourceName = "Oden Online",
-                SourceDocument = "COMMERCIAL INSURANCE - CANCELLATION - P&C",
+                SourceName = OdenSourceName(action),
+                SourceDocument = OdenSourceDocument(action),
                 SourceCreatedAt = DateTime.UtcNow,
                 ReviewStatus = "Approved",
                 LastVerifiedAt = DateTime.UtcNow,
@@ -681,6 +690,23 @@ public class LegalRequirementsController : ControllerBase
         return value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
+    private static string InferAction(string sourceName, string sourceText)
+    {
+        if (sourceName.Contains("Nonrenewal", StringComparison.OrdinalIgnoreCase) ||
+            sourceName.Contains("Non-Renewal", StringComparison.OrdinalIgnoreCase) ||
+            sourceText.Contains("nonrenewal", StringComparison.OrdinalIgnoreCase) ||
+            sourceText.Contains("non-renewal", StringComparison.OrdinalIgnoreCase))
+            return "NonRenewal";
+
+        return "Cancellation";
+    }
+
+    private static string OdenSourceName(string action) =>
+        action == "NonRenewal" ? "Oden Online Nonrenewal Chart" : "Oden Online Cancellation Chart";
+
+    private static string OdenSourceDocument(string action) =>
+        action == "NonRenewal" ? "COMMERCIAL INSURANCE - NONRENEWAL - P&C" : "COMMERCIAL INSURANCE - CANCELLATION - P&C";
+
     private static string? ValidateSource(LegalTrackedSourceUpsertDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.State))
@@ -739,6 +765,7 @@ public sealed record LegalRequirementSectionDto(
 
 public sealed record LegalRequirementsSummaryDto(
     string[] States,
+    string[] Actions,
     string[] Categories,
     int SectionCount,
     Dictionary<string, int> SectionsByState,
@@ -834,7 +861,7 @@ internal sealed record ParsedOdenRequirementSection(
     string[] Citations,
     int SortOrder);
 
-internal static partial class OdenCancellationChartParser
+internal static partial class OdenChartParser
 {
     private static readonly HashSet<string> StateNames =
     [
@@ -869,6 +896,7 @@ internal static partial class OdenCancellationChartParser
         var sections = new List<ParsedOdenRequirementSection>();
         var currentState = string.Empty;
         var sortOrder = 0;
+        var action = DetectAction(rows);
 
         foreach (var text in rows)
         {
@@ -897,7 +925,7 @@ internal static partial class OdenCancellationChartParser
             sections.Add(new ParsedOdenRequirementSection(
                 currentState,
                 "Commercial P&C",
-                "Cancellation",
+                action,
                 category,
                 topic,
                 body,
@@ -906,6 +934,15 @@ internal static partial class OdenCancellationChartParser
         }
 
         return sections;
+    }
+
+    private static string DetectAction(IEnumerable<string> rows)
+    {
+        return rows.Any(r =>
+            r.Contains("NONRENEWAL", StringComparison.OrdinalIgnoreCase) ||
+            r.Contains("NON-RENEWAL", StringComparison.OrdinalIgnoreCase))
+            ? "NonRenewal"
+            : "Cancellation";
     }
 
     private static List<string> ExtractRows(string html)

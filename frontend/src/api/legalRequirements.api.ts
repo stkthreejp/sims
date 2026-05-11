@@ -19,6 +19,7 @@ export interface LegalRequirementSection {
 
 export interface LegalRequirementsSummary {
   states: string[]
+  actions: string[]
   categories: string[]
   sectionCount: number
   sectionsByState: Record<string, number>
@@ -114,10 +115,11 @@ export const legalRequirementsApi = {
     return data
   },
 
-  async getSections(filters: { state?: string; category?: string; search?: string }) {
+  async getSections(filters: { state?: string; action?: string; category?: string; search?: string }) {
     const { data } = await apiClient.get<LegalRequirementSection[]>('/legal-requirements', {
       params: {
         state: filters.state || undefined,
+        action: filters.action || undefined,
         category: filters.category || undefined,
         search: filters.search || undefined,
       },

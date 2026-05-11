@@ -315,6 +315,16 @@ public class PolicyService : IPolicyService
 
     public async Task<Result<LegalComplianceGuidanceDto>> GetCancellationGuidanceAsync(Guid policyId, UserAccessScope access)
     {
+        return await GetLegalGuidanceAsync(policyId, access, "Cancellation");
+    }
+
+    public async Task<Result<LegalComplianceGuidanceDto>> GetNonRenewalGuidanceAsync(Guid policyId, UserAccessScope access)
+    {
+        return await GetLegalGuidanceAsync(policyId, access, "NonRenewal");
+    }
+
+    private async Task<Result<LegalComplianceGuidanceDto>> GetLegalGuidanceAsync(Guid policyId, UserAccessScope access, string action)
+    {
         var policy = await Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
             .Where(p => p.Id == policyId && !p.IsDeleted)
@@ -324,9 +334,9 @@ public class PolicyService : IPolicyService
 
         var state = NormalizeState(policy.Submission?.Insured?.State);
         if (string.IsNullOrWhiteSpace(state))
-            return Result<LegalComplianceGuidanceDto>.Failure("STATE_REQUIRED", "Insured state is required for cancellation guidance.");
+            return Result<LegalComplianceGuidanceDto>.Failure("STATE_REQUIRED", "Insured state is required for legal guidance.");
 
-        var rows = await GetCancellationRequirementQuery(state)
+        var rows = await GetRequirementQuery(state, action)
             .Select(r => new LegalComplianceRequirementDto
             {
                 Id = r.Id,
@@ -342,7 +352,7 @@ public class PolicyService : IPolicyService
         {
             State = state,
             LineOfBusiness = policy.LineOfBusiness.ToString(),
-            Action = "Cancellation",
+            Action = action,
             Requirements = rows,
             NoticeRequirements = rows.Where(r => r.Category == "NOTICE REQUIREMENTS").ToList(),
             ReasonRequirements = rows.Where(r => r.Category == "REASONS").ToList(),
@@ -359,8 +369,13 @@ public class PolicyService : IPolicyService
 
     private IQueryable<LegalRequirementSection> GetCancellationRequirementQuery(string state)
     {
+        return GetRequirementQuery(state, "Cancellation");
+    }
+
+    private IQueryable<LegalRequirementSection> GetRequirementQuery(string state, string action)
+    {
         return Db.Set<LegalRequirementSection>()
-            .Where(r => r.State == state && r.Action == "Cancellation")
+            .Where(r => r.State == state && r.Action == action)
             .OrderBy(r => r.Category == "NOTICE REQUIREMENTS" ? 0 :
                           r.Category == "REASONS" ? 1 :
                           r.Category == "INSURER REQUIREMENTS" ? 2 : 3)
