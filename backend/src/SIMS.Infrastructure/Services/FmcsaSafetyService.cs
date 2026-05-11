@@ -247,6 +247,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
         var radiusSummary = BuildRadiusSummary(insured, inspections, violations);
         var severeEvents = BuildSevereEvents(violations);
         var flags = BuildFlags(basics, oos, carrier, scoringRun);
+        var snapshotHistory = await BuildSnapshotHistoryAsync(dotNumber, ct);
 
         return Result<AutoSafetySummaryDto>.Success(new AutoSafetySummaryDto
         {
@@ -271,6 +272,7 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             RecentSevereEvents = severeEvents,
             InspectionTrend = BuildInspectionTrend(trendInspections, trendViolations, today),
             ViolationTrend = BuildViolationTrend(trendViolations, today),
+            SnapshotHistory = snapshotHistory,
         });
     }
 
@@ -797,6 +799,65 @@ public class FmcsaSafetyService : IFmcsaSafetyService
             .AsNoTracking()
             .Where(m => m.UsDotNumber == dotNumber && m.SnapshotMonth == latestSnapshot)
             .ToListAsync(ct);
+    }
+
+    private async Task<List<AutoSafetySnapshotHistoryDto>> BuildSnapshotHistoryAsync(string dotNumber, CancellationToken ct)
+    {
+        var carriers = await _db.FmcsaCarrierSnapshots
+            .AsNoTracking()
+            .Where(c => c.UsDotNumber == dotNumber)
+            .OrderByDescending(c => c.SnapshotMonth)
+            .Take(12)
+            .ToListAsync(ct);
+
+        var scoringRuns = await _db.FmcsaScoringRuns
+            .AsNoTracking()
+            .Include(r => r.BasicScores)
+            .Where(r => r.UsDotNumber == dotNumber)
+            .OrderByDescending(r => r.SnapshotMonth)
+            .ThenByDescending(r => r.GeneratedAt)
+            .Take(12)
+            .ToListAsync(ct);
+
+        var months = carriers.Select(c => c.SnapshotMonth)
+            .Concat(scoringRuns.Select(r => r.SnapshotMonth))
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(m => m)
+            .Take(12)
+            .ToList();
+
+        return months.Select(month =>
+        {
+            var carrier = carriers.FirstOrDefault(c => c.SnapshotMonth == month);
+            var scoringRun = scoringRuns.FirstOrDefault(r => r.SnapshotMonth == month);
+            return new AutoSafetySnapshotHistoryDto
+            {
+                SnapshotMonth = month,
+                CarrierName = carrier?.LegalName,
+                PowerUnits = carrier?.PowerUnits,
+                DriverCount = carrier?.DriverCount,
+                Mileage = carrier?.Mileage,
+                MileageYear = carrier?.MileageYear,
+                MethodologyVersion = scoringRun?.MethodologyVersion,
+                ImportedAt = carrier?.ImportedAt,
+                GeneratedAt = scoringRun?.GeneratedAt,
+                Basics = scoringRun?.BasicScores
+                    .OrderByDescending(b => b.IsPrioritized)
+                    .ThenByDescending(b => b.Percentile ?? 0)
+                    .ThenByDescending(b => b.EventCount)
+                    .Select(b => new AutoSafetySnapshotBasicDto
+                    {
+                        Basic = b.Basic,
+                        Measure = b.Measure,
+                        Percentile = b.Percentile,
+                        IsPrioritized = b.IsPrioritized,
+                        EventCount = b.EventCount,
+                        OutOfServiceCount = b.OutOfServiceCount,
+                    })
+                    .ToList() ?? [],
+            };
+        }).ToList();
     }
 
     private static List<AutoSafetyBasicDto> BuildBasics(FmcsaScoringRun? scoringRun, List<FmcsaBasicPeerMeasure> analyticsScores, List<FmcsaViolation> violations, AutoSafetyAccidentSummaryDto accidentSummary)

@@ -326,6 +326,28 @@ export interface AutoSafetyTrendBucket {
   outOfServiceRate: number | null
 }
 
+export interface AutoSafetySnapshotBasic {
+  basic: string
+  measure: number | null
+  percentile: number | null
+  isPrioritized: boolean
+  eventCount: number
+  outOfServiceCount: number
+}
+
+export interface AutoSafetySnapshotHistory {
+  snapshotMonth: string
+  carrierName: string | null
+  powerUnits: number | null
+  driverCount: number | null
+  mileage: number | null
+  mileageYear: number | null
+  methodologyVersion: string | null
+  importedAt: string | null
+  generatedAt: string | null
+  basics: AutoSafetySnapshotBasic[]
+}
+
 export interface AutoSafetySummary {
   status: AutoSafetyStatus
   message: string | null
@@ -347,6 +369,7 @@ export interface AutoSafetySummary {
   recentSevereEvents: AutoSafetyEvent[]
   inspectionTrend: AutoSafetyTrendBucket[]
   violationTrend: AutoSafetyTrendBucket[]
+  snapshotHistory: AutoSafetySnapshotHistory[]
 }
 
 export interface AutoSafetyRefresh {

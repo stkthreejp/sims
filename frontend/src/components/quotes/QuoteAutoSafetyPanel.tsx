@@ -5,7 +5,7 @@ import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, FileText, Map
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import { getGoogleMapsApiKey } from '@/lib/clientConfig'
-import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyIss, AutoSafetyRadiusSummary, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
+import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyIss, AutoSafetyRadiusSummary, AutoSafetyRiskLevel, AutoSafetySnapshotHistory, AutoSafetyTrendBucket } from '@/types/quote.types'
 
 type Props = {
   quoteId: string
@@ -356,9 +356,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
                 <Clock3 className="h-3.5 w-3.5" /> History Snapshot
               </div>
               <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
-              <div className="mt-3 rounded bg-slate-50 p-3 text-xs text-slate-500">
-                Monthly BASIC, MCS-150, and archived snapshot history will appear here as safety jobs accumulate historical snapshots.
-              </div>
+              <SnapshotHistoryList history={data.snapshotHistory ?? []} />
             </div>
           </div>
         </div>
@@ -371,6 +369,56 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           onClose={() => setDetailSelection(null)}
         />
       )}
+    </div>
+  )
+}
+
+function SnapshotHistoryList({ history }: { history: AutoSafetySnapshotHistory[] }) {
+  if (history.length === 0) {
+    return (
+      <div className="mt-3 rounded bg-slate-50 p-3 text-xs text-slate-500">
+        Historical snapshots will appear as monthly FMCSA jobs accumulate records.
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      {history.slice(0, 6).map((snapshot) => {
+        const topBasics = snapshot.basics
+          .filter((b) => b.percentile != null || b.measure != null || b.eventCount > 0 || b.outOfServiceCount > 0)
+          .slice(0, 2)
+        return (
+          <div key={snapshot.snapshotMonth} className="rounded border border-slate-200 bg-slate-50 p-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-slate-800">{snapshot.snapshotMonth}</div>
+              <div className="text-[11px] text-slate-500">
+                {snapshot.powerUnits == null ? '-' : `${snapshot.powerUnits.toLocaleString()} PU`}
+                {snapshot.driverCount == null ? '' : ` | ${snapshot.driverCount.toLocaleString()} drv`}
+              </div>
+            </div>
+            {snapshot.mileage != null && (
+              <div className="mt-1 text-[11px] text-slate-500">
+                Mileage {snapshot.mileage.toLocaleString()}{snapshot.mileageYear ? ` (${snapshot.mileageYear})` : ''}
+              </div>
+            )}
+            {topBasics.length > 0 ? (
+              <div className="mt-1 space-y-1">
+                {topBasics.map((basic) => (
+                  <div key={basic.basic} className="flex items-center justify-between gap-2 text-[11px]">
+                    <span className="truncate text-slate-600">{basic.basic}</span>
+                    <span className={basic.isPrioritized || (basic.percentile ?? 0) >= 75 ? 'font-semibold text-red-600' : 'text-slate-500'}>
+                      {basic.percentile == null ? `M ${basic.measure ?? '-'}` : `${Math.round(basic.percentile)}%`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-1 text-[11px] text-slate-400">Carrier snapshot only</div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

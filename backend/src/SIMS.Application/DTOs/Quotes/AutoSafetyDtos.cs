@@ -22,6 +22,7 @@ public class AutoSafetySummaryDto
     public List<AutoSafetyEventDto> RecentSevereEvents { get; set; } = new();
     public List<AutoSafetyTrendBucketDto> InspectionTrend { get; set; } = new();
     public List<AutoSafetyTrendBucketDto> ViolationTrend { get; set; } = new();
+    public List<AutoSafetySnapshotHistoryDto> SnapshotHistory { get; set; } = new();
 }
 
 public class AutoSafetyRefreshDto
@@ -168,4 +169,28 @@ public class AutoSafetyTrendBucketDto
     public int TotalCount { get; set; }
     public int OutOfServiceCount { get; set; }
     public decimal? OutOfServiceRate { get; set; }
+}
+
+public class AutoSafetySnapshotHistoryDto
+{
+    public string SnapshotMonth { get; set; } = string.Empty;
+    public string? CarrierName { get; set; }
+    public int? PowerUnits { get; set; }
+    public int? DriverCount { get; set; }
+    public int? Mileage { get; set; }
+    public int? MileageYear { get; set; }
+    public string? MethodologyVersion { get; set; }
+    public DateTime? ImportedAt { get; set; }
+    public DateTime? GeneratedAt { get; set; }
+    public List<AutoSafetySnapshotBasicDto> Basics { get; set; } = new();
+}
+
+public class AutoSafetySnapshotBasicDto
+{
+    public string Basic { get; set; } = string.Empty;
+    public decimal? Measure { get; set; }
+    public decimal? Percentile { get; set; }
+    public bool IsPrioritized { get; set; }
+    public int EventCount { get; set; }
+    public int OutOfServiceCount { get; set; }
 }
