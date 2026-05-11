@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import { getGoogleMapsApiKey } from '@/lib/clientConfig'
-import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyIss, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
+import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyIss, AutoSafetyRadiusSummary, AutoSafetyRiskLevel, AutoSafetyTrendBucket } from '@/types/quote.types'
 
 type Props = {
   quoteId: string
@@ -14,23 +14,37 @@ type Props = {
 type AutoSafetyTab = 'safer' | 'radius' | 'events' | 'history'
 type DetailSelection = { kind: string; title: string; basic?: string } | null
 
-function buildRadiusMapUrl(summary: NonNullable<Awaited<ReturnType<typeof quotesApi.getAutoSafety>>['radiusSummary']>) {
-  const key = getGoogleMapsApiKey()
-  if (!key || summary.baseLatitude == null || summary.baseLongitude == null || summary.mapPoints.length === 0) return null
+const MAPS_SCRIPT_ID = 'google-maps-places'
 
-  const params = new URLSearchParams({
-    size: '960x280',
-    scale: '2',
-    maptype: 'roadmap',
-    key,
-  })
-  params.append('markers', `color:blue|label:B|${summary.baseLatitude},${summary.baseLongitude}`)
-  summary.mapPoints.slice(0, 8).forEach((point, index) => {
-    const color = point.outOfServiceCount > 0 ? 'red' : point.precision === 'State estimate' ? 'orange' : 'green'
-    params.append('markers', `color:${color}|label:${index + 1}|${point.latitude},${point.longitude}`)
-  })
+function loadGoogleMaps(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).google?.maps) {
+      resolve()
+      return
+    }
 
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`
+    const key = getGoogleMapsApiKey()
+    if (!key) {
+      reject(new Error('Google Maps API key is not configured'))
+      return
+    }
+
+    const existing = document.getElementById(MAPS_SCRIPT_ID)
+    if (existing) {
+      existing.addEventListener('load', () => resolve())
+      existing.addEventListener('error', reject)
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = MAPS_SCRIPT_ID
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = reject
+    document.head.appendChild(script)
+  })
 }
 
 const riskStyle: Record<AutoSafetyRiskLevel, string> = {
@@ -113,7 +127,6 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
 
   const oos = data.oos
   const accident = data.accidentSummary
-  const radiusMapUrl = buildRadiusMapUrl(data.radiusSummary)
   const overallOosCount = oos.overallOosCount ?? Math.max(oos.driverOosCount, oos.vehicleOosCount)
   const overallOosRate = oos.overallOosRate ?? (oos.inspectionCount === 0 ? null : Math.round(overallOosCount * 10000 / oos.inspectionCount) / 100)
   const driverInspectionCount = oos.driverInspectionCount ?? oos.inspectionCount
@@ -223,15 +236,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
                 ))}
             </div>
           )}
-          {radiusMapUrl && (
-            <div className="mb-3 overflow-hidden rounded border border-slate-200 bg-slate-50">
-              <img
-                src={radiusMapUrl}
-                alt="Inspection radius map"
-                className="h-[180px] w-full object-cover"
-              />
-            </div>
-          )}
+          <InteractiveRadiusMap summary={data.radiusSummary} />
           {data.geographicHotspots.length === 0 ? (
             <p className="text-sm text-slate-400">No inspection location concentration yet.</p>
           ) : (
@@ -357,6 +362,164 @@ function SectionPill({ label, active, onClick }: { label: string; active: boolea
     >
       {label}
     </button>
+  )
+}
+
+function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary }) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const circleRef = useRef<any>(null)
+  const [radiusMiles, setRadiusMiles] = useState(100)
+  const [customRadius, setCustomRadius] = useState('100')
+  const [mapError, setMapError] = useState<string | null>(null)
+
+  const usablePoints = useMemo(
+    () => summary.mapPoints.filter((point) => point.latitude != null && point.longitude != null).slice(0, 8),
+    [summary.mapPoints]
+  )
+
+  const radiusSummary = useMemo(() => {
+    if (summary.baseLatitude == null || summary.baseLongitude == null) {
+      return { inspections: 0, oos: 0, points: 0 }
+    }
+
+    const inside = usablePoints.filter((point) =>
+      milesBetween(summary.baseLatitude!, summary.baseLongitude!, point.latitude, point.longitude) <= radiusMiles
+    )
+
+    return {
+      points: inside.length,
+      inspections: inside.reduce((sum, point) => sum + point.inspectionCount, 0),
+      oos: inside.reduce((sum, point) => sum + point.outOfServiceCount, 0),
+    }
+  }, [radiusMiles, summary.baseLatitude, summary.baseLongitude, usablePoints])
+
+  useEffect(() => {
+    if (!mapRef.current || summary.baseLatitude == null || summary.baseLongitude == null || usablePoints.length === 0) return
+
+    let cancelled = false
+    loadGoogleMaps()
+      .then(() => {
+        if (cancelled || !mapRef.current) return
+        setMapError(null)
+
+        const g = (window as any).google
+        const base = { lat: summary.baseLatitude!, lng: summary.baseLongitude! }
+        const map = new g.maps.Map(mapRef.current, {
+          center: base,
+          zoom: 7,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+        })
+        mapInstanceRef.current = map
+
+        const bounds = new g.maps.LatLngBounds()
+        bounds.extend(base)
+
+        new g.maps.Marker({
+          position: base,
+          map,
+          label: 'B',
+          title: 'Insured base location',
+        })
+
+        usablePoints.forEach((point, index) => {
+          const position = { lat: point.latitude, lng: point.longitude }
+          bounds.extend(position)
+          const marker = new g.maps.Marker({
+            position,
+            map,
+            label: `${index + 1}`,
+            title: `${point.label} - ${point.inspectionCount} inspections, ${point.outOfServiceCount} OOS`,
+          })
+          const info = new g.maps.InfoWindow({
+            content: `<strong>${escapeHtml(point.label)}</strong><br>${point.inspectionCount} inspections / ${point.outOfServiceCount} OOS<br>${escapeHtml(point.precision)}`,
+          })
+          marker.addListener('click', () => info.open({ anchor: marker, map }))
+        })
+
+        const circle = new g.maps.Circle({
+          map,
+          center: base,
+          radius: radiusMiles * 1609.344,
+          editable: true,
+          draggable: false,
+          fillColor: '#2563eb',
+          fillOpacity: 0.08,
+          strokeColor: '#2563eb',
+          strokeOpacity: 0.55,
+          strokeWeight: 2,
+        })
+        circleRef.current = circle
+        circle.addListener('radius_changed', () => {
+          const nextMiles = Math.max(1, Math.round(circle.getRadius() / 1609.344))
+          setRadiusMiles(nextMiles)
+          setCustomRadius(String(nextMiles))
+        })
+
+        map.fitBounds(bounds)
+      })
+      .catch(() => setMapError('Interactive map unavailable. Check the Google Maps browser key and Maps JavaScript API.'))
+
+    return () => {
+      cancelled = true
+    }
+  }, [summary.baseLatitude, summary.baseLongitude, usablePoints])
+
+  useEffect(() => {
+    if (circleRef.current) circleRef.current.setRadius(radiusMiles * 1609.344)
+  }, [radiusMiles])
+
+  if (summary.baseLatitude == null || summary.baseLongitude == null || usablePoints.length === 0) return null
+
+  const applyRadius = (value: number) => {
+    const next = Math.max(1, Math.min(1000, Math.round(value)))
+    setRadiusMiles(next)
+    setCustomRadius(String(next))
+  }
+
+  return (
+    <div className="mb-3 overflow-hidden rounded border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <span className="font-semibold text-slate-800">{radiusMiles.toLocaleString()} mi radius</span>
+          <span>{radiusSummary.points.toLocaleString()} points inside</span>
+          <span>{radiusSummary.inspections.toLocaleString()} insp inside</span>
+          <span className={radiusSummary.oos > 0 ? 'text-red-600' : 'text-slate-500'}>{radiusSummary.oos.toLocaleString()} OOS</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {[50, 100, 250].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => applyRadius(value)}
+              className={`rounded border px-2 py-1 text-xs font-medium ${radiusMiles === value ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+            >
+              {value}
+            </button>
+          ))}
+          <input
+            value={customRadius}
+            onChange={(e) => setCustomRadius(e.target.value)}
+            onBlur={() => applyRadius(Number(customRadius) || radiusMiles)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyRadius(Number(customRadius) || radiusMiles)
+            }}
+            className="h-7 w-16 rounded border border-slate-200 px-2 text-right text-xs text-slate-700"
+          />
+          <span className="text-xs text-slate-500">mi</span>
+        </div>
+      </div>
+      {mapError ? (
+        <div className="p-3 text-xs text-amber-700">{mapError}</div>
+      ) : (
+        <div ref={mapRef} className="h-[260px] w-full" />
+      )}
+      <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
+        Drag the circle edge to resize. Counts are based on grouped map points, so estimated county/state points are directional.
+      </div>
+    </div>
   )
 }
 
@@ -637,6 +800,24 @@ function splitDetailItems(value: string): Array<[string, string]> {
     if (separator === -1) return [`Item ${idx + 1}`, trimmed]
     return [trimmed.slice(0, separator).trim(), trimmed.slice(separator + 1).trim()]
   })
+}
+
+function milesBetween(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const toRadians = (value: number) => value * Math.PI / 180
+  const dLat = toRadians(lat2 - lat1)
+  const dLon = toRadians(lon2 - lon1)
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2
+  return 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }
 
 function formatDate(value: string) {
