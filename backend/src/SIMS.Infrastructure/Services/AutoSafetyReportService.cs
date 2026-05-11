@@ -1,5 +1,3 @@
-using System.Net;
-using System.Text;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.Quotes;
@@ -8,9 +6,9 @@ using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 using SIMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using Syncfusion.DocIO;
-using Syncfusion.DocIO.DLS;
-using Syncfusion.DocIORenderer;
+using Syncfusion.Drawing;
+using Syncfusion.Pdf;
+using Syncfusion.Pdf.Graphics;
 
 namespace SIMS.Infrastructure.Services;
 
@@ -51,7 +49,7 @@ public class AutoSafetyReportService : IAutoSafetyReportService
         byte[] pdfBytes;
         try
         {
-            pdfBytes = ConvertHtmlToPdf(BuildHtml(quote, safetyResult.Value));
+            pdfBytes = BuildPdf(quote, safetyResult.Value);
         }
         catch (Exception ex)
         {
@@ -74,201 +72,320 @@ public class AutoSafetyReportService : IAutoSafetyReportService
             userId);
     }
 
-    private static string BuildHtml(Quote quote, AutoSafetySummaryDto safety)
+    private static byte[] BuildPdf(Quote quote, AutoSafetySummaryDto safety)
     {
+        using var document = new PdfDocument();
+        document.PageSettings.Margins.All = 34;
+        document.PageSettings.Size = PdfPageSize.Letter;
+
+        var writer = new PdfReportWriter(document);
+        writer.Title("Auto Safety Snapshot", $"Point-in-time underwriting report generated {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC.");
+
         var insured = quote.Submission.Insured;
-        var generatedAt = DateTime.UtcNow;
-        var html = new StringBuilder();
+        writer.MetricGrid([
+            ("Carrier", safety.CarrierName ?? insured.DisplayName),
+            ("USDOT", safety.UsDotNumber ?? "-"),
+            ("Quote", quote.QuoteNumber),
+            ("Risk", safety.OverallRiskLevel),
+            ("Insured", insured.DisplayName),
+            ("Power Units", safety.PowerUnits?.ToString("N0") ?? "-"),
+            ("Drivers", safety.DriverCount?.ToString("N0") ?? "-"),
+            ("SIMS ISS", safety.Iss.Score == null ? (safety.Iss.Label ?? "Pending") : $"{safety.Iss.Label ?? safety.Iss.Status} {safety.Iss.Score}"),
+        ]);
 
-        html.Append("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8" />
-              <style>
-                @page { margin: 0.55in; }
-                body { font-family: Arial, sans-serif; color: #172033; font-size: 9.5pt; line-height: 1.35; }
-                h1 { margin: 0; font-size: 18pt; }
-                h2 { margin: 18px 0 8px; font-size: 12pt; color: #25344d; border-bottom: 1px solid #b8c2d2; padding-bottom: 4px; }
-                h3 { margin: 0 0 4px; font-size: 10pt; color: #25344d; }
-                p { margin: 0 0 6px; }
-                .muted { color: #64748b; }
-                .small { font-size: 8pt; }
-                .grid { width: 100%; border-collapse: separate; border-spacing: 6px; margin-top: 10px; }
-                .tile { border: 1px solid #cbd5e1; padding: 8px; vertical-align: top; }
-                .label { color: #64748b; font-size: 7.5pt; font-weight: bold; text-transform: uppercase; }
-                .value { font-size: 12pt; font-weight: bold; margin-top: 2px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-                th, td { border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; vertical-align: top; }
-                th { background: #eef2f7; color: #334155; font-size: 8pt; text-transform: uppercase; }
-                .status { display: inline-block; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
-                .green { color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; }
-                .yellow { color: #b45309; background: #fffbeb; border: 1px solid #fde68a; }
-                .red { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; }
-                .gray { color: #475569; background: #f8fafc; border: 1px solid #cbd5e1; }
-              </style>
-            </head>
-            <body>
-            """);
-
-        html.Append("<h1>Auto Safety Snapshot</h1>");
-        html.Append("<p class=\"muted\">Point-in-time underwriting report generated ")
-            .Append(Html(generatedAt.ToString("MM/dd/yyyy HH:mm 'UTC'")))
-            .Append(".</p>");
-
-        html.Append("<table class=\"grid\"><tr>");
-        AppendTile(html, "Carrier", safety.CarrierName ?? insured.DisplayName);
-        AppendTile(html, "USDOT", safety.UsDotNumber ?? "-");
-        AppendTile(html, "Quote", quote.QuoteNumber);
-        AppendTile(html, "Risk", safety.OverallRiskLevel);
-        html.Append("</tr><tr>");
-        AppendTile(html, "Insured", insured.DisplayName);
-        AppendTile(html, "Power Units", safety.PowerUnits?.ToString("N0") ?? "-");
-        AppendTile(html, "Drivers", safety.DriverCount?.ToString("N0") ?? "-");
-        AppendTile(html, "SIMS ISS", safety.Iss.Score == null ? (safety.Iss.Label ?? "Pending") : $"{safety.Iss.Label ?? safety.Iss.Status} {safety.Iss.Score}");
-        html.Append("</tr></table>");
-
-        html.Append("<h2>Summary</h2>");
-        html.Append("<p><strong>Snapshot:</strong> ").Append(Html(safety.SnapshotMonth ?? "-"))
-            .Append(" &nbsp; <strong>Methodology:</strong> ").Append(Html(safety.MethodologyVersion ?? "-"))
-            .Append(" &nbsp; <strong>Data refreshed:</strong> ").Append(Html(FormatDateTime(safety.DataRefreshedAt)))
-            .Append("</p>");
-        if (safety.SummaryFlags.Count > 0)
-            html.Append("<p><strong>Flags:</strong> ").Append(Html(string.Join("; ", safety.SummaryFlags))).Append("</p>");
-        html.Append("<p><strong>ISS basis:</strong> ").Append(Html(safety.Iss.Basis))
-            .Append(" &nbsp; <strong>Source:</strong> ").Append(Html(safety.Iss.Source))
-            .Append("</p>");
+        writer.Section("Summary");
+        writer.Paragraph($"Snapshot: {safety.SnapshotMonth ?? "-"}    Methodology: {safety.MethodologyVersion ?? "-"}    Data refreshed: {FormatDateTime(safety.DataRefreshedAt)}");
+        writer.Paragraph($"ISS basis: {safety.Iss.Basis}    Source: {safety.Iss.Source}");
         if (!string.IsNullOrWhiteSpace(safety.Iss.Explanation))
-            html.Append("<p class=\"muted\">").Append(Html(safety.Iss.Explanation)).Append("</p>");
+            writer.Paragraph(safety.Iss.Explanation);
+        if (safety.SummaryFlags.Count > 0)
+            writer.Paragraph($"Flags: {string.Join("; ", safety.SummaryFlags)}");
 
-        AppendOosTable(html, safety.Oos);
-        AppendAccidentTable(html, safety.AccidentSummary);
-        AppendBasicsTable(html, safety.Basics);
-        AppendRadiusTable(html, safety.RadiusSummary, safety.GeographicHotspots);
-        AppendTrendTable(html, "Inspection History", safety.InspectionTrend);
-        AppendTrendTable(html, "Violation History", safety.ViolationTrend);
-        AppendEventsTable(html, safety.RecentSevereEvents);
+        AppendOos(writer, safety.Oos);
+        AppendAccidents(writer, safety.AccidentSummary);
+        AppendBasics(writer, safety.Basics);
+        AppendRadius(writer, safety.RadiusSummary, safety.GeographicHotspots);
+        AppendTrend(writer, "Inspection History", safety.InspectionTrend);
+        AppendTrend(writer, "Violation History", safety.ViolationTrend);
+        AppendEvents(writer, safety.RecentSevereEvents);
 
-        html.Append("""
-            <h2>Notes</h2>
-            <p class="small muted">
-              This SIMS report preserves the auto safety view available at generation time. Official SMS percentiles,
-              SIMS peer percentiles, ISS estimates, geocoded inspection locations, and radius bands depend on the FMCSA
-              source data and imported analytics available when the report was created.
-            </p>
-            </body></html>
-            """);
+        writer.Section("Notes");
+        writer.Paragraph("This SIMS report preserves the auto safety view available at generation time. Official SMS percentiles, SIMS peer percentiles, ISS estimates, geocoded inspection locations, and radius bands depend on the FMCSA source data and imported analytics available when the report was created.");
 
-        return html.ToString();
+        using var stream = new MemoryStream();
+        document.Save(stream);
+        return stream.ToArray();
     }
 
-    private static void AppendOosTable(StringBuilder html, AutoSafetyOosDto oos)
+    private static void AppendOos(PdfReportWriter writer, AutoSafetyOosDto oos)
     {
-        html.Append("<h2>SAFER / OOS</h2><table><tr><th>Category</th><th>Rate</th><th>OOS / Inspections</th><th>National Avg</th></tr>");
-        AppendOosRow(html, "Overall", oos.OverallOosRate, oos.OverallOosCount, oos.InspectionCount, oos.OverallNationalAverageRate);
-        AppendOosRow(html, "Driver", oos.DriverOosRate, oos.DriverOosCount, oos.DriverInspectionCount, oos.DriverNationalAverageRate);
-        AppendOosRow(html, "Vehicle", oos.VehicleOosRate, oos.VehicleOosCount, oos.VehicleInspectionCount, oos.VehicleNationalAverageRate);
-        AppendOosRow(html, "Hazmat", oos.HazmatOosRate, oos.HazmatOosCount, oos.HazmatInspectionCount, oos.HazmatNationalAverageRate);
-        html.Append("</table>");
+        writer.Section("SAFER / OOS");
+        writer.Table(
+            ["Category", "Rate", "OOS / Inspections", "National Avg"],
+            [
+                ["Overall", FormatPct(oos.OverallOosRate), $"{oos.OverallOosCount} / {oos.InspectionCount}", FormatPct(oos.OverallNationalAverageRate)],
+                ["Driver", FormatPct(oos.DriverOosRate), $"{oos.DriverOosCount} / {oos.DriverInspectionCount}", FormatPct(oos.DriverNationalAverageRate)],
+                ["Vehicle", FormatPct(oos.VehicleOosRate), $"{oos.VehicleOosCount} / {oos.VehicleInspectionCount}", FormatPct(oos.VehicleNationalAverageRate)],
+                ["Hazmat", FormatPct(oos.HazmatOosRate), $"{oos.HazmatOosCount} / {oos.HazmatInspectionCount}", FormatPct(oos.HazmatNationalAverageRate)],
+            ]);
     }
 
-    private static void AppendAccidentTable(StringBuilder html, AutoSafetyAccidentSummaryDto accident)
+    private static void AppendAccidents(PdfReportWriter writer, AutoSafetyAccidentSummaryDto accident)
     {
-        html.Append("<h2>Accident Summary</h2><table><tr><th>Fatal</th><th>Injury</th><th>Tow</th><th>Reportable</th><th>Ratio</th></tr><tr>");
-        html.Append("<td>").Append(accident.FatalCount).Append("</td>");
-        html.Append("<td>").Append(accident.InjuryCount).Append("</td>");
-        html.Append("<td>").Append(accident.TowCount).Append("</td>");
-        html.Append("<td>").Append(accident.TotalReportableCount).Append("</td>");
-        html.Append("<td>").Append(FormatPct(accident.AccidentToPowerUnitRatio)).Append("</td>");
-        html.Append("</tr></table>");
+        writer.Section("Accident Summary");
+        writer.Table(
+            ["Fatal", "Injury", "Tow", "Reportable", "Ratio"],
+            [[accident.FatalCount.ToString(), accident.InjuryCount.ToString(), accident.TowCount.ToString(), accident.TotalReportableCount.ToString(), FormatPct(accident.AccidentToPowerUnitRatio)]]);
     }
 
-    private static void AppendBasicsTable(StringBuilder html, IReadOnlyCollection<AutoSafetyBasicDto> basics)
+    private static void AppendBasics(PdfReportWriter writer, IReadOnlyCollection<AutoSafetyBasicDto> basics)
     {
-        html.Append("<h2>CSA / BASICs</h2><table><tr><th>BASIC</th><th>Source</th><th>Measure</th><th>Score</th><th>Events</th><th>OOS</th><th>12 Month</th></tr>");
-        foreach (var basic in basics)
-        {
-            html.Append("<tr><td>").Append(Html(basic.Basic)).Append("</td>")
-                .Append("<td>").Append(Html(basic.ScoreSource)).Append("</td>")
-                .Append("<td>").Append(FormatDecimal(basic.Measure)).Append("</td>")
-                .Append("<td>").Append(basic.Percentile == null ? (basic.IsPrioritized ? "Alert" : "-") : $"{basic.Percentile:0}%").Append("</td>")
-                .Append("<td>").Append(basic.EventCount).Append("</td>")
-                .Append("<td>").Append(basic.OutOfServiceCount).Append("</td>")
-                .Append("<td>").Append(basic.RecentEventCount).Append(" events / ").Append(basic.RecentOutOfServiceCount).Append(" OOS</td></tr>");
-        }
-        html.Append("</table>");
+        writer.Section("CSA / BASICs");
+        writer.Table(
+            ["BASIC", "Source", "Measure", "Score", "Events", "OOS", "12 Month"],
+            basics.Select(b => new[]
+            {
+                b.Basic,
+                b.ScoreSource,
+                FormatDecimal(b.Measure),
+                b.Percentile == null ? (b.IsPrioritized ? "Alert" : "-") : $"{b.Percentile:0}%",
+                b.EventCount.ToString(),
+                b.OutOfServiceCount.ToString(),
+                $"{b.RecentEventCount} events / {b.RecentOutOfServiceCount} OOS",
+            }).ToList());
     }
 
-    private static void AppendRadiusTable(StringBuilder html, AutoSafetyRadiusSummaryDto radius, IReadOnlyCollection<AutoSafetyHotspotDto> hotspots)
+    private static void AppendRadius(PdfReportWriter writer, AutoSafetyRadiusSummaryDto radius, IReadOnlyCollection<AutoSafetyHotspotDto> hotspots)
     {
-        html.Append("<h2>Radius Of Operations</h2>");
+        writer.Section("Radius Of Operations");
         if (!string.IsNullOrWhiteSpace(radius.Note))
-            html.Append("<p class=\"muted\"><strong>").Append(Html(radius.Precision)).Append(":</strong> ").Append(Html(radius.Note)).Append("</p>");
+            writer.Paragraph($"{radius.Precision}: {radius.Note}");
 
-        html.Append("<table><tr><th>Band</th><th>Inspections</th><th>OOS</th></tr>");
-        foreach (var band in radius.Bands)
-            html.Append("<tr><td>").Append(Html(band.Label)).Append("</td><td>").Append(band.InspectionCount).Append("</td><td>").Append(band.OutOfServiceCount).Append("</td></tr>");
-        html.Append("</table>");
+        writer.Table(
+            ["Band", "Inspections", "OOS"],
+            radius.Bands.Select(b => new[] { b.Label, b.InspectionCount.ToString(), b.OutOfServiceCount.ToString() }).ToList());
 
         if (radius.MapPoints.Count > 0)
         {
-            html.Append("<h3>Top Map Points</h3><table><tr><th>Location</th><th>Precision</th><th>Inspections</th><th>OOS</th></tr>");
-            foreach (var point in radius.MapPoints.Take(10))
-                html.Append("<tr><td>").Append(Html(point.Label)).Append("</td><td>").Append(Html(point.Precision)).Append("</td><td>").Append(point.InspectionCount).Append("</td><td>").Append(point.OutOfServiceCount).Append("</td></tr>");
-            html.Append("</table>");
+            writer.Subsection("Top Map Points");
+            writer.Table(
+                ["Location", "Precision", "Inspections", "OOS"],
+                radius.MapPoints.Take(10).Select(p => new[] { p.Label, p.Precision, p.InspectionCount.ToString(), p.OutOfServiceCount.ToString() }).ToList());
         }
         else if (hotspots.Count > 0)
         {
-            html.Append("<h3>Hotspots</h3><table><tr><th>State</th><th>Inspections</th><th>Violations</th><th>OOS</th></tr>");
-            foreach (var hotspot in hotspots)
-                html.Append("<tr><td>").Append(Html(hotspot.State)).Append("</td><td>").Append(hotspot.InspectionCount).Append("</td><td>").Append(hotspot.ViolationCount).Append("</td><td>").Append(hotspot.OutOfServiceCount).Append("</td></tr>");
-            html.Append("</table>");
+            writer.Subsection("Hotspots");
+            writer.Table(
+                ["State", "Inspections", "Violations", "OOS"],
+                hotspots.Select(h => new[] { h.State, h.InspectionCount.ToString(), h.ViolationCount.ToString(), h.OutOfServiceCount.ToString() }).ToList());
         }
     }
 
-    private static void AppendTrendTable(StringBuilder html, string title, IReadOnlyCollection<AutoSafetyTrendBucketDto> buckets)
+    private static void AppendTrend(PdfReportWriter writer, string title, IReadOnlyCollection<AutoSafetyTrendBucketDto> buckets)
     {
-        html.Append("<h2>").Append(Html(title)).Append("</h2><table><tr><th>Months Ago</th><th>Total</th><th>OOS</th><th>OOS Rate</th></tr>");
-        foreach (var bucket in buckets)
-            html.Append("<tr><td>").Append(Html(bucket.Label)).Append("</td><td>").Append(bucket.TotalCount).Append("</td><td>").Append(bucket.OutOfServiceCount).Append("</td><td>").Append(FormatPct(bucket.OutOfServiceRate)).Append("</td></tr>");
-        html.Append("</table>");
+        writer.Section(title);
+        writer.Table(
+            ["Months Ago", "Total", "OOS", "OOS Rate"],
+            buckets.Select(b => new[] { b.Label, b.TotalCount.ToString(), b.OutOfServiceCount.ToString(), FormatPct(b.OutOfServiceRate) }).ToList());
     }
 
-    private static void AppendEventsTable(StringBuilder html, IReadOnlyCollection<AutoSafetyEventDto> events)
+    private static void AppendEvents(PdfReportWriter writer, IReadOnlyCollection<AutoSafetyEventDto> events)
     {
-        html.Append("<h2>Recent Severe Events</h2>");
+        writer.Section("Recent Severe Events");
         if (events.Count == 0)
         {
-            html.Append("<p class=\"muted\">No recent high-severity or OOS events in the imported window.</p>");
+            writer.Paragraph("No recent high-severity or OOS events in the imported window.");
             return;
         }
 
-        html.Append("<table><tr><th>Date</th><th>Type</th><th>Description</th><th>State</th><th>BASIC</th></tr>");
-        foreach (var item in events.Take(20))
-            html.Append("<tr><td>").Append(Html(item.Date.ToString("MM/dd/yyyy"))).Append("</td><td>").Append(Html(item.EventType)).Append("</td><td>").Append(Html(item.Description)).Append("</td><td>").Append(Html(item.State ?? "-")).Append("</td><td>").Append(Html(item.Basic ?? "-")).Append("</td></tr>");
-        html.Append("</table>");
-    }
-
-    private static void AppendTile(StringBuilder html, string label, string value)
-        => html.Append("<td class=\"tile\"><div class=\"label\">").Append(Html(label)).Append("</div><div class=\"value\">").Append(Html(value)).Append("</div></td>");
-
-    private static void AppendOosRow(StringBuilder html, string label, decimal? rate, int oosCount, int inspectionCount, decimal? nationalAverage)
-        => html.Append("<tr><td>").Append(Html(label)).Append("</td><td>").Append(FormatPct(rate)).Append("</td><td>").Append(oosCount).Append(" / ").Append(inspectionCount).Append("</td><td>").Append(FormatPct(nationalAverage)).Append("</td></tr>");
-
-    private static byte[] ConvertHtmlToPdf(string html)
-    {
-        using var htmlStream = new MemoryStream(Encoding.UTF8.GetBytes(html));
-        using var wordDoc = new WordDocument(htmlStream, FormatType.Html);
-        using var renderer = new DocIORenderer();
-        using var pdfDoc = renderer.ConvertToPDF(wordDoc);
-        using var pdfStream = new MemoryStream();
-        pdfDoc.Save(pdfStream);
-        return pdfStream.ToArray();
+        writer.Table(
+            ["Date", "Type", "Description", "State", "BASIC"],
+            events.Take(20).Select(e => new[] { e.Date.ToString("MM/dd/yyyy"), e.EventType, e.Description, e.State ?? "-", e.Basic ?? "-" }).ToList());
     }
 
     private static string FormatPct(decimal? value) => value == null ? "-" : $"{value:0.##}%";
     private static string FormatDecimal(decimal? value) => value == null ? "-" : $"{value:0.##}";
     private static string FormatDateTime(DateTime? value) => value == null ? "-" : value.Value.ToString("MM/dd/yyyy HH:mm 'UTC'");
-    private static string Html(string value) => WebUtility.HtmlEncode(value);
     private static string SanitizeFileName(string value) => string.Join("_", value.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries)).Replace(" ", "_");
+
+    private sealed class PdfReportWriter
+    {
+        private readonly PdfDocument _document;
+        private readonly PdfFont _titleFont = new PdfStandardFont(PdfFontFamily.Helvetica, 18, PdfFontStyle.Bold);
+        private readonly PdfFont _sectionFont = new PdfStandardFont(PdfFontFamily.Helvetica, 12, PdfFontStyle.Bold);
+        private readonly PdfFont _subsectionFont = new PdfStandardFont(PdfFontFamily.Helvetica, 10, PdfFontStyle.Bold);
+        private readonly PdfFont _labelFont = new PdfStandardFont(PdfFontFamily.Helvetica, 7, PdfFontStyle.Bold);
+        private readonly PdfFont _bodyFont = new PdfStandardFont(PdfFontFamily.Helvetica, 8.5f);
+        private readonly PdfFont _bodyBoldFont = new PdfStandardFont(PdfFontFamily.Helvetica, 8.5f, PdfFontStyle.Bold);
+        private readonly PdfBrush _ink = new PdfSolidBrush(new PdfColor(23, 32, 51));
+        private readonly PdfBrush _muted = new PdfSolidBrush(new PdfColor(100, 116, 139));
+        private readonly PdfBrush _headerFill = new PdfSolidBrush(new PdfColor(238, 242, 247));
+        private readonly PdfPen _border = new(new PdfColor(203, 213, 225), 0.7f);
+        private PdfPage _page;
+        private float _y;
+
+        public PdfReportWriter(PdfDocument document)
+        {
+            _document = document;
+            _page = _document.Pages.Add();
+            _y = 0;
+        }
+
+        private PdfGraphics Graphics => _page.Graphics;
+        private float Width => _page.GetClientSize().Width;
+        private float Height => _page.GetClientSize().Height;
+
+        public void Title(string title, string subtitle)
+        {
+            DrawText(title, _titleFont, _ink, 24);
+            DrawText(subtitle, _bodyFont, _muted, 14);
+            _y += 6;
+        }
+
+        public void Section(string title)
+        {
+            EnsureSpace(30);
+            _y += 6;
+            DrawText(title, _sectionFont, _ink, 18);
+            Graphics.DrawLine(_border, 0, _y, Width, _y);
+            _y += 6;
+        }
+
+        public void Subsection(string title)
+        {
+            EnsureSpace(20);
+            _y += 5;
+            DrawText(title, _subsectionFont, _ink, 15);
+        }
+
+        public void Paragraph(string text)
+        {
+            var lines = Wrap(text, 116).ToList();
+            EnsureSpace(lines.Count * 12 + 4);
+            foreach (var line in lines)
+                DrawText(line, _bodyFont, _muted, 12);
+            _y += 2;
+        }
+
+        public void MetricGrid(IReadOnlyList<(string Label, string Value)> metrics)
+        {
+            const int columns = 4;
+            const float gap = 6;
+            const float cellHeight = 44;
+            var cellWidth = (Width - gap * (columns - 1)) / columns;
+
+            for (var i = 0; i < metrics.Count; i += columns)
+            {
+                EnsureSpace(cellHeight + 6);
+                for (var col = 0; col < columns && i + col < metrics.Count; col++)
+                {
+                    var metric = metrics[i + col];
+                    var x = col * (cellWidth + gap);
+                    Graphics.DrawRectangle(_border, new RectangleF(x, _y, cellWidth, cellHeight));
+                    Graphics.DrawString(metric.Label.ToUpperInvariant(), _labelFont, _muted, new RectangleF(x + 7, _y + 7, cellWidth - 14, 10));
+                    Graphics.DrawString(Truncate(metric.Value, 36), _bodyBoldFont, _ink, new RectangleF(x + 7, _y + 22, cellWidth - 14, 14));
+                }
+                _y += cellHeight + 6;
+            }
+        }
+
+        public void Table(IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<string>> rows)
+        {
+            if (headers.Count == 0)
+                return;
+
+            var widths = BuildColumnWidths(headers.Count);
+            DrawHeader(headers, widths);
+
+            if (rows.Count == 0)
+            {
+                DrawRow(Enumerable.Repeat("-", headers.Count).ToList(), widths);
+                return;
+            }
+
+            foreach (var row in rows)
+                DrawRow(row, widths);
+
+            _y += 4;
+        }
+
+        private void DrawHeader(IReadOnlyList<string> headers, IReadOnlyList<float> widths)
+        {
+            EnsureSpace(19);
+            var x = 0f;
+            for (var i = 0; i < headers.Count; i++)
+            {
+                Graphics.DrawRectangle(_border, _headerFill, new RectangleF(x, _y, widths[i], 18));
+                Graphics.DrawString(Truncate(headers[i].ToUpperInvariant(), 24), _labelFont, _ink, new RectangleF(x + 4, _y + 5, widths[i] - 8, 10));
+                x += widths[i];
+            }
+            _y += 18;
+        }
+
+        private void DrawRow(IReadOnlyList<string> row, IReadOnlyList<float> widths)
+        {
+            const float rowHeight = 20;
+            EnsureSpace(rowHeight);
+            var x = 0f;
+            for (var i = 0; i < widths.Count; i++)
+            {
+                var value = i < row.Count ? row[i] : string.Empty;
+                Graphics.DrawRectangle(_border, new RectangleF(x, _y, widths[i], rowHeight));
+                Graphics.DrawString(Truncate(value, ColumnLimit(widths[i])), _bodyFont, _ink, new RectangleF(x + 4, _y + 5, widths[i] - 8, 10));
+                x += widths[i];
+            }
+            _y += rowHeight;
+        }
+
+        private IReadOnlyList<float> BuildColumnWidths(int count)
+        {
+            if (count == 7) return [Width * .22f, Width * .15f, Width * .11f, Width * .10f, Width * .10f, Width * .08f, Width * .24f];
+            if (count == 5) return [Width * .12f, Width * .16f, Width * .44f, Width * .10f, Width * .18f];
+            if (count == 4) return [Width * .25f, Width * .25f, Width * .25f, Width * .25f];
+            if (count == 3) return [Width * .45f, Width * .275f, Width * .275f];
+            return Enumerable.Repeat(Width / count, count).ToList();
+        }
+
+        private void DrawText(string text, PdfFont font, PdfBrush brush, float lineHeight)
+        {
+            Graphics.DrawString(text, font, brush, new RectangleF(0, _y, Width, lineHeight));
+            _y += lineHeight;
+        }
+
+        private void EnsureSpace(float requiredHeight)
+        {
+            if (_y + requiredHeight <= Height)
+                return;
+
+            _page = _document.Pages.Add();
+            _y = 0;
+        }
+
+        private static IEnumerable<string> Wrap(string text, int maxChars)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                yield break;
+
+            var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var line = string.Empty;
+            foreach (var word in words)
+            {
+                if ((line.Length + word.Length + 1) > maxChars)
+                {
+                    yield return line;
+                    line = word;
+                }
+                else
+                {
+                    line = string.IsNullOrEmpty(line) ? word : $"{line} {word}";
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(line))
+                yield return line;
+        }
+
+        private static int ColumnLimit(float width) => Math.Max(8, (int)(width / 4.2f));
+        private static string Truncate(string value, int maxLength) => value.Length <= maxLength ? value : $"{value[..Math.Max(0, maxLength - 1)]}...";
+    }
 }
