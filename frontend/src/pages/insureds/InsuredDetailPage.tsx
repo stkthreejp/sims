@@ -204,7 +204,7 @@ function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
 
 // ─── submission table ────────────────────────────────────────────────────────
 
-function SubmissionTable({ subs, onNew }: { subs: useSubmissions; onNew: () => void }) {
+function SubmissionTable({ subs, onOpen }: { subs: useSubmissions; onOpen: (id: string) => void }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
       <thead>
@@ -218,7 +218,7 @@ function SubmissionTable({ subs, onNew }: { subs: useSubmissions; onNew: () => v
         {subs.map((s) => {
           const pill = SUB_PILL[s.status]
           return (
-            <tr key={s.id} className="id-tr" onClick={() => window.location.href = `/submissions/${s.id}`}>
+            <tr key={s.id} className="id-tr" onClick={() => onOpen(s.id)}>
               <td className="id-td"><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{s.submissionNumber}</span></td>
               <td className="id-td">—</td>
               <td className="id-td"><Pill label={SUBMISSION_STATUS_LABELS[s.status]} bg={pill.bg} fg={pill.fg} /></td>
@@ -704,7 +704,7 @@ export function InsuredDetailPage() {
                 )}
               </div>
             ) : (
-              <SubmissionTable subs={submissions} onNew={() => navigate(`/submissions/new?insuredId=${id}`)} />
+              <SubmissionTable subs={submissions} onOpen={(submissionId) => navigate(`/submissions/${submissionId}`)} />
             )}
           </Card>
         )}
