@@ -8,7 +8,10 @@ public class DocumentTemplateDto
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public TemplateEntityType EntityType { get; set; }
+    public DocumentTemplateKind Kind { get; set; }
     public string HtmlContent { get; set; } = string.Empty;
+    public string? SubjectTemplate { get; set; }
+    public string? EmailBodyHtml { get; set; }
     public bool IsActive { get; set; }
     public string CreatedByName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
@@ -21,6 +24,7 @@ public class DocumentTemplateListItemDto
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public TemplateEntityType EntityType { get; set; }
+    public DocumentTemplateKind Kind { get; set; }
     public bool IsActive { get; set; }
     public string CreatedByName { get; set; } = string.Empty;
     public DateTime UpdatedAt { get; set; }
@@ -31,7 +35,10 @@ public class DocumentTemplateCreateDto
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public TemplateEntityType EntityType { get; set; }
+    public DocumentTemplateKind Kind { get; set; } = DocumentTemplateKind.Document;
     public string HtmlContent { get; set; } = string.Empty;
+    public string? SubjectTemplate { get; set; }
+    public string? EmailBodyHtml { get; set; }
 }
 
 public class DocumentTemplateUpdateDto
@@ -39,6 +46,9 @@ public class DocumentTemplateUpdateDto
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public TemplateEntityType EntityType { get; set; }
+    public DocumentTemplateKind Kind { get; set; } = DocumentTemplateKind.Document;
     public string HtmlContent { get; set; } = string.Empty;
+    public string? SubjectTemplate { get; set; }
+    public string? EmailBodyHtml { get; set; }
     public bool IsActive { get; set; }
 }

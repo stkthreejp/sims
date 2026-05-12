@@ -7,8 +7,14 @@ import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
+import type { DocumentTemplateKind } from '@/types/documentTemplate.types'
 
 const ENTITY_TYPES: TemplateEntityType[] = ['General', 'Quote', 'Policy', 'Submission', 'Carrier', 'Agent']
+const TEMPLATE_KINDS: { value: DocumentTemplateKind; label: string }[] = [
+  { value: 'Document', label: 'Document' },
+  { value: 'Email', label: 'Email' },
+  { value: 'DocumentAndEmail', label: 'Document + Email' },
+]
 
 interface LocationState {
   importedHtml?: string
@@ -26,8 +32,12 @@ export function TemplateEditorPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [entityType, setEntityType] = useState<TemplateEntityType>('Policy')
+  const [kind, setKind] = useState<DocumentTemplateKind>('Document')
   const [isActive, setIsActive] = useState(true)
-  const [content, setContent] = useState('<p></p>')
+  const [documentContent, setDocumentContent] = useState('<p></p>')
+  const [subjectTemplate, setSubjectTemplate] = useState('')
+  const [emailBodyHtml, setEmailBodyHtml] = useState('<p></p>')
+  const [activeBody, setActiveBody] = useState<'document' | 'email'>('document')
   const [isDirty, setIsDirty] = useState(false)
 
   // Load existing template
@@ -43,22 +53,34 @@ export function TemplateEditorPage() {
       setName(template.name)
       setDescription(template.description ?? '')
       setEntityType(template.entityType)
+      setKind(template.kind)
       setIsActive(template.isActive)
-      setContent(template.htmlContent)
+      setDocumentContent(template.htmlContent || '<p></p>')
+      setSubjectTemplate(template.subjectTemplate ?? '')
+      setEmailBodyHtml(template.emailBodyHtml || '<p></p>')
+      setActiveBody(template.kind === 'Email' ? 'email' : 'document')
     }
   }, [template])
 
   // Pre-fill from Word import (new template)
   useEffect(() => {
     if (isNew && state?.importedHtml) {
-      setContent(state.importedHtml)
+      setDocumentContent(state.importedHtml)
       if (state.importedName) setName(state.importedName)
       setIsDirty(true)
     }
   }, [isNew, state])
 
   const createMutation = useMutation({
-    mutationFn: () => documentTemplatesApi.create({ name, description: description || undefined, entityType, htmlContent: content }),
+    mutationFn: () => documentTemplatesApi.create({
+      name,
+      description: description || undefined,
+      entityType,
+      kind,
+      htmlContent: kind === 'Email' ? '' : documentContent,
+      subjectTemplate: kind === 'Document' ? undefined : subjectTemplate,
+      emailBodyHtml: kind === 'Document' ? undefined : emailBodyHtml,
+    }),
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['document-templates'] })
       toast.success('Template created')
@@ -69,7 +91,16 @@ export function TemplateEditorPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: () => documentTemplatesApi.update(id!, { name, description: description || undefined, entityType, htmlContent: content, isActive }),
+    mutationFn: () => documentTemplatesApi.update(id!, {
+      name,
+      description: description || undefined,
+      entityType,
+      kind,
+      htmlContent: kind === 'Email' ? '' : documentContent,
+      subjectTemplate: kind === 'Document' ? undefined : subjectTemplate,
+      emailBodyHtml: kind === 'Document' ? undefined : emailBodyHtml,
+      isActive,
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['document-templates'] })
       toast.success('Template saved')
@@ -82,8 +113,16 @@ export function TemplateEditorPage() {
 
   const handleSave = () => {
     if (!name.trim()) { toast.error('Template name is required'); return }
-    if (!content || content === '<p></p>') { toast.error('Template content cannot be empty'); return }
+    if (kind !== 'Email' && (!documentContent || documentContent === '<p></p>')) { toast.error('Document content cannot be empty'); return }
+    if (kind !== 'Document' && !subjectTemplate.trim()) { toast.error('Email subject is required'); return }
+    if (kind !== 'Document' && (!emailBodyHtml || emailBodyHtml === '<p></p>')) { toast.error('Email body cannot be empty'); return }
     isNew ? createMutation.mutate() : updateMutation.mutate()
+  }
+
+  const handleKindChange = (nextKind: DocumentTemplateKind) => {
+    setKind(nextKind)
+    setActiveBody(nextKind === 'Email' ? 'email' : 'document')
+    setIsDirty(true)
   }
 
   const handleImportDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +133,11 @@ export function TemplateEditorPage() {
       const mammoth = await import('mammoth/mammoth.browser')
       const arrayBuffer = await file.arrayBuffer()
       const result = await mammoth.convertToHtml({ arrayBuffer })
-      setContent(result.value)
+      if (activeBody === 'email') {
+        setEmailBodyHtml(result.value)
+      } else {
+        setDocumentContent(result.value)
+      }
       if (!name && file.name) setName(file.name.replace(/\.(doc|docx)$/i, ''))
       setIsDirty(true)
       toast.success('Word document imported')
@@ -104,6 +147,8 @@ export function TemplateEditorPage() {
   }
 
   if (!isNew && isLoading) return <LoadingSpinner />
+
+  const editorContent = activeBody === 'email' ? emailBodyHtml : documentContent
 
   return (
     <div className="flex flex-col h-full">
@@ -135,6 +180,16 @@ export function TemplateEditorPage() {
         >
           {ENTITY_TYPES.map((t) => (
             <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
+
+        <select
+          value={kind}
+          onChange={(e) => handleKindChange(e.target.value as DocumentTemplateKind)}
+          className="text-sm border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        >
+          {TEMPLATE_KINDS.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
 
@@ -182,11 +237,44 @@ export function TemplateEditorPage() {
         />
       </div>
 
+      {kind !== 'Document' && (
+        <div className="px-6 py-2 border-b border-slate-100 bg-white shrink-0">
+          <input
+            value={subjectTemplate}
+            onChange={(e) => { setSubjectTemplate(e.target.value); setIsDirty(true) }}
+            placeholder="Email subject..."
+            className="w-full text-sm text-slate-700 border-0 bg-transparent focus:outline-none focus:ring-0 placeholder:text-slate-400"
+          />
+        </div>
+      )}
+
+      {kind === 'DocumentAndEmail' && (
+        <div className="px-6 py-2 border-b border-slate-100 bg-white shrink-0">
+          <div className="inline-flex rounded-md border border-slate-200 p-0.5">
+            <button
+              onClick={() => setActiveBody('document')}
+              className={`px-3 py-1.5 text-xs font-medium rounded ${activeBody === 'document' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              Document Body
+            </button>
+            <button
+              onClick={() => setActiveBody('email')}
+              className={`px-3 py-1.5 text-xs font-medium rounded ${activeBody === 'email' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              Email Body
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Editor */}
       <div className="flex-1 overflow-auto p-6">
         <TemplateEditor
-          content={content}
-          onChange={(html) => { setContent(html); setIsDirty(true) }}
+          content={editorContent}
+          onChange={(html) => {
+            activeBody === 'email' ? setEmailBodyHtml(html) : setDocumentContent(html)
+            setIsDirty(true)
+          }}
           entityType={entityType}
         />
       </div>

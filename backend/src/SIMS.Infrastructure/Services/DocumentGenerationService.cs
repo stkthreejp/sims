@@ -36,6 +36,8 @@ public class DocumentGenerationService : IDocumentGenerationService
         var template = await Db.Set<DocumentTemplate>().FindAsync(templateId);
         if (template == null)
             return Result<GeneratedDocumentDto>.Failure("NOT_FOUND", "Template not found.");
+        if (template.Kind == DocumentTemplateKind.Email)
+            return Result<GeneratedDocumentDto>.Failure("INVALID_TEMPLATE_KIND", "Email-only templates cannot be generated as documents.");
 
         // ── 2. Build tag data dictionary ──────────────────────────────────────
         Dictionary<string, string> data;

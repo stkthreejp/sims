@@ -1,10 +1,10 @@
 import { apiClient } from './client'
-import type { DocumentTemplate, DocumentTemplateListItem, DocumentTemplateCreate, DocumentTemplateUpdate, TemplateEntityType } from '@/types/documentTemplate.types'
+import type { DocumentTemplate, DocumentTemplateListItem, DocumentTemplateCreate, DocumentTemplateUpdate, TemplateEntityType, DocumentTemplateKind } from '@/types/documentTemplate.types'
 
 export const documentTemplatesApi = {
-  getAll: (entityType?: TemplateEntityType, includeInactive = false) =>
+  getAll: (entityType?: TemplateEntityType, includeInactive = false, kind?: DocumentTemplateKind) =>
     apiClient
-      .get<DocumentTemplateListItem[]>('/document-templates', { params: { entityType, includeInactive } })
+      .get<DocumentTemplateListItem[]>('/document-templates', { params: { entityType, includeInactive, kind } })
       .then((r) => r.data),
 
   getById: (id: string) =>

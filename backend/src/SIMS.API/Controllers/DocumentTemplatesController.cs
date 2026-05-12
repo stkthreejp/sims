@@ -19,9 +19,10 @@ public class DocumentTemplatesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] TemplateEntityType? entityType = null,
-        [FromQuery] bool includeInactive = false)
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] DocumentTemplateKind? kind = null)
     {
-        var result = await _service.GetAllAsync(entityType, includeInactive);
+        var result = await _service.GetAllAsync(entityType, includeInactive, kind);
         return Ok(result);
     }
 

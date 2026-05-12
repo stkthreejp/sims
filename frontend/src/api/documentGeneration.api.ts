@@ -5,6 +5,7 @@ export type DocumentTemplate = {
   id: string
   name: string
   entityType: string
+  kind: 'Document' | 'Email' | 'DocumentAndEmail'
 }
 
 export type GenerateDocumentRequest = {
@@ -21,7 +22,9 @@ export type GenerateDocumentResponse = {
 
 export const documentGenerationApi = {
   getTemplates: (entityType: string) =>
-    apiClient.get<DocumentTemplate[]>('/document-templates', { params: { entityType } }).then((r) => r.data),
+    apiClient
+      .get<DocumentTemplate[]>('/document-templates', { params: { entityType } })
+      .then((r) => r.data.filter((t) => t.kind !== 'Email')),
 
   generate: (data: GenerateDocumentRequest) =>
     apiClient.post<GenerateDocumentResponse>('/document-generation', data).then((r) => r.data),

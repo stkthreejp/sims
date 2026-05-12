@@ -15,13 +15,18 @@ public class DocumentTemplateService : IDocumentTemplateService
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
     public async Task<IEnumerable<DocumentTemplateListItemDto>> GetAllAsync(
-        TemplateEntityType? entityType = null, bool includeInactive = false)
+        TemplateEntityType? entityType = null,
+        bool includeInactive = false,
+        DocumentTemplateKind? kind = null)
     {
         IQueryable<DocumentTemplate> q = Db.Set<DocumentTemplate>()
             .Include(t => t.CreatedBy);
 
         if (entityType.HasValue)
             q = q.Where(t => t.EntityType == entityType.Value);
+
+        if (kind.HasValue)
+            q = q.Where(t => t.Kind == kind.Value);
 
         if (!includeInactive)
             q = q.Where(t => t.IsActive);
@@ -34,6 +39,7 @@ public class DocumentTemplateService : IDocumentTemplateService
             Name = t.Name,
             Description = t.Description,
             EntityType = t.EntityType,
+            Kind = t.Kind,
             IsActive = t.IsActive,
             CreatedByName = t.CreatedBy?.FullName ?? string.Empty,
             UpdatedAt = t.UpdatedAt,
@@ -58,7 +64,10 @@ public class DocumentTemplateService : IDocumentTemplateService
             Name = dto.Name.Trim(),
             Description = dto.Description?.Trim(),
             EntityType = dto.EntityType,
+            Kind = dto.Kind,
             HtmlContent = dto.HtmlContent,
+            SubjectTemplate = dto.SubjectTemplate?.Trim(),
+            EmailBodyHtml = dto.EmailBodyHtml,
             IsActive = true,
             CreatedById = createdById,
         };
@@ -79,7 +88,10 @@ public class DocumentTemplateService : IDocumentTemplateService
         template.Name = dto.Name.Trim();
         template.Description = dto.Description?.Trim();
         template.EntityType = dto.EntityType;
+        template.Kind = dto.Kind;
         template.HtmlContent = dto.HtmlContent;
+        template.SubjectTemplate = dto.SubjectTemplate?.Trim();
+        template.EmailBodyHtml = dto.EmailBodyHtml;
         template.IsActive = dto.IsActive;
 
         await Db.SaveChangesAsync();
@@ -104,7 +116,10 @@ public class DocumentTemplateService : IDocumentTemplateService
         Name = t.Name,
         Description = t.Description,
         EntityType = t.EntityType,
+        Kind = t.Kind,
         HtmlContent = t.HtmlContent,
+        SubjectTemplate = t.SubjectTemplate,
+        EmailBodyHtml = t.EmailBodyHtml,
         IsActive = t.IsActive,
         CreatedByName = t.CreatedBy?.FullName ?? string.Empty,
         CreatedAt = t.CreatedAt,

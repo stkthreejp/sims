@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
-import type { DocumentTemplateListItem } from '@/types/documentTemplate.types'
+import type { DocumentTemplateKind, DocumentTemplateListItem } from '@/types/documentTemplate.types'
 import { formatDateTime } from '@/lib/utils'
 
 const ENTITY_TYPE_COLORS: Record<TemplateEntityType, string> = {
@@ -21,19 +21,34 @@ const ENTITY_TYPE_COLORS: Record<TemplateEntityType, string> = {
 }
 
 const ALL_TYPES: (TemplateEntityType | 'All')[] = ['All', 'General', 'Quote', 'Policy', 'Submission', 'Carrier', 'Agent']
+const ALL_KINDS: (DocumentTemplateKind | 'All')[] = ['All', 'Document', 'Email', 'DocumentAndEmail']
+
+const KIND_LABELS: Record<DocumentTemplateKind, string> = {
+  Document: 'Document',
+  Email: 'Email',
+  DocumentAndEmail: 'Document + Email',
+}
+
+const KIND_COLORS: Record<DocumentTemplateKind, string> = {
+  Document: 'bg-slate-100 text-slate-600',
+  Email: 'bg-emerald-100 text-emerald-700',
+  DocumentAndEmail: 'bg-indigo-100 text-indigo-700',
+}
 
 export function DocumentLibraryPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [filter, setFilter] = useState<TemplateEntityType | 'All'>('All')
+  const [kindFilter, setKindFilter] = useState<DocumentTemplateKind | 'All'>('All')
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
 
   const { data: templates = [], isLoading } = useQuery({
-    queryKey: ['document-templates', { filter, showInactive }],
+    queryKey: ['document-templates', { filter, kindFilter, showInactive }],
     queryFn: () => documentTemplatesApi.getAll(
       filter === 'All' ? undefined : filter,
-      showInactive
+      showInactive,
+      kindFilter === 'All' ? undefined : kindFilter
     ),
   })
 
@@ -124,6 +139,22 @@ export function DocumentLibraryPage() {
               }`}
             >
               {type}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1.5 flex-wrap">
+          {ALL_KINDS.map((kind) => (
+            <button
+              key={kind}
+              onClick={() => setKindFilter(kind)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                kindFilter === kind
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600 border-slate-300 hover:border-slate-500'
+              }`}
+            >
+              {kind === 'All' ? 'All Kinds' : KIND_LABELS[kind]}
             </button>
           ))}
         </div>
@@ -236,9 +267,14 @@ function TemplateGrid({
           )}
 
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ENTITY_TYPE_COLORS[t.entityType]}`}>
-              {ENTITY_TYPE_LABELS[t.entityType]}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ENTITY_TYPE_COLORS[t.entityType]}`}>
+                {ENTITY_TYPE_LABELS[t.entityType]}
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${KIND_COLORS[t.kind]}`}>
+                {KIND_LABELS[t.kind]}
+              </span>
+            </div>
             {!t.isActive && (
               <span className="text-xs text-slate-400 italic">Inactive</span>
             )}
