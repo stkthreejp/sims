@@ -8,6 +8,8 @@ import type {
   SubmissionVehicleCreate,
   SubmissionPriorCarrier,
   SubmissionPriorCarrierCreate,
+  SubmissionAdditionalInterest,
+  SubmissionAdditionalInterestCreate,
   SubmissionSupplemental,
   SubmissionSupplementalUpsert,
   SubmissionGLCoverages,
@@ -55,6 +57,17 @@ export const submissionPriorCarriersApi = {
     apiClient.put<SubmissionPriorCarrier>(`${base(submissionId)}/prior-carriers/${id}`, dto).then((r) => r.data),
   delete: (submissionId: string, id: string) =>
     apiClient.delete(`${base(submissionId)}/prior-carriers/${id}`),
+}
+
+export const submissionAdditionalInterestsApi = {
+  getAll: (submissionId: string) =>
+    apiClient.get<SubmissionAdditionalInterest[]>(`${base(submissionId)}/additional-interests`).then((r) => r.data),
+  create: (submissionId: string, dto: SubmissionAdditionalInterestCreate) =>
+    apiClient.post<SubmissionAdditionalInterest>(`${base(submissionId)}/additional-interests`, dto).then((r) => r.data),
+  update: (submissionId: string, id: string, dto: SubmissionAdditionalInterestCreate) =>
+    apiClient.put<SubmissionAdditionalInterest>(`${base(submissionId)}/additional-interests/${id}`, dto).then((r) => r.data),
+  delete: (submissionId: string, id: string) =>
+    apiClient.delete(`${base(submissionId)}/additional-interests/${id}`),
 }
 
 export const submissionLocationsApi = {

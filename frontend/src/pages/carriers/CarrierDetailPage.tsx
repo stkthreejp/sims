@@ -23,6 +23,17 @@ import {
 import type { CarrierCommission } from '@/types/carrierCommission.types'
 import { ratingApi } from '@/api/rating.api'
 import type { CarrierRatingAssignment, RatingPlanVersionPicker } from '@/types/rating.types'
+import { carrierAdditionalInterestRatesApi } from '@/api/carrierAdditionalInterestRates.api'
+import {
+  ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS,
+  ADDITIONAL_INTEREST_COVERAGE_LABELS,
+} from '@/types/submissionLob.types'
+import type {
+  AdditionalInterestChargeMethod,
+  AdditionalInterestCoverageType,
+  CarrierAdditionalInterestRate,
+  CarrierAdditionalInterestRateCreate,
+} from '@/types/submissionLob.types'
 
 // ─── Contact form ──────────────────────────────────────────────────────────────
 
@@ -153,6 +164,34 @@ type InfoFormData = {
   linesOfBusiness: PolicyLineOfBusiness[]
 }
 
+type AdditionalInterestRateForm = {
+  lineOfBusiness: PolicyLineOfBusiness | ''
+  coverageType: AdditionalInterestCoverageType
+  chargeMethod: AdditionalInterestChargeMethod
+  perInterestAmount: string
+  blanketAmount: string
+  minimumCharge: string
+  maximumCharge: string
+  state: string
+  effectiveDate: string
+  expirationDate: string
+  isActive: boolean
+}
+
+const emptyAdditionalInterestRateForm = (): AdditionalInterestRateForm => ({
+  lineOfBusiness: '',
+  coverageType: 'AdditionalInsured',
+  chargeMethod: 'PerInterest',
+  perInterestAmount: '',
+  blanketAmount: '',
+  minimumCharge: '',
+  maximumCharge: '',
+  state: '',
+  effectiveDate: '',
+  expirationDate: '',
+  isActive: true,
+})
+
 export function CarrierDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -173,6 +212,9 @@ export function CarrierDetailPage() {
   const [showAddCommission, setShowAddCommission] = useState(false)
   const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '' as string, commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
+  const [showAdditionalInterestRateForm, setShowAdditionalInterestRateForm] = useState(false)
+  const [editingAdditionalInterestRateId, setEditingAdditionalInterestRateId] = useState<string | null>(null)
+  const [additionalInterestRateForm, setAdditionalInterestRateForm] = useState<AdditionalInterestRateForm>(emptyAdditionalInterestRateForm())
 
   // Rating plan assignment state
   const [showRatingModal, setShowRatingModal] = useState(false)
@@ -189,6 +231,12 @@ export function CarrierDetailPage() {
   const { data: commissions = [] } = useQuery({
     queryKey: ['carrier-commissions', id],
     queryFn: () => getCarrierCommissions(id!),
+    enabled: !!id,
+  })
+
+  const { data: additionalInterestRates = [] } = useQuery<CarrierAdditionalInterestRate[]>({
+    queryKey: ['carrier-additional-interest-rates', id],
+    queryFn: () => carrierAdditionalInterestRatesApi.getAll(id!),
     enabled: !!id,
   })
 
@@ -215,6 +263,46 @@ export function CarrierDetailPage() {
       toast.success('Commission rate disabled')
     },
     onError: (err: Error) => toast.error(err.message),
+  })
+
+  const toAdditionalInterestRateDto = (): CarrierAdditionalInterestRateCreate => ({
+    lineOfBusiness: additionalInterestRateForm.lineOfBusiness,
+    coverageType: additionalInterestRateForm.coverageType,
+    chargeMethod: additionalInterestRateForm.chargeMethod,
+    perInterestAmount: additionalInterestRateForm.perInterestAmount ? parseFloat(additionalInterestRateForm.perInterestAmount) : undefined,
+    blanketAmount: additionalInterestRateForm.blanketAmount ? parseFloat(additionalInterestRateForm.blanketAmount) : undefined,
+    minimumCharge: additionalInterestRateForm.minimumCharge ? parseFloat(additionalInterestRateForm.minimumCharge) : undefined,
+    maximumCharge: additionalInterestRateForm.maximumCharge ? parseFloat(additionalInterestRateForm.maximumCharge) : undefined,
+    state: additionalInterestRateForm.state || undefined,
+    effectiveDate: additionalInterestRateForm.effectiveDate || undefined,
+    expirationDate: additionalInterestRateForm.expirationDate || undefined,
+    isActive: additionalInterestRateForm.isActive,
+  })
+
+  const saveAdditionalInterestRateMutation = useMutation({
+    mutationFn: () => {
+      const dto = toAdditionalInterestRateDto()
+      return editingAdditionalInterestRateId
+        ? carrierAdditionalInterestRatesApi.update(id!, editingAdditionalInterestRateId, dto)
+        : carrierAdditionalInterestRatesApi.create(id!, dto)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carrier-additional-interest-rates', id] })
+      setShowAdditionalInterestRateForm(false)
+      setEditingAdditionalInterestRateId(null)
+      setAdditionalInterestRateForm(emptyAdditionalInterestRateForm())
+      toast.success('Additional interest rate saved')
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to save additional interest rate'),
+  })
+
+  const deleteAdditionalInterestRateMutation = useMutation({
+    mutationFn: (rateId: string) => carrierAdditionalInterestRatesApi.delete(id!, rateId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carrier-additional-interest-rates', id] })
+      toast.success('Additional interest rate removed')
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to remove additional interest rate'),
   })
 
   // ─── Rating plan queries + mutations ────────────────────────────────────────
@@ -838,6 +926,177 @@ export function CarrierDetailPage() {
                           }}
                           className="p-1 text-slate-400 hover:text-red-600 rounded"
                           title="Remove assignment"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Additional Interest Rates */}
+      <div className="bg-white border rounded-lg p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <BanknoteIcon className="h-4 w-4 text-slate-400" />
+            Additional Interest Rates
+          </h2>
+          <button
+            onClick={() => {
+              setEditingAdditionalInterestRateId(null)
+              setAdditionalInterestRateForm({ ...emptyAdditionalInterestRateForm(), lineOfBusiness: carrier.linesOfBusiness[0] ?? '' })
+              setShowAdditionalInterestRateForm(true)
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Rate
+          </button>
+        </div>
+
+        {showAdditionalInterestRateForm && (
+          <div className="bg-slate-50 rounded-lg p-3 border space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business *</label>
+                <select value={additionalInterestRateForm.lineOfBusiness} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="w-full border rounded px-2 py-1.5 text-sm bg-white">
+                  <option value="">Select...</option>
+                  {carrier.linesOfBusiness.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Interest Type</label>
+                <select value={additionalInterestRateForm.coverageType} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, coverageType: e.target.value as AdditionalInterestCoverageType }))} className="w-full border rounded px-2 py-1.5 text-sm bg-white">
+                  {(Object.keys(ADDITIONAL_INTEREST_COVERAGE_LABELS) as AdditionalInterestCoverageType[]).map((k) => <option key={k} value={k}>{ADDITIONAL_INTEREST_COVERAGE_LABELS[k]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Charge Method</label>
+                <select value={additionalInterestRateForm.chargeMethod} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, chargeMethod: e.target.value as AdditionalInterestChargeMethod }))} className="w-full border rounded px-2 py-1.5 text-sm bg-white">
+                  {(Object.keys(ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS) as AdditionalInterestChargeMethod[]).map((k) => <option key={k} value={k}>{ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS[k]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                <input value={additionalInterestRateForm.state} maxLength={2} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))} placeholder="Optional" className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Per Interest Amount</label>
+                <input type="number" value={additionalInterestRateForm.perInterestAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, perInterestAmount: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Blanket Amount</label>
+                <input type="number" value={additionalInterestRateForm.blanketAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, blanketAmount: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Minimum</label>
+                <input type="number" value={additionalInterestRateForm.minimumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, minimumCharge: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Maximum</label>
+                <input type="number" value={additionalInterestRateForm.maximumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, maximumCharge: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
+                <input type="date" value={additionalInterestRateForm.effectiveDate} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, effectiveDate: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Expiration Date</label>
+                <input type="date" value={additionalInterestRateForm.expirationDate} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, expirationDate: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={additionalInterestRateForm.isActive} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, isActive: e.target.checked }))} className="rounded" />
+                  Active
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (!additionalInterestRateForm.lineOfBusiness) { toast.error('Select a line of business'); return }
+                  saveAdditionalInterestRateMutation.mutate()
+                }}
+                disabled={saveAdditionalInterestRateMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" /> Save Rate
+              </button>
+              <button onClick={() => { setShowAdditionalInterestRateForm(false); setEditingAdditionalInterestRateId(null); setAdditionalInterestRateForm(emptyAdditionalInterestRateForm()) }} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50">
+                <X className="h-3.5 w-3.5" /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {additionalInterestRates.length === 0 ? (
+          <div className="text-center py-6 border border-dashed rounded-lg">
+            <BanknoteIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No additional interest rates configured.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Rating will use these rules after the premium calculation is wired in.</p>
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b bg-slate-50">
+                  <th className="px-4 py-2 font-medium">LOB</th>
+                  <th className="px-4 py-2 font-medium">Type</th>
+                  <th className="px-4 py-2 font-medium">Method</th>
+                  <th className="px-4 py-2 font-medium">Amount</th>
+                  <th className="px-4 py-2 font-medium">State</th>
+                  <th className="px-4 py-2 font-medium">Effective</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {additionalInterestRates.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-slate-700">{LOB_LABELS[r.lineOfBusiness as PolicyLineOfBusiness] ?? r.lineOfBusiness}</td>
+                    <td className="px-4 py-3 text-slate-700">{ADDITIONAL_INTEREST_COVERAGE_LABELS[r.coverageType]}</td>
+                    <td className="px-4 py-3 text-slate-600">{ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS[r.chargeMethod]}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {r.chargeMethod === 'PerInterest' ? formatCurrency(r.perInterestAmount ?? 0) : r.chargeMethod === 'BlanketFlat' ? formatCurrency(r.blanketAmount ?? 0) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{r.state ?? '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">{r.effectiveDate ?? '-'}</td>
+                    <td className="px-4 py-3">
+                      {r.isActive ? <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">Active</span> : <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">Inactive</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingAdditionalInterestRateId(r.id)
+                            setAdditionalInterestRateForm({
+                              lineOfBusiness: r.lineOfBusiness as PolicyLineOfBusiness,
+                              coverageType: r.coverageType,
+                              chargeMethod: r.chargeMethod,
+                              perInterestAmount: r.perInterestAmount?.toString() ?? '',
+                              blanketAmount: r.blanketAmount?.toString() ?? '',
+                              minimumCharge: r.minimumCharge?.toString() ?? '',
+                              maximumCharge: r.maximumCharge?.toString() ?? '',
+                              state: r.state ?? '',
+                              effectiveDate: r.effectiveDate ?? '',
+                              expirationDate: r.expirationDate ?? '',
+                              isActive: r.isActive,
+                            })
+                            setShowAdditionalInterestRateForm(true)
+                          }}
+                          className="p-1 text-slate-400 hover:text-blue-600 rounded"
+                          title="Edit rate"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm('Remove this additional interest rate?')) deleteAdditionalInterestRateMutation.mutate(r.id) }}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded"
+                          title="Remove rate"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

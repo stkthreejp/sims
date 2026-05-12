@@ -12,11 +12,11 @@ import { quotesApi } from '@/api/quotes.api'
 import { carriersApi } from '@/api/carriers.api'
 import { usersApi } from '@/api/users.api'
 import { agentsApi } from '@/api/agents.api'
-import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
+import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionAdditionalInterestsApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
 import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
-import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES } from '@/types/submissionLob.types'
-import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis } from '@/types/submissionLob.types'
+import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
@@ -124,7 +124,7 @@ function daysUntil(dateStr: string | null | undefined): number | null {
 
 // ── Page Component ─────────────────────────────────────────────────────────────
 
-type Tab = 'quotes' | 'exposures' | 'prior-carriers' | 'documents' | 'activity'
+type Tab = 'quotes' | 'exposures' | 'additional-interests' | 'prior-carriers' | 'documents' | 'activity'
 
 export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -161,6 +161,18 @@ export function SubmissionDetailPage() {
   const [showCarrierForm, setShowCarrierForm] = useState(false)
   const [carrierForm, setCarrierForm] = useState<SubmissionPriorCarrierCreate>(emptyCarrierForm())
   const [editingCarrierId, setEditingCarrierId] = useState<string | null>(null)
+  const emptyAdditionalInterestForm = (): SubmissionAdditionalInterestCreate => ({
+    lineOfBusiness: ACTIVE_LOBS[0],
+    name: '',
+    appliesToType: 'Blanket',
+    additionalInsured: false,
+    lossPayee: false,
+    waiverOfSubrogation: false,
+    primaryNonContributory: false,
+  })
+  const [showAdditionalInterestForm, setShowAdditionalInterestForm] = useState(false)
+  const [additionalInterestForm, setAdditionalInterestForm] = useState<SubmissionAdditionalInterestCreate>(emptyAdditionalInterestForm())
+  const [editingAdditionalInterestId, setEditingAdditionalInterestId] = useState<string | null>(null)
   const emptyEquipmentForm = (): SubmissionEquipmentCreate => ({ itemNumber: 1 })
   const [showEquipmentForm, setShowEquipmentForm] = useState(false)
   const [equipmentForm, setEquipmentForm] = useState<SubmissionEquipmentCreate>(emptyEquipmentForm())
@@ -206,6 +218,12 @@ export function SubmissionDetailPage() {
     queryKey: ['submission-prior-carriers', id],
     queryFn: () => submissionPriorCarriersApi.getAll(id!),
     enabled: !!id && activeTab === 'prior-carriers',
+  })
+
+  const { data: additionalInterests = [] } = useQuery({
+    queryKey: ['submission-additional-interests', id],
+    queryFn: () => submissionAdditionalInterestsApi.getAll(id!),
+    enabled: !!id && activeTab === 'additional-interests',
   })
 
   const { data: supplemental } = useQuery({
@@ -316,6 +334,7 @@ export function SubmissionDetailPage() {
         qc.invalidateQueries({ queryKey: ['submission-drivers', id] })
         qc.invalidateQueries({ queryKey: ['submission-vehicles', id] })
         qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] })
+        qc.invalidateQueries({ queryKey: ['submission-additional-interests', id] })
         qc.invalidateQueries({ queryKey: ['submission-supplemental', id] })
         qc.invalidateQueries({ queryKey: ['submission-gl-coverages', id] })
         qc.invalidateQueries({ queryKey: ['submission-im-coverages', id] })
@@ -402,6 +421,23 @@ export function SubmissionDetailPage() {
   const deletePriorCarrierMutation = useMutation({
     mutationFn: (cId: string) => submissionPriorCarriersApi.delete(id!, cId),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] }); toast.success('Prior carrier removed') },
+  })
+
+  const saveAdditionalInterestMutation = useMutation({
+    mutationFn: (dto: SubmissionAdditionalInterestCreate) =>
+      editingAdditionalInterestId
+        ? submissionAdditionalInterestsApi.update(id!, editingAdditionalInterestId, dto)
+        : submissionAdditionalInterestsApi.create(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-additional-interests', id] })
+      setShowAdditionalInterestForm(false); setAdditionalInterestForm(emptyAdditionalInterestForm()); setEditingAdditionalInterestId(null)
+      toast.success('Additional interest saved')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to save additional interest'),
+  })
+  const deleteAdditionalInterestMutation = useMutation({
+    mutationFn: (aiId: string) => submissionAdditionalInterestsApi.delete(id!, aiId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-additional-interests', id] }); toast.success('Additional interest removed') },
   })
 
   const saveEquipmentMutation = useMutation({
@@ -957,6 +993,7 @@ export function SubmissionDetailPage() {
         {([
           { key: 'quotes', label: 'Quotes', count: quotes.length },
           { key: 'exposures', label: 'Exposures', count: drivers.length + vehicles.length + equipment.length > 0 ? drivers.length + vehicles.length + equipment.length : undefined },
+          { key: 'additional-interests', label: 'Additional interests', count: additionalInterests.length > 0 ? additionalInterests.length : undefined },
           { key: 'prior-carriers', label: 'Prior carriers', count: priorCarriers.length > 0 ? priorCarriers.length : undefined },
           { key: 'documents', label: 'Documents' },
           { key: 'activity', label: 'Activity' },
@@ -1290,6 +1327,92 @@ export function SubmissionDetailPage() {
               </div>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Additional Interests tab */}
+      {activeTab === 'additional-interests' && (
+        <section className="sd-card">
+          <div className="sd-card-head">
+            <h3>Additional interests <span className="cnt">{additionalInterests.length}</span></h3>
+            <button
+              className="sd-btn sm primary"
+              onClick={() => {
+                setShowAdditionalInterestForm(true)
+                setAdditionalInterestForm({ ...emptyAdditionalInterestForm(), lineOfBusiness: submission?.linesOfBusiness[0] ?? ACTIVE_LOBS[0] })
+                setEditingAdditionalInterestId(null)
+              }}
+            >
+              <Plus size={12} /> Add interest
+            </button>
+          </div>
+          <div className="sd-card-body tight">
+            {showAdditionalInterestForm && (
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingAdditionalInterestId ? 'Edit Additional Interest' : 'Add Additional Interest'}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Name *</label><input value={additionalInterestForm.name} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, name: e.target.value }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Line of Business</label><select value={additionalInterestForm.lineOfBusiness} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, lineOfBusiness: e.target.value }))} style={inputStyle}>{(submission?.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS).map((l) => <option key={l} value={l}>{LOB_LABELS[l]}</option>)}</select></div>
+                  <div><label style={labelStyle}>Applies To</label><select value={additionalInterestForm.appliesToType} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, appliesToType: e.target.value as AdditionalInterestAppliesToType }))} style={inputStyle}>{(Object.keys(ADDITIONAL_INTEREST_APPLIES_TO_LABELS) as AdditionalInterestAppliesToType[]).map((k) => <option key={k} value={k}>{ADDITIONAL_INTEREST_APPLIES_TO_LABELS[k]}</option>)}</select></div>
+                  <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Address Line 1</label><input value={additionalInterestForm.addressLine1 ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, addressLine1: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Address Line 2</label><input value={additionalInterestForm.addressLine2 ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, addressLine2: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>City</label><input value={additionalInterestForm.city ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, city: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>State</label><input maxLength={2} value={additionalInterestForm.state ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, state: e.target.value.toUpperCase() || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>ZIP</label><input value={additionalInterestForm.zipCode ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, zipCode: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Scheduled Items</label><input value={additionalInterestForm.scheduledItemNumbers ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, scheduledItemNumbers: e.target.value || undefined }))} placeholder="e.g. 1, 3, 7" style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Email</label><input value={additionalInterestForm.email ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, email: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Phone</label><input value={additionalInterestForm.phone ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, phone: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Notes</label><input value={additionalInterestForm.notes ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, notes: e.target.value || undefined }))} style={inputStyle} /></div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" checked={additionalInterestForm.additionalInsured} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, additionalInsured: e.target.checked }))} /> Additional Insured</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" checked={additionalInterestForm.lossPayee} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, lossPayee: e.target.checked }))} /> Loss Payee</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" checked={additionalInterestForm.waiverOfSubrogation} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, waiverOfSubrogation: e.target.checked }))} /> Waiver of Subrogation</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" checked={additionalInterestForm.primaryNonContributory} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, primaryNonContributory: e.target.checked }))} /> Primary & Non-Contributory</label>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button onClick={() => saveAdditionalInterestMutation.mutate(additionalInterestForm)} disabled={!additionalInterestForm.name || saveAdditionalInterestMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
+                  <button onClick={() => { setShowAdditionalInterestForm(false); setAdditionalInterestForm(emptyAdditionalInterestForm()); setEditingAdditionalInterestId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
+                </div>
+              </div>
+            )}
+            {additionalInterests.length === 0 && !showAdditionalInterestForm ? (
+              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
+                <div style={{ color: 'var(--ink-2)', fontWeight: 600, marginBottom: 4 }}>No additional interests entered</div>
+                <button className="sd-btn outline sm" style={{ marginTop: 10 }} onClick={() => { setShowAdditionalInterestForm(true); setAdditionalInterestForm({ ...emptyAdditionalInterestForm(), lineOfBusiness: submission?.linesOfBusiness[0] ?? ACTIVE_LOBS[0] }); setEditingAdditionalInterestId(null) }}><Plus size={13} /> Add Interest</button>
+              </div>
+            ) : (
+              <table className="sd-table">
+                <thead><tr><th>Name</th><th>LOB</th><th>Requested</th><th>Applies To</th><th>Address</th><th /></tr></thead>
+                <tbody>
+                  {additionalInterests.map((a) => {
+                    const requested = [
+                      a.additionalInsured ? 'AI' : null,
+                      a.lossPayee ? 'LP' : null,
+                      a.waiverOfSubrogation ? 'WOS' : null,
+                      a.primaryNonContributory ? 'PNC' : null,
+                    ].filter((v): v is string => Boolean(v))
+                    const address = [a.addressLine1, a.city, a.state, a.zipCode].filter(Boolean).join(', ')
+                    return (
+                      <tr key={a.id}>
+                        <td className="primary-cell">{a.name}</td>
+                        <td><span className="sd-lob">{LOB_SHORT[a.lineOfBusiness] ?? a.lineOfBusiness}</span></td>
+                        <td>{requested.length > 0 ? requested.map((r) => <span key={r} className="sd-lob" style={{ marginRight: 4 }}>{r}</span>) : '-'}</td>
+                        <td>{ADDITIONAL_INTEREST_APPLIES_TO_LABELS[a.appliesToType]}{a.scheduledItemNumbers ? `: ${a.scheduledItemNumbers}` : ''}</td>
+                        <td>{address || '-'}</td>
+                        <td style={{ padding: '8px 14px' }}>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => { setAdditionalInterestForm({ lineOfBusiness: a.lineOfBusiness, name: a.name, addressLine1: a.addressLine1 ?? undefined, addressLine2: a.addressLine2 ?? undefined, city: a.city ?? undefined, state: a.state ?? undefined, zipCode: a.zipCode ?? undefined, email: a.email ?? undefined, phone: a.phone ?? undefined, appliesToType: a.appliesToType, scheduledItemNumbers: a.scheduledItemNumbers ?? undefined, additionalInsured: a.additionalInsured, lossPayee: a.lossPayee, waiverOfSubrogation: a.waiverOfSubrogation, primaryNonContributory: a.primaryNonContributory, notes: a.notes ?? undefined }); setEditingAdditionalInterestId(a.id); setShowAdditionalInterestForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
+                            <button onClick={() => { if (confirm('Remove additional interest?')) deleteAdditionalInterestMutation.mutate(a.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </section>
       )}
 

@@ -190,6 +190,101 @@ export interface SubmissionPriorCarrierCreate {
   premium?: number
 }
 
+export type AdditionalInterestAppliesToType = 'Blanket' | 'ScheduledItems'
+export type AdditionalInterestCoverageType = 'AdditionalInsured' | 'LossPayee' | 'WaiverOfSubrogation' | 'PrimaryNonContributory'
+export type AdditionalInterestChargeMethod = 'NoCharge' | 'Included' | 'PerInterest' | 'BlanketFlat'
+
+export const ADDITIONAL_INTEREST_APPLIES_TO_LABELS: Record<AdditionalInterestAppliesToType, string> = {
+  Blanket: 'Blanket',
+  ScheduledItems: 'Scheduled items',
+}
+
+export const ADDITIONAL_INTEREST_COVERAGE_LABELS: Record<AdditionalInterestCoverageType, string> = {
+  AdditionalInsured: 'Additional Insured',
+  LossPayee: 'Loss Payee',
+  WaiverOfSubrogation: 'Waiver of Subrogation',
+  PrimaryNonContributory: 'Primary & Non-Contributory',
+}
+
+export const ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS: Record<AdditionalInterestChargeMethod, string> = {
+  NoCharge: 'No charge',
+  Included: 'Included',
+  PerInterest: 'Per interest',
+  BlanketFlat: 'Blanket flat',
+}
+
+export interface SubmissionAdditionalInterest {
+  id: string
+  submissionId: string
+  lineOfBusiness: string
+  name: string
+  addressLine1: string | null
+  addressLine2: string | null
+  city: string | null
+  state: string | null
+  zipCode: string | null
+  email: string | null
+  phone: string | null
+  appliesToType: AdditionalInterestAppliesToType
+  scheduledItemNumbers: string | null
+  additionalInsured: boolean
+  lossPayee: boolean
+  waiverOfSubrogation: boolean
+  primaryNonContributory: boolean
+  notes: string | null
+  createdAt: string
+}
+
+export interface SubmissionAdditionalInterestCreate {
+  lineOfBusiness: string
+  name: string
+  addressLine1?: string
+  addressLine2?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  email?: string
+  phone?: string
+  appliesToType: AdditionalInterestAppliesToType
+  scheduledItemNumbers?: string
+  additionalInsured: boolean
+  lossPayee: boolean
+  waiverOfSubrogation: boolean
+  primaryNonContributory: boolean
+  notes?: string
+}
+
+export interface CarrierAdditionalInterestRate {
+  id: string
+  carrierId: string
+  lineOfBusiness: string
+  coverageType: AdditionalInterestCoverageType
+  chargeMethod: AdditionalInterestChargeMethod
+  perInterestAmount: number | null
+  blanketAmount: number | null
+  minimumCharge: number | null
+  maximumCharge: number | null
+  state: string | null
+  effectiveDate: string | null
+  expirationDate: string | null
+  isActive: boolean
+  createdAt: string
+}
+
+export interface CarrierAdditionalInterestRateCreate {
+  lineOfBusiness: string
+  coverageType: AdditionalInterestCoverageType
+  chargeMethod: AdditionalInterestChargeMethod
+  perInterestAmount?: number
+  blanketAmount?: number
+  minimumCharge?: number
+  maximumCharge?: number
+  state?: string
+  effectiveDate?: string
+  expirationDate?: string
+  isActive: boolean
+}
+
 // GL endorsement/surcharge options
 export const GL_OCC_LIMIT_OPTIONS = [
   { value: 300_000,   label: '$300,000' },
