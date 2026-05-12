@@ -84,6 +84,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IAttachmentService, AttachmentService>();
         services.AddScoped<IDocumentTemplateService, DocumentTemplateService>();
         services.AddScoped<IDocumentGenerationService, DocumentGenerationService>();
+        services.AddScoped<IOutboundCommunicationService, OutboundCommunicationService>();
         services.AddScoped<IInboundEmailService, InboundEmailService>();
         services.AddScoped<IEmailIngestionService, EmailIngestionService>();
         services.AddScoped<IGeminiExtractionService, GeminiExtractionService>();

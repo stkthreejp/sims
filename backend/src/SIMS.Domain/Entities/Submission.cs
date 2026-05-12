@@ -32,6 +32,7 @@ public class Submission : BaseEntity
     public ICollection<SubmissionLossYear> LossYears { get; set; } = new List<SubmissionLossYear>();
     public ICollection<SubmissionGLClassification> GLClassifications { get; set; } = new List<SubmissionGLClassification>();
     public ICollection<SubmissionEquipment> Equipment { get; set; } = new List<SubmissionEquipment>();
+    public ICollection<SubmissionAdditionalInterest> AdditionalInterests { get; set; } = new List<SubmissionAdditionalInterest>();
     public SubmissionSupplemental? Supplemental { get; set; }
     public SubmissionGLCoverages? GLCoverages { get; set; }
     public SubmissionIMCoverages? IMCoverages { get; set; }

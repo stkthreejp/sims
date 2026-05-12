@@ -36,6 +36,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<QuoteUWWriteupCondition> QuoteUWWriteupConditions => Set<QuoteUWWriteupCondition>();
     public DbSet<QuoteChecklistItem> QuoteChecklistItems => Set<QuoteChecklistItem>();
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<OutboundCommunication> OutboundCommunications => Set<OutboundCommunication>();
+    public DbSet<OutboundCommunicationAttachment> OutboundCommunicationAttachments => Set<OutboundCommunicationAttachment>();
     public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
     public DbSet<EmailAttachment> EmailAttachments => Set<EmailAttachment>();
     public DbSet<SubmissionLocation> SubmissionLocations => Set<SubmissionLocation>();
@@ -49,6 +51,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<SubmissionGLClassification> SubmissionGLClassifications => Set<SubmissionGLClassification>();
     public DbSet<SubmissionIMCoverages> SubmissionIMCoverages => Set<SubmissionIMCoverages>();
     public DbSet<SubmissionEquipment> SubmissionEquipment => Set<SubmissionEquipment>();
+    public DbSet<SubmissionAdditionalInterest> SubmissionAdditionalInterests => Set<SubmissionAdditionalInterest>();
+    public DbSet<CarrierAdditionalInterestRate> CarrierAdditionalInterestRates => Set<CarrierAdditionalInterestRate>();
     public DbSet<TaskType> TaskTypes => Set<TaskType>();
     public DbSet<TaskInstance> TaskInstances => Set<TaskInstance>();
     public DbSet<SystemEvent> SystemEvents => Set<SystemEvent>();
@@ -146,6 +150,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Note>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<DocumentTemplate>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<OutboundCommunication>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<OutboundCommunicationAttachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<InboundEmail>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<EmailAttachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionLocation>().HasQueryFilter(e => !e.IsDeleted);
@@ -159,6 +165,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<SubmissionGLClassification>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionIMCoverages>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionEquipment>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionAdditionalInterest>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<CarrierAdditionalInterestRate>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<TaskType>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<TaskInstance>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SystemEvent>().HasQueryFilter(e => !e.IsDeleted);

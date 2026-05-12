@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIMS.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SIMS.Infrastructure.Data;
 namespace SIMS.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260512171530_AddOutboundCommunications")]
+    partial class AddOutboundCommunications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1802,72 +1805,6 @@ namespace SIMS.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("carriers", (string)null);
-                });
-
-            modelBuilder.Entity("SIMS.Domain.Entities.CarrierAdditionalInterestRate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("BlanketAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("CarrierId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ChargeMethod")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("CoverageType")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly?>("EffectiveDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("ExpirationDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("LineOfBusiness")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("MaximumCharge")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal?>("MinimumCharge")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal?>("PerInterestAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("State")
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CarrierId", "LineOfBusiness", "CoverageType", "IsActive", "IsDeleted");
-
-                    b.ToTable("carrier_additional_interest_rates", (string)null);
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.CarrierCommission", b =>
@@ -5487,93 +5424,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.ToTable("submissions", (string)null);
                 });
 
-            modelBuilder.Entity("SIMS.Domain.Entities.SubmissionAdditionalInterest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("AdditionalInsured")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("AddressLine1")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<string>("AddressLine2")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<int>("AppliesToType")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("City")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("LineOfBusiness")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("LossPayee")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("PrimaryNonContributory")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ScheduledItemNumbers")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("State")
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.Property<Guid>("SubmissionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("WaiverOfSubrogation")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ZipCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubmissionId", "LineOfBusiness", "IsDeleted");
-
-                    b.ToTable("submission_additional_interests", (string)null);
-                });
-
             modelBuilder.Entity("SIMS.Domain.Entities.SubmissionDriver", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7080,17 +6930,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("UploadedBy");
                 });
 
-            modelBuilder.Entity("SIMS.Domain.Entities.CarrierAdditionalInterestRate", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Carrier", "Carrier")
-                        .WithMany()
-                        .HasForeignKey("CarrierId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Carrier");
-                });
-
             modelBuilder.Entity("SIMS.Domain.Entities.CarrierCommission", b =>
                 {
                     b.HasOne("SIMS.Domain.Entities.Carrier", "Carrier")
@@ -7710,17 +7549,6 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("Underwriter");
                 });
 
-            modelBuilder.Entity("SIMS.Domain.Entities.SubmissionAdditionalInterest", b =>
-                {
-                    b.HasOne("SIMS.Domain.Entities.Submission", "Submission")
-                        .WithMany("AdditionalInterests")
-                        .HasForeignKey("SubmissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Submission");
-                });
-
             modelBuilder.Entity("SIMS.Domain.Entities.SubmissionDriver", b =>
                 {
                     b.HasOne("SIMS.Domain.Entities.Submission", "Submission")
@@ -8109,8 +7937,6 @@ namespace SIMS.Infrastructure.Migrations
 
             modelBuilder.Entity("SIMS.Domain.Entities.Submission", b =>
                 {
-                    b.Navigation("AdditionalInterests");
-
                     b.Navigation("Drivers");
 
                     b.Navigation("Equipment");
