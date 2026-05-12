@@ -63,6 +63,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<LegalSourceScanRun> LegalSourceScanRuns => Set<LegalSourceScanRun>();
     public DbSet<LegalSourceScanResult> LegalSourceScanResults => Set<LegalSourceScanResult>();
     public DbSet<LegalRequirementChangeLog> LegalRequirementChangeLogs => Set<LegalRequirementChangeLog>();
+    public DbSet<LegiScanTrackedBill> LegiScanTrackedBills => Set<LegiScanTrackedBill>();
 
     // Rating
     public DbSet<EquipmentType> EquipmentTypes => Set<EquipmentType>();
@@ -172,6 +173,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<LegalSourceScanRun>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegalSourceScanResult>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegalRequirementChangeLog>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<LegiScanTrackedBill>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaCarrierSnapshot>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaInspection>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaViolation>().HasQueryFilter(e => !e.IsDeleted);

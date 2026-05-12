@@ -124,11 +124,14 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICarrierRatingAssignmentService, CarrierRatingAssignmentService>();
         services.AddScoped<IShadowRatingService, ShadowRatingService>();
         services.AddScoped<IUWWriteupService, UWWriteupService>();
+        services.AddScoped<ILegiScanService, LegiScanService>();
         services.AddScoped<IFmcsaSafetyService, FmcsaSafetyService>();
         services.AddScoped<IAutoSafetyReportService, AutoSafetyReportService>();
         services.AddScoped<IFmcsaSafetyAnalyticsService, FmcsaSafetyAnalyticsService>();
         services.AddScoped<IFmcsaInspectionEnrichmentService, FmcsaInspectionEnrichmentService>();
         services.AddScoped<FmcsaSocrataClient>();
+        services.Configure<LegiScanSettings>(configuration.GetSection("LegiScan"));
+        services.AddScoped<LegiScanClient>();
         services.AddHttpClient("gemini", c => c.Timeout = TimeSpan.FromSeconds(
             int.TryParse(configuration["HttpClients:GeminiTimeoutSeconds"], out var geminiTimeout) ? geminiTimeout : 60));
         services.AddHttpClient("qbo_oauth", c => c.Timeout = TimeSpan.FromSeconds(
@@ -157,6 +160,12 @@ public static class InfrastructureServiceExtensions
             c.BaseAddress = new Uri("https://maps.googleapis.com");
             c.Timeout = TimeSpan.FromSeconds(
                 int.TryParse(configuration["HttpClients:GoogleGeocodingTimeoutSeconds"], out var googleTimeout) ? googleTimeout : 10);
+        });
+        services.AddHttpClient("legiscan", c =>
+        {
+            c.BaseAddress = new Uri(configuration["LegiScan:BaseUrl"] ?? "https://api.legiscan.com");
+            c.Timeout = TimeSpan.FromSeconds(
+                int.TryParse(configuration["HttpClients:LegiScanTimeoutSeconds"], out var legiscanTimeout) ? legiscanTimeout : 30);
         });
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
