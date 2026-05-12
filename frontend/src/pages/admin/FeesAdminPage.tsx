@@ -3,19 +3,33 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChevronRight, ArrowLeft, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { feesApi } from '@/api/fees.api'
+import { carriersApi } from '@/api/carriers.api'
+import { premiumChargesApi } from '@/api/premiumCharges.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { FeeDefinition, FeeRuleVersion } from '@/types/fee.types'
+import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
+import {
+  ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS,
+  ADDITIONAL_INTEREST_COVERAGE_LABELS,
+} from '@/types/submissionLob.types'
+import type {
+  AdditionalInterestChargeMethod,
+  AdditionalInterestCoverageType,
+  CarrierAdditionalInterestRate,
+  CarrierAdditionalInterestRateCreate,
+} from '@/types/submissionLob.types'
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']
 
 type View = 'list' | 'versions' | 'edit-version' | 'new-version'
+type AdminTab = 'fees' | 'premium-charges'
 
 type VersionForm = Omit<FeeRuleVersion, 'id' | 'feeCode' | 'feeDisplayName'>
 
 const EMPTY: VersionForm = {
   feeDefinitionId: 0,
-  companyId: null, producerId: null, lineOfBusiness: null,
+  carrierId: null, companyId: null, producerId: null, lineOfBusiness: null,
   stateCode: null, city: null, licenseType: null,
   effectiveDate: '', disabledDate: null,
   calcType: 'Flat', flatAmount: null, percentRate: null,
@@ -30,6 +44,23 @@ const EMPTY: VersionForm = {
   payableRouting: 'NotPayable', payablePayeeId: null, notes: null,
   premiumBrackets: [], nonTaxableStates: [],
 }
+
+type PremiumChargeForm = CarrierAdditionalInterestRateCreate
+
+const emptyPremiumChargeForm = (): PremiumChargeForm => ({
+  carrierId: undefined,
+  lineOfBusiness: undefined,
+  coverageType: 'AdditionalInsured',
+  chargeMethod: 'PerInterest',
+  perInterestAmount: undefined,
+  blanketAmount: undefined,
+  minimumCharge: undefined,
+  maximumCharge: undefined,
+  state: undefined,
+  effectiveDate: undefined,
+  expirationDate: undefined,
+  isActive: true,
+})
 
 function SectionHeader({ label }: { label: string }) {
   return <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2 pb-1 border-b border-gray-100">{label}</h3>
@@ -49,6 +80,7 @@ const selectCls = inputCls
 
 export function FeesAdminPage() {
   const qc = useQueryClient()
+  const [activeTab, setActiveTab] = useState<AdminTab>('fees')
   const [view, setView] = useState<View>('list')
   const [selectedDef, setSelectedDef] = useState<FeeDefinition | null>(null)
   const [editingVersion, setEditingVersion] = useState<FeeRuleVersion | null>(null)
@@ -58,10 +90,24 @@ export function FeesAdminPage() {
   const [showTaxability, setShowTaxability] = useState(false)
   const [defForm, setDefForm] = useState({ code: '', displayName: '', feeCategory: 'PolicyFee', isTaxable: true, calculationOrder: 100, ledgerAccountId: 0 })
   const [nonTaxableEdit, setNonTaxableEdit] = useState<string[]>([])
+  const [showPremiumChargeForm, setShowPremiumChargeForm] = useState(false)
+  const [editingPremiumChargeId, setEditingPremiumChargeId] = useState<string | null>(null)
+  const [premiumChargeForm, setPremiumChargeForm] = useState<PremiumChargeForm>(emptyPremiumChargeForm())
 
   const { data: definitions = [], isLoading } = useQuery({
     queryKey: ['admin', 'fees', 'definitions'],
     queryFn: () => feesApi.getDefinitions(),
+  })
+
+  const { data: carriers = [] } = useQuery({
+    queryKey: ['carriers', 'active'],
+    queryFn: () => carriersApi.getAll(true),
+  })
+
+  const { data: premiumCharges = [], isLoading: loadingPremiumCharges } = useQuery({
+    queryKey: ['admin', 'premium-charges', 'additional-interests'],
+    queryFn: () => premiumChargesApi.getAdditionalInterestRates(),
+    enabled: activeTab === 'premium-charges',
   })
 
   const { data: versions = [], isLoading: loadingVersions } = useQuery({
@@ -106,6 +152,29 @@ export function FeesAdminPage() {
     onError: () => toast.error('Save failed'),
   })
 
+  const { mutate: savePremiumCharge, isPending: savingPremiumCharge } = useMutation({
+    mutationFn: () => editingPremiumChargeId
+      ? premiumChargesApi.updateAdditionalInterestRate(editingPremiumChargeId, premiumChargeForm)
+      : premiumChargesApi.createAdditionalInterestRate(premiumChargeForm),
+    onSuccess: () => {
+      toast.success('Premium charge saved')
+      qc.invalidateQueries({ queryKey: ['admin', 'premium-charges', 'additional-interests'] })
+      setShowPremiumChargeForm(false)
+      setEditingPremiumChargeId(null)
+      setPremiumChargeForm(emptyPremiumChargeForm())
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Save failed'),
+  })
+
+  const { mutate: deletePremiumCharge } = useMutation({
+    mutationFn: (id: string) => premiumChargesApi.deleteAdditionalInterestRate(id),
+    onSuccess: () => {
+      toast.success('Premium charge removed')
+      qc.invalidateQueries({ queryKey: ['admin', 'premium-charges', 'additional-interests'] })
+    },
+    onError: () => toast.error('Delete failed'),
+  })
+
   function openNewVersion(cloneFrom?: FeeRuleVersion) {
     setForm(cloneFrom
       ? { ...cloneFrom, effectiveDate: '', disabledDate: null, feeDefinitionId: selectedDef!.id }
@@ -120,6 +189,29 @@ export function FeesAdminPage() {
 
   function set<K extends keyof VersionForm>(key: K, val: VersionForm[K]) {
     setForm(p => ({ ...p, [key]: val }))
+  }
+
+  function setPremium<K extends keyof PremiumChargeForm>(key: K, val: PremiumChargeForm[K]) {
+    setPremiumChargeForm(p => ({ ...p, [key]: val }))
+  }
+
+  function editPremiumCharge(row: CarrierAdditionalInterestRate) {
+    setEditingPremiumChargeId(row.id)
+    setPremiumChargeForm({
+      carrierId: row.carrierId ?? undefined,
+      lineOfBusiness: row.lineOfBusiness ?? undefined,
+      coverageType: row.coverageType,
+      chargeMethod: row.chargeMethod,
+      perInterestAmount: row.perInterestAmount ?? undefined,
+      blanketAmount: row.blanketAmount ?? undefined,
+      minimumCharge: row.minimumCharge ?? undefined,
+      maximumCharge: row.maximumCharge ?? undefined,
+      state: row.state ?? undefined,
+      effectiveDate: row.effectiveDate ?? undefined,
+      expirationDate: row.expirationDate ?? undefined,
+      isActive: row.isActive,
+    })
+    setShowPremiumChargeForm(true)
   }
 
   const isSuperseded = (v: FeeRuleVersion) => v.disabledDate !== null && new Date(v.disabledDate) <= new Date()
@@ -226,6 +318,12 @@ export function FeesAdminPage() {
         {/* Scope */}
         <SectionHeader label="Scope (blank = applies to all)" />
         <div className="grid grid-cols-3 gap-4">
+          <Field label="Carrier">
+            <select value={form.carrierId ?? ''} onChange={e => set('carrierId', e.target.value || null)} className={selectCls}>
+              <option value="">All Carriers</option>
+              {carriers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
           <Field label="State">
             <select value={form.stateCode ?? ''} onChange={e => set('stateCode', e.target.value || null)} className={selectCls}>
               <option value="">All States</option>
@@ -240,7 +338,10 @@ export function FeesAdminPage() {
             </select>
           </Field>
           <Field label="Line of Business">
-            <input type="text" value={form.lineOfBusiness ?? ''} onChange={e => set('lineOfBusiness', e.target.value || null)} className={inputCls} />
+            <select value={form.lineOfBusiness ?? ''} onChange={e => set('lineOfBusiness', e.target.value || null)} className={selectCls}>
+              <option value="">All LOBs</option>
+              {ACTIVE_LOBS.map(lob => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+            </select>
           </Field>
         </div>
 
@@ -348,15 +449,37 @@ export function FeesAdminPage() {
   return (
     <div className="p-6 space-y-5">
       <PageHeader
-        title="Fee Rules"
-        subtitle="Effective-dated fee definitions and rule versions"
+        title="Charges & Fees"
+        subtitle="Premium charges, taxes, and fee rules with carrier and LOB-specific versions"
         action={
-          <button onClick={() => setShowNewDef(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-            <Plus className="h-4 w-4" /> New Fee Type
-          </button>
+          activeTab === 'fees' ? (
+            <button onClick={() => setShowNewDef(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+              <Plus className="h-4 w-4" /> New Fee Type
+            </button>
+          ) : (
+            <button onClick={() => { setEditingPremiumChargeId(null); setPremiumChargeForm(emptyPremiumChargeForm()); setShowPremiumChargeForm(true) }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+              <Plus className="h-4 w-4" /> New Premium Charge
+            </button>
+          )
         }
       />
 
+      <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+        {([
+          ['fees', 'Taxes & Fees'],
+          ['premium-charges', 'Premium Charges'],
+        ] as [AdminTab, string][]).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`px-3 py-1.5 text-sm rounded-md ${activeTab === key ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'fees' && (
       <div className="flex gap-6">
         {/* Definitions sidebar */}
         <div className="w-64 flex-shrink-0 bg-white border border-gray-200 rounded-lg overflow-hidden self-start">
@@ -423,7 +546,12 @@ export function FeesAdminPage() {
                         <tr key={v.id} onClick={() => openEditVersion(v)} className={`cursor-pointer hover:bg-gray-50 ${sup ? 'opacity-40' : ''}`}>
                           <td className={`px-6 py-3 ${sup ? 'line-through' : 'text-gray-900 font-medium'}`}>{v.effectiveDate}</td>
                           <td className="px-6 py-3 text-gray-500">{v.disabledDate ?? <span className="text-green-600">Active</span>}</td>
-                          <td className="px-6 py-3 text-gray-500">{[v.stateCode, v.lineOfBusiness, v.licenseType].filter(Boolean).join(' · ') || 'All'}</td>
+                          <td className="px-6 py-3 text-gray-500">{[
+                            v.carrierId ? carriers.find(c => c.id === v.carrierId)?.name ?? 'Carrier' : null,
+                            v.stateCode,
+                            v.lineOfBusiness ? LOB_LABELS[v.lineOfBusiness as PolicyLineOfBusiness] ?? v.lineOfBusiness : null,
+                            v.licenseType,
+                          ].filter(Boolean).join(' · ') || 'All'}</td>
                           <td className="px-6 py-3 text-gray-700">{v.calcType}</td>
                           <td className="px-6 py-3 text-gray-700">
                             {v.calcType === 'Flat' && v.flatAmount != null && `$${Number(v.flatAmount).toFixed(2)}`}
@@ -448,6 +576,124 @@ export function FeesAdminPage() {
           {(view === 'edit-version' || view === 'new-version') && VersionEditor}
         </div>
       </div>
+      )}
+
+      {activeTab === 'premium-charges' && (
+        <div className="bg-white border border-gray-200 rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-900">Additional Interest Premium Charges</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Blank carrier or LOB means the rule applies to all.</p>
+          </div>
+
+          {showPremiumChargeForm && (
+            <div className="p-4 border-b border-gray-200 bg-gray-50 space-y-3">
+              <div className="grid grid-cols-4 gap-3">
+                <Field label="Carrier">
+                  <select value={premiumChargeForm.carrierId ?? ''} onChange={e => setPremium('carrierId', e.target.value || undefined)} className={selectCls}>
+                    <option value="">All Carriers</option>
+                    {carriers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Line of Business">
+                  <select value={premiumChargeForm.lineOfBusiness ?? ''} onChange={e => setPremium('lineOfBusiness', e.target.value || undefined)} className={selectCls}>
+                    <option value="">All LOBs</option>
+                    {ACTIVE_LOBS.map(lob => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+                  </select>
+                </Field>
+                <Field label="Interest Type">
+                  <select value={premiumChargeForm.coverageType} onChange={e => setPremium('coverageType', e.target.value as AdditionalInterestCoverageType)} className={selectCls}>
+                    {(Object.keys(ADDITIONAL_INTEREST_COVERAGE_LABELS) as AdditionalInterestCoverageType[]).map(k => <option key={k} value={k}>{ADDITIONAL_INTEREST_COVERAGE_LABELS[k]}</option>)}
+                  </select>
+                </Field>
+                <Field label="Charge Method">
+                  <select value={premiumChargeForm.chargeMethod} onChange={e => setPremium('chargeMethod', e.target.value as AdditionalInterestChargeMethod)} className={selectCls}>
+                    {(Object.keys(ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS) as AdditionalInterestChargeMethod[]).map(k => <option key={k} value={k}>{ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS[k]}</option>)}
+                  </select>
+                </Field>
+                <Field label="Per Interest Amount">
+                  <input type="number" step="0.01" value={premiumChargeForm.perInterestAmount ?? ''} onChange={e => setPremium('perInterestAmount', e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                </Field>
+                <Field label="Blanket Amount">
+                  <input type="number" step="0.01" value={premiumChargeForm.blanketAmount ?? ''} onChange={e => setPremium('blanketAmount', e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                </Field>
+                <Field label="Minimum">
+                  <input type="number" step="0.01" value={premiumChargeForm.minimumCharge ?? ''} onChange={e => setPremium('minimumCharge', e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                </Field>
+                <Field label="Maximum">
+                  <input type="number" step="0.01" value={premiumChargeForm.maximumCharge ?? ''} onChange={e => setPremium('maximumCharge', e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                </Field>
+                <Field label="State">
+                  <select value={premiumChargeForm.state ?? ''} onChange={e => setPremium('state', e.target.value || undefined)} className={selectCls}>
+                    <option value="">All States</option>
+                    {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </Field>
+                <Field label="Effective Date">
+                  <input type="date" value={premiumChargeForm.effectiveDate ?? ''} onChange={e => setPremium('effectiveDate', e.target.value || undefined)} className={inputCls} />
+                </Field>
+                <Field label="Expiration Date">
+                  <input type="date" value={premiumChargeForm.expirationDate ?? ''} onChange={e => setPremium('expirationDate', e.target.value || undefined)} className={inputCls} />
+                </Field>
+                <label className="flex items-center gap-2 cursor-pointer pt-6">
+                  <input type="checkbox" checked={premiumChargeForm.isActive} onChange={e => setPremium('isActive', e.target.checked)} className="rounded" />
+                  <span className="text-sm text-gray-700">Active</span>
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => savePremiumCharge()} disabled={savingPremiumCharge} className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                  {savingPremiumCharge ? 'Saving...' : 'Save Premium Charge'}
+                </button>
+                <button onClick={() => { setShowPremiumChargeForm(false); setEditingPremiumChargeId(null); setPremiumChargeForm(emptyPremiumChargeForm()) }} className="px-4 py-1.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-50">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {loadingPremiumCharges ? <div className="p-8 flex justify-center"><LoadingSpinner /></div> : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left">Carrier</th>
+                  <th className="px-6 py-3 text-left">LOB</th>
+                  <th className="px-6 py-3 text-left">Interest</th>
+                  <th className="px-6 py-3 text-left">Method</th>
+                  <th className="px-6 py-3 text-left">Amount</th>
+                  <th className="px-6 py-3 text-left">State</th>
+                  <th className="px-6 py-3 text-left">Status</th>
+                  <th className="px-6 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {premiumCharges.map(row => {
+                  const carrierName = row.carrierId ? carriers.find(c => c.id === row.carrierId)?.name ?? 'Carrier' : 'All Carriers'
+                  const amount = row.chargeMethod === 'PerInterest'
+                    ? row.perInterestAmount != null ? `$${Number(row.perInterestAmount).toFixed(2)} each` : '-'
+                    : row.chargeMethod === 'BlanketFlat'
+                      ? row.blanketAmount != null ? `$${Number(row.blanketAmount).toFixed(2)} blanket` : '-'
+                      : '-'
+                  return (
+                    <tr key={row.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-3 font-medium text-gray-900">{carrierName}</td>
+                      <td className="px-6 py-3 text-gray-600">{row.lineOfBusiness ? LOB_LABELS[row.lineOfBusiness as PolicyLineOfBusiness] ?? row.lineOfBusiness : 'All LOBs'}</td>
+                      <td className="px-6 py-3 text-gray-700">{ADDITIONAL_INTEREST_COVERAGE_LABELS[row.coverageType]}</td>
+                      <td className="px-6 py-3 text-gray-600">{ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS[row.chargeMethod]}</td>
+                      <td className="px-6 py-3 text-gray-700">{amount}</td>
+                      <td className="px-6 py-3 text-gray-500">{row.state ?? 'All'}</td>
+                      <td className="px-6 py-3">{row.isActive ? <span className="text-green-600">Active</span> : <span className="text-gray-400">Inactive</span>}</td>
+                      <td className="px-6 py-3 text-right">
+                        <button onClick={() => editPremiumCharge(row)} className="text-xs text-blue-600 hover:underline mr-3">Edit</button>
+                        <button onClick={() => { if (confirm('Delete this premium charge?')) deletePremiumCharge(row.id) }} className="text-xs text-red-500 hover:underline">Delete</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {premiumCharges.length === 0 && (
+                  <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400">No premium charges yet. Click "New Premium Charge" to add one.</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {/* New Fee Type Modal */}
       {showNewDef && (

@@ -256,8 +256,8 @@ export interface SubmissionAdditionalInterestCreate {
 
 export interface CarrierAdditionalInterestRate {
   id: string
-  carrierId: string
-  lineOfBusiness: string
+  carrierId: string | null
+  lineOfBusiness: string | null
   coverageType: AdditionalInterestCoverageType
   chargeMethod: AdditionalInterestChargeMethod
   perInterestAmount: number | null
@@ -272,7 +272,8 @@ export interface CarrierAdditionalInterestRate {
 }
 
 export interface CarrierAdditionalInterestRateCreate {
-  lineOfBusiness: string
+  carrierId?: string
+  lineOfBusiness?: string
   coverageType: AdditionalInterestCoverageType
   chargeMethod: AdditionalInterestChargeMethod
   perInterestAmount?: number

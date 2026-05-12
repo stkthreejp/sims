@@ -6,6 +6,7 @@ public record PolicyContext(
     string StateCode,
     bool IsEndorsement,
     bool IsFilingState,       // false = non-admitted, filing not required in this state
+    Guid? CarrierId,
     int? CompanyId,
     int? ProducerId,
     string? LineOfBusiness,

@@ -22,6 +22,7 @@ public class FeeCalculationService : IFeeCalculationService
             .Include(v => v.FeeDefinition)
             .Include(v => v.PremiumBrackets)
             .Where(v =>
+                (v.CarrierId == null || v.CarrierId == ctx.CarrierId) &&
                 (v.CompanyId == null || v.CompanyId == ctx.CompanyId) &&
                 (v.ProducerId == null || v.ProducerId == ctx.ProducerId) &&
                 (v.LineOfBusiness == null || v.LineOfBusiness == ctx.LineOfBusiness) &&
@@ -136,6 +137,7 @@ public class FeeCalculationService : IFeeCalculationService
 
     private static int Specificity(FeeRuleVersion v) =>
         (v.CompanyId != null ? 1 : 0) +
+        (v.CarrierId != null ? 1 : 0) +
         (v.ProducerId != null ? 1 : 0) +
         (v.LineOfBusiness != null ? 1 : 0) +
         (v.StateCode != null ? 1 : 0) +

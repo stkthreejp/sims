@@ -343,6 +343,7 @@ public class QuoteService : IQuoteService
             StateCode: quote.Submission?.Insured?.State ?? "",
             IsEndorsement: false,
             IsFilingState: quote.IsFilingState,
+            CarrierId: quote.CarrierId,
             CompanyId: quote.CompanyId,
             ProducerId: quote.ProducerId,
             LineOfBusiness: quote.LineOfBusiness.ToString(),

@@ -6,6 +6,7 @@ public class FeeRuleVersion
     public long FeeDefinitionId { get; set; }
 
     // Scope dimensions (null = wildcard)
+    public Guid? CarrierId { get; set; }
     public int? CompanyId { get; set; }
     public int? ProducerId { get; set; }
     public string? LineOfBusiness { get; set; }
@@ -63,6 +64,7 @@ public class FeeRuleVersion
     public string? Notes { get; set; }
 
     public FeeDefinition FeeDefinition { get; set; } = null!;
+    public Carrier? Carrier { get; set; }
     public Payee? PayablePayee { get; set; }
     public ICollection<FeePremiumBracket> PremiumBrackets { get; set; } = new List<FeePremiumBracket>();
     public ICollection<FeeAuditLog> AuditLogs { get; set; } = new List<FeeAuditLog>();

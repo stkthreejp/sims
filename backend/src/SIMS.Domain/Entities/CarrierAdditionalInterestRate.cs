@@ -4,9 +4,9 @@ namespace SIMS.Domain.Entities;
 
 public class CarrierAdditionalInterestRate : BaseEntity
 {
-    public Guid CarrierId { get; set; }
-    public Carrier Carrier { get; set; } = null!;
-    public PolicyLineOfBusiness LineOfBusiness { get; set; }
+    public Guid? CarrierId { get; set; }
+    public Carrier? Carrier { get; set; }
+    public PolicyLineOfBusiness? LineOfBusiness { get; set; }
     public AdditionalInterestCoverageType CoverageType { get; set; }
     public AdditionalInterestChargeMethod ChargeMethod { get; set; }
     public decimal? PerInterestAmount { get; set; }

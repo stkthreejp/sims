@@ -15,6 +15,7 @@ public record FeeRuleVersionDto(
     long FeeDefinitionId,
     string FeeCode,
     string FeeDisplayName,
+    Guid? CarrierId,
     int? CompanyId,
     int? ProducerId,
     string? LineOfBusiness,
@@ -80,6 +81,7 @@ public record CreateFeeDefinitionRequest(
 
 public record CreateFeeRuleVersionRequest(
     long FeeDefinitionId,
+    Guid? CarrierId,
     int? CompanyId,
     int? ProducerId,
     string? LineOfBusiness,

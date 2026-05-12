@@ -30,6 +30,11 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
         b.Property(x => x.PremiumMinThreshold).HasColumnType("numeric(19,4)");
         b.Property(x => x.PremiumMaxThreshold).HasColumnType("numeric(19,4)");
 
+        b.HasOne(x => x.Carrier)
+            .WithMany()
+            .HasForeignKey(x => x.CarrierId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         b.HasOne(x => x.FeeDefinition)
             .WithMany(x => x.RuleVersions)
             .HasForeignKey(x => x.FeeDefinitionId)
@@ -42,5 +47,7 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
 
         b.HasIndex(x => new { x.FeeDefinitionId, x.StateCode, x.EffectiveDate })
             .HasDatabaseName("ix_fee_rule_lookup");
+        b.HasIndex(x => new { x.FeeDefinitionId, x.CarrierId, x.LineOfBusiness, x.StateCode, x.EffectiveDate })
+            .HasDatabaseName("ix_fee_rule_carrier_lob_lookup");
     }
 }

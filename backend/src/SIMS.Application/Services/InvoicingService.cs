@@ -29,6 +29,7 @@ public class InvoicingService : IInvoicingService
         var ctx = new PolicyContext(
             req.EffectiveDate, req.GrossPremium, req.StateCode,
             req.IsEndorsement, req.IsFilingState,
+            req.CarrierId,
             req.CompanyId, req.ProducerId, req.LineOfBusiness,
             req.City, req.LicenseType, req.LocationCount, req.VehicleCount);
 

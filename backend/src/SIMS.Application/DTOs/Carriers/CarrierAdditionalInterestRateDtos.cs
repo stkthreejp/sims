@@ -5,8 +5,8 @@ namespace SIMS.Application.DTOs.Carriers;
 public class CarrierAdditionalInterestRateDto
 {
     public Guid Id { get; set; }
-    public Guid CarrierId { get; set; }
-    public PolicyLineOfBusiness LineOfBusiness { get; set; }
+    public Guid? CarrierId { get; set; }
+    public PolicyLineOfBusiness? LineOfBusiness { get; set; }
     public AdditionalInterestCoverageType CoverageType { get; set; }
     public AdditionalInterestChargeMethod ChargeMethod { get; set; }
     public decimal? PerInterestAmount { get; set; }
@@ -22,7 +22,8 @@ public class CarrierAdditionalInterestRateDto
 
 public class CarrierAdditionalInterestRateCreateDto
 {
-    public PolicyLineOfBusiness LineOfBusiness { get; set; }
+    public Guid? CarrierId { get; set; }
+    public PolicyLineOfBusiness? LineOfBusiness { get; set; }
     public AdditionalInterestCoverageType CoverageType { get; set; }
     public AdditionalInterestChargeMethod ChargeMethod { get; set; }
     public decimal? PerInterestAmount { get; set; }

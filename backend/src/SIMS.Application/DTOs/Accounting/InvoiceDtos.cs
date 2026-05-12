@@ -6,6 +6,7 @@ public record CreateInvoiceRequest(
     string StateCode,
     bool IsEndorsement,
     bool IsFilingState,
+    Guid? CarrierId,
     int? CompanyId,
     int? ProducerId,
     string? LineOfBusiness,

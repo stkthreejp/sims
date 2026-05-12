@@ -106,7 +106,7 @@ export function Sidebar() {
             {isAdmin && <NavItem to="/admin/jobs" label="Jobs" icon={Settings2} />}
             {isAdmin && <NavItem to="/admin/legal-requirements" label="Legal Tracker" icon={BookOpenCheck} />}
             {perms.canViewDocumentLibrary && <NavItem to="/document-library" label="Doc Library" icon={LayoutTemplate} />}
-            {perms.canViewFeesAdmin && <NavItem to="/admin/fees" label="Fee Rules" icon={Receipt} />}
+            {perms.canViewFeesAdmin && <NavItem to="/admin/fees" label="Charges & Fees" icon={Receipt} />}
             {perms.canViewRatingAdmin && <NavItem to="/admin/rating" label="Rating Plans" icon={Sliders} />}
             {perms.canViewRatingAdmin && <NavItem to="/admin/rating/shadow" label="Shadow Mode" icon={FlaskConical} />}
             {perms.canViewTaskAdmin && <NavItem to="/admin/task-types" label="Task Types" icon={ListChecks} />}

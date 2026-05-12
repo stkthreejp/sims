@@ -171,6 +171,7 @@ public class PolicyService : IPolicyService
                 StateCode: submission.Insured?.State ?? "",
                 IsEndorsement: true,
                 IsFilingState: quote.IsFilingState,
+                CarrierId: txn.Policy.CarrierId,
                 CompanyId: quote.CompanyId,
                 ProducerId: quote.ProducerId,
                 LineOfBusiness: quote.LineOfBusiness.ToString(),

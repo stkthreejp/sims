@@ -25,6 +25,7 @@ export interface FeeRuleVersion {
   feeDefinitionId: number
   feeCode: string
   feeDisplayName: string
+  carrierId: string | null
   companyId: number | null
   producerId: number | null
   lineOfBusiness: string | null

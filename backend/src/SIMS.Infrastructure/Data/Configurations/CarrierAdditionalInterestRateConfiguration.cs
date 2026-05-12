@@ -20,6 +20,6 @@ public class CarrierAdditionalInterestRateConfiguration : IEntityTypeConfigurati
         builder.HasIndex(r => new { r.CarrierId, r.LineOfBusiness, r.CoverageType, r.IsActive, r.IsDeleted });
 
         builder.HasOne(r => r.Carrier).WithMany()
-            .HasForeignKey(r => r.CarrierId).OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(r => r.CarrierId).OnDelete(DeleteBehavior.Restrict);
     }
 }

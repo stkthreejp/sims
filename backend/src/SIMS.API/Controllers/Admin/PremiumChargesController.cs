@@ -1,87 +1,91 @@
-using SIMS.Application.DTOs.Carriers;
-using SIMS.Domain.Entities;
-using SIMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SIMS.Application.DTOs.Carriers;
+using SIMS.Domain.Entities;
+using SIMS.Domain.Enums;
+using SIMS.Infrastructure.Data;
 
-namespace SIMS.API.Controllers;
+namespace SIMS.API.Controllers.Admin;
 
 [ApiController]
-[Route("api/v1/carriers/{carrierId:guid}/additional-interest-rates")]
-[Authorize(Policy = AppPermissions.UnderwritingManage)]
-public class CarrierAdditionalInterestRatesController : ControllerBase
+[Route("api/v1/admin/premium-charges")]
+[Authorize(Policy = AppPermissions.AdminSystemManage)]
+public class PremiumChargesController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
 
-    public CarrierAdditionalInterestRatesController(ApplicationDbContext db) => _db = db;
+    public PremiumChargesController(ApplicationDbContext db) => _db = db;
 
-    [HttpGet]
-    public async Task<IActionResult> GetAll(Guid carrierId)
+    [HttpGet("additional-interest-rates")]
+    public async Task<IActionResult> GetAdditionalInterestRates(CancellationToken ct)
     {
         var rows = await _db.CarrierAdditionalInterestRates
-            .Where(r => r.CarrierId == carrierId)
-            .OrderBy(r => r.LineOfBusiness)
+            .OrderBy(r => r.CarrierId == null ? 0 : 1)
+            .ThenBy(r => r.Carrier!.Name)
+            .ThenBy(r => r.LineOfBusiness)
             .ThenBy(r => r.CoverageType)
-            .ThenByDescending(r => r.IsActive)
             .Select(r => MapToDto(r))
-            .ToListAsync();
+            .ToListAsync(ct);
 
         return Ok(rows);
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Create(Guid carrierId, [FromBody] CarrierAdditionalInterestRateCreateDto dto)
+    [HttpPost("additional-interest-rates")]
+    public async Task<IActionResult> CreateAdditionalInterestRate(
+        [FromBody] CarrierAdditionalInterestRateCreateDto dto,
+        CancellationToken ct)
     {
-        if (!await _db.Carriers.AnyAsync(c => c.Id == carrierId))
-            return NotFound(new { ErrorMessage = "Carrier not found." });
-
-        var validation = Validate(dto);
+        var validation = await Validate(dto, ct);
         if (validation is not null) return BadRequest(new { ErrorMessage = validation });
 
-        var row = new CarrierAdditionalInterestRate { CarrierId = carrierId };
-        Apply(row, dto, carrierId);
+        var row = new CarrierAdditionalInterestRate();
+        Apply(row, dto);
 
         _db.CarrierAdditionalInterestRates.Add(row);
-        await _db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetAll), new { carrierId }, MapToDto(row));
-    }
-
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid carrierId, Guid id, [FromBody] CarrierAdditionalInterestRateUpdateDto dto)
-    {
-        var row = await _db.CarrierAdditionalInterestRates
-            .FirstOrDefaultAsync(r => r.Id == id && r.CarrierId == carrierId);
-        if (row == null) return NotFound();
-
-        var validation = Validate(dto);
-        if (validation is not null) return BadRequest(new { ErrorMessage = validation });
-
-        Apply(row, dto, carrierId);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
         return Ok(MapToDto(row));
     }
 
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid carrierId, Guid id)
+    [HttpPut("additional-interest-rates/{id:guid}")]
+    public async Task<IActionResult> UpdateAdditionalInterestRate(
+        Guid id,
+        [FromBody] CarrierAdditionalInterestRateUpdateDto dto,
+        CancellationToken ct)
     {
-        var row = await _db.CarrierAdditionalInterestRates
-            .FirstOrDefaultAsync(r => r.Id == id && r.CarrierId == carrierId);
-        if (row == null) return NotFound();
+        var row = await _db.CarrierAdditionalInterestRates.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (row is null) return NotFound();
+
+        var validation = await Validate(dto, ct);
+        if (validation is not null) return BadRequest(new { ErrorMessage = validation });
+
+        Apply(row, dto);
+        await _db.SaveChangesAsync(ct);
+        return Ok(MapToDto(row));
+    }
+
+    [HttpDelete("additional-interest-rates/{id:guid}")]
+    public async Task<IActionResult> DeleteAdditionalInterestRate(Guid id, CancellationToken ct)
+    {
+        var row = await _db.CarrierAdditionalInterestRates.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (row is null) return NotFound();
 
         row.IsDeleted = true;
         row.DeletedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
         return NoContent();
     }
 
-    private static string? Validate(CarrierAdditionalInterestRateCreateDto dto)
+    private async Task<string?> Validate(CarrierAdditionalInterestRateCreateDto dto, CancellationToken ct)
     {
-        if (dto.ChargeMethod == Domain.Enums.AdditionalInterestChargeMethod.PerInterest &&
+        if (dto.CarrierId.HasValue && !await _db.Carriers.AnyAsync(c => c.Id == dto.CarrierId.Value, ct))
+            return "Carrier not found.";
+
+        if (dto.ChargeMethod == AdditionalInterestChargeMethod.PerInterest &&
             (!dto.PerInterestAmount.HasValue || dto.PerInterestAmount < 0))
             return "Per-interest amount is required for per-interest charges.";
 
-        if (dto.ChargeMethod == Domain.Enums.AdditionalInterestChargeMethod.BlanketFlat &&
+        if (dto.ChargeMethod == AdditionalInterestChargeMethod.BlanketFlat &&
             (!dto.BlanketAmount.HasValue || dto.BlanketAmount < 0))
             return "Blanket amount is required for blanket charges.";
 
@@ -94,9 +98,9 @@ public class CarrierAdditionalInterestRatesController : ControllerBase
         return null;
     }
 
-    private static void Apply(CarrierAdditionalInterestRate row, CarrierAdditionalInterestRateCreateDto dto, Guid carrierId)
+    private static void Apply(CarrierAdditionalInterestRate row, CarrierAdditionalInterestRateCreateDto dto)
     {
-        row.CarrierId = carrierId;
+        row.CarrierId = dto.CarrierId;
         row.LineOfBusiness = dto.LineOfBusiness;
         row.CoverageType = dto.CoverageType;
         row.ChargeMethod = dto.ChargeMethod;
