@@ -46,6 +46,18 @@ const LOB_SHORT: Record<string, string> = {
 
 const getLobLabel = (lob: string) => LOB_LABELS[lob as PolicyLineOfBusiness] ?? lob
 
+function getSaveErrorMessage(err: any, fallback: string) {
+  const data = err?.response?.data
+  const errors = data?.errors
+  if (errors && typeof errors === 'object') {
+    const first = Object.entries(errors).flatMap(([field, messages]) =>
+      Array.isArray(messages) ? messages.map((m) => `${field}: ${m}`) : [`${field}: ${messages}`]
+    )[0]
+    if (first) return first
+  }
+  return data?.errorMessage ?? data?.detail ?? data?.title ?? fallback
+}
+
 const STATUS_PILL: Record<SubmissionStatus, string> = {
   New: 'new',
   InProgress: 'inprogress',
@@ -335,6 +347,36 @@ export function SubmissionDetailPage() {
     return match?.code
   }, [insured?.state, imTerritories])
 
+  const prepareEquipmentPayload = (form: SubmissionEquipmentCreate): SubmissionEquipmentCreate => ({
+    itemNumber: form.itemNumber || 1,
+    year: form.year,
+    make: form.make?.trim() || undefined,
+    model: form.model?.trim() || undefined,
+    description: form.description?.trim() || undefined,
+    serialNumber: form.serialNumber?.trim() || undefined,
+    value: form.value,
+    equipmentTypeId: form.equipmentTypeId || undefined,
+    territoryCode: form.territoryCode || (!editingEquipmentId ? defaultTerritoryCode : undefined),
+    deductible: form.deductible,
+    settlementBasis: form.settlementBasis || undefined,
+  })
+
+  const openNewEquipmentForm = () => {
+    const lastItemNumber = equipment.reduce((max, item) => Math.max(max, item.itemNumber), 0)
+    setEquipmentForm({ itemNumber: lastItemNumber + 1, territoryCode: defaultTerritoryCode })
+    setEditingEquipmentId(null)
+    setShowEquipmentForm(true)
+  }
+
+  const saveEquipment = () => {
+    saveEquipmentMutation.mutate(prepareEquipmentPayload(equipmentForm))
+  }
+
+  useEffect(() => {
+    if (!showEquipmentForm || editingEquipmentId || equipmentForm.territoryCode || !defaultTerritoryCode) return
+    setEquipmentForm((form) => ({ ...form, territoryCode: defaultTerritoryCode }))
+  }, [defaultTerritoryCode, editingEquipmentId, equipmentForm.territoryCode, showEquipmentForm])
+
   useEffect(() => {
     if (supplemental) {
       setSupplementalForm({
@@ -539,7 +581,7 @@ export function SubmissionDetailPage() {
       setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null)
       toast.success('Equipment saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to save equipment'),
+    onError: (e: any) => toast.error(getSaveErrorMessage(e, 'Failed to save equipment')),
   })
   const deleteEquipmentMutation = useMutation({
     mutationFn: (eId: string) => submissionIMApi.deleteEquipment(id!, eId),
@@ -1506,14 +1548,14 @@ export function SubmissionDetailPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={() => saveEquipmentMutation.mutate(equipmentForm)} disabled={saveEquipmentMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
+                    <button onClick={saveEquipment} disabled={saveEquipmentMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
                     <button onClick={() => { setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
                   </div>
                 </div>
               )}
               <div className="exp-h">
                 <div className="exp-h-l">Equipment schedule <span className="c">{equipment.length}</span></div>
-                <button className="sd-btn ghost sm" onClick={() => { setShowEquipmentForm(true); setEquipmentForm({ itemNumber: (equipment.at(-1)?.itemNumber ?? 0) + 1, territoryCode: defaultTerritoryCode ?? null }); setEditingEquipmentId(null) }}><Plus size={12} /> Add</button>
+                <button className="sd-btn ghost sm" onClick={openNewEquipmentForm}><Plus size={12} /> Add</button>
               </div>
               {equipment.length === 0 && !showEquipmentForm ? (
                 <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No equipment scheduled yet</div>
