@@ -17,8 +17,8 @@ import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { documentGenerationApi } from '@/api/documentGeneration.api'
 import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
-import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS } from '@/types/submissionLob.types'
-import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
+import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS, GL_CLASS_CODE_OPTIONS } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
@@ -194,6 +194,10 @@ export function SubmissionDetailPage() {
   const emptyGlCovForm = (): SubmissionGLCoveragesUpsert => ({ aiIndividualCount: 0, aiBlanket: false, wosIndividualCount: 0, wosBlanket: false, primaryNonContributory: false, includeTria: false })
   const [glCovForm, setGlCovForm] = useState<SubmissionGLCoveragesUpsert>(emptyGlCovForm())
   const [glCovDirty, setGlCovDirty] = useState(false)
+  const emptyGlClassForm = (): SubmissionGLClassificationCreate => ({ locationNumber: 1 })
+  const [showGlClassForm, setShowGlClassForm] = useState(false)
+  const [glClassForm, setGlClassForm] = useState<SubmissionGLClassificationCreate>(emptyGlClassForm())
+  const [editingGlClassId, setEditingGlClassId] = useState<string | null>(null)
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -253,6 +257,12 @@ export function SubmissionDetailPage() {
     queryKey: ['submission-gl-coverages', id],
     queryFn: () => submissionGLApi.getCoverages(id!),
     enabled: !!id,
+  })
+
+  const { data: glClassifications = [] } = useQuery({
+    queryKey: ['submission-gl-classifications', id],
+    queryFn: () => submissionGLApi.getClassifications(id!),
+    enabled: !!id && activeTab === 'exposures',
   })
 
   const { data: imCoverages } = useQuery({
@@ -377,6 +387,7 @@ export function SubmissionDetailPage() {
         qc.invalidateQueries({ queryKey: ['submission-additional-interests', id] })
         qc.invalidateQueries({ queryKey: ['submission-supplemental', id] })
         qc.invalidateQueries({ queryKey: ['submission-gl-coverages', id] })
+        qc.invalidateQueries({ queryKey: ['submission-gl-classifications', id] })
         qc.invalidateQueries({ queryKey: ['submission-im-coverages', id] })
       } else {
         toast.error('Extraction failed again — please fill in the fields manually below')
@@ -527,6 +538,23 @@ export function SubmissionDetailPage() {
     onError: () => toast.error('Failed to save GL coverages'),
   })
 
+  const saveGlClassMutation = useMutation({
+    mutationFn: (dto: SubmissionGLClassificationCreate) =>
+      editingGlClassId
+        ? submissionGLApi.updateClassification(id!, editingGlClassId, dto)
+        : submissionGLApi.createClassification(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-gl-classifications', id] })
+      setShowGlClassForm(false); setGlClassForm(emptyGlClassForm()); setEditingGlClassId(null)
+      toast.success('GL exposure saved')
+    },
+    onError: () => toast.error('Failed to save GL exposure'),
+  })
+  const deleteGlClassMutation = useMutation({
+    mutationFn: (classId: string) => submissionGLApi.deleteClassification(id!, classId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-gl-classifications', id] }); toast.success('GL exposure removed') },
+  })
+
   const previewInlandMarineProposalMutation = useMutation({
     mutationFn: (quoteId: string) => documentGenerationApi.getInlandMarineProposalHtml(quoteId),
     onSuccess: (html) => {
@@ -629,7 +657,7 @@ export function SubmissionDetailPage() {
   const defaultExposureLob: ExposureLob = hasAuto ? 'auto' : hasGL ? 'gl' : hasIM ? 'im' : 'auto'
   const expLobList = [
     ...(hasAuto ? [{ k: 'auto' as const, label: 'Commercial Auto', count: drivers.length + vehicles.length }] : []),
-    ...(hasGL ? [{ k: 'gl' as const, label: 'General Liability', count: null as null }] : []),
+    ...(hasGL ? [{ k: 'gl' as const, label: 'General Liability', count: glClassifications.length }] : []),
     ...(hasIM ? [{ k: 'im' as const, label: 'Inland Marine', count: equipment.length }] : []),
   ]
   const activeLob: ExposureLob =
@@ -1116,7 +1144,7 @@ export function SubmissionDetailPage() {
       <div className="sd-tabs" style={{ marginBottom: 14 }}>
         {([
           { key: 'quotes', label: 'Quotes', count: quotes.length },
-          { key: 'exposures', label: 'Exposures', count: drivers.length + vehicles.length + equipment.length > 0 ? drivers.length + vehicles.length + equipment.length : undefined },
+          { key: 'exposures', label: 'Exposures', count: drivers.length + vehicles.length + equipment.length + glClassifications.length > 0 ? drivers.length + vehicles.length + equipment.length + glClassifications.length : undefined },
           { key: 'additional-interests', label: 'Additional interests', count: additionalInterests.length > 0 ? additionalInterests.length : undefined },
           { key: 'prior-carriers', label: 'Prior carriers', count: priorCarriers.length > 0 ? priorCarriers.length : undefined },
           { key: 'documents', label: 'Documents' },
@@ -1436,6 +1464,96 @@ export function SubmissionDetailPage() {
                   <div style={{ marginTop: 12 }}>
                     <button onClick={() => saveGlCovMutation.mutate(glCovForm)} disabled={saveGlCovMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save GL Coverages</button>
                   </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
+                <div className="exp-h" style={{ marginLeft: -16, marginRight: -16, borderTop: 0 }}>
+                  <div className="exp-h-l">GL classification schedule <span className="c">{glClassifications.length}</span></div>
+                  <button
+                    className="sd-btn ghost sm"
+                    onClick={() => {
+                      setShowGlClassForm(true)
+                      setGlClassForm({ locationNumber: (glClassifications.at(-1)?.locationNumber ?? 0) + 1 })
+                      setEditingGlClassId(null)
+                    }}
+                  >
+                    <Plus size={12} /> Add
+                  </button>
+                </div>
+
+                {showGlClassForm && (
+                  <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line-2)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingGlClassId ? 'Edit GL Exposure' : 'Add GL Exposure'}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                      <div><label style={labelStyle}>Location #</label><input type="number" value={glClassForm.locationNumber} onChange={(e) => setGlClassForm((f) => ({ ...f, locationNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
+                      <div>
+                        <label style={labelStyle}>Class Code *</label>
+                        <select
+                          value={glClassForm.classCode ?? ''}
+                          onChange={(e) => {
+                            const option = GL_CLASS_CODE_OPTIONS.find((o) => o.value === e.target.value)
+                            setGlClassForm((f) => ({
+                              ...f,
+                              classCode: e.target.value || undefined,
+                              description: option?.label.split(' - ')[1] ?? f.description,
+                            }))
+                          }}
+                          style={inputStyle}
+                        >
+                          <option value="">- Select -</option>
+                          {GL_CLASS_CODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelStyle}>Premium Basis</label><input value={glClassForm.premiumBasis ?? ''} onChange={(e) => setGlClassForm((f) => ({ ...f, premiumBasis: e.target.value || undefined }))} placeholder="Payroll, sales, cost, area" style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Exposure *</label><input type="number" value={glClassForm.exposure ?? ''} onChange={(e) => setGlClassForm((f) => ({ ...f, exposure: parseFloat(e.target.value) || undefined }))} placeholder="0" style={inputStyle} /></div>
+                      <div style={{ gridColumn: 'span 4' }}><label style={labelStyle}>Description</label><input value={glClassForm.description ?? ''} onChange={(e) => setGlClassForm((f) => ({ ...f, description: e.target.value || undefined }))} style={inputStyle} /></div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button onClick={() => saveGlClassMutation.mutate(glClassForm)} disabled={!glClassForm.classCode || !glClassForm.exposure || saveGlClassMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save GL Exposure</button>
+                      <button onClick={() => { setShowGlClassForm(false); setGlClassForm(emptyGlClassForm()); setEditingGlClassId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {glClassifications.length === 0 && !showGlClassForm ? (
+                  <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No GL classifications entered yet</div>
+                ) : (
+                  <table className="sd-table">
+                    <thead><tr><th>Loc.</th><th>Class Code</th><th>Description</th><th>Premium Basis</th><th className="num">Exposure</th><th /></tr></thead>
+                    <tbody>
+                      {glClassifications.map((classification) => (
+                        <tr key={classification.id}>
+                          <td className="id">{classification.locationNumber}</td>
+                          <td><span className="sd-lob">{classification.classCode ?? '-'}</span></td>
+                          <td className="primary-cell">{classification.description ?? '-'}</td>
+                          <td>{classification.premiumBasis ?? '-'}</td>
+                          <td className="num">{classification.exposure != null ? classification.exposure.toLocaleString() : '-'}</td>
+                          <td style={{ padding: '8px 14px' }}>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                onClick={() => {
+                                  setGlClassForm({
+                                    locationNumber: classification.locationNumber,
+                                    classCode: classification.classCode ?? undefined,
+                                    description: classification.description ?? undefined,
+                                    premiumBasis: classification.premiumBasis ?? undefined,
+                                    exposure: classification.exposure ?? undefined,
+                                  })
+                                  setEditingGlClassId(classification.id)
+                                  setShowGlClassForm(true)
+                                }}
+                                className="sd-btn ghost sm"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => { if (confirm('Remove GL exposure?')) deleteGlClassMutation.mutate(classification.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>

@@ -57,7 +57,7 @@ public class SubmissionGLController : ControllerBase
     public async Task<IActionResult> GetClassifications(Guid submissionId)
     {
         var list = await _db.SubmissionGLClassifications
-            .Where(c => c.SubmissionId == submissionId)
+            .Where(c => c.SubmissionId == submissionId && !c.IsDeleted)
             .OrderBy(c => c.LocationNumber)
             .Select(c => MapClassificationToDto(c))
             .ToListAsync();
