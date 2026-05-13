@@ -129,6 +129,13 @@ function daysUntil(dateStr: string | null | undefined): number | null {
 // ── Page Component ─────────────────────────────────────────────────────────────
 
 type Tab = 'quotes' | 'exposures' | 'additional-interests' | 'prior-carriers' | 'documents' | 'activity'
+type ExposureLob = 'auto' | 'gl' | 'im'
+
+function hasAutoExposureLine(linesOfBusiness: string[]) {
+  return linesOfBusiness.some((lob) =>
+    lob === 'CommercialAuto' || lob === 'AutoLiability' || lob === 'AutoPhysicalDamage'
+  )
+}
 
 export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -144,7 +151,7 @@ export function SubmissionDetailPage() {
   const [reExtractLob, setReExtractLob] = useState('')
 
   const [activeTab, setActiveTab] = useState<Tab>('quotes')
-  const [expLob, setExpLob] = useState<'auto' | 'gl' | 'im'>('auto')
+  const [expLob, setExpLob] = useState<ExposureLob>('auto')
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
@@ -336,6 +343,19 @@ export function SubmissionDetailPage() {
       })
     }
   }, [glCoverages])
+
+  useEffect(() => {
+    if (!submission) return
+
+    const hasAuto = hasAutoExposureLine(submission.linesOfBusiness)
+    const hasGL = submission.linesOfBusiness.includes('GeneralLiability')
+    const hasIM = submission.linesOfBusiness.includes('InlandMarine')
+    const preferredLob: ExposureLob = hasAuto ? 'auto' : hasGL ? 'gl' : hasIM ? 'im' : 'auto'
+
+    if ((expLob === 'auto' && !hasAuto) || (expLob === 'gl' && !hasGL) || (expLob === 'im' && !hasIM)) {
+      setExpLob(preferredLob)
+    }
+  }, [submission, expLob])
 
   const selectedCarrier = carriers.find((c) => c.id === quoteForm.carrierId)
   const availableLobs = selectedCarrier
@@ -603,16 +623,19 @@ export function SubmissionDetailPage() {
 
   // ── Derived exposure LOB state ─────────────────────────────────────────────
 
+  const hasAuto = hasAutoExposureLine(submission.linesOfBusiness)
   const hasGL = submission.linesOfBusiness.includes('GeneralLiability')
   const hasIM = submission.linesOfBusiness.includes('InlandMarine')
+  const defaultExposureLob: ExposureLob = hasAuto ? 'auto' : hasGL ? 'gl' : hasIM ? 'im' : 'auto'
   const expLobList = [
-    { k: 'auto' as const, label: 'Commercial Auto', count: drivers.length + vehicles.length },
+    ...(hasAuto ? [{ k: 'auto' as const, label: 'Commercial Auto', count: drivers.length + vehicles.length }] : []),
     ...(hasGL ? [{ k: 'gl' as const, label: 'General Liability', count: null as null }] : []),
     ...(hasIM ? [{ k: 'im' as const, label: 'Inland Marine', count: equipment.length }] : []),
   ]
-  const activeLob: 'auto' | 'gl' | 'im' =
-    (expLob === 'gl' && !hasGL) ? 'auto' :
-    (expLob === 'im' && !hasIM) ? 'auto' :
+  const activeLob: ExposureLob =
+    (expLob === 'auto' && !hasAuto) ? defaultExposureLob :
+    (expLob === 'gl' && !hasGL) ? defaultExposureLob :
+    (expLob === 'im' && !hasIM) ? defaultExposureLob :
     expLob
 
   const additionalInterestLobs = submission.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS
