@@ -82,9 +82,9 @@ export function InsuredCreatePage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
             <input
-              {...register('email', { validate: rhfValidators.email })}
+              {...register('email', { required: 'Required', validate: rhfValidators.email })}
               type="text"
               placeholder="name@example.com"
               className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-400' : 'border-slate-300'}`}
@@ -92,9 +92,9 @@ export function InsuredCreatePage() {
             {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Phone *</label>
             <input
-              {...register('phone', { validate: rhfValidators.phone })}
+              {...register('phone', { required: 'Required', validate: rhfValidators.phone })}
               type="text"
               placeholder="(555) 123-4567"
               onChange={(e) => setValue('phone', formatPhoneInput(e.target.value), { shouldValidate: true })}

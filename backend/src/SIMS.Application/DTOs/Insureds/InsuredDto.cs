@@ -70,10 +70,10 @@ public class InsuredCreateDto
     [MaxLength(20)]
     public string? TaxId { get; set; }
 
-    [EmailAddress, MaxLength(256)]
+    [Required, EmailAddress, MaxLength(256)]
     public string? Email { get; set; }
 
-    [Phone, MaxLength(30)]
+    [Required, Phone, MaxLength(30)]
     public string? Phone { get; set; }
 
     [Phone, MaxLength(30)]
