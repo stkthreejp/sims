@@ -76,9 +76,12 @@ public class SubmissionIMController : ControllerBase
             Deductible = dto.Deductible,
             SettlementBasis = dto.SettlementBasis,
         };
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
         _db.SubmissionEquipment.Add(e);
         await _db.SaveChangesAsync();
         await SyncIMCoveragesAsync(submissionId);
+        await tx.CommitAsync();
         return CreatedAtAction(nameof(GetEquipment), new { submissionId }, MapEquipmentToDto(e));
     }
 
@@ -91,6 +94,7 @@ public class SubmissionIMController : ControllerBase
         var validation = await ValidateRatingFieldsAsync(dto);
         if (validation is not null) return BadRequest(new { ErrorMessage = validation });
 
+        await using var tx = await _db.Database.BeginTransactionAsync();
         e.ItemNumber = dto.ItemNumber; e.Year = dto.Year; e.Make = dto.Make;
         e.Model = dto.Model; e.Description = dto.Description;
         e.SerialNumber = dto.SerialNumber; e.Value = dto.Value;
@@ -100,6 +104,7 @@ public class SubmissionIMController : ControllerBase
         e.SettlementBasis = dto.SettlementBasis;
         await _db.SaveChangesAsync();
         await SyncIMCoveragesAsync(submissionId);
+        await tx.CommitAsync();
         return Ok(MapEquipmentToDto(e));
     }
 
@@ -151,9 +156,12 @@ public class SubmissionIMController : ControllerBase
     {
         var e = await _db.SubmissionEquipment.FirstOrDefaultAsync(x => x.Id == id && x.SubmissionId == submissionId);
         if (e == null) return NotFound();
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
         e.IsDeleted = true; e.DeletedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         await SyncIMCoveragesAsync(submissionId);
+        await tx.CommitAsync();
         return NoContent();
     }
 

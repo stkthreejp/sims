@@ -14,7 +14,7 @@ public class SubmissionIMCoveragesConfiguration : IEntityTypeConfiguration<Submi
         builder.Property(i => i.UnscheduledEquipmentLimit).HasPrecision(18, 2);
         builder.Property(i => i.MaximumValueAnyOneItem).HasPrecision(18, 2);
         builder.Property(i => i.Deductible).HasPrecision(18, 2);
-        builder.Property(i => i.CoinsurancePercentage).HasPrecision(5, 4);
+        builder.Property(i => i.CoinsurancePercentage).HasPrecision(7, 4);
 
         builder.HasOne(i => i.Submission).WithOne(s => s.IMCoverages)
             .HasForeignKey<SubmissionIMCoverages>(i => i.SubmissionId).OnDelete(DeleteBehavior.Cascade);

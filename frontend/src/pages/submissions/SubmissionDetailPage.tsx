@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -17,7 +17,7 @@ import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS, GL_CLASS_CODE_OPTIONS } from '@/types/submissionLob.types'
-import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipment, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
@@ -202,6 +202,7 @@ export function SubmissionDetailPage() {
   const [showEquipmentForm, setShowEquipmentForm] = useState(false)
   const [equipmentForm, setEquipmentForm] = useState<SubmissionEquipmentCreate>(emptyEquipmentForm())
   const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null)
+  const savingEquipmentRef = useRef(false)
   const emptySupplementalForm = (): SubmissionSupplementalUpsert => ({ commoditiesHauled: [], terminalLocations: [], safetyProgramInPlace: false, filingsRequired: [], ownerOperator: false })
   const [supplementalForm, setSupplementalForm] = useState<SubmissionSupplementalUpsert>(emptySupplementalForm())
   const [supplementalDirty, setSupplementalDirty] = useState(false)
@@ -369,7 +370,11 @@ export function SubmissionDetailPage() {
   }
 
   const saveEquipment = () => {
-    saveEquipmentMutation.mutate(prepareEquipmentPayload(equipmentForm))
+    if (savingEquipmentRef.current || saveEquipmentMutation.isPending) return
+    savingEquipmentRef.current = true
+    saveEquipmentMutation.mutate(prepareEquipmentPayload(equipmentForm), {
+      onSettled: () => { savingEquipmentRef.current = false },
+    })
   }
 
   useEffect(() => {
@@ -576,8 +581,16 @@ export function SubmissionDetailPage() {
       editingEquipmentId
         ? submissionIMApi.updateEquipment(id!, editingEquipmentId, dto)
         : submissionIMApi.createEquipment(id!, dto),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      qc.setQueryData<SubmissionEquipment[]>(['submission-equipment', id], (current = []) => {
+        const existingIndex = current.findIndex((item) => item.id === saved.id)
+        if (existingIndex >= 0) {
+          return current.map((item) => item.id === saved.id ? saved : item)
+        }
+        return [...current, saved].sort((a, b) => a.itemNumber - b.itemNumber)
+      })
       qc.invalidateQueries({ queryKey: ['submission-equipment', id] })
+      qc.invalidateQueries({ queryKey: ['submission-im-coverages', id] })
       setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null)
       toast.success('Equipment saved')
     },
@@ -585,7 +598,12 @@ export function SubmissionDetailPage() {
   })
   const deleteEquipmentMutation = useMutation({
     mutationFn: (eId: string) => submissionIMApi.deleteEquipment(id!, eId),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-equipment', id] }); toast.success('Equipment removed') },
+    onSuccess: (_, eId) => {
+      qc.setQueryData<SubmissionEquipment[]>(['submission-equipment', id], (current = []) => current.filter((item) => item.id !== eId))
+      qc.invalidateQueries({ queryKey: ['submission-equipment', id] })
+      qc.invalidateQueries({ queryKey: ['submission-im-coverages', id] })
+      toast.success('Equipment removed')
+    },
   })
 
   const saveSupplementalMutation = useMutation({
@@ -1548,14 +1566,14 @@ export function SubmissionDetailPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={saveEquipment} disabled={saveEquipmentMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
-                    <button onClick={() => { setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
+                    <button type="button" onClick={saveEquipment} disabled={saveEquipmentMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
+                    <button type="button" onClick={() => { setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
                   </div>
                 </div>
               )}
               <div className="exp-h">
                 <div className="exp-h-l">Equipment schedule <span className="c">{equipment.length}</span></div>
-                <button className="sd-btn ghost sm" onClick={openNewEquipmentForm}><Plus size={12} /> Add</button>
+                <button type="button" className="sd-btn ghost sm" onClick={openNewEquipmentForm}><Plus size={12} /> Add</button>
               </div>
               {equipment.length === 0 && !showEquipmentForm ? (
                 <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No equipment scheduled yet</div>
@@ -1577,8 +1595,8 @@ export function SubmissionDetailPage() {
                           <td>{eq.territoryCode ?? '—'}</td>
                           <td style={{ padding: '8px 14px' }}>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button onClick={() => { setEquipmentForm({ itemNumber: eq.itemNumber, year: eq.year ?? undefined, make: eq.make ?? undefined, model: eq.model ?? undefined, description: eq.description ?? undefined, serialNumber: eq.serialNumber ?? undefined, value: eq.value ?? undefined, equipmentTypeId: eq.equipmentTypeId, territoryCode: eq.territoryCode, deductible: eq.deductible, settlementBasis: eq.settlementBasis }); setEditingEquipmentId(eq.id); setShowEquipmentForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                              <button onClick={() => { if (confirm('Remove equipment item?')) deleteEquipmentMutation.mutate(eq.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                              <button type="button" onClick={() => { setEquipmentForm({ itemNumber: eq.itemNumber, year: eq.year ?? undefined, make: eq.make ?? undefined, model: eq.model ?? undefined, description: eq.description ?? undefined, serialNumber: eq.serialNumber ?? undefined, value: eq.value ?? undefined, equipmentTypeId: eq.equipmentTypeId, territoryCode: eq.territoryCode, deductible: eq.deductible, settlementBasis: eq.settlementBasis }); setEditingEquipmentId(eq.id); setShowEquipmentForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
+                              <button type="button" onClick={() => { if (confirm('Remove equipment item?')) deleteEquipmentMutation.mutate(eq.id) }} disabled={deleteEquipmentMutation.isPending} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
                             </div>
                           </td>
                         </tr>
