@@ -20,15 +20,37 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return this.props.fallback ?? (
-        <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
-          <p className="text-lg font-semibold text-slate-800">Something went wrong</p>
-          <p className="text-sm text-slate-500 max-w-md">{this.state.error?.message}</p>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-            onClick={() => this.setState({ hasError: false, error: null })}
+        <div className="flex h-full items-center justify-center p-8">
+          <div
+            style={{
+              width: 'min(100%, 460px)',
+              padding: '16px 18px',
+              border: '1px solid #f3c6be',
+              borderLeft: '4px solid #b33a2a',
+              borderRadius: 'var(--r-lg)',
+              background: 'var(--surface)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
           >
-            Try again
-          </button>
+            <p style={{ margin: 0, fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--bad-fg)' }}>
+              Something went wrong
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: 'var(--fs-body)', color: 'var(--ink-3)' }}>
+              This page could not finish loading. Try again to reload this section.
+            </p>
+            {import.meta.env.DEV && this.state.error?.message && (
+              <p style={{ margin: '8px 0 0', fontSize: 'var(--fs-sm)', color: 'var(--ink-4)' }}>
+                {this.state.error.message}
+              </p>
+            )}
+            <button
+              className="sd-btn outline sm"
+              style={{ marginTop: 14 }}
+              onClick={() => this.setState({ hasError: false, error: null })}
+            >
+              Try again
+            </button>
+          </div>
         </div>
       )
     }

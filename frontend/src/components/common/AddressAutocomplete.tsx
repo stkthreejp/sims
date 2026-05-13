@@ -146,10 +146,21 @@ export function AddressAutocomplete({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete="off"
-        className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${hasError ? 'border-red-400' : 'border-slate-300'}`}
+        className="sims-address-input w-full"
+        style={{
+          height: 34,
+          padding: '0 10px',
+          border: `1px solid ${hasError ? 'var(--bad-fg)' : 'var(--line)'}`,
+          borderRadius: 'var(--r-md)',
+          outline: 0,
+          background: 'var(--surface)',
+          color: 'var(--ink)',
+          fontFamily: 'inherit',
+          fontSize: 'var(--fs-body)',
+        }}
       />
       {loadError && (
-        <p className="mt-1 text-xs text-amber-700">
+        <p style={{ margin: '4px 0 0', fontSize: 'var(--fs-sm)', color: 'var(--warn-fg)' }}>
           Address lookup is unavailable. Enter the address manually and save to geocode from the backend.
         </p>
       )}
