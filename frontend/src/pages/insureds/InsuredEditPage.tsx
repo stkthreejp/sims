@@ -30,7 +30,7 @@ export function InsuredEditPage() {
       queryClient.invalidateQueries({ queryKey: ['insureds'] })
       navigate(`/insureds/${id}`)
     },
-    onError: () => toast.error('Failed to update insured'),
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? err?.response?.data?.title ?? 'Failed to update insured'),
   })
 
   if (isLoading) return <LoadingSpinner />

@@ -26,7 +26,7 @@ export function InsuredCreatePage() {
       queryClient.invalidateQueries({ queryKey: ['insureds'] })
       navigate(`/insureds/${insured.id}`)
     },
-    onError: () => toast.error('Failed to create insured'),
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? err?.response?.data?.title ?? 'Failed to create insured'),
   })
 
   return (
