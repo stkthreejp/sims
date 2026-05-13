@@ -89,19 +89,20 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Quote rating panel | Panel | `frontend/src/components/quotes/QuoteRatingPanel.tsx` | Never updated | Old slate/blue cards, tables, buttons, and form controls. | High |
 | Quote auto safety panel | Panel | `frontend/src/components/quotes/QuoteAutoSafetyPanel.tsx` | Never updated | Large panel with extensive old utility styling. | High |
 | Task queue | Page | `/tasks` | Needs tweaking | Mixed token and older styling. | Medium |
-| Task detail drawer | Drawer | `frontend/src/pages/tasks/TaskDetailDrawer.tsx` | Needs tweaking | Separate drawer surface with old controls and slate styling. | Medium |
+| Task detail drawer | Drawer | `frontend/src/pages/tasks/TaskDetailDrawer.tsx` | Good | Updated to SIMS drawer, header, field, button, and activity styles; visual browser confirmation still useful. | Low |
 | Agents list | Page | `/agents` | Needs tweaking | Uses shared header but old list, form, and table styling remain. | Medium |
 | Agent detail | Page | `/agents/:id` | Never updated | Large detail surface with old cards/forms/tables. | High |
 | Carriers list | Page | `/carriers` | Needs tweaking | Uses shared header but old cards/list styling remain. | Medium |
 | Carrier detail | Page | `/carriers/:id` | Never updated | Large detail surface with old cards/forms/tables. | High |
-| Users | Page + modal | `/users` | Needs tweaking | Old table and user modal styling. Modal should be audited separately in visual pass. | Medium |
+| Users | Page | `/users` | Needs tweaking | Old table, search, status, and page action styling remain. | Medium |
+| User create/edit modal | Modal | `frontend/src/pages/users/UsersPage.tsx` | Good | Modal now uses SIMS modal, field, role chip, and footer button patterns. | Low |
 | Inbox list | Page | `/inbox` | Needs tweaking | Smaller surface but old utility styling remains. | Medium |
 | Inbox detail | Page | `/inbox/:id` | Never updated | Mostly older utility styling. | High |
 | Document library | Page | `/document-library` | Needs tweaking | Uses shared header but old list/card styling remains. | Medium |
 | Template editor page | Page | `/document-library/new`, `/document-library/:id` | Never updated | Older editor page shell and controls. | High |
 | Template editor | Editor surface | `frontend/src/components/editor/TemplateEditor.tsx` | Never updated | Large editor surface with old toolbar/control styling. | High |
 | Documents section | Panel | `frontend/src/components/documents/DocumentsSection.tsx` | Never updated | Old document list/upload styling. | High |
-| Generate document modal | Modal | `frontend/src/components/documents/GenerateDocumentModal.tsx` | Never updated | Old modal controls and slate/blue styling. | Medium |
+| Generate document modal | Modal | `frontend/src/components/documents/GenerateDocumentModal.tsx` | Good | Updated to SIMS modal, select, footer, and button patterns. | Low |
 | Cash balance badge | Shared accounting component | `frontend/src/components/accounting/CashBalanceBadge.tsx` | Needs tweaking | Needs visual confirmation; no strong token signals. | Low |
 | Billing activity | Page | `/billing/activity` | Needs tweaking | Uses shared header but many old tables/cards/buttons remain. | Medium |
 | Cash application | Page | `/billing/cash-application` | Needs tweaking | Old billing workflow styling. | Medium |
@@ -142,3 +143,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 |---|---|---|---|
 | 2026-05-13 | Codex | Code-informed first pass | Initial chart created; browser visual confirmation still needed. |
 | 2026-05-13 | Codex | Shared primitives batch 1 | Updated EmptyState, ErrorBoundary, LoadingSpinner, and AddressAutocomplete to SIMS visual style. Type check passed. |
+| 2026-05-13 | Codex | Modal/drawer baseline batch | Updated GenerateDocumentModal, TaskDetailDrawer, and the user create/edit modal to SIMS visual style. Type check passed. |

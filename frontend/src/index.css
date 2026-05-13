@@ -125,6 +125,131 @@
   box-shadow: 0 0 0 2px rgba(27, 117, 186, 0.12);
 }
 
+.sims-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 17, 28, 0.34);
+  padding: 16px;
+}
+
+.sims-modal {
+  width: min(100%, 460px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.sims-modal-head,
+.sims-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+}
+
+.sims-modal-head {
+  border-bottom: 1px solid var(--line-2);
+}
+
+.sims-modal-foot {
+  justify-content: flex-end;
+  border-top: 1px solid var(--line-2);
+  background: var(--surface-2);
+}
+
+.sims-modal-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.sims-modal-body {
+  padding: 14px 16px 16px;
+}
+
+.sims-icon-btn {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.sims-icon-btn:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.sims-field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.sims-input,
+.sims-select,
+.sims-textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--fs-body);
+}
+
+.sims-input,
+.sims-select {
+  height: 34px;
+  padding: 0 10px;
+}
+
+.sims-textarea {
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.sims-input:focus,
+.sims-select:focus,
+.sims-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(27, 117, 186, 0.12);
+}
+
+.sims-drawer {
+  margin: 0 0 0 auto;
+  width: var(--drawer-w);
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.sims-drawer::backdrop {
+  background: rgba(12, 17, 28, 0.24);
+}
+
 /* ============================================================
    Submission Detail v2 — component classes
    ============================================================ */
@@ -253,6 +378,7 @@
 .sd-btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
 .sd-btn.danger { border: 1px solid var(--line); background: var(--surface); color: var(--bad-fg); }
 .sd-btn.danger:hover { border-color: #e7baad; background: var(--bad-bg); }
+.sd-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Tab strip */
 .sd-tabs {

@@ -72,29 +72,25 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
       ref={dialogRef}
       onCancel={(e) => { e.preventDefault(); onClose() }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      className="[&::backdrop]:bg-black/20 flex flex-col bg-white shadow-xl p-0 border-0"
+      className="sims-drawer flex flex-col p-0"
       style={{
-        margin: '0 0 0 auto',
         width: 460,
-        height: '100%',
-        maxHeight: '100%',
-        borderLeft: '1px solid var(--line)',
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
-        <h2 className="font-semibold text-slate-800 text-base">
-          {isLoading ? 'Loading…' : task?.taskTypeName}
+      <div className="sims-modal-head shrink-0">
+        <h2 className="sims-modal-title">
+          {isLoading ? 'Loading...' : task?.taskTypeName}
         </h2>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
-          <X className="h-5 w-5" />
+        <button onClick={onClose} className="sims-icon-btn" aria-label="Close">
+          <X size={16} strokeWidth={1.7} />
         </button>
       </div>
 
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center"><LoadingSpinner /></div>
       ) : !task ? (
-        <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">Task not found.</div>
+        <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>Task not found.</div>
       ) : (
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* Meta */}
@@ -104,7 +100,7 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
             <MetaRow icon={<CheckCircle className="h-3.5 w-3.5" />} label="Status" value={task.status} />
             <MetaRow icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Priority" value={task.priority} />
             {task.escalationLevel > 0 && (
-              <MetaRow icon={<AlertTriangle className="h-3.5 w-3.5 text-orange-500" />} label="Escalation" value={`Level ${task.escalationLevel}`} accent />
+              <MetaRow icon={<AlertTriangle size={14} />} label="Escalation" value={`Level ${task.escalationLevel}`} accent />
             )}
             {task.entityType && (
               <MetaRow icon={<></>} label="Entity" value={`${task.entityType}`} />
@@ -114,14 +110,14 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
           {/* Status update */}
           {task.status !== 'Closed' && task.status !== 'Cancelled' && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Update Status</p>
+              <p className="sims-field-label">Update Status</p>
               <div className="flex flex-wrap gap-2">
                 {STATUS_OPTIONS.filter((o) => o.value !== task.status && o.value !== 'Cancelled').map((opt) => (
                   <button
                     key={opt.value}
                     disabled={updatingStatus}
                     onClick={() => updateStatus({ status: opt.value })}
-                    className="px-3 py-1 rounded-lg border text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                    className="sd-btn outline sm"
                   >
                     {opt.label}
                   </button>
@@ -130,36 +126,36 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes…"
+                placeholder="Optional notes..."
                 rows={2}
-                className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+                className="sims-textarea"
               />
             </div>
           )}
 
           {/* Audit log */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</p>
+            <p className="sims-field-label">Activity</p>
             {task.auditEntries.length === 0 ? (
-              <p className="text-sm text-slate-400">No activity yet.</p>
+              <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>No activity yet.</p>
             ) : (
-              <ol className="relative border-l border-slate-200 ml-3 space-y-4">
+              <ol className="relative ml-3 space-y-4" style={{ borderLeft: '1px solid var(--line)' }}>
                 {task.auditEntries.map((entry) => {
                   const config = ACTION_CONFIG[entry.action]
                   const ActionIcon = config?.icon
                   return (
                     <li key={entry.id} className="ml-4">
-                      <span className="absolute -left-1.5 mt-1.5 h-2.5 w-2.5 rounded-full border border-white bg-slate-300" />
-                      <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleString()}</p>
-                      <p className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                        {ActionIcon && <ActionIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
+                      <span className="absolute -left-1.5 mt-1.5 h-2.5 w-2.5 rounded-full" style={{ border: '1px solid var(--surface)', background: 'var(--ink-4)' }} />
+                      <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>{new Date(entry.timestamp).toLocaleString()}</p>
+                      <p className="flex items-center gap-1.5" style={{ margin: 0, color: 'var(--ink-2)', fontSize: 'var(--fs-body)', fontWeight: 500 }}>
+                        {ActionIcon && <ActionIcon size={14} className="shrink-0" style={{ color: 'var(--ink-3)' }} />}
                         {config?.label ?? entry.action}
-                        {entry.userName && <span className="font-normal text-slate-500"> — {entry.userName}</span>}
+                        {entry.userName && <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}> - {entry.userName}</span>}
                       </p>
                       {entry.oldValue && entry.newValue && (
-                        <p className="text-xs text-slate-400">{entry.oldValue} → {entry.newValue}</p>
+                        <p style={{ margin: 0, color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>{entry.oldValue} to {entry.newValue}</p>
                       )}
-                      {entry.notes && <p className="text-xs text-slate-500 italic">{entry.notes}</p>}
+                      {entry.notes && <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 'var(--fs-sm)', fontStyle: 'italic' }}>{entry.notes}</p>}
                     </li>
                   )
                 })}
@@ -175,10 +171,10 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
 function MetaRow({ icon, label, value, accent = false }: { icon: React.ReactNode; label: string; value: string; accent?: boolean }) {
   return (
     <div className="flex items-start gap-1.5">
-      <span className={`mt-0.5 shrink-0 ${accent ? 'text-red-500' : 'text-slate-400'}`}>{icon}</span>
+      <span className="mt-0.5 shrink-0" style={{ color: accent ? 'var(--bad-fg)' : 'var(--ink-3)' }}>{icon}</span>
       <div>
-        <p className="text-xs text-slate-400">{label}</p>
-        <p className={`text-sm font-medium ${accent ? 'text-red-600' : 'text-slate-700'}`}>{value}</p>
+        <p style={{ margin: 0, color: 'var(--ink-4)', fontSize: 'var(--fs-xs)' }}>{label}</p>
+        <p style={{ margin: 0, color: accent ? 'var(--bad-fg)' : 'var(--ink-2)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>{value}</p>
       </div>
     </div>
   )

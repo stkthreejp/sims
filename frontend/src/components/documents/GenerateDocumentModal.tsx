@@ -43,35 +43,35 @@ export function GenerateDocumentModal({ entityType, entityId, attachmentEntityTy
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+    <div className="sims-modal-backdrop">
+      <div className="sims-modal">
+        <div className="sims-modal-head">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-900">Generate Document</h2>
+            <FileText size={16} strokeWidth={1.7} style={{ color: 'var(--ink-3)' }} />
+            <h2 className="sims-modal-title">Generate Document</h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100">
-            <X className="h-4 w-4 text-slate-500" />
+          <button onClick={onClose} className="sims-icon-btn" aria-label="Close">
+            <X size={16} strokeWidth={1.7} />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
+        <div className="sims-modal-body space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Template *</label>
+            <label className="sims-field-label">Template *</label>
             {loadingTemplates ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400 py-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Loading templates…
+              <div className="flex items-center gap-2 py-2" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
+                <Loader2 size={14} className="animate-spin" />
+                Loading templates...
               </div>
             ) : templates.length === 0 ? (
-              <p className="text-sm text-slate-400 py-2">No templates available for {entityType}.</p>
+              <p style={{ margin: 0, padding: '8px 0', color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>No templates available for {entityType}.</p>
             ) : (
               <select
                 value={selectedTemplateId}
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="sims-select"
               >
-                <option value="">— Select a template —</option>
+                <option value="">Select a template</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
@@ -80,11 +80,11 @@ export function GenerateDocumentModal({ entityType, entityId, attachmentEntityTy
           </div>
           {documentTypes.length > 0 && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Save As *</label>
+              <label className="sims-field-label">Save As *</label>
               <select
                 value={documentType}
                 onChange={(e) => setDocumentType(e.target.value as DocumentType)}
-                className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="sims-select"
               >
                 {documentTypes.map((t) => (
                   <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t]}</option>
@@ -94,19 +94,19 @@ export function GenerateDocumentModal({ entityType, entityId, attachmentEntityTy
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t bg-slate-50 rounded-b-lg">
+        <div className="sims-modal-foot">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 border rounded text-sm hover:bg-white"
+            className="sd-btn outline sm"
           >
             Cancel
           </button>
           <button
             disabled={!selectedTemplateId || generateMutation.isPending}
             onClick={() => generateMutation.mutate()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="sd-btn primary sm"
           >
-            {generateMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {generateMutation.isPending && <Loader2 size={14} className="animate-spin" />}
             Generate
           </button>
         </div>

@@ -86,58 +86,59 @@ function UserModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-800">{user ? 'Edit User' : 'Create User'}</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100"><X className="h-4 w-4 text-slate-400" /></button>
+    <div className="sims-modal-backdrop">
+      <div className="sims-modal">
+        <div className="sims-modal-head">
+          <h2 className="sims-modal-title">{user ? 'Edit User' : 'Create User'}</h2>
+          <button onClick={onClose} className="sims-icon-btn" aria-label="Close"><X size={16} strokeWidth={1.7} /></button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">First Name *</label>
-            <input value={firstName} onChange={(e) => setFirstName(e.target.value)}
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <div className="sims-modal-body space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="sims-field-label">First Name *</label>
+              <input value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                className="sims-input" />
+            </div>
+            <div>
+              <label className="sims-field-label">Last Name</label>
+              <input value={lastName} onChange={(e) => setLastName(e.target.value)}
+                className="sims-input" />
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)}
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-        </div>
 
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Email *</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
+          <div>
+            <label className="sims-field-label">Email *</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              className="sims-input" />
+          </div>
 
         {!user && (
           <>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Username *</label>
+              <label className="sims-field-label">Username *</label>
               <input value={userName} onChange={(e) => setUserName(e.target.value)}
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="sims-input" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Password *</label>
+              <label className="sims-field-label">Password *</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="sims-input" />
             </div>
           </>
         )}
 
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Phone</label>
-          <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
+          <div>
+            <label className="sims-field-label">Phone</label>
+            <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
+              className="sims-input" />
+          </div>
 
         {user && (
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
+            <label className="sims-field-label">Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value as UserStatus)}
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="sims-select">
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
               <option value="Locked">Locked</option>
@@ -145,36 +146,40 @@ function UserModal({
           </div>
         )}
 
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-2">Roles *</label>
-          <div className="flex flex-wrap gap-2">
-            {ALL_ROLES.map((role) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => toggleRole(role)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  roles.includes(role)
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
-                }`}
-              >
-                {role}
-              </button>
-            ))}
+          <div>
+            <label className="sims-field-label">Roles *</label>
+            <div className="flex flex-wrap gap-2">
+              {ALL_ROLES.map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => toggleRole(role)}
+                  className="sd-btn sm"
+                  style={{
+                    height: 28,
+                    border: `1px solid ${roles.includes(role) ? 'var(--accent)' : 'var(--line)'}`,
+                    background: roles.includes(role) ? 'var(--accent-soft)' : 'var(--surface)',
+                    color: roles.includes(role) ? 'var(--accent-ink)' : 'var(--ink-2)',
+                    borderRadius: 'var(--r-pill)',
+                  }}
+                >
+                  {role}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-2 pt-1">
+        <div className="sims-modal-foot">
+          <button onClick={onClose} className="sd-btn outline sm">
+            Cancel
+          </button>
           <button
             onClick={handleSubmit}
             disabled={isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-40"
+            className="sd-btn primary sm"
           >
-            <Check className="h-4 w-4" /> {user ? 'Save Changes' : 'Create User'}
-          </button>
-          <button onClick={onClose} className="px-4 py-2 border border-slate-300 rounded-md text-sm hover:bg-slate-50">
-            Cancel
+            <Check size={14} /> {user ? 'Save Changes' : 'Create User'}
           </button>
         </div>
       </div>
