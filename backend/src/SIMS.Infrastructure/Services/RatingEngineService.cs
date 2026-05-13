@@ -6,6 +6,7 @@ using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Rating;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
+using SIMS.Domain.Enums;
 using SIMS.Infrastructure.Data;
 
 namespace SIMS.Infrastructure.Services;
@@ -19,6 +20,10 @@ public class RatingEngineService : IRatingEngineService
     public async Task<Result<RatingResultDto>> RateAsync(Guid quoteId, RateQuoteRequest request, Guid ratedById)
     {
         var quote = await _db.Quotes
+            .Include(q => q.Submission)
+                .ThenInclude(s => s.Insured)
+            .Include(q => q.Submission)
+                .ThenInclude(s => s.AdditionalInterests)
             .Include(q => q.Submission)
                 .ThenInclude(s => s.Equipment)
                     .ThenInclude(e => e.EquipmentType)
@@ -71,6 +76,13 @@ public class RatingEngineService : IRatingEngineService
         {
             var err = TryRateIm(quote, version, modifier, out output);
             if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
+        }
+
+        var additionalInterestLines = await BuildAdditionalInterestChargeLinesAsync(quote);
+        if (additionalInterestLines.Count > 0)
+        {
+            output.Lines.AddRange(additionalInterestLines);
+            output = output with { GrandTotal = output.GrandTotal + additionalInterestLines.Sum(l => l.LinePremium) };
         }
 
         // ── Persist snapshot ─────────────────────────────────────────────────
@@ -455,6 +467,131 @@ public class RatingEngineService : IRatingEngineService
     }
 
     // ── Shared helpers ───────────────────────────────────────────────────────
+
+    private async Task<List<QuoteRatingLine>> BuildAdditionalInterestChargeLinesAsync(Domain.Entities.Quote quote)
+    {
+        var interests = quote.Submission.AdditionalInterests
+            .Where(i => !i.IsDeleted && i.LineOfBusiness == quote.LineOfBusiness)
+            .ToList();
+
+        if (interests.Count == 0)
+            return [];
+
+        var policyState = quote.Submission.Insured?.State?.Trim().ToUpperInvariant();
+        var effectiveDate = quote.EffectiveDate;
+
+        var candidateRules = await _db.CarrierAdditionalInterestRates
+            .Where(r => r.IsActive)
+            .Where(r => r.CarrierId == null || r.CarrierId == quote.CarrierId)
+            .Where(r => r.LineOfBusiness == null || r.LineOfBusiness == quote.LineOfBusiness)
+            .Where(r => r.State == null || (policyState != null && r.State == policyState))
+            .Where(r => r.EffectiveDate == null || r.EffectiveDate <= effectiveDate)
+            .Where(r => r.ExpirationDate == null || r.ExpirationDate > effectiveDate)
+            .ToListAsync();
+
+        if (candidateRules.Count == 0)
+            return [];
+
+        var lines = new List<QuoteRatingLine>();
+
+        foreach (var coverageType in Enum.GetValues<AdditionalInterestCoverageType>())
+        {
+            var matchingInterests = interests
+                .Where(i => RequestsCoverage(i, coverageType))
+                .ToList();
+            if (matchingInterests.Count == 0)
+                continue;
+
+            var rule = candidateRules
+                .Where(r => r.CoverageType == coverageType)
+                .OrderByDescending(RuleSpecificity)
+                .ThenByDescending(r => r.EffectiveDate ?? DateOnly.MinValue)
+                .FirstOrDefault();
+
+            if (rule is null)
+                continue;
+
+            var amount = CalculateAdditionalInterestCharge(rule, matchingInterests.Count);
+            var coverageLabel = AdditionalInterestLabel(coverageType);
+
+            lines.Add(new QuoteRatingLine
+            {
+                Id = Guid.NewGuid(),
+                ExposureRef = $"ADDINT-{AdditionalInterestCode(coverageType)}",
+                Inputs = JsonSerializer.Serialize(new
+                {
+                    type = coverageLabel,
+                    count = matchingInterests.Count,
+                    names = matchingInterests.Select(i => i.Name).ToList(),
+                    applies_to = matchingInterests
+                        .Select(i => i.AppliesToType.ToString())
+                        .Distinct()
+                        .ToList(),
+                }),
+                FactorsApplied = JsonSerializer.Serialize(new
+                {
+                    rule_id = rule.Id,
+                    method = rule.ChargeMethod.ToString(),
+                    carrier_scope = rule.CarrierId?.ToString() ?? "All",
+                    lob_scope = rule.LineOfBusiness?.ToString() ?? "All",
+                    state_scope = rule.State ?? "All",
+                    per_interest_amount = rule.PerInterestAmount,
+                    blanket_amount = rule.BlanketAmount,
+                    minimum = rule.MinimumCharge,
+                    maximum = rule.MaximumCharge,
+                }),
+                LinePremium = amount,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            });
+        }
+
+        return lines;
+    }
+
+    private static decimal CalculateAdditionalInterestCharge(CarrierAdditionalInterestRate rule, int interestCount)
+        => AdditionalInterestChargeCalculator.Calculate(
+            rule.ChargeMethod,
+            interestCount,
+            rule.PerInterestAmount,
+            rule.BlanketAmount,
+            rule.MinimumCharge,
+            rule.MaximumCharge);
+
+    private static bool RequestsCoverage(SubmissionAdditionalInterest interest, AdditionalInterestCoverageType coverageType) =>
+        coverageType switch
+        {
+            AdditionalInterestCoverageType.AdditionalInsured => interest.AdditionalInsured,
+            AdditionalInterestCoverageType.LossPayee => interest.LossPayee,
+            AdditionalInterestCoverageType.WaiverOfSubrogation => interest.WaiverOfSubrogation,
+            AdditionalInterestCoverageType.PrimaryNonContributory => interest.PrimaryNonContributory,
+            _ => false
+        };
+
+    private static int RuleSpecificity(CarrierAdditionalInterestRate rule) =>
+        (rule.CarrierId.HasValue ? 1 : 0) +
+        (rule.LineOfBusiness.HasValue ? 1 : 0) +
+        (!string.IsNullOrWhiteSpace(rule.State) ? 1 : 0);
+
+    private static string AdditionalInterestCode(AdditionalInterestCoverageType coverageType) =>
+        coverageType switch
+        {
+            AdditionalInterestCoverageType.AdditionalInsured => "AI",
+            AdditionalInterestCoverageType.LossPayee => "LP",
+            AdditionalInterestCoverageType.WaiverOfSubrogation => "WOS",
+            AdditionalInterestCoverageType.PrimaryNonContributory => "PNC",
+            _ => coverageType.ToString().ToUpperInvariant()
+        };
+
+    private static string AdditionalInterestLabel(AdditionalInterestCoverageType coverageType) =>
+        coverageType switch
+        {
+            AdditionalInterestCoverageType.AdditionalInsured => "Additional Insured",
+            AdditionalInterestCoverageType.LossPayee => "Loss Payee",
+            AdditionalInterestCoverageType.WaiverOfSubrogation => "Waiver of Subrogation",
+            AdditionalInterestCoverageType.PrimaryNonContributory => "Primary & Non-Contributory",
+            _ => coverageType.ToString()
+        };
 
     private record struct FormulaOutput(decimal ManualPremium, decimal GrandTotal, List<QuoteRatingLine> Lines);
 
