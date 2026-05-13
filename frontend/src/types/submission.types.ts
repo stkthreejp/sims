@@ -53,6 +53,7 @@ export interface SubmissionCreate {
   effectiveDate?: string
   expirationDate?: string
   descriptionOfOperations?: string
+  linesOfBusiness: string[]
 }
 
 export interface SubmissionUpdate extends SubmissionCreate {

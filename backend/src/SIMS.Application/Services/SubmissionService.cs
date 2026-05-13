@@ -107,6 +107,9 @@ public class SubmissionService : ISubmissionService
             AssistantUWId = dto.AssistantUWId,
             EffectiveDate = dto.EffectiveDate,
             ExpirationDate = dto.ExpirationDate,
+            LinesOfBusiness = dto.LinesOfBusiness.Count > 0
+                ? JsonSerializer.Serialize(dto.LinesOfBusiness.Distinct().ToList())
+                : null,
             CreatedById = createdById
         };
 
@@ -148,6 +151,9 @@ public class SubmissionService : ISubmissionService
         submission.EffectiveDate = dto.EffectiveDate;
         submission.ExpirationDate = dto.ExpirationDate;
         submission.Status = dto.Status;
+        submission.LinesOfBusiness = dto.LinesOfBusiness.Count > 0
+            ? JsonSerializer.Serialize(dto.LinesOfBusiness.Distinct().ToList())
+            : null;
         submission.UpdatedAt = DateTime.UtcNow;
 
         await Db.SaveChangesAsync();

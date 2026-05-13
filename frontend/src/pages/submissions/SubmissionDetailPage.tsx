@@ -151,6 +151,7 @@ export function SubmissionDetailPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>('quotes')
   const [expLob, setExpLob] = useState<ExposureLob>('auto')
+  const [showLobEditor, setShowLobEditor] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
@@ -367,9 +368,10 @@ export function SubmissionDetailPage() {
   }, [submission, expLob])
 
   const selectedCarrier = carriers.find((c) => c.id === quoteForm.carrierId)
+  const submissionLobOptions = submission?.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS
   const availableLobs = selectedCarrier
-    ? selectedCarrier.linesOfBusiness.filter((l) => ACTIVE_LOBS.includes(l))
-    : ACTIVE_LOBS
+    ? selectedCarrier.linesOfBusiness.filter((l) => submissionLobOptions.includes(l))
+    : submissionLobOptions
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -397,7 +399,10 @@ export function SubmissionDetailPage() {
 
   const setLobsMutation = useMutation({
     mutationFn: (lobs: string[]) => submissionsApi.setLinesOfBusiness(id!, lobs),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['submissions', id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submissions', id] })
+      setShowLobEditor(false)
+    },
     onError: () => toast.error('Failed to update lines of business'),
   })
 
@@ -657,26 +662,8 @@ export function SubmissionDetailPage() {
         {submission.linesOfBusiness.map((lob) => (
           <span key={lob} className="sd-lob-chip">
             {LOB_SHORT[lob] ?? lob}
-            <button
-              onClick={() => setLobsMutation.mutate(submission.linesOfBusiness.filter((l) => l !== lob))}
-              disabled={setLobsMutation.isPending}
-              style={{ cursor: 'pointer', opacity: .5, fontSize: 11, background: 'none', border: 0, color: 'inherit', lineHeight: 1, padding: 0 }}
-            >×</button>
           </span>
         ))}
-        {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).length > 0 && (
-          <select
-            value=""
-            onChange={(e) => { if (e.target.value) setLobsMutation.mutate([...submission.linesOfBusiness, e.target.value]) }}
-            disabled={setLobsMutation.isPending}
-            className="sd-lob-add"
-          >
-            <option value="">+ Add LOB</option>
-            {ACTIVE_LOBS.filter((l) => !submission.linesOfBusiness.includes(l)).map((l) => (
-              <option key={l} value={l}>{LOB_LABELS[l]}</option>
-            ))}
-          </select>
-        )}
       </div>
 
       {/* Quote rows */}
@@ -741,7 +728,7 @@ export function SubmissionDetailPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
               { label: 'Carrier *', node: <select value={quoteForm.carrierId} onChange={setQF('carrierId')} style={inputStyle}><option value="">— Select carrier —</option>{carriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select> },
-              { label: 'Line of Business *', node: <select value={quoteForm.lineOfBusiness} onChange={setQF('lineOfBusiness')} disabled={!quoteForm.carrierId} style={inputStyle}><option value="">— Select LOB —</option>{availableLobs.map((l) => <option key={l} value={l}>{LOB_LABELS[l]}</option>)}</select> },
+              { label: 'Line of Business *', node: <select value={quoteForm.lineOfBusiness} onChange={setQF('lineOfBusiness')} disabled={!quoteForm.carrierId} style={inputStyle}><option value="">— Select LOB —</option>{availableLobs.map((l) => <option key={l} value={l}>{getLobLabel(l)}</option>)}</select> },
               { label: 'Effective Date *', node: <input type="date" value={quoteForm.effectiveDate} onChange={setQF('effectiveDate')} style={inputStyle} /> },
               { label: 'Expiration Date *', node: <input type="date" value={quoteForm.expirationDate} onChange={setQF('expirationDate')} style={inputStyle} /> },
               { label: 'Premium', node: <input type="number" value={quoteForm.premiumAmount} onChange={setQF('premiumAmount')} placeholder="0.00" style={inputStyle} /> },
@@ -867,11 +854,37 @@ export function SubmissionDetailPage() {
         </div>
         <div>
           <div className="k">Lines</div>
-          <div className="v" style={{ gap: 4 }}>
+          <div className="v" style={{ gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
             {submission.linesOfBusiness.length === 0
               ? <span style={{ color: 'var(--ink-4)', fontStyle: 'italic' }}>None</span>
               : submission.linesOfBusiness.map((l) => <span key={l} className="sd-lob">{LOB_SHORT[l] ?? l}</span>)}
+            <button type="button" onClick={() => setShowLobEditor((v) => !v)} className="sd-btn ghost sm" style={{ height: 22, padding: '0 6px' }}>
+              Edit
+            </button>
           </div>
+          {showLobEditor && (
+            <div style={{ marginTop: 8, padding: 10, border: '1px solid var(--line-2)', borderRadius: 8, background: 'var(--surface)', boxShadow: '0 8px 24px rgba(15,23,42,.08)' }}>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {ACTIVE_LOBS.map((lob) => {
+                  const checked = submission.linesOfBusiness.includes(lob)
+                  const next = checked
+                    ? submission.linesOfBusiness.filter((value) => value !== lob)
+                    : [...submission.linesOfBusiness, lob]
+                  return (
+                    <label key={lob} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--ink-2)' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={setLobsMutation.isPending || (checked && submission.linesOfBusiness.length === 1)}
+                        onChange={() => setLobsMutation.mutate(next)}
+                      />
+                      {LOB_LABELS[lob]}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
         <div>
           <div className="k">Effective</div>

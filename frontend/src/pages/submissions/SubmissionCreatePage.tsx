@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { SubmissionCreate } from '@/types/submission.types'
 import type { InsuredListItem } from '@/types/insured.types'
+import { ACTIVE_LOBS, LOB_LABELS } from '@/types/quote.types'
 
 // ── Insured search combobox ───────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ export function SubmissionCreatePage() {
     assistantUWId: undefined,
     effectiveDate: undefined,
     expirationDate: undefined,
+    linesOfBusiness: [],
   })
 
   const { data: insured } = useQuery({
@@ -143,8 +145,8 @@ export function SubmissionCreatePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.insuredId || !form.underwriterId) {
-      toast.error('Insured and underwriter are required')
+    if (!form.insuredId || !form.underwriterId || form.linesOfBusiness.length === 0) {
+      toast.error('Insured, underwriter, and at least one line of business are required')
       return
     }
     createMutation.mutate({
@@ -153,6 +155,7 @@ export function SubmissionCreatePage() {
       assistantUWId: form.assistantUWId || undefined,
       effectiveDate: form.effectiveDate || undefined,
       expirationDate: form.expirationDate || undefined,
+      linesOfBusiness: form.linesOfBusiness,
     })
   }
 
@@ -217,6 +220,27 @@ export function SubmissionCreatePage() {
 
           <div />
 
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-2">Lines of Business *</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {ACTIVE_LOBS.map((lob) => (
+                <label key={lob} className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={form.linesOfBusiness.includes(lob)}
+                    onChange={(e) => setForm((f) => ({
+                      ...f,
+                      linesOfBusiness: e.target.checked
+                        ? [...f.linesOfBusiness, lob]
+                        : f.linesOfBusiness.filter((value) => value !== lob),
+                    }))}
+                  />
+                  {LOB_LABELS[lob]}
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Target Effective Date</label>
             <input type="date" value={form.effectiveDate ?? ''} onChange={set('effectiveDate')} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -231,7 +255,7 @@ export function SubmissionCreatePage() {
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
-            disabled={createMutation.isPending || !form.insuredId || !form.underwriterId}
+            disabled={createMutation.isPending || !form.insuredId || !form.underwriterId || form.linesOfBusiness.length === 0}
             className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-40"
           >
             {createMutation.isPending ? 'Creating…' : 'Create Submission'}

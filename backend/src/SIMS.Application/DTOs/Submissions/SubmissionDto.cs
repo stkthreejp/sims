@@ -58,6 +58,8 @@ public class SubmissionCreateDto
 
     [MaxLength(2000)]
     public string? DescriptionOfOperations { get; set; }
+
+    public List<string> LinesOfBusiness { get; set; } = [];
 }
 
 public class SubmissionUpdateDto : SubmissionCreateDto
