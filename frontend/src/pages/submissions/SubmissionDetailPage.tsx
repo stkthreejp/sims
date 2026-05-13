@@ -152,6 +152,8 @@ export function SubmissionDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('quotes')
   const [expLob, setExpLob] = useState<ExposureLob>('auto')
   const [showLobEditor, setShowLobEditor] = useState(false)
+  const [showSubmissionEditor, setShowSubmissionEditor] = useState(false)
+  const [submissionForm, setSubmissionForm] = useState<SubmissionUpdate | null>(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
@@ -215,6 +217,17 @@ export function SubmissionDetailPage() {
   const { data: carriers = [] } = useQuery({
     queryKey: ['carriers', 'active'],
     queryFn: () => carriersApi.getAll(true),
+  })
+
+  const { data: usersData } = useQuery({
+    queryKey: ['users', { pageSize: 100 }],
+    queryFn: () => usersApi.getAll({ pageSize: 100 }),
+  })
+  const users = usersData?.items ?? []
+
+  const { data: agents = [] } = useQuery({
+    queryKey: ['agents', 'active'],
+    queryFn: () => agentsApi.getAll(true),
   })
 
   const { data: drivers = [] } = useQuery({
@@ -404,6 +417,17 @@ export function SubmissionDetailPage() {
       setShowLobEditor(false)
     },
     onError: () => toast.error('Failed to update lines of business'),
+  })
+
+  const updateSubmissionMutation = useMutation({
+    mutationFn: (dto: SubmissionUpdate) => submissionsApi.update(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submissions', id] })
+      setShowSubmissionEditor(false)
+      setSubmissionForm(null)
+      toast.success('Submission updated')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to update submission'),
   })
 
   const createQuoteMutation = useMutation({
@@ -652,6 +676,53 @@ export function SubmissionDetailPage() {
     })
   }
 
+  const openSubmissionEditor = () => {
+    setSubmissionForm({
+      insuredId: submission.insuredId,
+      agentId: submission.agentId ?? undefined,
+      underwriterId: submission.underwriterId,
+      assistantUWId: submission.assistantUWId ?? undefined,
+      effectiveDate: submission.effectiveDate ?? undefined,
+      expirationDate: submission.expirationDate ?? undefined,
+      descriptionOfOperations: submission.descriptionOfOperations ?? undefined,
+      linesOfBusiness: submission.linesOfBusiness,
+      status: submission.status,
+    })
+    setShowSubmissionEditor(true)
+  }
+
+  const setSubmissionField = (field: keyof SubmissionUpdate, value: string | string[]) => {
+    setSubmissionForm((current) => current ? { ...current, [field]: value } : current)
+  }
+
+  const toggleSubmissionLob = (lob: PolicyLineOfBusiness, checked: boolean) => {
+    setSubmissionForm((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        linesOfBusiness: checked
+          ? [...current.linesOfBusiness, lob]
+          : current.linesOfBusiness.filter((value) => value !== lob),
+      }
+    })
+  }
+
+  const saveSubmissionEdit = () => {
+    if (!submissionForm) return
+    if (!submissionForm.underwriterId || submissionForm.linesOfBusiness.length === 0) {
+      toast.error('Underwriter and at least one line of business are required')
+      return
+    }
+    updateSubmissionMutation.mutate({
+      ...submissionForm,
+      agentId: submissionForm.agentId || undefined,
+      assistantUWId: submissionForm.assistantUWId || undefined,
+      effectiveDate: submissionForm.effectiveDate || undefined,
+      expirationDate: submissionForm.expirationDate || undefined,
+      descriptionOfOperations: submissionForm.descriptionOfOperations || undefined,
+    })
+  }
+
   // ── Shared quote list renderer ─────────────────────────────────────────────
 
   const renderQuoteList = () => (
@@ -825,6 +896,9 @@ export function SubmissionDetailPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button onClick={openSubmissionEditor} className="sd-btn">
+            <Pencil size={13} /> Edit submission
+          </button>
           {canCreatePolicies && (
             <button onClick={() => setShowGenerateModal(true)} className="sd-btn">
               <FileText size={13} /> Generate doc
@@ -838,6 +912,83 @@ export function SubmissionDetailPage() {
           </button>
         </div>
       </div>
+
+      {showSubmissionEditor && submissionForm && (
+        <section className="sd-card" style={{ marginTop: 14, marginBottom: 14 }}>
+          <div className="sd-card-head">
+            <h3>Edit submission</h3>
+            <button onClick={() => { setShowSubmissionEditor(false); setSubmissionForm(null) }} className="sd-btn ghost sm"><X size={13} /></button>
+          </div>
+          <div className="sd-card-body">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              <div>
+                <label style={labelStyle}>Status</label>
+                <select value={submissionForm.status} onChange={(e) => setSubmissionField('status', e.target.value)} style={inputStyle}>
+                  {(Object.keys(SUBMISSION_STATUS_LABELS) as SubmissionStatus[]).map((status) => (
+                    <option key={status} value={status}>{SUBMISSION_STATUS_LABELS[status]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Underwriter *</label>
+                <select value={submissionForm.underwriterId} onChange={(e) => setSubmissionField('underwriterId', e.target.value)} style={inputStyle}>
+                  <option value="">— Select underwriter —</option>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Assistant UW</label>
+                <select value={submissionForm.assistantUWId ?? ''} onChange={(e) => setSubmissionField('assistantUWId', e.target.value)} style={inputStyle}>
+                  <option value="">— None —</option>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Agent</label>
+                <select value={submissionForm.agentId ?? ''} onChange={(e) => setSubmissionField('agentId', e.target.value)} style={inputStyle}>
+                  <option value="">— None —</option>
+                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}{a.agencyName ? ` (${a.agencyName})` : ''}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Target Effective Date</label>
+                <input type="date" value={submissionForm.effectiveDate ?? ''} onChange={(e) => setSubmissionField('effectiveDate', e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Target Expiration Date</label>
+                <input type="date" value={submissionForm.expirationDate ?? ''} onChange={(e) => setSubmissionField('expirationDate', e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>Lines of Business *</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                  {ACTIVE_LOBS.map((lob) => {
+                    const checked = submissionForm.linesOfBusiness.includes(lob)
+                    return (
+                      <label key={lob} style={{ display: 'flex', alignItems: 'center', gap: 7, border: '1px solid var(--line-2)', borderRadius: 6, padding: '8px 10px', fontSize: 12.5, color: 'var(--ink-2)' }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={checked && submissionForm.linesOfBusiness.length === 1}
+                          onChange={(e) => toggleSubmissionLob(lob, e.target.checked)}
+                        />
+                        {LOB_LABELS[lob]}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>UW Notes</label>
+                <textarea value={submissionForm.descriptionOfOperations ?? ''} onChange={(e) => setSubmissionField('descriptionOfOperations', e.target.value)} rows={3} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={saveSubmissionEdit} disabled={updateSubmissionMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save Submission</button>
+              <button onClick={() => { setShowSubmissionEditor(false); setSubmissionForm(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Metadata strip */}
       <div className="sd-ph-strip">
