@@ -52,6 +52,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<SubmissionIMCoverages> SubmissionIMCoverages => Set<SubmissionIMCoverages>();
     public DbSet<SubmissionEquipment> SubmissionEquipment => Set<SubmissionEquipment>();
     public DbSet<SubmissionAdditionalInterest> SubmissionAdditionalInterests => Set<SubmissionAdditionalInterest>();
+    public DbSet<SubmissionAdditionalInterestBlanket> SubmissionAdditionalInterestBlankets => Set<SubmissionAdditionalInterestBlanket>();
     public DbSet<CarrierAdditionalInterestRate> CarrierAdditionalInterestRates => Set<CarrierAdditionalInterestRate>();
     public DbSet<TaskType> TaskTypes => Set<TaskType>();
     public DbSet<TaskInstance> TaskInstances => Set<TaskInstance>();
@@ -166,6 +167,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<SubmissionIMCoverages>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionEquipment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<SubmissionAdditionalInterest>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SubmissionAdditionalInterestBlanket>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<CarrierAdditionalInterestRate>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<TaskType>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<TaskInstance>().HasQueryFilter(e => !e.IsDeleted);

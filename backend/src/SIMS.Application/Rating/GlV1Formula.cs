@@ -17,9 +17,8 @@ namespace SIMS.Application.Rating;
 /// Account level:
 ///   Subtotal        = sum(LineTotals)
 ///   ModifiedPremium = Subtotal × scheduleModifier   (0.80–1.20)
-///   Endorsements    = AI_Ind×$50 + AI_Blanket×$250 + WOS_Ind×$50 + WOS_Blanket×$250 + PNC×$250
 ///   TRIA            = IncludeTria ? ModifiedPremium × 2.5% : 0
-///   GrandTotal      = ModifiedPremium + Endorsements + TRIA
+///   GrandTotal      = ModifiedPremium + TRIA
 /// </summary>
 public static class GlV1Formula
 {
@@ -132,14 +131,8 @@ public static class GlV1Formula
         decimal Subtotal,
         decimal ScheduleModifier,
         decimal ModifiedPremium,
-        decimal AiIndividualPremium,
-        decimal AiBlanketPremium,
-        decimal WosIndividualPremium,
-        decimal WosBlanketPremium,
-        decimal PncPremium,
-        decimal EndorsementTotal,
         decimal TriaPremium,
-        decimal ManualPremium,   // = Subtotal (pre-modifier, pre-endorsement)
+        decimal ManualPremium,   // = Subtotal (pre-modifier)
         decimal GrandTotal
     );
 
@@ -151,11 +144,6 @@ public static class GlV1Formula
         int pcoLimit,            // 1000000 / 2000000
         int medLimit,            // 5000 / 10000 / 15000 / 25000
         decimal scheduleModifier,// quote-level: 0.80–1.20 (applied to Subtotal)
-        int aiIndividualCount,
-        bool aiBlanket,
-        int wosIndividualCount,
-        bool wosBlanket,
-        bool primaryNonContributory,
         bool includeTria)
     {
         if (!IlfTable.ContainsKey(occLimit))
@@ -207,26 +195,14 @@ public static class GlV1Formula
 
         decimal modifiedPremium = Math.Round(subtotal * scheduleModifier, 2);
 
-        decimal aiIndPremium  = aiIndividualCount  * 50m;
-        decimal aiBlanketPrem = aiBlanket          ? 250m : 0m;
-        decimal wosIndPremium = wosIndividualCount * 50m;
-        decimal wosBlanketPrem = wosBlanket        ? 250m : 0m;
-        decimal pncPremium    = primaryNonContributory ? 250m : 0m;
-        decimal endorsementTotal = aiIndPremium + aiBlanketPrem + wosIndPremium + wosBlanketPrem + pncPremium;
         decimal triaPremium   = includeTria ? Math.Round(modifiedPremium * 0.025m, 2) : 0m;
-        decimal grandTotal    = modifiedPremium + endorsementTotal + triaPremium;
+        decimal grandTotal    = modifiedPremium + triaPremium;
 
         return new RatingResult(
             Lines:                lines,
             Subtotal:             subtotal,
             ScheduleModifier:     scheduleModifier,
             ModifiedPremium:      modifiedPremium,
-            AiIndividualPremium:  aiIndPremium,
-            AiBlanketPremium:     aiBlanketPrem,
-            WosIndividualPremium: wosIndPremium,
-            WosBlanketPremium:    wosBlanketPrem,
-            PncPremium:           pncPremium,
-            EndorsementTotal:     endorsementTotal,
             TriaPremium:          triaPremium,
             ManualPremium:        subtotal,
             GrandTotal:           grandTotal

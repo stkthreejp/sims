@@ -25,6 +25,8 @@ public class RatingEngineService : IRatingEngineService
             .Include(q => q.Submission)
                 .ThenInclude(s => s.AdditionalInterests)
             .Include(q => q.Submission)
+                .ThenInclude(s => s.AdditionalInterestBlankets)
+            .Include(q => q.Submission)
                 .ThenInclude(s => s.Equipment)
                     .ThenInclude(e => e.EquipmentType)
             .Include(q => q.Submission)
@@ -193,10 +195,7 @@ public class RatingEngineService : IRatingEngineService
         {
             result = GlV1Formula.Rate(
                 inputs, occLimit, pcoLimit, medLimit,
-                modifier,
-                cov.AiIndividualCount, cov.AiBlanket,
-                cov.WosIndividualCount, cov.WosBlanket,
-                cov.PrimaryNonContributory, cov.IncludeTria);
+                modifier, cov.IncludeTria);
         }
         catch (InvalidOperationException ex)
         {
@@ -235,19 +234,6 @@ public class RatingEngineService : IRatingEngineService
                 UpdatedAt      = DateTime.UtcNow,
             };
         }).ToList();
-
-        // Append summary lines for endorsements and TRIA
-        if (result.EndorsementTotal > 0)
-            lines.Add(new QuoteRatingLine
-            {
-                Id             = Guid.NewGuid(),
-                ExposureRef    = "GL-ENDT",
-                Inputs         = JsonSerializer.Serialize(new { ai_individual = result.AiIndividualPremium, ai_blanket = result.AiBlanketPremium, wos_individual = result.WosIndividualPremium, wos_blanket = result.WosBlanketPremium, pnc = result.PncPremium }),
-                FactorsApplied = "{}",
-                LinePremium    = result.EndorsementTotal,
-                CreatedAt      = DateTime.UtcNow,
-                UpdatedAt      = DateTime.UtcNow,
-            });
 
         if (result.TriaPremium > 0)
             lines.Add(new QuoteRatingLine
@@ -473,8 +459,10 @@ public class RatingEngineService : IRatingEngineService
         var interests = quote.Submission.AdditionalInterests
             .Where(i => !i.IsDeleted && i.LineOfBusiness == quote.LineOfBusiness)
             .ToList();
+        var blanket = quote.Submission.AdditionalInterestBlankets
+            .FirstOrDefault(b => !b.IsDeleted && b.LineOfBusiness == quote.LineOfBusiness);
 
-        if (interests.Count == 0)
+        if (interests.Count == 0 && blanket == null)
             return [];
 
         var policyState = quote.Submission.Insured?.State?.Trim().ToUpperInvariant();
@@ -499,19 +487,23 @@ public class RatingEngineService : IRatingEngineService
             var matchingInterests = interests
                 .Where(i => RequestsCoverage(i, coverageType))
                 .ToList();
-            if (matchingInterests.Count == 0)
+            var blanketRequested = RequestsBlanketCoverage(blanket, coverageType);
+
+            if (matchingInterests.Count == 0 && !blanketRequested)
                 continue;
 
             var rule = candidateRules
                 .Where(r => r.CoverageType == coverageType)
                 .OrderByDescending(RuleSpecificity)
+                .ThenByDescending(r => blanketRequested && r.ChargeMethod != AdditionalInterestChargeMethod.PerInterest)
                 .ThenByDescending(r => r.EffectiveDate ?? DateOnly.MinValue)
                 .FirstOrDefault();
 
             if (rule is null)
                 continue;
 
-            var amount = CalculateAdditionalInterestCharge(rule, matchingInterests.Count);
+            var chargeCount = blanketRequested ? 1 : matchingInterests.Count;
+            var amount = CalculateAdditionalInterestCharge(rule, chargeCount);
             var coverageLabel = AdditionalInterestLabel(coverageType);
 
             lines.Add(new QuoteRatingLine
@@ -521,7 +513,9 @@ public class RatingEngineService : IRatingEngineService
                 Inputs = JsonSerializer.Serialize(new
                 {
                     type = coverageLabel,
-                    count = matchingInterests.Count,
+                    blanket = blanketRequested,
+                    count = chargeCount,
+                    named_count = matchingInterests.Count,
                     names = matchingInterests.Select(i => i.Name).ToList(),
                     applies_to = matchingInterests
                         .Select(i => i.AppliesToType.ToString())
@@ -565,6 +559,15 @@ public class RatingEngineService : IRatingEngineService
             AdditionalInterestCoverageType.LossPayee => interest.LossPayee,
             AdditionalInterestCoverageType.WaiverOfSubrogation => interest.WaiverOfSubrogation,
             AdditionalInterestCoverageType.PrimaryNonContributory => interest.PrimaryNonContributory,
+            _ => false
+        };
+
+    private static bool RequestsBlanketCoverage(SubmissionAdditionalInterestBlanket? blanket, AdditionalInterestCoverageType coverageType) =>
+        blanket != null && coverageType switch
+        {
+            AdditionalInterestCoverageType.AdditionalInsured => blanket.AdditionalInsured,
+            AdditionalInterestCoverageType.WaiverOfSubrogation => blanket.WaiverOfSubrogation,
+            AdditionalInterestCoverageType.PrimaryNonContributory => blanket.PrimaryNonContributory,
             _ => false
         };
 

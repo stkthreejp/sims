@@ -30,7 +30,7 @@ public class AttachmentService : IAttachmentService
         _fileScan = fileScan;
         _maxFileSize = long.TryParse(config["Storage:MaxFileSizeBytes"], out var parsed) ? parsed : 52_428_800L;
         _allowedExtensions = (config.GetSection("Storage:AllowedExtensions").Get<string[]>()
-                ?? [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt", ".csv"])
+                ?? [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt", ".csv", ".html"])
             .Select(e => e.StartsWith('.') ? e.ToLowerInvariant() : $".{e.ToLowerInvariant()}")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         _contentTypesByExtension = new(StringComparer.OrdinalIgnoreCase)
@@ -45,6 +45,7 @@ public class AttachmentService : IAttachmentService
             [".jpeg"] = "image/jpeg",
             [".txt"] = "text/plain",
             [".csv"] = "text/csv",
+            [".html"] = "text/html",
         };
     }
 

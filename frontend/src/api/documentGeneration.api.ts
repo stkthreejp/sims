@@ -20,6 +20,11 @@ export type GenerateDocumentResponse = {
   attachment: Attachment
 }
 
+export type ProposalSendDraftResponse = {
+  generatedDocument: GenerateDocumentResponse
+  communicationId: string
+}
+
 export const documentGenerationApi = {
   getTemplates: (entityType: string) =>
     apiClient
@@ -28,4 +33,24 @@ export const documentGenerationApi = {
 
   generate: (data: GenerateDocumentRequest) =>
     apiClient.post<GenerateDocumentResponse>('/document-generation', data).then((r) => r.data),
+
+  getInlandMarineProposalHtml: (quoteId: string) =>
+    apiClient
+      .get<string>(`/quotes/${quoteId}/proposal/inland-marine/html`, { responseType: 'text' as any })
+      .then((r) => r.data),
+
+  saveInlandMarineProposalHtml: (quoteId: string) =>
+    apiClient
+      .post<GenerateDocumentResponse>(`/quotes/${quoteId}/proposal/inland-marine/html`)
+      .then((r) => r.data),
+
+  saveInlandMarineProposalPdf: (quoteId: string) =>
+    apiClient
+      .post<GenerateDocumentResponse>(`/quotes/${quoteId}/proposal/inland-marine/pdf`)
+      .then((r) => r.data),
+
+  createInlandMarineProposalSendDraft: (quoteId: string) =>
+    apiClient
+      .post<ProposalSendDraftResponse>(`/quotes/${quoteId}/proposal/inland-marine/send-draft`)
+      .then((r) => r.data),
 }

@@ -254,6 +254,22 @@ export interface SubmissionAdditionalInterestCreate {
   notes?: string
 }
 
+export interface SubmissionAdditionalInterestBlanket {
+  id: string
+  submissionId: string
+  lineOfBusiness: string
+  additionalInsured: boolean
+  waiverOfSubrogation: boolean
+  primaryNonContributory: boolean
+  createdAt: string
+}
+
+export interface SubmissionAdditionalInterestBlanketUpsert {
+  additionalInsured: boolean
+  waiverOfSubrogation: boolean
+  primaryNonContributory: boolean
+}
+
 export interface CarrierAdditionalInterestRate {
   id: string
   carrierId: string | null

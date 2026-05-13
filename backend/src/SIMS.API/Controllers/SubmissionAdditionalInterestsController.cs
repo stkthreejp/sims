@@ -1,5 +1,6 @@
 using SIMS.Application.DTOs.Submissions;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Enums;
 using SIMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,6 +28,48 @@ public class SubmissionAdditionalInterestsController : ControllerBase
             .ToListAsync();
 
         return Ok(rows);
+    }
+
+    [HttpGet("blankets")]
+    public async Task<IActionResult> GetBlankets(Guid submissionId)
+    {
+        var rows = await _db.SubmissionAdditionalInterestBlankets
+            .Where(b => b.SubmissionId == submissionId)
+            .OrderBy(b => b.LineOfBusiness)
+            .Select(b => MapBlanketToDto(b))
+            .ToListAsync();
+
+        return Ok(rows);
+    }
+
+    [HttpPut("blankets/{lineOfBusiness}")]
+    public async Task<IActionResult> UpsertBlanket(Guid submissionId, string lineOfBusiness, [FromBody] SubmissionAdditionalInterestBlanketUpsertDto dto)
+    {
+        if (!Enum.TryParse<PolicyLineOfBusiness>(lineOfBusiness, true, out var lob))
+            return BadRequest(new { ErrorMessage = "Invalid line of business." });
+
+        if (!await _db.Submissions.AnyAsync(s => s.Id == submissionId))
+            return NotFound(new { ErrorMessage = "Submission not found." });
+
+        var row = await _db.SubmissionAdditionalInterestBlankets
+            .FirstOrDefaultAsync(b => b.SubmissionId == submissionId && b.LineOfBusiness == lob);
+
+        if (row == null)
+        {
+            row = new SubmissionAdditionalInterestBlanket
+            {
+                SubmissionId = submissionId,
+                LineOfBusiness = lob,
+            };
+            _db.SubmissionAdditionalInterestBlankets.Add(row);
+        }
+
+        row.AdditionalInsured = dto.AdditionalInsured;
+        row.WaiverOfSubrogation = dto.WaiverOfSubrogation;
+        row.PrimaryNonContributory = dto.PrimaryNonContributory;
+
+        await _db.SaveChangesAsync();
+        return Ok(MapBlanketToDto(row));
     }
 
     [HttpPost]
@@ -130,5 +173,16 @@ public class SubmissionAdditionalInterestsController : ControllerBase
         PrimaryNonContributory = a.PrimaryNonContributory,
         Notes = a.Notes,
         CreatedAt = a.CreatedAt,
+    };
+
+    private static SubmissionAdditionalInterestBlanketDto MapBlanketToDto(SubmissionAdditionalInterestBlanket b) => new()
+    {
+        Id = b.Id,
+        SubmissionId = b.SubmissionId,
+        LineOfBusiness = b.LineOfBusiness,
+        AdditionalInsured = b.AdditionalInsured,
+        WaiverOfSubrogation = b.WaiverOfSubrogation,
+        PrimaryNonContributory = b.PrimaryNonContributory,
+        CreatedAt = b.CreatedAt,
     };
 }

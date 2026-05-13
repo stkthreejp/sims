@@ -46,3 +46,21 @@ public class SubmissionAdditionalInterestCreateDto
 }
 
 public class SubmissionAdditionalInterestUpdateDto : SubmissionAdditionalInterestCreateDto { }
+
+public class SubmissionAdditionalInterestBlanketDto
+{
+    public Guid Id { get; set; }
+    public Guid SubmissionId { get; set; }
+    public PolicyLineOfBusiness LineOfBusiness { get; set; }
+    public bool AdditionalInsured { get; set; }
+    public bool WaiverOfSubrogation { get; set; }
+    public bool PrimaryNonContributory { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class SubmissionAdditionalInterestBlanketUpsertDto
+{
+    public bool AdditionalInsured { get; set; }
+    public bool WaiverOfSubrogation { get; set; }
+    public bool PrimaryNonContributory { get; set; }
+}

@@ -10,6 +10,8 @@ import type {
   SubmissionPriorCarrierCreate,
   SubmissionAdditionalInterest,
   SubmissionAdditionalInterestCreate,
+  SubmissionAdditionalInterestBlanket,
+  SubmissionAdditionalInterestBlanketUpsert,
   SubmissionSupplemental,
   SubmissionSupplementalUpsert,
   SubmissionGLCoverages,
@@ -62,6 +64,10 @@ export const submissionPriorCarriersApi = {
 export const submissionAdditionalInterestsApi = {
   getAll: (submissionId: string) =>
     apiClient.get<SubmissionAdditionalInterest[]>(`${base(submissionId)}/additional-interests`).then((r) => r.data),
+  getBlankets: (submissionId: string) =>
+    apiClient.get<SubmissionAdditionalInterestBlanket[]>(`${base(submissionId)}/additional-interests/blankets`).then((r) => r.data),
+  upsertBlanket: (submissionId: string, lineOfBusiness: string, dto: SubmissionAdditionalInterestBlanketUpsert) =>
+    apiClient.put<SubmissionAdditionalInterestBlanket>(`${base(submissionId)}/additional-interests/blankets/${lineOfBusiness}`, dto).then((r) => r.data),
   create: (submissionId: string, dto: SubmissionAdditionalInterestCreate) =>
     apiClient.post<SubmissionAdditionalInterest>(`${base(submissionId)}/additional-interests`, dto).then((r) => r.data),
   update: (submissionId: string, id: string, dto: SubmissionAdditionalInterestCreate) =>

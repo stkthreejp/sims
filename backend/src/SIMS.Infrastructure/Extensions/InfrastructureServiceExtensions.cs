@@ -84,6 +84,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IAttachmentService, AttachmentService>();
         services.AddScoped<IDocumentTemplateService, DocumentTemplateService>();
         services.AddScoped<IDocumentGenerationService, DocumentGenerationService>();
+        services.AddScoped<IProposalGenerationService, ProposalGenerationService>();
+        services.AddScoped<IHtmlToPdfService, SyncfusionHtmlToPdfService>();
         services.AddScoped<IOutboundCommunicationService, OutboundCommunicationService>();
         services.AddScoped<IInboundEmailService, InboundEmailService>();
         services.AddScoped<IEmailIngestionService, EmailIngestionService>();

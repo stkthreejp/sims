@@ -15,8 +15,10 @@ import { agentsApi } from '@/api/agents.api'
 import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionAdditionalInterestsApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
 import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
+import { documentGenerationApi } from '@/api/documentGeneration.api'
+import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS } from '@/types/submissionLob.types'
-import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
@@ -226,6 +228,12 @@ export function SubmissionDetailPage() {
     enabled: !!id && activeTab === 'additional-interests',
   })
 
+  const { data: additionalInterestBlankets = [] } = useQuery({
+    queryKey: ['submission-additional-interest-blankets', id],
+    queryFn: () => submissionAdditionalInterestsApi.getBlankets(id!),
+    enabled: !!id && activeTab === 'additional-interests',
+  })
+
   const { data: supplemental } = useQuery({
     queryKey: ['submission-supplemental', id],
     queryFn: () => submissionSupplementalApi.get(id!),
@@ -274,6 +282,16 @@ export function SubmissionDetailPage() {
     queryKey: ['insured', submission?.insuredId],
     queryFn: () => insuredsApi.getById(submission!.insuredId),
     enabled: !!submission?.insuredId,
+  })
+
+  const { data: outboundCommunications = [] } = useQuery({
+    queryKey: ['submission-outbound-communications', id, quotes.map((q) => q.id).join('|')],
+    queryFn: async () => {
+      const rows = await outboundCommunicationsApi.getForEntity('Submission', id!)
+      const quoteRows = await Promise.all(quotes.map((q) => outboundCommunicationsApi.getForEntity('Quote', q.id)))
+      return [...rows, ...quoteRows.flat()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    },
+    enabled: !!id && activeTab === 'activity',
   })
 
   const defaultTerritoryCode = useMemo(() => {
@@ -440,6 +458,16 @@ export function SubmissionDetailPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-additional-interests', id] }); toast.success('Additional interest removed') },
   })
 
+  const saveAdditionalInterestBlanketMutation = useMutation({
+    mutationFn: ({ lineOfBusiness, dto }: { lineOfBusiness: string; dto: SubmissionAdditionalInterestBlanketUpsert }) =>
+      submissionAdditionalInterestsApi.upsertBlanket(id!, lineOfBusiness, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-additional-interest-blankets', id] })
+      toast.success('Blanket request saved')
+    },
+    onError: () => toast.error('Failed to save blanket request'),
+  })
+
   const saveEquipmentMutation = useMutation({
     mutationFn: (dto: SubmissionEquipmentCreate) =>
       editingEquipmentId
@@ -475,6 +503,38 @@ export function SubmissionDetailPage() {
       toast.success('GL coverages saved')
     },
     onError: () => toast.error('Failed to save GL coverages'),
+  })
+
+  const previewInlandMarineProposalMutation = useMutation({
+    mutationFn: (quoteId: string) => documentGenerationApi.getInlandMarineProposalHtml(quoteId),
+    onSuccess: (html) => {
+      const blob = new Blob([html], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to generate proposal preview'),
+  })
+
+  const saveInlandMarineProposalMutation = useMutation({
+    mutationFn: (quoteId: string) => documentGenerationApi.saveInlandMarineProposalPdf(quoteId),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['attachments', 'Submission', id] })
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+      toast.success('Proposal generated and filed')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to generate proposal'),
+  })
+
+  const sendInlandMarineProposalDraftMutation = useMutation({
+    mutationFn: (quoteId: string) => documentGenerationApi.createInlandMarineProposalSendDraft(quoteId),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['attachments', 'Submission', id] })
+      qc.invalidateQueries({ queryKey: ['submission-outbound-communications', id] })
+      window.open(data.generatedDocument.url, '_blank', 'noopener,noreferrer')
+      toast.success('Proposal draft created and filed')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to create proposal draft'),
   })
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -553,6 +613,20 @@ export function SubmissionDetailPage() {
     (expLob === 'im' && !hasIM) ? 'auto' :
     expLob
 
+  const additionalInterestLobs = submission.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS
+  const saveBlanketRequest = (lineOfBusiness: string, patch: Partial<SubmissionAdditionalInterestBlanketUpsert>) => {
+    const current = additionalInterestBlankets.find((b) => b.lineOfBusiness === lineOfBusiness)
+    saveAdditionalInterestBlanketMutation.mutate({
+      lineOfBusiness,
+      dto: {
+        additionalInsured: current?.additionalInsured ?? false,
+        waiverOfSubrogation: current?.waiverOfSubrogation ?? false,
+        primaryNonContributory: current?.primaryNonContributory ?? false,
+        ...patch,
+      },
+    })
+  }
+
   // ── Shared quote list renderer ─────────────────────────────────────────────
 
   const renderQuoteList = () => (
@@ -618,6 +692,31 @@ export function SubmissionDetailPage() {
                   </div>
                 </div>
                 <div className="acts">
+                  {q.lineOfBusiness === 'InlandMarine' && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); previewInlandMarineProposalMutation.mutate(q.id) }}
+                        disabled={previewInlandMarineProposalMutation.isPending}
+                        className="sd-btn sm outline"
+                      >
+                        <FileText size={12} /> Preview
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); saveInlandMarineProposalMutation.mutate(q.id) }}
+                        disabled={saveInlandMarineProposalMutation.isPending}
+                        className="sd-btn sm primary"
+                      >
+                        <FileText size={12} /> Generate Proposal
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); sendInlandMarineProposalDraftMutation.mutate(q.id) }}
+                        disabled={sendInlandMarineProposalDraftMutation.isPending}
+                        className="sd-btn sm primary"
+                      >
+                        <FileText size={12} /> Send Proposal
+                      </button>
+                    </>
+                  )}
                   {q.status === 'Bound' && (
                     <Link to={`/policies/${q.id}`} className="sd-btn sm outline">View Policy</Link>
                   )}
@@ -1304,21 +1403,10 @@ export function SubmissionDetailPage() {
                   <div><label style={labelStyle}>Total Subcontractor Cost</label><input type="number" value={glCovForm.totalSubcontractorCost ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, totalSubcontractorCost: parseFloat(e.target.value) || undefined })); setGlCovDirty(true) }} style={inputStyle} placeholder="For class 91581" /></div>
                 </div>
               </div>
-              {/* Endorsements & surcharges */}
+              {/* TRIA */}
               <div style={{ paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Endorsements & Surcharges</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                  <div><label style={labelStyle}>AI Individual (qty × $50)</label><input type="number" min={0} value={glCovForm.aiIndividualCount} onChange={(e) => { setGlCovForm((f) => ({ ...f, aiIndividualCount: parseInt(e.target.value) || 0 })); setGlCovDirty(true) }} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>WOS Individual (qty × $50)</label><input type="number" min={0} value={glCovForm.wosIndividualCount} onChange={(e) => { setGlCovForm((f) => ({ ...f, wosIndividualCount: parseInt(e.target.value) || 0 })); setGlCovDirty(true) }} style={inputStyle} /></div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.aiBlanket} onChange={(e) => { setGlCovForm((f) => ({ ...f, aiBlanket: e.target.checked })); setGlCovDirty(true) }} /> AI Blanket ($250)</label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.wosBlanket} onChange={(e) => { setGlCovForm((f) => ({ ...f, wosBlanket: e.target.checked })); setGlCovDirty(true) }} /> WOS Blanket ($250)</label>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.primaryNonContributory} onChange={(e) => { setGlCovForm((f) => ({ ...f, primaryNonContributory: e.target.checked })); setGlCovDirty(true) }} /> Primary Non-Contributory ($250)</label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.includeTria} onChange={(e) => { setGlCovForm((f) => ({ ...f, includeTria: e.target.checked })); setGlCovDirty(true) }} /> Include TRIA (2.5%)</label>
-                  </div>
-                </div>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Terrorism</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.includeTria} onChange={(e) => { setGlCovForm((f) => ({ ...f, includeTria: e.target.checked })); setGlCovDirty(true) }} /> Include TRIA (2.5%)</label>
                 {glCovDirty && (
                   <div style={{ marginTop: 12 }}>
                     <button onClick={() => saveGlCovMutation.mutate(glCovForm)} disabled={saveGlCovMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save GL Coverages</button>
@@ -1347,6 +1435,25 @@ export function SubmissionDetailPage() {
             </button>
           </div>
           <div className="sd-card-body tight">
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)' }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Blanket requests</div>
+              <table className="sd-table">
+                <thead><tr><th>LOB</th><th>Blanket AI</th><th>Blanket WOS</th><th>Blanket PNC</th></tr></thead>
+                <tbody>
+                  {additionalInterestLobs.map((lob) => {
+                    const blanket = additionalInterestBlankets.find((b) => b.lineOfBusiness === lob)
+                    return (
+                      <tr key={lob}>
+                        <td><span className="sd-lob">{LOB_SHORT[lob] ?? lob}</span></td>
+                        <td><input type="checkbox" checked={blanket?.additionalInsured ?? false} disabled={saveAdditionalInterestBlanketMutation.isPending} onChange={(e) => saveBlanketRequest(lob, { additionalInsured: e.target.checked })} /></td>
+                        <td><input type="checkbox" checked={blanket?.waiverOfSubrogation ?? false} disabled={saveAdditionalInterestBlanketMutation.isPending} onChange={(e) => saveBlanketRequest(lob, { waiverOfSubrogation: e.target.checked })} /></td>
+                        <td><input type="checkbox" checked={blanket?.primaryNonContributory ?? false} disabled={saveAdditionalInterestBlanketMutation.isPending} onChange={(e) => saveBlanketRequest(lob, { primaryNonContributory: e.target.checked })} /></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
             {showAdditionalInterestForm && (
               <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingAdditionalInterestId ? 'Edit Additional Interest' : 'Add Additional Interest'}</div>
@@ -1491,10 +1598,29 @@ export function SubmissionDetailPage() {
       {/* Activity tab */}
       {activeTab === 'activity' && (
         <section className="sd-card">
-          <div className="sd-card-head"><h3>Activity</h3></div>
-          <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-            <div style={{ color: 'var(--ink-2)', fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>No activity recorded yet</div>
-            <div style={{ fontSize: 12 }}>Activity log coming soon.</div>
+          <div className="sd-card-head"><h3>Activity <span className="cnt">{outboundCommunications.length}</span></h3></div>
+          <div className="sd-card-body tight">
+            {outboundCommunications.length === 0 ? (
+              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
+                <div style={{ color: 'var(--ink-2)', fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>No communication activity recorded yet</div>
+              </div>
+            ) : (
+              <table className="sd-table">
+                <thead><tr><th>Subject</th><th>To</th><th>From</th><th>Status</th><th>Attachments</th><th>Created</th></tr></thead>
+                <tbody>
+                  {outboundCommunications.map((c) => (
+                    <tr key={c.id}>
+                      <td className="primary-cell">{c.subject}</td>
+                      <td>{c.toName ? `${c.toName} <${c.toAddress}>` : c.toAddress}</td>
+                      <td>{c.fromAddress}</td>
+                      <td><span className="sd-lob">{c.status}</span></td>
+                      <td>{c.attachmentCount}</td>
+                      <td>{new Date(c.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </section>
       )}
