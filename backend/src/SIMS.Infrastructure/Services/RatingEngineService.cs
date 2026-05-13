@@ -80,12 +80,25 @@ public class RatingEngineService : IRatingEngineService
             if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
         }
 
+        var inlandMarineEndorsementLines = quote.LineOfBusiness == PolicyLineOfBusiness.InlandMarine
+            ? BuildInlandMarineEndorsementLines(request)
+            : new List<QuoteRatingLine>();
+
+        if (inlandMarineEndorsementLines.Count > 0)
+        {
+            output.Lines.AddRange(inlandMarineEndorsementLines);
+            output = output with { GrandTotal = output.GrandTotal + inlandMarineEndorsementLines.Sum(l => l.LinePremium) };
+        }
+
         var additionalInterestLines = await BuildAdditionalInterestChargeLinesAsync(quote);
         if (additionalInterestLines.Count > 0)
         {
             output.Lines.AddRange(additionalInterestLines);
             output = output with { GrandTotal = output.GrandTotal + additionalInterestLines.Sum(l => l.LinePremium) };
         }
+
+        var endorsementPremium = inlandMarineEndorsementLines.Sum(l => l.LinePremium);
+        var isInlandMarine = quote.LineOfBusiness == PolicyLineOfBusiness.InlandMarine;
 
         // ── Persist snapshot ─────────────────────────────────────────────────
         var existing = await _db.QuoteRatingSnapshots
@@ -104,7 +117,11 @@ public class RatingEngineService : IRatingEngineService
             ScheduleModifier = modifier,
             ScheduleModifierReason = request.ScheduleModifierReason,
             GrandTotalPremium = output.GrandTotal,
-            EndorsementPremium = 0,
+            DebrisRemoval = isInlandMarine && (request.DebrisRemoval ?? true),
+            RentalReimbursement = isInlandMarine && (request.RentalReimbursement ?? true),
+            TowingStorageRecovery = isInlandMarine && (request.TowingStorageRecovery ?? true),
+            NewlyAcquiredEquipment = isInlandMarine && (request.NewlyAcquiredEquipment ?? false),
+            EndorsementPremium = endorsementPremium,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             Lines = output.Lines,
@@ -598,12 +615,42 @@ public class RatingEngineService : IRatingEngineService
 
     private record struct FormulaOutput(decimal ManualPremium, decimal GrandTotal, List<QuoteRatingLine> Lines);
 
+    private static List<QuoteRatingLine> BuildInlandMarineEndorsementLines(RateQuoteRequest request)
+    {
+        var selections = new[]
+        {
+            new { Selected = request.DebrisRemoval ?? true, Code = "DEBRIS", Name = "Debris Removal", Premium = 250m },
+            new { Selected = request.RentalReimbursement ?? true, Code = "RENTAL", Name = "Rental Reimbursement", Premium = 500m },
+            new { Selected = request.TowingStorageRecovery ?? true, Code = "TOWING", Name = "Towing, Storage & Recovery", Premium = 175m },
+            new { Selected = request.NewlyAcquiredEquipment ?? false, Code = "NEWLY", Name = "Newly Acquired Equipment", Premium = 0m },
+        };
+
+        return selections
+            .Where(e => e.Selected && e.Premium > 0)
+            .Select(e => new QuoteRatingLine
+            {
+                Id = Guid.NewGuid(),
+                ExposureRef = $"IM-END-{e.Code}",
+                Inputs = JsonSerializer.Serialize(new { type = e.Name }),
+                FactorsApplied = JsonSerializer.Serialize(new { basis = "flat" }),
+                LinePremium = e.Premium,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            })
+            .ToList();
+    }
+
     private static RatingResultDto MapSnapshotToDto(QuoteRatingSnapshot s, RatingPlanVersion v, string? ratedByName) => new()
     {
         SnapshotId = s.Id,
         ManualPremium = s.ManualPremium,
         ScheduleModifier = s.ScheduleModifier,
         ScheduleModifierReason = s.ScheduleModifierReason,
+        DebrisRemoval = s.DebrisRemoval,
+        RentalReimbursement = s.RentalReimbursement,
+        TowingStorageRecovery = s.TowingStorageRecovery,
+        NewlyAcquiredEquipment = s.NewlyAcquiredEquipment,
+        EndorsementPremium = s.EndorsementPremium,
         GrandTotalPremium = s.GrandTotalPremium,
         RatedAt = s.RatedAt,
         RatedById = s.RatedById,

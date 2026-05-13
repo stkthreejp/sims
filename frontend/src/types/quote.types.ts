@@ -174,6 +174,10 @@ export interface Note {
 export interface RateQuoteRequest {
   scheduleModifier: number
   scheduleModifierReason?: string
+  debrisRemoval?: boolean
+  rentalReimbursement?: boolean
+  towingStorageRecovery?: boolean
+  newlyAcquiredEquipment?: boolean
 }
 
 export interface RatingLine {
@@ -188,6 +192,11 @@ export interface RatingResult {
   manualPremium: number
   scheduleModifier: number
   scheduleModifierReason: string | null
+  debrisRemoval: boolean
+  rentalReimbursement: boolean
+  towingStorageRecovery: boolean
+  newlyAcquiredEquipment: boolean
+  endorsementPremium: number
   grandTotalPremium: number
   ratedAt: string
   ratedById: string

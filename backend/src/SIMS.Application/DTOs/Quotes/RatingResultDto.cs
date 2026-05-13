@@ -6,6 +6,11 @@ public class RatingResultDto
     public decimal ManualPremium { get; set; }
     public decimal ScheduleModifier { get; set; }
     public string? ScheduleModifierReason { get; set; }
+    public bool DebrisRemoval { get; set; }
+    public bool RentalReimbursement { get; set; }
+    public bool TowingStorageRecovery { get; set; }
+    public bool NewlyAcquiredEquipment { get; set; }
+    public decimal EndorsementPremium { get; set; }
     public decimal GrandTotalPremium { get; set; }
     public DateTime RatedAt { get; set; }
     public Guid RatedById { get; set; }

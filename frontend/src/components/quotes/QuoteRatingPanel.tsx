@@ -16,6 +16,15 @@ const LOB_SHADOW_KEY: Partial<Record<PolicyLineOfBusiness, 'gl' | 'im' | 'al' | 
   AutoPhysicalDamage:'apd',
 }
 
+const IM_OPTIONAL_ENDORSEMENTS = [
+  { key: 'debrisRemoval', label: 'Debris Removal', premium: 250 },
+  { key: 'rentalReimbursement', label: 'Rental Reimbursement', premium: 500 },
+  { key: 'towingStorageRecovery', label: 'Towing, Storage & Recovery', premium: 175 },
+  { key: 'newlyAcquiredEquipment', label: 'Newly Acquired Equipment', premium: 0 },
+] as const
+
+type IMEndorsementKey = typeof IM_OPTIONAL_ENDORSEMENTS[number]['key']
+
 type Props = {
   quoteId: string
   submissionId: string
@@ -51,11 +60,23 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
   // Form state — seeded from snapshot when one exists.
   const [modifier, setModifier] = useState(1.0)
   const [reason, setReason] = useState('')
+  const [imEndorsements, setImEndorsements] = useState<Record<IMEndorsementKey, boolean>>({
+    debrisRemoval: true,
+    rentalReimbursement: true,
+    towingStorageRecovery: true,
+    newlyAcquiredEquipment: false,
+  })
 
   useEffect(() => {
     if (snapshot) {
       setModifier(snapshot.scheduleModifier)
       setReason(snapshot.scheduleModifierReason ?? '')
+      setImEndorsements({
+        debrisRemoval: snapshot.debrisRemoval,
+        rentalReimbursement: snapshot.rentalReimbursement,
+        towingStorageRecovery: snapshot.towingStorageRecovery,
+        newlyAcquiredEquipment: snapshot.newlyAcquiredEquipment,
+      })
     }
   }, [snapshot])
 
@@ -77,6 +98,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
     mutationFn: () => quotesApi.rate(quoteId, {
       scheduleModifier: modifier,
       scheduleModifierReason: reason.trim() || undefined,
+      ...(lineOfBusiness === 'InlandMarine' ? imEndorsements : {}),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rating-snapshot', quoteId] })
@@ -94,6 +116,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
     mutationFn: () => quotesApi.shadowRate(quoteId, {
       scheduleModifier: modifier,
       scheduleModifierReason: reason.trim() || undefined,
+      ...(lineOfBusiness === 'InlandMarine' ? imEndorsements : {}),
     }),
     onSuccess: (result: any) => {
       const shadow = result?.shadowPremium
@@ -125,6 +148,9 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
   const itemsMissingType = equipment.filter((e) => !e.equipmentTypeId)
   const itemsMissingValue = equipment.filter((e) => !e.value)
   const blockedByMissingFields = itemsMissingType.length > 0 || itemsMissingValue.length > 0
+  const selectedEndorsementPremium = IM_OPTIONAL_ENDORSEMENTS
+    .filter((e) => imEndorsements[e.key])
+    .reduce((sum, e) => sum + e.premium, 0)
 
   return (
     <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 space-y-4">
@@ -197,6 +223,31 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
           </table>
         )}
       </div>
+
+      {lineOfBusiness === 'InlandMarine' && (
+        <div className="bg-white border rounded p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold text-slate-700 uppercase">Optional Endorsements</h4>
+            <span className="text-xs text-slate-500">Selected premium: {formatCurrency(selectedEndorsementPremium)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {IM_OPTIONAL_ENDORSEMENTS.map((endorsement) => (
+              <label key={endorsement.key} className="flex items-center justify-between gap-3 border rounded px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                <span className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={imEndorsements[endorsement.key]}
+                    disabled={isBound}
+                    onChange={(e) => setImEndorsements((current) => ({ ...current, [endorsement.key]: e.target.checked }))}
+                  />
+                  {endorsement.label}
+                </span>
+                <span className="text-xs text-slate-500">{endorsement.premium > 0 ? formatCurrency(endorsement.premium) : 'No charge'}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Schedule modifier */}
       <div className="bg-white border rounded p-4 space-y-3">
@@ -301,7 +352,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
               </tr>
             </thead>
             <tbody className="divide-y">
-              {snapshot.lines.map((l) => {
+              {snapshot.lines.filter((l) => !l.exposureRef.startsWith('IM-END-')).map((l) => {
                 const inputs = safeParse(l.inputs)
                 const factors = safeParse(l.factorsApplied)
                 return (
@@ -337,6 +388,12 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
                     Minimum premium floor applied ({formatCurrency(snapshot.minimumPremium)})
                   </td>
                   <td />
+                </tr>
+              )}
+              {lineOfBusiness === 'InlandMarine' && snapshot.endorsementPremium > 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-2 text-right text-slate-600">Optional Endorsements</td>
+                  <td className="px-4 py-2 text-right font-medium">{formatCurrency(snapshot.endorsementPremium)}</td>
                 </tr>
               )}
               <tr className="bg-blue-50 border-t-2 border-blue-200">

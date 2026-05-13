@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text;
 using System.Text.Json;
@@ -65,8 +66,8 @@ public class ProposalGenerationService : IProposalGenerationService
         var proposal = BuildProposalData(quote, latestSnapshot);
         var equipment = BuildEquipmentData(quote, latestSnapshot);
         var lossPayees = BuildLossPayeeData(quote.Submission.AdditionalInterests);
-        var endorsements = BuildEndorsementData();
-        var forms = BuildFormsData();
+        var endorsements = BuildEndorsementData(latestSnapshot);
+        var forms = BuildFormsData(endorsements);
 
         var html = await BuildSelfContainedHtmlAsync(templateDir, proposal, equipment, lossPayees, endorsements, forms);
         return Result<string>.Success(html);
@@ -221,17 +222,18 @@ public class ProposalGenerationService : IProposalGenerationService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var premium = quote.PremiumAmount != 0m
-            ? quote.PremiumAmount
-            : snapshot?.ManualPremium ?? 0m;
+        var premium = snapshot?.ManualPremium
+            ?? (quote.PremiumAmount != 0m ? quote.PremiumAmount : 0m);
         var total = quote.TotalPremium != 0m
             ? quote.TotalPremium
-            : premium + quote.TaxesAndFees;
+            : (snapshot?.GrandTotalPremium ?? premium) + quote.TaxesAndFees;
 
         var fees = new List<object[]>
         {
             new object[] { "Inland Marine Premium", FormatMoney(premium) },
         };
+        if (snapshot?.EndorsementPremium > 0)
+            fees.Add(new object[] { "Optional Endorsements", FormatMoney(snapshot.EndorsementPremium) });
         if (quote.TaxesAndFees != 0m)
             fees.Add(new object[] { "Taxes & Fees", FormatMoney(quote.TaxesAndFees) });
 
@@ -318,6 +320,49 @@ public class ProposalGenerationService : IProposalGenerationService
             .ToList();
     }
 
+    private static IReadOnlyList<EndorsementProposalRow> BuildEndorsementData(QuoteRatingSnapshot? snapshot)
+    {
+        var debris = snapshot?.DebrisRemoval ?? true;
+        var rental = snapshot?.RentalReimbursement ?? true;
+        var towing = snapshot?.TowingStorageRecovery ?? true;
+        var newly = snapshot?.NewlyAcquiredEquipment ?? false;
+
+        return
+        [
+            new("Debris Removal", [new("Any one loss", "$2,500"), new("Aggregate", "$10,000")], debris, debris ? FormatMoney(250m) : null, debris ? 250m : 0m),
+            new("Rental Reimbursement", [new("Per day", "$2,500"), new("Aggregate", "$10,000")], rental, rental ? FormatMoney(500m) : null, rental ? 500m : 0m),
+            new("Towing, Storage & Recovery", [new("Any one loss", "$5,000")], towing, towing ? FormatMoney(175m) : null, towing ? 175m : 0m),
+            new("Newly Acquired Equipment", [new("Maximum limit", "$25,000")], newly, null, 0m, "Coverage for newly purchased units, reported within 30 days."),
+        ];
+    }
+
+    private static IReadOnlyList<object> BuildFormsData(IReadOnlyList<EndorsementProposalRow> endorsements)
+    {
+        var forms = new List<object>
+        {
+            new { form = "LL IM SCHED", edition = "-", title = "LL Inland Marine Policy Schedule" },
+            new { form = "LL IM EQ SCHED", edition = "-", title = "LL Inland Marine Equipment Schedule" },
+            new { form = "SMM - SLSTAMP", edition = "-", title = "Surplus Lines - State Stamp Only" },
+            new { form = "LL IM OPT END", edition = "-", title = "LL Inland Marine Optional Endorsements" },
+            new { form = "FORMS - SCHED A", edition = "08 12", title = "Schedule of Taxes, Surcharges or Fees" },
+            new { form = "LL IM CLAIMS", edition = "-", title = "LL Inland Marine Claims Page" },
+            new { form = "FORMS - SCHED", edition = "08 12", title = "Schedule of Forms and Endorsements" },
+        };
+
+        foreach (var endorsement in endorsements.Where(e => e.included))
+        {
+            forms.Add(new
+            {
+                form = $"LL IM END - {EndorsementCode(endorsement.name)}",
+                edition = "-",
+                title = endorsement.name,
+            });
+        }
+
+        forms.Add(new { form = "LL IM FLOATER", edition = "-", title = "LL Inland Marine Floater" });
+        return forms;
+    }
+
     private static IReadOnlyList<object> BuildEndorsementData() =>
     [
         new { name = "Debris Removal", limits = new[] { new { label = "Any one loss", value = "$2,500" }, new { label = "Aggregate", value = "$10,000" } }, included = true, premium = "$250.00", premiumNum = 250 },
@@ -343,7 +388,7 @@ public class ProposalGenerationService : IProposalGenerationService
         object proposal,
         IReadOnlyList<object> equipment,
         IReadOnlyList<object> lossPayees,
-        IReadOnlyList<object> endorsements,
+        IReadOnlyList<EndorsementProposalRow> endorsements,
         IReadOnlyList<object> forms)
     {
         var html = await File.ReadAllTextAsync(Path.Combine(templateDir, "index.html"));
@@ -399,8 +444,26 @@ public class ProposalGenerationService : IProposalGenerationService
     }
 
     private static string FormatProposalDate(DateOnly date) => date.ToString("MM / dd / yyyy");
-    private static string FormatMoney(decimal value) => value.ToString("C");
+    private static string FormatMoney(decimal value) => value.ToString("C", CultureInfo.GetCultureInfo("en-US"));
     private static string SanitizeFileName(string name) => Regex.Replace(name, @"[^\w\-]", "_").Trim('_');
+
+    private static string EndorsementCode(string name) => name switch
+    {
+        "Debris Removal" => "DEBRIS",
+        "Rental Reimbursement" => "RENTAL",
+        "Towing, Storage & Recovery" => "TOWING",
+        "Newly Acquired Equipment" => "NEWLY",
+        _ => Regex.Replace(name.ToUpperInvariant(), @"[^A-Z0-9]+", "-").Trim('-'),
+    };
+
+    private sealed record EndorsementLimitRow(string label, string value);
+    private sealed record EndorsementProposalRow(
+        string name,
+        IReadOnlyList<EndorsementLimitRow> limits,
+        bool included,
+        string? premium,
+        decimal premiumNum,
+        string? note = null);
 
     private static string BuildProposalEmailBody(Quote quote)
     {
