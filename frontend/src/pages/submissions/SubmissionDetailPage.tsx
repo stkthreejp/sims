@@ -15,7 +15,6 @@ import { agentsApi } from '@/api/agents.api'
 import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionAdditionalInterestsApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
 import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
-import { documentGenerationApi } from '@/api/documentGeneration.api'
 import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS, GL_CLASS_CODE_OPTIONS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
@@ -555,38 +554,6 @@ export function SubmissionDetailPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-gl-classifications', id] }); toast.success('GL exposure removed') },
   })
 
-  const previewInlandMarineProposalMutation = useMutation({
-    mutationFn: (quoteId: string) => documentGenerationApi.getInlandMarineProposalHtml(quoteId),
-    onSuccess: (html) => {
-      const blob = new Blob([html], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank', 'noopener,noreferrer')
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to generate proposal preview'),
-  })
-
-  const saveInlandMarineProposalMutation = useMutation({
-    mutationFn: (quoteId: string) => documentGenerationApi.saveInlandMarineProposalPdf(quoteId),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['attachments', 'Submission', id] })
-      window.open(data.url, '_blank', 'noopener,noreferrer')
-      toast.success('Proposal generated and filed')
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to generate proposal'),
-  })
-
-  const sendInlandMarineProposalDraftMutation = useMutation({
-    mutationFn: (quoteId: string) => documentGenerationApi.createInlandMarineProposalSendDraft(quoteId),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['attachments', 'Submission', id] })
-      qc.invalidateQueries({ queryKey: ['submission-outbound-communications', id] })
-      window.open(data.generatedDocument.url, '_blank', 'noopener,noreferrer')
-      toast.success('Proposal draft created and filed')
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to create proposal draft'),
-  })
-
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleCreateQuote = () => {
@@ -745,31 +712,6 @@ export function SubmissionDetailPage() {
                   </div>
                 </div>
                 <div className="acts">
-                  {q.lineOfBusiness === 'InlandMarine' && (
-                    <>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); previewInlandMarineProposalMutation.mutate(q.id) }}
-                        disabled={previewInlandMarineProposalMutation.isPending}
-                        className="sd-btn sm outline"
-                      >
-                        <FileText size={12} /> Preview
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); saveInlandMarineProposalMutation.mutate(q.id) }}
-                        disabled={saveInlandMarineProposalMutation.isPending}
-                        className="sd-btn sm primary"
-                      >
-                        <FileText size={12} /> Generate Proposal
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); sendInlandMarineProposalDraftMutation.mutate(q.id) }}
-                        disabled={sendInlandMarineProposalDraftMutation.isPending}
-                        className="sd-btn sm primary"
-                      >
-                        <FileText size={12} /> Send Proposal
-                      </button>
-                    </>
-                  )}
                   {q.status === 'Bound' && (
                     <Link to={`/policies/${q.id}`} className="sd-btn sm outline">View Policy</Link>
                   )}

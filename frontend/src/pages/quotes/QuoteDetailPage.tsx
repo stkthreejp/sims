@@ -14,6 +14,7 @@ import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { attachmentsApi } from '@/api/attachments.api'
+import { documentGenerationApi } from '@/api/documentGeneration.api'
 import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -543,7 +544,7 @@ export function QuoteDetailPage() {
   })
 
   const { data: ratingSnapshot } = useQuery({
-    queryKey: ['quote-rating-snapshot', quoteId],
+    queryKey: ['rating-snapshot', quoteId],
     queryFn: () => quotesApi.getRatingSnapshot(quoteId!),
     enabled: !!quoteId,
   })
@@ -572,6 +573,37 @@ export function QuoteDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to apply commission override'),
   })
 
+  const previewInlandMarineProposalMutation = useMutation({
+    mutationFn: () => documentGenerationApi.getInlandMarineProposalHtml(quoteId!),
+    onSuccess: (html) => {
+      const blob = new Blob([html], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to generate proposal preview'),
+  })
+
+  const saveInlandMarineProposalMutation = useMutation({
+    mutationFn: () => documentGenerationApi.saveInlandMarineProposalPdf(quoteId!),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['quote-attachments', quoteId] })
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+      toast.success('Proposal generated and filed')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to generate proposal'),
+  })
+
+  const sendInlandMarineProposalDraftMutation = useMutation({
+    mutationFn: () => documentGenerationApi.createInlandMarineProposalSendDraft(quoteId!),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['quote-attachments', quoteId] })
+      window.open(data.generatedDocument.url, '_blank', 'noopener,noreferrer')
+      toast.success('Proposal draft created and filed')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to create proposal draft'),
+  })
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -593,6 +625,7 @@ export function QuoteDetailPage() {
   const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted).length
   const canBind = (quote.status === 'Quoted' || quote.status === 'Submitted') && openBlockers === 0
   const canReduce = quote.status !== 'Bound' && quote.status !== 'Cancelled' && quote.status !== 'Expired' && canCreatePolicies && !quote.commissionOverride
+  const canGenerateInlandMarineProposal = quote.lineOfBusiness === 'InlandMarine' && !!ratingSnapshot && ratingSnapshot.grandTotalPremium > 0
   const otherQuotes = siblingQuotes.filter((q) => q.id !== quote.id)
 
   // Commission: use override if present, else computed amounts
@@ -666,6 +699,19 @@ export function QuoteDetailPage() {
               <Btn variant="primary" onClick={() => setShowBind(true)}>
                 <CheckCircle2 className="h-3.5 w-3.5" /> Bind quote
               </Btn>
+            )}
+            {canGenerateInlandMarineProposal && (
+              <>
+                <Btn variant="outline" onClick={() => previewInlandMarineProposalMutation.mutate()} disabled={previewInlandMarineProposalMutation.isPending}>
+                  <FileText className="h-3.5 w-3.5" /> Preview
+                </Btn>
+                <Btn variant="outline" onClick={() => saveInlandMarineProposalMutation.mutate()} disabled={saveInlandMarineProposalMutation.isPending}>
+                  <FileText className="h-3.5 w-3.5" /> Generate Proposal
+                </Btn>
+                <Btn variant="primary" onClick={() => sendInlandMarineProposalDraftMutation.mutate()} disabled={sendInlandMarineProposalDraftMutation.isPending}>
+                  <FileText className="h-3.5 w-3.5" /> Send Proposal
+                </Btn>
+              </>
             )}
             <Btn variant="ghost">
               <MoreHorizontal className="h-4 w-4" />

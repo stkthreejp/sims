@@ -91,8 +91,8 @@ public class ProposalGenerationService : IProposalGenerationService
         var fileName = $"{SanitizeFileName(quote.QuoteNumber)}_InlandMarineProposal_{DateTime.UtcNow:yyyyMMdd_HHmmss}.html";
 
         var attachmentResult = await _attachments.CreateGeneratedAsync(
-            DocumentEntityType.Submission,
-            quote.SubmissionId,
+            DocumentEntityType.Policy,
+            quoteId,
             stream,
             fileName,
             "text/html",
@@ -139,8 +139,8 @@ public class ProposalGenerationService : IProposalGenerationService
         var fileName = $"{SanitizeFileName(quote.QuoteNumber)}_InlandMarineProposal_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
 
         var attachmentResult = await _attachments.CreateGeneratedAsync(
-            DocumentEntityType.Submission,
-            quote.SubmissionId,
+            DocumentEntityType.Policy,
+            quoteId,
             stream,
             fileName,
             "application/pdf",
