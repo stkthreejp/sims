@@ -15,6 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { attachmentsApi } from '@/api/attachments.api'
 import { documentGenerationApi } from '@/api/documentGeneration.api'
+import { uwWriteupApi } from '@/api/uwWriteup.api'
 import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -48,6 +49,14 @@ function fmt(n: number | null | undefined) {
 function fmtFull(n: number | null | undefined) {
   if (n == null) return '—'
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function parseLineInputs(inputs: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(inputs)
+  } catch {
+    return null
+  }
 }
 
 function stageIdx(status: QuoteStatus, issuedDate: string | null): number {
@@ -146,6 +155,37 @@ function Btn({ children, onClick, variant = 'ghost', disabled, className = '', t
 }
 
 // ── Bind checklist ─────────────────────────────────────────────────────────────
+
+function MenuButton({
+  label, children, variant = 'outline',
+}: { label: React.ReactNode; children: React.ReactNode; variant?: 'outline' | 'ghost' | 'primary' }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative">
+      <Btn variant={variant} onClick={() => setOpen((v) => !v)}>
+        {label}
+      </Btn>
+      {open && (
+        <div className="absolute right-0 top-9 z-20 min-w-48 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {children}
+    </button>
+  )
+}
 
 function ChecklistCard({ quoteId }: { quoteId: string }) {
   const qc = useQueryClient()
@@ -549,6 +589,12 @@ export function QuoteDetailPage() {
     enabled: !!quoteId,
   })
 
+  const { data: writeup } = useQuery({
+    queryKey: ['uw-writeup', quoteId],
+    queryFn: () => uwWriteupApi.get(quoteId!),
+    enabled: !!quoteId,
+  })
+
   const { data: siblingQuotes = [] } = useQuery({
     queryKey: ['quotes', 'by-submission', quote?.submissionId],
     queryFn: () => quotesApi.getBySubmission(quote!.submissionId),
@@ -628,9 +674,20 @@ export function QuoteDetailPage() {
   const canGenerateInlandMarineProposal = quote.lineOfBusiness === 'InlandMarine' && !!ratingSnapshot && ratingSnapshot.grandTotalPremium > 0
   const otherQuotes = siblingQuotes.filter((q) => q.id !== quote.id)
 
-  // Commission: use override if present, else computed amounts
-  const agentCommAmt = quote.commissionOverride?.agentCommissionAmount ?? quote.agentCommissionAmount
+  const ratedTotalPremium = ratingSnapshot?.grandTotalPremium ?? quote.totalPremium
+
+  // Commission: show the rated premium basis when a rating snapshot exists.
   const agentCommRate = quote.commissionOverride?.agentRate ?? quote.agentCommissionRate
+  const agentCommAmt = quote.commissionOverride?.agentCommissionAmount ?? ratedTotalPremium * agentCommRate
+  const carrierCommAmt = ratedTotalPremium * quote.carrierCommissionRate
+  const smmRetentionAmt = ratedTotalPremium * quote.smmRetentionRate
+
+  const ratedEquipmentValues = ratingSnapshot?.lines
+    .map((line) => parseLineInputs(line.inputs)?.value)
+    .filter((value): value is number => typeof value === 'number') ?? []
+  const totalTiv = writeup?.equipment.totalTiv ?? (ratedEquipmentValues.length > 0 ? ratedEquipmentValues.reduce((sum, value) => sum + value, 0) : null)
+  const anyOneItemLimit = writeup?.equipment.largestUnitTiv ?? (ratedEquipmentValues.length > 0 ? Math.max(...ratedEquipmentValues) : null)
+  const displayLimit = quote.lineOfBusiness === 'InlandMarine' ? totalTiv : quote.limit
 
   // Premium breakdown
   const manualPremium = ratingSnapshot?.manualPremium ?? quote.premiumAmount
@@ -680,42 +737,38 @@ export function QuoteDetailPage() {
               <span>Submission <Link to={`/submissions/${quote.submissionId}`} className="font-semibold text-sky-700 hover:text-sky-800">{quote.submissionNumber}</Link></span>
             </div>
           </div>
-          <div className="flex flex-shrink-0 items-center gap-2">
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
             <Btn variant={showRating ? 'primary' : 'outline'} onClick={() => setShowRating((v) => !v)}>
               <Calculator className="h-3.5 w-3.5" /> Rate
             </Btn>
-            {canReduce && (
-              <Btn variant={showReduce ? 'primary' : 'outline'} onClick={() => { setShowReduce((v) => !v); setOverrideMode('dollar'); setOverrideInput('') }}>
-                <TrendingDown className="h-3.5 w-3.5" /> Reduce
-              </Btn>
+            {canGenerateInlandMarineProposal && (
+              <MenuButton label={<><FileText className="h-3.5 w-3.5" /> Proposal</>}>
+                <MenuItem onClick={() => previewInlandMarineProposalMutation.mutate()} disabled={previewInlandMarineProposalMutation.isPending}>
+                  <FileText className="h-3.5 w-3.5" /> Preview
+                </MenuItem>
+                <MenuItem onClick={() => saveInlandMarineProposalMutation.mutate()} disabled={saveInlandMarineProposalMutation.isPending}>
+                  <Download className="h-3.5 w-3.5" /> Generate & file PDF
+                </MenuItem>
+                <MenuItem onClick={() => sendInlandMarineProposalDraftMutation.mutate()} disabled={sendInlandMarineProposalDraftMutation.isPending}>
+                  <FileOutput className="h-3.5 w-3.5" /> Send proposal
+                </MenuItem>
+              </MenuButton>
             )}
-            <Btn variant="outline">
-              <Copy className="h-3.5 w-3.5" /> Duplicate
-            </Btn>
-            <Btn variant="outline" onClick={() => navigate(`/quotes/${quoteId}/writeup`)}>
-              <FileOutput className="h-3.5 w-3.5" /> UW Writeup
-            </Btn>
             {canBind && (
               <Btn variant="primary" onClick={() => setShowBind(true)}>
                 <CheckCircle2 className="h-3.5 w-3.5" /> Bind quote
               </Btn>
             )}
-            {canGenerateInlandMarineProposal && (
-              <>
-                <Btn variant="outline" onClick={() => previewInlandMarineProposalMutation.mutate()} disabled={previewInlandMarineProposalMutation.isPending}>
-                  <FileText className="h-3.5 w-3.5" /> Preview
-                </Btn>
-                <Btn variant="outline" onClick={() => saveInlandMarineProposalMutation.mutate()} disabled={saveInlandMarineProposalMutation.isPending}>
-                  <FileText className="h-3.5 w-3.5" /> Generate Proposal
-                </Btn>
-                <Btn variant="primary" onClick={() => sendInlandMarineProposalDraftMutation.mutate()} disabled={sendInlandMarineProposalDraftMutation.isPending}>
-                  <FileText className="h-3.5 w-3.5" /> Send Proposal
-                </Btn>
-              </>
-            )}
-            <Btn variant="ghost">
-              <MoreHorizontal className="h-4 w-4" />
-            </Btn>
+            <MenuButton label={<MoreHorizontal className="h-4 w-4" />} variant="ghost">
+              {canReduce && (
+                <MenuItem onClick={() => { setShowReduce((v) => !v); setOverrideMode('dollar'); setOverrideInput('') }}>
+                  <TrendingDown className="h-3.5 w-3.5" /> Reduce commission
+                </MenuItem>
+              )}
+              <MenuItem>
+                <Copy className="h-3.5 w-3.5" /> Duplicate quote
+              </MenuItem>
+            </MenuButton>
           </div>
         </div>
 
@@ -796,10 +849,10 @@ export function QuoteDetailPage() {
         <div className="mb-5 grid grid-cols-4 gap-3 max-[900px]:grid-cols-2 max-[600px]:grid-cols-1">
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
             <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-sky-600">Total premium</div>
-            <div className="text-3xl font-semibold tracking-tight text-sky-900">{fmt(quote.totalPremium)}</div>
+            <div className="text-3xl font-semibold tracking-tight text-sky-900">{fmt(ratedTotalPremium)}</div>
             <div className="mt-2 text-xs text-sky-700">
               {ratingSnapshot ? (
-                <><span className="font-semibold">{fmt(ratingSnapshot.grandTotalPremium)}</span> rated</>
+                <><span className="font-semibold">Rated</span> from current snapshot</>
               ) : (
                 <span className="text-sky-600/70">No rating snapshot yet</span>
               )}
@@ -814,17 +867,23 @@ export function QuoteDetailPage() {
             </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Limit / Deductible</div>
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{quote.lineOfBusiness === 'InlandMarine' ? 'Total TIV' : 'Limit / Deductible'}</div>
             <div className="text-2xl font-semibold tracking-tight text-slate-800">
-              {quote.limit ? `$${(quote.limit / 1_000_000).toFixed(1)}M` : '—'}
+              {displayLimit ? fmt(displayLimit) : '—'}
               {quote.deductible != null && (
                 <span className="ml-1.5 text-lg font-medium text-slate-400">/ {fmt(quote.deductible)}</span>
               )}
             </div>
             <div className="mt-2 text-xs text-slate-500">
-              {quote.uninsuredMotoristLimit ? `UM ${fmt(quote.uninsuredMotoristLimit)}` : ''}
-              {quote.medicalPaymentsLimit ? `  Med pay ${fmt(quote.medicalPaymentsLimit)}` : ''}
-              {!quote.uninsuredMotoristLimit && !quote.medicalPaymentsLimit ? <span className="text-slate-300">No additional limits</span> : ''}
+              {quote.lineOfBusiness === 'InlandMarine' ? (
+                anyOneItemLimit != null ? <>Any one item <span className="font-semibold">{fmt(anyOneItemLimit)}</span></> : <span className="text-slate-300">No scheduled items rated</span>
+              ) : (
+                <>
+                  {quote.uninsuredMotoristLimit ? `UM ${fmt(quote.uninsuredMotoristLimit)}` : ''}
+                  {quote.medicalPaymentsLimit ? `  Med pay ${fmt(quote.medicalPaymentsLimit)}` : ''}
+                  {!quote.uninsuredMotoristLimit && !quote.medicalPaymentsLimit ? <span className="text-slate-300">No additional limits</span> : ''}
+                </>
+              )}
             </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -846,6 +905,12 @@ export function QuoteDetailPage() {
             <Card>
               <CardHead title="Coverage limits" right={<Btn variant="ghost"><Edit2 className="h-3.5 w-3.5" />Edit</Btn>} />
               <div className="grid grid-cols-4 gap-x-6 gap-y-4 p-5 max-[800px]:grid-cols-2">
+                {quote.lineOfBusiness === 'InlandMarine' && (
+                  <>
+                    <KV label="Total TIV" value={totalTiv != null ? formatCurrency(totalTiv) : '—'} />
+                    <KV label="Any one item limit" value={anyOneItemLimit != null ? formatCurrency(anyOneItemLimit) : '—'} />
+                  </>
+                )}
                 {quote.limit != null && (
                   <KV label="Occurrence limit" value={formatCurrency(quote.limit)} />
                 )}
@@ -914,7 +979,7 @@ export function QuoteDetailPage() {
                 ))}
                 <div className="flex items-center justify-between py-3 text-sm font-bold text-slate-900">
                   <span>Total premium</span>
-                  <span className="text-base tabular-nums">{fmtFull(quote.totalPremium)}</span>
+                  <span className="text-base tabular-nums">{fmtFull(ratedTotalPremium)}</span>
                 </div>
                 <div className="flex items-center justify-between py-2 text-xs text-slate-400">
                   <span>Agency commission ({formatPercent(agentCommRate)})</span>
@@ -923,52 +988,30 @@ export function QuoteDetailPage() {
               </div>
             </Card>
 
-            {/* Quote details */}
+{/* Inline UW Writeup */}
             <Card>
-              <CardHead title="Quote details" />
-              <div className="grid grid-cols-4 gap-x-6 gap-y-5 p-5 max-[800px]:grid-cols-2">
-                <KV label="Quote #" value={<span className="font-mono">{quote.quoteNumber}</span>} />
-                <KV label="Carrier" value={quote.carrierName} />
-                <KV label="Line of business" value={LOB_LABELS[quote.lineOfBusiness]} />
-                <KV label="Status" value={quote.status} />
-                <KV label="Effective" value={formatDate(quote.effectiveDate)} />
-                <KV label="Expires" value={formatDate(quote.expirationDate)} />
-                {quote.boundDate && <KV label="Bound date" value={formatDate(quote.boundDate)} />}
-                {quote.policyNumber && <KV label="Policy #" value={<span className="font-mono">{quote.policyNumber}</span>} />}
-                {quote.limit != null && <KV label="Occurrence limit" value={formatCurrency(quote.limit)} />}
-                {quote.deductible != null && <KV label="Deductible" value={formatCurrency(quote.deductible)} />}
-                <KV label="Agent commission" value={`${formatPercent(agentCommRate)} → ${fmt(agentCommAmt)}`} />
-                <KV label="SMM retention" value={`${formatPercent(quote.smmRetentionRate)} → ${fmt(quote.smmRetentionAmount)}`} />
-                {quote.isFilingState && <KV label="Filing state" value="Yes" />}
-              </div>
-              {ratingSnapshot && (
-                <div className="border-t border-slate-100 px-5 py-3">
-                  <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Rating snapshot</p>
-                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
-                    <span>Rated by <span className="font-medium text-slate-700">{ratingSnapshot.ratedByName ?? 'System'}</span></span>
-                    <span>·</span>
-                    <span>Rated <span className="font-medium text-slate-700">{formatDate(ratingSnapshot.ratedAt)}</span></span>
-                    {ratingSnapshot.scheduleModifierReason && (
-                      <>
-                        <span>·</span>
-                        <span>Modifier reason: <span className="font-medium text-slate-700">{ratingSnapshot.scheduleModifierReason}</span></span>
-                      </>
-                    )}
+              <CardHead
+                title={<span className="flex items-center gap-2"><Edit2 className="h-4 w-4 text-slate-500" />Underwriting writeup</span>}
+                right={<span className="rounded-md bg-slate-100 px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">{writeup?.status ?? 'Draft'}</span>}
+              />
+              <div className="divide-y divide-slate-100">
+                {[
+                  { n: '01', title: 'Account summary', body: writeup ? `${writeup.insuredName} · ${writeup.lob} · ${writeup.policyType} account effective ${formatDate(writeup.effectiveDate)}.` : 'Writeup context will load here.' },
+                  { n: '02', title: 'Risk description & operations', body: writeup?.payload.narrativeOperators || writeup?.operationType || 'No operation narrative entered yet.' },
+                  { n: '03', title: 'Equipment & values', body: writeup ? `${writeup.equipment.totalCount} scheduled item${writeup.equipment.totalCount !== 1 ? 's' : ''}; total TIV ${fmt(writeup.equipment.totalTiv)}; largest item ${fmt(writeup.equipment.largestUnitTiv)}.` : 'Equipment summary will load here.' },
+                  { n: '04', title: 'Decision rationale', body: writeup?.payload.decisionRationale || 'No decision rationale entered yet.' },
+                ].map((section, index) => (
+                  <div key={section.n} className={index === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                    <div className="flex items-center gap-3 px-5 py-3">
+                      <span className="font-mono text-[11px] font-semibold text-slate-400">{section.n}</span>
+                      <span className="text-sm font-semibold text-slate-800">{section.title}</span>
+                      <span className={`ml-auto rounded-md border px-2 py-0.5 text-[10.5px] font-semibold ${section.body.startsWith('No ') ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                        {section.body.startsWith('No ') ? 'open' : 'complete'}
+                      </span>
+                    </div>
+                    <p className="px-5 pb-4 pl-[4.5rem] text-sm leading-6 text-slate-600">{section.body}</p>
                   </div>
-                </div>
-              )}
-            </Card>
-
-            {/* UW Writeup link */}
-            <Card>
-              <div className="flex items-center justify-between px-5 py-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-800">Underwriting writeup</h2>
-                  <p className="mt-0.5 text-xs text-slate-400">Narrative, risk analysis, recommendation, and conditions.</p>
-                </div>
-                <Btn variant="outline" onClick={() => navigate(`/quotes/${quoteId}/writeup`)}>
-                  <Edit2 className="h-3.5 w-3.5" /> Open writeup
-                </Btn>
+                ))}
               </div>
             </Card>
 
@@ -991,7 +1034,7 @@ export function QuoteDetailPage() {
                 <p className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/70">
                   {canBind ? 'Ready to bind' : `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining`}
                 </p>
-                <p className="text-2xl font-semibold">{fmt(quote.totalPremium)}</p>
+                <p className="text-2xl font-semibold">{fmt(ratedTotalPremium)}</p>
                 <p className="mb-4 text-xs text-white/70">{formatDate(quote.effectiveDate)} effective</p>
                 <button
                   disabled={!canBind}
@@ -1003,13 +1046,40 @@ export function QuoteDetailPage() {
               </div>
             )}
 
+            {/* Quote details */}
+            <Card>
+              <div className="px-4 py-3">
+                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Quote details</h3>
+                {[
+                  { label: 'Quote #', value: quote.quoteNumber },
+                  { label: 'Carrier', value: quote.carrierName },
+                  { label: 'Line', value: LOB_LABELS[quote.lineOfBusiness] },
+                  { label: 'Status', value: quote.status },
+                  { label: 'Effective', value: formatDate(quote.effectiveDate) },
+                  { label: 'Expires', value: formatDate(quote.expirationDate) },
+                  ...(quote.policyNumber ? [{ label: 'Policy #', value: quote.policyNumber }] : []),
+                  ...(quote.isFilingState ? [{ label: 'Filing state', value: 'Yes' }] : []),
+                ].map((row) => (
+                  <div key={row.label} className="flex items-start justify-between border-b border-slate-100 py-2 text-xs last:border-0">
+                    <span className="text-slate-400">{row.label}</span>
+                    <span className="ml-3 text-right font-medium text-slate-700">{row.value}</span>
+                  </div>
+                ))}
+                {ratingSnapshot && (
+                  <div className="mt-2 rounded-lg bg-slate-50 px-2 py-2 text-[11px] leading-5 text-slate-500">
+                    Rated by <span className="font-medium text-slate-700">{ratingSnapshot.ratedByName ?? 'System'}</span> on <span className="font-medium text-slate-700">{formatDate(ratingSnapshot.ratedAt)}</span>
+                  </div>
+                )}
+              </div>
+            </Card>
+
             {/* Commission breakdown */}
             <Card>
               <div className="px-4 py-3">
                 <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Commission split</h3>
                 {[
-                  { label: 'Carrier commission', rate: quote.carrierCommissionRate, amt: quote.carrierCommissionAmount },
-                  { label: 'SMM retention', rate: quote.smmRetentionRate, amt: quote.smmRetentionAmount },
+                  { label: 'Carrier commission', rate: quote.carrierCommissionRate, amt: carrierCommAmt },
+                  { label: 'SMM retention', rate: quote.smmRetentionRate, amt: smmRetentionAmt },
                   { label: 'Agent commission', rate: agentCommRate, amt: agentCommAmt },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between border-b border-slate-100 py-2 text-xs last:border-0">
