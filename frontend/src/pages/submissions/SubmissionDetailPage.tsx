@@ -45,6 +45,8 @@ const LOB_SHORT: Record<string, string> = {
   ExcessLiability: 'XS',
 }
 
+const getLobLabel = (lob: string) => LOB_LABELS[lob as PolicyLineOfBusiness] ?? lob
+
 const STATUS_PILL: Record<SubmissionStatus, string> = {
   New: 'new',
   InProgress: 'inprogress',
@@ -1459,7 +1461,7 @@ export function SubmissionDetailPage() {
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingAdditionalInterestId ? 'Edit Additional Interest' : 'Add Additional Interest'}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                   <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Name *</label><input value={additionalInterestForm.name} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, name: e.target.value }))} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>Line of Business</label><select value={additionalInterestForm.lineOfBusiness} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, lineOfBusiness: e.target.value }))} style={inputStyle}>{(submission?.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS).map((l) => <option key={l} value={l}>{LOB_LABELS[l]}</option>)}</select></div>
+                  <div><label style={labelStyle}>Line of Business</label><select value={additionalInterestForm.lineOfBusiness} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, lineOfBusiness: e.target.value }))} style={inputStyle}>{(submission?.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS).map((l) => <option key={l} value={l}>{getLobLabel(l)}</option>)}</select></div>
                   <div><label style={labelStyle}>Applies To</label><select value={additionalInterestForm.appliesToType} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, appliesToType: e.target.value as AdditionalInterestAppliesToType }))} style={inputStyle}>{(Object.keys(ADDITIONAL_INTEREST_APPLIES_TO_LABELS) as AdditionalInterestAppliesToType[]).map((k) => <option key={k} value={k}>{ADDITIONAL_INTEREST_APPLIES_TO_LABELS[k]}</option>)}</select></div>
                   <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Address Line 1</label><input value={additionalInterestForm.addressLine1 ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, addressLine1: e.target.value || undefined }))} style={inputStyle} /></div>
                   <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Address Line 2</label><input value={additionalInterestForm.addressLine2 ?? ''} onChange={(e) => setAdditionalInterestForm((f) => ({ ...f, addressLine2: e.target.value || undefined }))} style={inputStyle} /></div>

@@ -13,6 +13,7 @@ import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
+import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
