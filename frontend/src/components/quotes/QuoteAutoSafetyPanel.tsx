@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, FileText, MapPin, RefreshCw, ShieldAlert, ShieldCheck, Truck, X, XCircle } from 'lucide-react'
@@ -47,11 +47,11 @@ function loadGoogleMaps(): Promise<void> {
   })
 }
 
-const riskStyle: Record<AutoSafetyRiskLevel, string> = {
-  Unknown: 'bg-slate-100 text-slate-600 border-slate-200',
-  Acceptable: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Watch: 'bg-amber-50 text-amber-700 border-amber-200',
-  High: 'bg-red-50 text-red-700 border-red-200',
+const riskStyle: Record<AutoSafetyRiskLevel, CSSProperties> = {
+  Unknown: { background: 'var(--pill-draft-bg)', color: 'var(--pill-draft-fg)' },
+  Acceptable: { background: 'var(--good-bg)', color: 'var(--good-fg)' },
+  Watch: { background: 'var(--warn-bg)', color: 'var(--warn-fg)' },
+  High: { background: 'var(--bad-bg)', color: 'var(--bad-fg)' },
 }
 
 export function QuoteAutoSafetyPanel({ quoteId }: Props) {
@@ -98,7 +98,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="px-5 py-4 bg-slate-50 border-y border-slate-200 text-sm text-slate-600">
+      <div style={{ padding: '14px 16px', borderBlock: '1px solid var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
         Opening auto safety profile...
       </div>
     )
@@ -107,30 +107,30 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
   if (isError || !data) {
     const message = getLoadErrorMessage(error)
     return (
-      <div className="px-5 py-4 bg-red-50 border-y border-red-100 text-sm text-red-700">
-        <div className="font-semibold">Auto safety profile could not be loaded.</div>
-        <div className="mt-1 text-red-600">{message}</div>
+      <div style={{ padding: '14px 16px', borderBlock: '1px solid #f3c6be', borderLeft: '4px solid #b33a2a', background: 'var(--surface)', color: 'var(--bad-fg)', fontSize: 'var(--fs-body)' }}>
+        <div style={{ fontWeight: 600 }}>Auto safety profile could not be loaded.</div>
+        <div style={{ marginTop: 4, color: 'var(--bad-fg)' }}>{message}</div>
       </div>
     )
   }
 
   if (data.status !== 'Ready') {
     return (
-      <div className="px-5 py-4 bg-slate-50 border-t border-slate-200">
-        <div className="flex items-start gap-3 rounded border border-slate-200 bg-white p-4">
-          <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />
+      <div style={{ padding: '14px 16px', borderTop: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+        <div className="flex items-start gap-3 sd-card" style={{ padding: 14 }}>
+          <AlertTriangle size={16} style={{ marginTop: 2, color: 'var(--warn-fg)' }} />
           <div className="flex-1">
-            <div className="text-sm font-semibold text-slate-800">Auto Safety</div>
-            <p className="mt-1 text-sm text-slate-600">{data.message ?? 'FMCSA data is not available yet.'}</p>
-            {data.usDotNumber && <p className="mt-2 text-xs text-slate-500">USDOT {data.usDotNumber}</p>}
+            <div style={{ color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>Auto Safety</div>
+            <p style={{ margin: '4px 0 0', color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>{data.message ?? 'FMCSA data is not available yet.'}</p>
+            {data.usDotNumber && <p style={{ margin: '8px 0 0', color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>USDOT {data.usDotNumber}</p>}
           </div>
           {data.status === 'NoData' && (
             <button
               onClick={() => refreshMutation.mutate()}
               disabled={refreshMutation.isPending}
-              className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="sd-btn outline sm"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+              <RefreshCw size={14} className={refreshMutation.isPending ? 'animate-spin' : ''} />
               {refreshMutation.isPending ? 'Refreshing' : 'Refresh FMCSA'}
             </button>
           )}
@@ -149,33 +149,33 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
   const hazmatOosCount = oos.hazmatOosCount ?? 0
 
   return (
-    <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 space-y-4">
+    <div className="space-y-4" style={{ padding: '14px 16px', borderTop: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {data.overallRiskLevel === 'High' ? <ShieldAlert className="h-4 w-4 text-red-600" /> : <ShieldCheck className="h-4 w-4 text-slate-700" />}
-          <h3 className="text-sm font-semibold text-slate-800">Auto Safety</h3>
-          <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-semibold ${riskStyle[data.overallRiskLevel]}`}>
+          {data.overallRiskLevel === 'High' ? <ShieldAlert size={16} style={{ color: 'var(--bad-fg)' }} /> : <ShieldCheck size={16} style={{ color: 'var(--ink-3)' }} />}
+          <h3 style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>Auto Safety</h3>
+          <span className="sd-pill" style={riskStyle[data.overallRiskLevel]}>
             {data.overallRiskLevel}
           </span>
         </div>
-        <div className="text-xs text-slate-500">
+        <div style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>
           {data.snapshotMonth ? `Snapshot ${data.snapshotMonth}` : 'No scored snapshot'}{data.methodologyVersion ? ` - ${data.methodologyVersion}` : ''}
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => reportMutation.mutate()}
             disabled={reportMutation.isPending}
-            className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="sd-btn outline sm"
           >
-            <FileText className="h-3.5 w-3.5" />
+            <FileText size={14} />
             {reportMutation.isPending ? 'Saving' : 'Save Report'}
           </button>
           <button
             onClick={() => refreshMutation.mutate()}
             disabled={refreshMutation.isPending}
-            className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="sd-btn outline sm"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+            <RefreshCw size={14} className={refreshMutation.isPending ? 'animate-spin' : ''} />
             {refreshMutation.isPending ? 'Refreshing' : 'Refresh FMCSA'}
           </button>
         </div>
@@ -192,14 +192,14 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
       {data.summaryFlags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {data.summaryFlags.map((flag) => (
-            <span key={flag} className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
-              <AlertTriangle className="h-3 w-3" /> {flag}
+            <span key={flag} className="sd-lob" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)', border: '1px solid #f5d9a8' }}>
+              <AlertTriangle size={12} /> {flag}
             </span>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-slate-600">
+      <div className="grid grid-cols-4 gap-2">
         <SectionPill label="SAFER / OOS" active={activeTab === 'safer'} onClick={() => setActiveTab('safer')} />
         <SectionPill label="Radius" active={activeTab === 'radius'} onClick={() => setActiveTab('radius')} />
         <SectionPill label="Events" active={activeTab === 'events'} onClick={() => setActiveTab('events')} />
@@ -208,9 +208,10 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
 
       {activeTab === 'safer' && (
         <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2 rounded border bg-white p-3">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-              <Truck className="h-3.5 w-3.5" /> SAFER / OOS
+          <div className="col-span-2 sd-card">
+            <div className="sd-card-body">
+            <div className="sims-field-label flex items-center gap-2">
+              <Truck size={14} /> SAFER / OOS
             </div>
             <div className="grid grid-cols-4 gap-3">
               <OosMetric label="Overall" count={oos.inspectionCount} oosCount={overallOosCount} rate={overallOosRate} nationalAverage={oos.overallNationalAverageRate} onClick={() => setDetailSelection({ kind: 'overall-oos', title: 'Overall OOS Events' })} />
@@ -218,11 +219,13 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               <OosMetric label="Vehicle" count={vehicleInspectionCount} oosCount={oos.vehicleOosCount} rate={oos.vehicleOosRate} nationalAverage={oos.vehicleNationalAverageRate} onClick={() => setDetailSelection({ kind: 'vehicle-oos', title: 'Vehicle OOS Events' })} />
               <OosMetric label="Hazmat" count={hazmatInspectionCount} oosCount={hazmatOosCount} rate={oos.hazmatOosRate ?? null} nationalAverage={oos.hazmatNationalAverageRate} onClick={() => setDetailSelection({ kind: 'hazmat-oos', title: 'Hazmat OOS Events' })} />
             </div>
+            </div>
           </div>
 
-          <div className="rounded border bg-white p-3">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-              <Activity className="h-3.5 w-3.5" /> Accident Summary
+          <div className="sd-card">
+            <div className="sd-card-body">
+            <div className="sims-field-label flex items-center gap-2">
+              <Activity size={14} /> Accident Summary
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Metric label="Fatal" value={(accident?.fatalCount ?? 0).toLocaleString()} compact onClick={() => setDetailSelection({ kind: 'fatal-crash', title: 'Fatal Crashes' })} />
@@ -230,17 +233,19 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               <Metric label="Tow" value={(accident?.towCount ?? 0).toLocaleString()} compact onClick={() => setDetailSelection({ kind: 'tow-crash', title: 'Tow-Only Crashes' })} />
               <Metric label="Reportable" value={(accident?.totalReportableCount ?? 0).toLocaleString()} compact onClick={() => setDetailSelection({ kind: 'reportable-crash', title: 'Reportable Crashes' })} />
             </div>
-            <p className="mt-3 text-xs text-slate-400">
+            <p style={{ margin: '12px 0 0', color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>
               SAFER-style reportable crash events; ratio: {accident?.accidentToPowerUnitRatio == null ? '-' : `${accident.accidentToPowerUnitRatio}%`}
             </p>
+            </div>
           </div>
         </div>
       )}
 
       {activeTab === 'radius' && (
-        <div className="rounded border bg-white p-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-            <MapPin className="h-3.5 w-3.5" /> Radius Of Operations
+        <div className="sd-card">
+          <div className="sd-card-body">
+          <div className="sims-field-label flex items-center gap-2">
+            <MapPin size={14} /> Radius Of Operations
           </div>
           {data.radiusSummary?.note && (
             <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -260,7 +265,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           )}
           <InteractiveRadiusMap summary={data.radiusSummary} />
           {data.geographicHotspots.length === 0 ? (
-            <p className="text-sm text-slate-400">No inspection location concentration yet.</p>
+            <p style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>No inspection location concentration yet.</p>
           ) : (
             <div className="grid grid-cols-5 gap-2">
               {data.radiusSummary.mapPoints.length > 0 ? data.radiusSummary.mapPoints.slice(0, 5).map((h, idx) => (
@@ -292,22 +297,23 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               </div>
             ))}
           </div>
+          </div>
         </div>
       )}
 
       {activeTab === 'events' && (
-        <div className="rounded border bg-white">
-          <div className="border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">Events</div>
+        <div className="sd-card">
+          <div className="sd-card-head"><h3>Events</h3></div>
           {data.recentSevereEvents.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-slate-400">No recent high-severity or OOS events in the imported window.</p>
+            <p style={{ margin: 0, padding: '14px 16px', color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>No recent high-severity or OOS events in the imported window.</p>
           ) : (
-            <div className="divide-y">
+            <div>
               {data.recentSevereEvents.map((event, idx) => (
-                <div key={`${event.date}-${idx}`} className="grid grid-cols-[120px_160px_1fr_80px] gap-3 px-4 py-2 text-sm">
-                  <span className="text-slate-500">{new Date(event.date).toLocaleDateString()}</span>
-                  <span className="font-medium text-slate-700">{event.eventType}</span>
-                  <span className="truncate text-slate-600">{event.description}</span>
-                  <span className="text-right text-slate-500">{event.state ?? '-'}</span>
+                <div key={`${event.date}-${idx}`} className="grid grid-cols-[120px_160px_1fr_80px] gap-3 px-4 py-2" style={{ borderBottom: '1px solid var(--line-2)', fontSize: 'var(--fs-body)' }}>
+                  <span style={{ color: 'var(--ink-3)' }}>{new Date(event.date).toLocaleDateString()}</span>
+                  <span style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{event.eventType}</span>
+                  <span className="truncate" style={{ color: 'var(--ink-2)' }}>{event.description}</span>
+                  <span className="text-right" style={{ color: 'var(--ink-3)' }}>{event.state ?? '-'}</span>
                 </div>
               ))}
             </div>
@@ -317,11 +323,11 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
 
       {activeTab === 'history' && (
         <div className="space-y-3">
-          <div className="rounded border bg-white">
-            <div className="flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold uppercase text-slate-600">
-              <BarChart3 className="h-3.5 w-3.5" /> CSA / BASICs
+          <div className="sd-card">
+            <div className="sd-card-head">
+              <h3><BarChart3 size={14} /> CSA / BASICs</h3>
             </div>
-            <div className="grid grid-cols-7 divide-x">
+            <div className="grid grid-cols-7" style={{ borderTop: '1px solid var(--line-2)' }}>
               {data.basics.map((b) => (
                 <BasicKpiTile
                   key={b.basic}
@@ -351,12 +357,14 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               />
             </div>
 
-            <div className="rounded border bg-white p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-600">
-                <Clock3 className="h-3.5 w-3.5" /> History Snapshot
+            <div className="sd-card">
+              <div className="sd-card-body">
+              <div className="sims-field-label flex items-center gap-2">
+                <Clock3 size={14} /> History Snapshot
               </div>
               <Metric label="Data Refreshed" value={data.dataRefreshedAt ? new Date(data.dataRefreshedAt).toLocaleDateString() : '-'} compact />
               <SnapshotHistoryList history={data.snapshotHistory ?? []} />
+              </div>
             </div>
           </div>
         </div>
@@ -428,7 +436,8 @@ function SectionPill({ label, active, onClick }: { label: string; active: boolea
     <button
       type="button"
       onClick={onClick}
-      className={`rounded border px-3 py-2 text-center transition ${active ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+      className={`sd-btn sm ${active ? '' : 'outline'}`}
+      style={active ? { background: 'var(--accent-soft)', color: 'var(--accent-ink)', border: '1px solid var(--accent-light)' } : undefined}
     >
       {label}
     </button>
@@ -646,11 +655,11 @@ function OosMetric({ label, count, oosCount, rate, nationalAverage, onClick }: {
         : 'text-slate-500'
 
   return (
-    <button type="button" onClick={onClick} className="rounded bg-slate-50 p-2 text-left hover:bg-slate-100">
-      <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-slate-800">{rate == null ? '-' : `${rate}%`}</div>
-      <div className="mt-1 text-xs text-slate-500">{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
-      <div className="mt-1 text-[11px] text-slate-400">
+    <button type="button" onClick={onClick} className="text-left" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', padding: 8 }}>
+      <div className="sims-field-label">{label}</div>
+      <div style={{ marginTop: 4, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>{rate == null ? '-' : `${rate}%`}</div>
+      <div style={{ marginTop: 4, color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
+      <div style={{ marginTop: 4, color: 'var(--ink-4)', fontSize: 'var(--fs-xs)' }}>
         Natl {nationalAverage == null ? '-' : `${nationalAverage}%`}
         {difference != null && <span className={`ml-1 ${differenceClass}`}>{difference > 0 ? '+' : ''}{difference}%</span>}
       </div>
@@ -667,19 +676,19 @@ function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
     { key: 'Green', className: status === 'Green' ? 'bg-emerald-500' : 'bg-slate-200' },
   ]
   return (
-    <div className="rounded border bg-white p-3">
+    <div className="sd-card" style={{ padding: 12 }}>
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div className="text-[11px] font-semibold uppercase text-slate-500">SIMS ISS</div>
-          <div className="mt-1 truncate text-sm font-semibold text-slate-800" title={`${recommendation}${iss?.score == null ? '' : ` (${iss.score})`}`}>
+          <div className="sims-field-label">SIMS ISS</div>
+          <div className="mt-1 truncate" style={{ color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }} title={`${recommendation}${iss?.score == null ? '' : ` (${iss.score})`}`}>
             {iss?.score == null ? recommendation : `${recommendation} ${iss.score}`}
           </div>
         </div>
-        <div className="flex h-12 w-7 flex-col items-center justify-center gap-1 rounded border border-slate-300 bg-slate-50">
+        <div className="flex h-12 w-7 flex-col items-center justify-center gap-1" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)' }}>
           {lights.map((light) => <span key={light.key} className={`h-2.5 w-2.5 rounded-full ${light.className}`} />)}
         </div>
       </div>
-      <div className="mt-1 truncate text-[11px] text-slate-500" title={iss?.explanation ?? iss?.source ?? 'Pending ISS source'}>
+      <div className="mt-1 truncate" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-xs)' }} title={iss?.explanation ?? iss?.source ?? 'Pending ISS source'}>
         Basis: {iss?.basis ?? 'Pending'}
       </div>
     </div>
@@ -1010,19 +1019,19 @@ function getLoadErrorMessage(error: unknown) {
 function Metric({ label, value, compact = false, onClick }: { label: string; value: string; compact?: boolean; onClick?: () => void }) {
   const content = (
     <>
-      <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
-      <div className="mt-1 truncate text-sm font-semibold text-slate-800" title={value}>{value}</div>
+      <div className="sims-field-label">{label}</div>
+      <div className="mt-1 truncate" style={{ color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }} title={value}>{value}</div>
     </>
   )
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={`${compact ? '' : 'rounded border bg-white p-3'} text-left hover:bg-slate-50`}>
+      <button type="button" onClick={onClick} className="text-left" style={compact ? undefined : { border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', padding: 12, boxShadow: 'var(--shadow-sm)' }}>
         {content}
       </button>
     )
   }
   return (
-    <div className={compact ? '' : 'rounded border bg-white p-3'}>
+    <div style={compact ? undefined : { border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', padding: 12, boxShadow: 'var(--shadow-sm)' }}>
       {content}
     </div>
   )
