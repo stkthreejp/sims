@@ -545,28 +545,28 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-800">Bind quote</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+    <div className="sims-modal-backdrop">
+      <div className="sims-modal max-w-sm">
+        <div className="sims-modal-head">
+          <h2 className="sims-modal-title">Bind quote</h2>
+          <button type="button" onClick={onClose} className="sims-icon-btn" title="Close"><X className="h-4 w-4" /></button>
         </div>
-        <div className="space-y-4">
+        <div className="sims-modal-body space-y-4">
           {(['boundDate', 'effectiveDate', 'expirationDate'] as const).map((k) => (
             <label key={k} className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <span className="sims-field-label">
                 {k === 'boundDate' ? 'Bound date' : k === 'effectiveDate' ? 'Effective date' : 'Expiration date'}
               </span>
               <input
                 type="date"
                 value={form[k]}
                 onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                className="sims-input"
               />
             </label>
           ))}
         </div>
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="sims-modal-foot">
           <Btn variant="outline" onClick={onClose}>Cancel</Btn>
           <Btn
             variant="primary"
@@ -644,7 +644,7 @@ function NotesCard({ quoteId }: { quoteId: string }) {
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Add a note…"
             rows={3}
-            className="w-full resize-none rounded-lg border border-slate-200 p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+            className="sims-textarea"
           />
           <div className="mt-2 flex justify-end gap-2">
             <Btn variant="outline" onClick={() => { setAdding(false); setDraft('') }}>Cancel</Btn>
@@ -676,14 +676,14 @@ function NotesCard({ quoteId }: { quoteId: string }) {
               <div className="flex flex-shrink-0 items-start gap-1">
                 <button
                   onClick={() => pinMutation.mutate(note.id)}
-                  className={`rounded p-1 transition-colors ${note.isPinned ? 'text-amber-500 hover:text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}
+                  className={`sims-icon-btn ${note.isPinned ? 'text-amber-500 hover:text-amber-600' : ''}`}
                   title={note.isPinned ? 'Unpin' : 'Pin'}
                 >
                   <Pin className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => { if (confirm('Delete this note?')) deleteMutation.mutate(note.id) }}
-                  className="rounded p-1 text-slate-300 transition-colors hover:text-red-500"
+                  className="sims-icon-btn hover:text-red-500"
                   title="Delete"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -776,20 +776,20 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
       {attachments.length === 0 ? (
         <p className="px-5 py-6 text-sm text-slate-400">No documents yet.</p>
       ) : (
-        <table className="w-full text-sm">
+        <table className="sd-table">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              <th className="px-5 py-2.5 text-left">File</th>
-              <th className="px-4 py-2.5 text-left">Size</th>
-              <th className="px-4 py-2.5 text-left">Uploaded by</th>
-              <th className="px-4 py-2.5 text-left">Date</th>
-              <th className="w-16 px-4 py-2.5" />
+            <tr>
+              <th>File</th>
+              <th>Size</th>
+              <th>Uploaded by</th>
+              <th>Date</th>
+              <th />
             </tr>
           </thead>
           <tbody>
-            {attachments.map((a, i) => (
-              <tr key={a.id} className={`${i < attachments.length - 1 ? 'border-b border-slate-100' : ''} hover:bg-slate-50`}>
-                <td className="px-5 py-3">
+            {attachments.map((a) => (
+              <tr key={a.id}>
+                <td>
                   <div className="flex items-center gap-2">
                     <FileText className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
                     <span className="cursor-pointer font-medium text-sky-700 hover:text-sky-800" onClick={() => downloadMutation.mutate(a.id)}>
@@ -798,21 +798,21 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
                   </div>
                   {a.description && <p className="mt-0.5 pl-5.5 text-xs text-slate-400">{a.description}</p>}
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-400">{fmtBytes(a.fileSizeBytes)}</td>
-                <td className="px-4 py-3 text-slate-600">{a.uploadedByName}</td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-400">{formatDate(a.createdAt)}</td>
-                <td className="px-4 py-3">
+                <td className="id">{fmtBytes(a.fileSizeBytes)}</td>
+                <td>{a.uploadedByName}</td>
+                <td className="id">{formatDate(a.createdAt)}</td>
+                <td>
                   <div className="flex items-center justify-end gap-1">
                     <button
                       onClick={() => downloadMutation.mutate(a.id)}
-                      className="rounded p-1 text-slate-300 hover:text-sky-600"
+                      className="sims-icon-btn hover:text-sky-600"
                       title="Download"
                     >
                       <Download className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => { if (confirm('Delete this document?')) deleteMutation.mutate(a.id) }}
-                      className="rounded p-1 text-slate-300 hover:text-red-500"
+                      className="sims-icon-btn hover:text-red-500"
                       title="Delete"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
