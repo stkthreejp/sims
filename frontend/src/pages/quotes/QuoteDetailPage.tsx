@@ -1,14 +1,15 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowLeft, Calculator, Check, CheckCircle2, ChevronRight, Copy, Download,
+  ArrowLeft, Calculator, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download,
   Edit2, FileOutput, FileText, MoreHorizontal, Pin, Plus, RefreshCw,
-  ShieldCheck, Trash2, TrendingDown, Upload, X,
+  Save, ShieldCheck, Trash2, TrendingDown, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
-import { LOB_LABELS, type CommissionOverrideRequest, type PolicyLineOfBusiness, type QuoteStatus } from '@/types/quote.types'
+import { policyFormsApi } from '@/api/policyForms.api'
+import { LOB_LABELS, type CommissionOverrideRequest, type PolicyFormType, type PolicyLineOfBusiness, type QuotePolicyFormSelection, type QuotePolicyFormSelectionUpsert, type QuoteStatus } from '@/types/quote.types'
 import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
 import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -16,6 +17,8 @@ import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentMo
 import { attachmentsApi } from '@/api/attachments.api'
 import { documentGenerationApi } from '@/api/documentGeneration.api'
 import { uwWriteupApi } from '@/api/uwWriteup.api'
+import type { IMWriteupPayload, WriteupCondition } from '@/types/uwWriteup.types'
+import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
 import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -155,6 +158,115 @@ function Btn({ children, onClick, variant = 'ghost', disabled, className = '', t
 
 // ── Bind checklist ─────────────────────────────────────────────────────────────
 
+function WriteupStatusPill({ status }: { status?: string }) {
+  const cls = status === 'Approved'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : status === 'Submitted'
+      ? 'border-sky-200 bg-sky-50 text-sky-700'
+      : status === 'Declined'
+        ? 'border-red-200 bg-red-50 text-red-700'
+        : 'border-slate-200 bg-slate-50 text-slate-600'
+
+  return (
+    <span className={`rounded-md border px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wide ${cls}`}>
+      {status ?? 'Draft'}
+    </span>
+  )
+}
+
+function InlineWriteupSection({
+  number,
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  number: string
+  title: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <div className="border-t border-slate-100 first:border-t-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50"
+      >
+        <span className="font-mono text-[11px] font-semibold text-slate-400">{number}</span>
+        <span className="text-sm font-semibold text-slate-800">{title}</span>
+        {open ? (
+          <ChevronDown className="ml-auto h-4 w-4 text-slate-400" />
+        ) : (
+          <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+        )}
+      </button>
+      {open && (
+        <div className="space-y-4 bg-slate-50/40 px-5 pb-5 pt-1">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InlineWriteupTextarea({
+  label,
+  value,
+  onChange,
+  readOnly,
+  rows = 3,
+}: {
+  label: string
+  value?: string
+  onChange: (value: string) => void
+  readOnly: boolean
+  rows?: number
+}) {
+  return (
+    <label className="block">
+      <span className="sims-field-label">{label}</span>
+      <textarea
+        rows={rows}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        readOnly={readOnly}
+        className="sims-textarea mt-1"
+        placeholder={readOnly ? '' : 'Enter notes...'}
+      />
+    </label>
+  )
+}
+
+function InlineWriteupCheckbox({
+  label,
+  checked,
+  onChange,
+  readOnly,
+  auto,
+}: {
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+  readOnly: boolean
+  auto?: boolean
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-slate-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={readOnly}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border-slate-300"
+      />
+      <span className={checked ? 'font-semibold text-slate-800' : ''}>{label}</span>
+      {auto && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-amber-700">auto</span>}
+    </label>
+  )
+}
+
 function MenuButton({
   label, children, variant = 'outline',
 }: { label: React.ReactNode; children: React.ReactNode; variant?: 'outline' | 'ghost' | 'primary' }) {
@@ -184,6 +296,158 @@ function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; 
     >
       {children}
     </button>
+  )
+}
+
+function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canManage: boolean }) {
+  const qc = useQueryClient()
+  const [templateId, setTemplateId] = useState('')
+
+  const { data: forms = [], isLoading } = useQuery({
+    queryKey: ['quote-policy-forms', quoteId],
+    queryFn: () => quotesApi.getPolicyForms(quoteId),
+  })
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['policy-form-templates', false],
+    queryFn: () => policyFormsApi.getTemplates(false),
+  })
+
+  const saveMutation = useMutation({
+    mutationFn: (nextForms: QuotePolicyFormSelectionUpsert[]) => quotesApi.savePolicyForms(quoteId, nextForms),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quote-policy-forms', quoteId] })
+      toast.success('Policy form list saved')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to save policy forms'),
+  })
+
+  const resetMutation = useMutation({
+    mutationFn: () => quotesApi.resetPolicyForms(quoteId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quote-policy-forms', quoteId] })
+      toast.success('Policy forms refreshed from package')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to refresh policy forms'),
+  })
+
+  const toUpsert = (row: QuotePolicyFormSelection, index: number): QuotePolicyFormSelectionUpsert => ({
+    policyFormTemplateId: row.policyFormTemplateId,
+    sequenceOrder: index + 1,
+    formType: row.formType,
+    isIncluded: row.isIncluded,
+    isSystemGenerated: row.isSystemGenerated,
+    triggerConditionJson: row.triggerConditionJson,
+    notes: row.notes,
+  })
+
+  const saveRows = (nextRows: QuotePolicyFormSelection[]) => {
+    saveMutation.mutate(nextRows.map(toUpsert))
+  }
+
+  const selectedIds = new Set(forms.map((f) => f.policyFormTemplateId))
+  const availableTemplates = templates.filter((t) => !selectedIds.has(t.id))
+  const includedCount = forms.filter((f) => f.isIncluded).length
+
+  return (
+    <Card>
+      <CardHead
+        title={<span className="flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" />Policy forms for proposal</span>}
+        count={includedCount}
+        right={canManage && (
+          <Btn variant="outline" disabled={resetMutation.isPending} onClick={() => resetMutation.mutate()}>
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh from package
+          </Btn>
+        )}
+      />
+      <div className="px-5 py-4">
+        {isLoading ? (
+          <div className="flex h-20 items-center justify-center"><LoadingSpinner /></div>
+        ) : forms.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+            No forms were found for this carrier, line, and state package yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {forms.map((form, index) => (
+              <div key={form.id || `${form.policyFormTemplateId}-${index}`} className="flex items-center gap-3 px-3 py-3">
+                <span className="w-7 shrink-0 text-right font-mono text-[11px] font-semibold text-slate-400">{String(index + 1).padStart(2, '0')}</span>
+                <input
+                  type="checkbox"
+                  checked={form.isIncluded}
+                  disabled={!canManage || form.formType === 'Mandatory' || saveMutation.isPending}
+                  onChange={(e) => saveRows(forms.map((row, rowIndex) => rowIndex === index ? { ...row, isIncluded: e.target.checked } : row))}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-slate-800">{form.formName}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                    <span className="font-mono">{form.formNumber}</span>
+                    <span>{form.editionDate || '-'}</span>
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{form.formType}</span>
+                    {!form.isIncluded && <span className="rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700">Excluded</span>}
+                  </div>
+                </div>
+                {canManage && form.formType === 'AdHoc' && (
+                  <button
+                    type="button"
+                    disabled={saveMutation.isPending}
+                    onClick={() => saveRows(forms.filter((_, rowIndex) => rowIndex !== index))}
+                    className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    title="Remove form"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {canManage && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value)}
+              className="min-w-64 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+            >
+              <option value="">Add ad-hoc form...</option>
+              {availableTemplates.map((template) => (
+                <option key={template.id} value={template.id}>{template.formNumber} - {template.name}</option>
+              ))}
+            </select>
+            <Btn
+              variant="outline"
+              disabled={!templateId || saveMutation.isPending}
+              onClick={() => {
+                const template = templates.find((t) => t.id === templateId)
+                if (!template) return
+                saveRows([
+                  ...forms,
+                  {
+                    id: '',
+                    quoteId,
+                    policyFormTemplateId: template.id,
+                    formNumber: template.formNumber,
+                    formName: template.name,
+                    editionDate: template.editionDate,
+                    sequenceOrder: forms.length + 1,
+                    formType: 'AdHoc' as PolicyFormType,
+                    isIncluded: true,
+                    isSystemGenerated: false,
+                    triggerConditionJson: null,
+                    notes: null,
+                  },
+                ])
+                setTemplateId('')
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add form
+            </Btn>
+          </div>
+        )}
+      </div>
+    </Card>
   )
 }
 
@@ -589,11 +853,21 @@ export function QuoteDetailPage() {
     enabled: !!quoteId,
   })
 
-  const { data: writeup } = useQuery({
+  const { data: writeup, isLoading: writeupLoading, isError: writeupIsError } = useQuery({
     queryKey: ['uw-writeup', quoteId],
     queryFn: () => uwWriteupApi.get(quoteId!),
     enabled: !!quoteId,
   })
+
+  const [writeupPayload, setWriteupPayload] = useState<IMWriteupPayload>(EMPTY_PAYLOAD)
+  const [writeupConditions, setWriteupConditions] = useState<WriteupCondition[]>([])
+  const [newWriteupCondition, setNewWriteupCondition] = useState('')
+
+  useEffect(() => {
+    if (!writeup) return
+    setWriteupPayload({ ...EMPTY_PAYLOAD, ...(writeup.payload ?? {}) })
+    setWriteupConditions(writeup.conditions ?? [])
+  }, [writeup])
 
   const { data: siblingQuotes = [] } = useQuery({
     queryKey: ['quotes', 'by-submission', quote?.submissionId],
@@ -650,6 +924,18 @@ export function QuoteDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to create proposal draft'),
   })
 
+  const saveWriteupMutation = useMutation({
+    mutationFn: () => uwWriteupApi.save(quoteId!, {
+      payload: writeupPayload,
+      conditions: writeupConditions.map((condition, index) => ({ ...condition, sortOrder: index })),
+    }),
+    onSuccess: (data) => {
+      qc.setQueryData(['uw-writeup', quoteId], data)
+      toast.success('Writeup saved')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to save writeup'),
+  })
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -673,6 +959,21 @@ export function QuoteDetailPage() {
   const canReduce = quote.status !== 'Bound' && quote.status !== 'Cancelled' && quote.status !== 'Expired' && canCreatePolicies && !quote.commissionOverride
   const canGenerateInlandMarineProposal = quote.lineOfBusiness === 'InlandMarine' && !!ratingSnapshot && ratingSnapshot.grandTotalPremium > 0
   const otherQuotes = siblingQuotes.filter((q) => q.id !== quote.id)
+  const writeupReadOnly = writeup?.status !== 'Draft'
+  const patchWriteupPayload = (patch: Partial<IMWriteupPayload>) =>
+    setWriteupPayload((current) => ({ ...current, ...patch }))
+  const addWriteupCondition = () => {
+    const text = newWriteupCondition.trim()
+    if (!text) return
+    setWriteupConditions((conditions) => [
+      ...conditions,
+      { id: crypto.randomUUID(), text, required: true, satisfied: false, sortOrder: conditions.length },
+    ])
+    setNewWriteupCondition('')
+  }
+  const removeWriteupCondition = (id: string) => {
+    setWriteupConditions((conditions) => conditions.filter((condition) => condition.id !== id))
+  }
 
   const ratedTotalPremium = ratingSnapshot?.grandTotalPremium ?? quote.totalPremium
 
@@ -987,6 +1288,10 @@ export function QuoteDetailPage() {
                 </div>
               </div>
             </Card>
+
+            {ratingSnapshot && (
+              <QuotePolicyFormsCard quoteId={quoteId!} canManage={canCreatePolicies} />
+            )}
 
 {/* Inline UW Writeup */}
             <Card>

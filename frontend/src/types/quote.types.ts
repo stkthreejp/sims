@@ -417,6 +417,33 @@ export interface QuoteChecklistItem {
   completedAt: string | null
 }
 
+export type PolicyFormType = 'Mandatory' | 'Conditional' | 'AdHoc'
+
+export interface QuotePolicyFormSelection {
+  id: string
+  quoteId: string
+  policyFormTemplateId: string
+  formNumber: string
+  formName: string
+  editionDate: string | null
+  sequenceOrder: number
+  formType: PolicyFormType
+  isIncluded: boolean
+  isSystemGenerated: boolean
+  triggerConditionJson: string | null
+  notes: string | null
+}
+
+export interface QuotePolicyFormSelectionUpsert {
+  policyFormTemplateId: string
+  sequenceOrder: number
+  formType: PolicyFormType
+  isIncluded: boolean
+  isSystemGenerated: boolean
+  triggerConditionJson?: string | null
+  notes?: string | null
+}
+
 export interface Attachment {
   id: string
   quoteId: string

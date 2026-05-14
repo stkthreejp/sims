@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail, QuoteChecklistItem } from '@/types/quote.types'
+import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail, QuoteChecklistItem, QuotePolicyFormSelection, QuotePolicyFormSelectionUpsert } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const quotesApi = {
@@ -95,4 +95,14 @@ export const quotesApi = {
 
   toggleChecklistItem: (quoteId: string, itemId: string, isCompleted: boolean) =>
     apiClient.patch<QuoteChecklistItem>(`/quotes/${quoteId}/checklist/${itemId}/toggle`, { isCompleted }).then((r) => r.data),
+
+  // Policy forms reviewed before proposal / issuance
+  getPolicyForms: (quoteId: string) =>
+    apiClient.get<QuotePolicyFormSelection[]>(`/quotes/${quoteId}/policy-forms`).then((r) => r.data),
+
+  savePolicyForms: (quoteId: string, forms: QuotePolicyFormSelectionUpsert[]) =>
+    apiClient.put<QuotePolicyFormSelection[]>(`/quotes/${quoteId}/policy-forms`, forms).then((r) => r.data),
+
+  resetPolicyForms: (quoteId: string) =>
+    apiClient.post<QuotePolicyFormSelection[]>(`/quotes/${quoteId}/policy-forms/reset`).then((r) => r.data),
 }

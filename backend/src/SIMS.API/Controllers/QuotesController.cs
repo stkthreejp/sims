@@ -17,15 +17,18 @@ public class QuotesController : ControllerBase
     private readonly IShadowRatingService _shadowRating;
     private readonly IFmcsaSafetyService _fmcsaSafety;
     private readonly IAutoSafetyReportService _autoSafetyReport;
+    private readonly IQuotePolicyFormSelectionService _quotePolicyForms;
 
     public QuotesController(IQuoteService quoteService, IRatingEngineService ratingEngine,
-        IShadowRatingService shadowRating, IFmcsaSafetyService fmcsaSafety, IAutoSafetyReportService autoSafetyReport)
+        IShadowRatingService shadowRating, IFmcsaSafetyService fmcsaSafety, IAutoSafetyReportService autoSafetyReport,
+        IQuotePolicyFormSelectionService quotePolicyForms)
     {
         _quoteService = quoteService;
         _ratingEngine = ratingEngine;
         _shadowRating = shadowRating;
         _fmcsaSafety = fmcsaSafety;
         _autoSafetyReport = autoSafetyReport;
+        _quotePolicyForms = quotePolicyForms;
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -150,6 +153,38 @@ public class QuotesController : ControllerBase
     public async Task<IActionResult> CommissionOverride(Guid id, [FromBody] CommissionOverrideRequest req)
     {
         var result = await _quoteService.ApplyCommissionOverrideAsync(id, req, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpGet("{id:guid}/policy-forms")]
+    public async Task<IActionResult> GetPolicyForms(Guid id)
+    {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
+        var result = await _quotePolicyForms.GetOrSeedAsync(id);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPut("{id:guid}/policy-forms")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> SavePolicyForms(Guid id, [FromBody] IReadOnlyList<QuotePolicyFormSelectionUpsertDto> forms)
+    {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
+        var result = await _quotePolicyForms.SaveAsync(id, forms);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/policy-forms/reset")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> ResetPolicyForms(Guid id)
+    {
+        var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
+        if (!quote.IsSuccess) return NotFound();
+
+        var result = await _quotePolicyForms.ResetFromPackageAsync(id);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

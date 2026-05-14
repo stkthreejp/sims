@@ -341,6 +341,23 @@ public class ProposalGenerationService : IProposalGenerationService
         QuoteRatingSnapshot? snapshot,
         IReadOnlyList<EndorsementProposalRow> endorsements)
     {
+        var reviewedForms = await _db.QuotePolicyFormSelections
+            .AsNoTracking()
+            .Include(f => f.PolicyFormTemplate)
+            .Where(f => f.QuoteId == quote.Id && f.IsIncluded)
+            .OrderBy(f => f.SequenceOrder)
+            .Select(f => new
+            {
+                form = f.PolicyFormTemplate.FormNumber,
+                edition = string.IsNullOrWhiteSpace(f.PolicyFormTemplate.EditionDate) ? "-" : f.PolicyFormTemplate.EditionDate,
+                title = f.PolicyFormTemplate.Name,
+            })
+            .Cast<object>()
+            .ToListAsync();
+
+        if (reviewedForms.Count > 0)
+            return reviewedForms;
+
         var state = ResolvePackageState(quote);
         var package = await _db.PolicyPackageConfigurations
             .AsNoTracking()
