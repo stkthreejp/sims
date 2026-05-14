@@ -67,7 +67,7 @@ public class ProposalGenerationService : IProposalGenerationService
         var equipment = BuildEquipmentData(quote, latestSnapshot);
         var lossPayees = BuildLossPayeeData(quote.Submission.AdditionalInterests);
         var endorsements = BuildEndorsementData(latestSnapshot);
-        var forms = BuildFormsData(endorsements);
+        var forms = await BuildFormsDataAsync(quote, latestSnapshot, endorsements);
 
         var html = await BuildSelfContainedHtmlAsync(templateDir, proposal, equipment, lossPayees, endorsements, forms);
         return Result<string>.Success(html);
@@ -336,7 +336,44 @@ public class ProposalGenerationService : IProposalGenerationService
         ];
     }
 
-    private static IReadOnlyList<object> BuildFormsData(IReadOnlyList<EndorsementProposalRow> endorsements)
+    private async Task<IReadOnlyList<object>> BuildFormsDataAsync(
+        Quote quote,
+        QuoteRatingSnapshot? snapshot,
+        IReadOnlyList<EndorsementProposalRow> endorsements)
+    {
+        var state = ResolvePackageState(quote);
+        var package = await _db.PolicyPackageConfigurations
+            .AsNoTracking()
+            .Include(p => p.Forms)
+                .ThenInclude(f => f.PolicyFormTemplate)
+            .Where(p => p.IsActive
+                && p.CarrierId == quote.CarrierId
+                && p.LineOfBusiness == quote.LineOfBusiness
+                && p.State == state)
+            .OrderByDescending(p => p.UpdatedAt)
+            .FirstOrDefaultAsync();
+
+        if (package == null)
+            return BuildFallbackFormsData(endorsements);
+
+        var configuredForms = package.Forms
+            .Where(f => ShouldIncludePackageForm(f, quote, snapshot))
+            .OrderBy(f => f.SequenceOrder)
+            .Select(f => new
+            {
+                form = f.PolicyFormTemplate.FormNumber,
+                edition = string.IsNullOrWhiteSpace(f.PolicyFormTemplate.EditionDate) ? "-" : f.PolicyFormTemplate.EditionDate,
+                title = f.PolicyFormTemplate.Name,
+            })
+            .Cast<object>()
+            .ToList();
+
+        return configuredForms.Count > 0
+            ? configuredForms
+            : BuildFallbackFormsData(endorsements);
+    }
+
+    private static IReadOnlyList<object> BuildFallbackFormsData(IReadOnlyList<EndorsementProposalRow> endorsements)
     {
         var forms = new List<object>
         {
@@ -363,25 +400,108 @@ public class ProposalGenerationService : IProposalGenerationService
         return forms;
     }
 
-    private static IReadOnlyList<object> BuildEndorsementData() =>
-    [
-        new { name = "Debris Removal", limits = new[] { new { label = "Any one loss", value = "$2,500" }, new { label = "Aggregate", value = "$10,000" } }, included = true, premium = "$250.00", premiumNum = 250 },
-        new { name = "Rental Reimbursement", limits = new[] { new { label = "Per day", value = "$2,500" }, new { label = "Aggregate", value = "$10,000" } }, included = true, premium = "$500.00", premiumNum = 500 },
-        new { name = "Towing, Storage & Recovery", limits = new[] { new { label = "Any one loss", value = "$5,000" } }, included = true, premium = "$175.00", premiumNum = 175 },
-        new { name = "Newly Acquired Equipment", note = "Coverage for newly purchased units, reported within 30 days.", limits = new[] { new { label = "Maximum limit", value = "$25,000" } }, included = false, premium = (string?)null, premiumNum = 0 },
-    ];
+    private static bool ShouldIncludePackageForm(PolicyPackageForm packageForm, Quote quote, QuoteRatingSnapshot? snapshot)
+        => packageForm.FormType switch
+        {
+            PolicyFormType.Mandatory => true,
+            PolicyFormType.AdHoc => false,
+            PolicyFormType.Conditional => EvaluateTriggerCondition(packageForm.TriggerConditionJson, quote, snapshot),
+            _ => false,
+        };
 
-    private static IReadOnlyList<object> BuildFormsData() =>
-    [
-        new { form = "LL IM SCHED", edition = "—", title = "LL Inland Marine Policy Schedule" },
-        new { form = "LL IM EQ SCHED", edition = "—", title = "LL Inland Marine Equipment Schedule" },
-        new { form = "SMM - SLSTAMP", edition = "—", title = "Surplus Lines — State Stamp Only" },
-        new { form = "LL IM OPT END", edition = "—", title = "LL Inland Marine Optional Endorsements" },
-        new { form = "FORMS - SCHED A", edition = "08 12", title = "Schedule of Taxes, Surcharges or Fees" },
-        new { form = "LL IM CLAIMS", edition = "—", title = "LL Inland Marine Claims Page" },
-        new { form = "FORMS - SCHED", edition = "08 12", title = "Schedule of Forms and Endorsements" },
-        new { form = "LL IM FLOATER", edition = "—", title = "LL Inland Marine Floater" },
-    ];
+    private static bool EvaluateTriggerCondition(string? triggerConditionJson, Quote quote, QuoteRatingSnapshot? snapshot)
+    {
+        if (string.IsNullOrWhiteSpace(triggerConditionJson))
+            return false;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(triggerConditionJson);
+            return EvaluateTriggerNode(doc.RootElement, quote, snapshot);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool EvaluateTriggerNode(JsonElement node, Quote quote, QuoteRatingSnapshot? snapshot)
+    {
+        if (node.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.Array)
+            return all.EnumerateArray().All(child => EvaluateTriggerNode(child, quote, snapshot));
+
+        if (node.TryGetProperty("any", out var any) && any.ValueKind == JsonValueKind.Array)
+            return any.EnumerateArray().Any(child => EvaluateTriggerNode(child, quote, snapshot));
+
+        if (!node.TryGetProperty("path", out var pathElement) || pathElement.ValueKind != JsonValueKind.String)
+            return false;
+
+        var actual = GetTriggerValue(pathElement.GetString(), quote, snapshot);
+        if (actual == null)
+            return false;
+
+        if (node.TryGetProperty("equals", out var equals))
+            return TriggerValuesEqual(actual, equals);
+
+        if (node.TryGetProperty("notEquals", out var notEquals))
+            return !TriggerValuesEqual(actual, notEquals);
+
+        if (node.TryGetProperty("greaterThan", out var greaterThan) && TryGetDecimal(actual, out var actualDecimal) && TryGetDecimal(greaterThan, out var greaterThanDecimal))
+            return actualDecimal > greaterThanDecimal;
+
+        if (node.TryGetProperty("lessThan", out var lessThan) && TryGetDecimal(actual, out actualDecimal) && TryGetDecimal(lessThan, out var lessThanDecimal))
+            return actualDecimal < lessThanDecimal;
+
+        return false;
+    }
+
+    private static object? GetTriggerValue(string? path, Quote quote, QuoteRatingSnapshot? snapshot)
+        => path switch
+        {
+            "Rating.DebrisRemoval" => snapshot?.DebrisRemoval,
+            "Rating.RentalReimbursement" => snapshot?.RentalReimbursement,
+            "Rating.TowingStorageRecovery" => snapshot?.TowingStorageRecovery,
+            "Rating.NewlyAcquiredEquipment" => snapshot?.NewlyAcquiredEquipment,
+            "Rating.Tria" => snapshot?.Tria,
+            "Rating.EndorsementPremium" => snapshot?.EndorsementPremium,
+            "Rating.GrandTotalPremium" => snapshot?.GrandTotalPremium,
+            "Quote.TotalPremium" => quote.TotalPremium,
+            "Quote.PremiumAmount" => quote.PremiumAmount,
+            "Quote.IsFilingState" => quote.IsFilingState,
+            "Quote.LineOfBusiness" => quote.LineOfBusiness.ToString(),
+            "Submission.State" => ResolvePackageState(quote),
+            "Submission.LossPayeeCount" => quote.Submission.AdditionalInterests.Count(i => !i.IsDeleted && i.LineOfBusiness == quote.LineOfBusiness && i.LossPayee),
+            _ => null,
+        };
+
+    private static bool TriggerValuesEqual(object actual, JsonElement expected)
+        => expected.ValueKind switch
+        {
+            JsonValueKind.True => actual is bool b && b,
+            JsonValueKind.False => actual is bool b && !b,
+            JsonValueKind.Number => TryGetDecimal(actual, out var actualDecimal) && TryGetDecimal(expected, out var expectedDecimal) && actualDecimal == expectedDecimal,
+            JsonValueKind.String => string.Equals(Convert.ToString(actual, CultureInfo.InvariantCulture), expected.GetString(), StringComparison.OrdinalIgnoreCase),
+            _ => false,
+        };
+
+    private static bool TryGetDecimal(object value, out decimal result)
+        => decimal.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out result);
+
+    private static bool TryGetDecimal(JsonElement value, out decimal result)
+    {
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out result))
+            return true;
+        if (value.ValueKind == JsonValueKind.String)
+            return decimal.TryParse(value.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out result);
+
+        result = 0;
+        return false;
+    }
+
+    private static string ResolvePackageState(Quote quote)
+        => (quote.Submission.Insured.State ?? ExtractState(quote.Submission.Locations.FirstOrDefault()?.Address) ?? string.Empty)
+            .Trim()
+            .ToUpperInvariant();
 
     private static async Task<string> BuildSelfContainedHtmlAsync(
         string templateDir,
