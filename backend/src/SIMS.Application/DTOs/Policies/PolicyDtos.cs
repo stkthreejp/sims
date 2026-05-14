@@ -97,6 +97,35 @@ public class IssueEndorsementDto
     public decimal? PremiumChange { get; set; }
 }
 
+public class PolicyIssuancePacketDto
+{
+    public Guid PolicyId { get; set; }
+    public Guid BoundQuoteId { get; set; }
+    public bool IsIssued { get; set; }
+    public DateOnly? IssuedDate { get; set; }
+    public int IncludedFormCount { get; set; }
+    public IReadOnlyList<PolicyIssuanceFormDto> Forms { get; set; } = [];
+}
+
+public class PolicyIssuanceFormDto
+{
+    public Guid Id { get; set; }
+    public Guid PolicyFormTemplateId { get; set; }
+    public string FormNumber { get; set; } = string.Empty;
+    public string FormName { get; set; } = string.Empty;
+    public string? EditionDate { get; set; }
+    public int SequenceOrder { get; set; }
+    public PolicyFormType FormType { get; set; }
+    public bool IsIncluded { get; set; }
+    public bool IsSystemGenerated { get; set; }
+}
+
+public class IssuePolicyDto
+{
+    public DateOnly IssuedDate { get; set; }
+    public string? Notes { get; set; }
+}
+
 public class NonRenewPolicyDto
 {
     public DateOnly NonRenewedDate { get; set; }

@@ -49,6 +49,21 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
     }
 
+    [HttpGet("{id:guid}/issuance-packet")]
+    public async Task<IActionResult> GetIssuancePacket(Guid id)
+    {
+        var result = await _policies.GetIssuancePacketAsync(id, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/issue")]
+    [Authorize(Policy = AppPermissions.PoliciesIssue)]
+    public async Task<IActionResult> Issue(Guid id, [FromBody] IssuePolicyDto dto)
+    {
+        var result = await _policies.IssueAsync(id, dto, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // --- Endorsements ---
 
     [HttpPost("{id:guid}/endorsements")]

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Ban, FileSignature, FileX2, Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText } from 'lucide-react'
+import { AlertTriangle, Ban, FileSignature, FileX2, Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_STATUS_COLORS } from '@/types/policy.types'
-import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyTransaction } from '@/types/policy.types'
+import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -75,7 +75,13 @@ export function PolicyDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] }),
   })
 
-  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canCreatePolicies, canEndorsePolicies, canCancelPolicies } = usePermissions()
+  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canCreatePolicies, canIssuePolicies, canEndorsePolicies, canCancelPolicies } = usePermissions()
+
+  const { data: issuancePacket } = useQuery({
+    queryKey: ['policies', id, 'issuance-packet'],
+    queryFn: () => policiesApi.getIssuancePacket(id!),
+    enabled: !!id,
+  })
 
   const { data: cancellationGuidance } = useQuery({
     queryKey: ['policies', id, 'cancellation-guidance'],
@@ -119,6 +125,16 @@ export function PolicyDetailPage() {
       toast.success('Policy marked non-renewed')
     },
     onError: () => toast.error('Policy could not be non-renewed'),
+  })
+
+  const issuePolicyMutation = useMutation({
+    mutationFn: () => policiesApi.issue(id!, { issuedDate: new Date().toISOString().slice(0, 10) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies', id, 'issuance-packet'] })
+      toast.success('Policy marked issued')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be issued'),
   })
 
   if (isLoading) return <LoadingSpinner />
@@ -307,6 +323,13 @@ export function PolicyDetailPage() {
         )}
       </div>
 
+      <PolicyIssuancePanel
+        packet={issuancePacket}
+        canIssue={canIssuePolicies && policy.status === 'Active' && !policy.issuedDate}
+        issuing={issuePolicyMutation.isPending}
+        onIssue={() => issuePolicyMutation.mutate()}
+      />
+
       {/* Transactions */}
       {policy.transactions.length > 0 && (
         <div className="bg-white border rounded-lg overflow-hidden">
@@ -455,6 +478,83 @@ export function PolicyDetailPage() {
       {/* Documents */}
       <div className="bg-white border rounded-lg p-5">
         <DocumentsSection entityType="Policy" entityId={policy.boundQuoteId} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
+      </div>
+    </div>
+  )
+}
+
+function PolicyIssuancePanel({
+  packet,
+  canIssue,
+  issuing,
+  onIssue,
+}: {
+  packet?: PolicyIssuancePacket
+  canIssue: boolean
+  issuing: boolean
+  onIssue: () => void
+}) {
+  const includedForms = packet?.forms.filter((form) => form.isIncluded) ?? []
+  const excludedForms = packet?.forms.filter((form) => !form.isIncluded) ?? []
+  const ready = includedForms.length > 0
+  const issued = packet?.isIssued
+
+  return (
+    <div className="bg-white border rounded-lg overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Policy issuance packet</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {issued
+              ? `Issued ${packet?.issuedDate ? new Date(packet.issuedDate).toLocaleDateString() : ''}`
+              : ready
+                ? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready for issuance review`
+                : 'No included policy forms found yet'}
+          </p>
+        </div>
+        {issued ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+            <Check className="h-3.5 w-3.5" /> Issued
+          </span>
+        ) : (
+          <button
+            disabled={!canIssue || !ready || issuing}
+            onClick={onIssue}
+            className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Send className="h-3.5 w-3.5" /> Mark issued
+          </button>
+        )}
+      </div>
+      <div className="px-5 py-4">
+        {!packet ? (
+          <div className="flex h-16 items-center justify-center"><LoadingSpinner /></div>
+        ) : includedForms.length === 0 ? (
+          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+            Review the quote policy forms first. Once forms are included on the bound quote, they will appear here for issuance.
+          </div>
+        ) : (
+          <div className="divide-y rounded border">
+            {includedForms.map((form) => (
+              <div key={form.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                <span className="w-8 text-right font-mono text-xs font-semibold text-slate-400">{String(form.sequenceOrder).padStart(2, '0')}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-slate-800">{form.formName}</div>
+                  <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-slate-500">
+                    <span className="font-mono">{form.formNumber}</span>
+                    <span>{form.editionDate || '-'}</span>
+                    <span>{form.formType}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {excludedForms.length > 0 && (
+          <p className="mt-3 text-xs text-slate-500">
+            {excludedForms.length} form{excludedForms.length === 1 ? '' : 's'} excluded from this packet.
+          </p>
+        )}
       </div>
     </div>
   )

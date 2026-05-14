@@ -91,6 +91,98 @@ public class PolicyService : IPolicyService
             : Result<PolicyDto>.Success(MapToDto(policy));
     }
 
+    public async Task<Result<PolicyIssuancePacketDto>> GetIssuancePacketAsync(Guid policyId, UserAccessScope access)
+    {
+        var policy = await Db.Set<Policy>()
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Submission)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+
+        if (policy == null)
+            return Result<PolicyIssuancePacketDto>.Failure("NOT_FOUND", "Policy not found.");
+
+        var quoteForms = (IQuotePolicyFormSelectionService)_sp.GetService(typeof(IQuotePolicyFormSelectionService))!;
+        await quoteForms.GetOrSeedAsync(policy.BoundQuoteId);
+
+        var forms = await Db.Set<QuotePolicyFormSelection>()
+            .Include(f => f.PolicyFormTemplate)
+            .Where(f => f.QuoteId == policy.BoundQuoteId)
+            .OrderBy(f => f.SequenceOrder)
+            .Select(f => new PolicyIssuanceFormDto
+            {
+                Id = f.Id,
+                PolicyFormTemplateId = f.PolicyFormTemplateId,
+                FormNumber = f.PolicyFormTemplate.FormNumber,
+                FormName = f.PolicyFormTemplate.Name,
+                EditionDate = f.PolicyFormTemplate.EditionDate,
+                SequenceOrder = f.SequenceOrder,
+                FormType = f.FormType,
+                IsIncluded = f.IsIncluded,
+                IsSystemGenerated = f.IsSystemGenerated,
+            })
+            .ToListAsync();
+
+        return Result<PolicyIssuancePacketDto>.Success(new PolicyIssuancePacketDto
+        {
+            PolicyId = policy.Id,
+            BoundQuoteId = policy.BoundQuoteId,
+            IsIssued = policy.IssuedDate.HasValue,
+            IssuedDate = policy.IssuedDate,
+            IncludedFormCount = forms.Count(f => f.IsIncluded),
+            Forms = forms,
+        });
+    }
+
+    public async Task<Result<PolicyDto>> IssueAsync(Guid policyId, IssuePolicyDto dto, UserAccessScope access)
+    {
+        var policy = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+
+        if (policy == null)
+            return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can be issued.");
+        if (policy.IssuedDate.HasValue)
+            return Result<PolicyDto>.Failure("ALREADY_ISSUED", "Policy has already been issued.");
+
+        var packet = await GetIssuancePacketAsync(policyId, access);
+        if (!packet.IsSuccess)
+            return Result<PolicyDto>.Failure(packet.ErrorCode ?? "ISSUANCE_PACKET_ERROR", packet.ErrorMessage ?? "Unable to load issuance packet.");
+        if (packet.Value!.IncludedFormCount == 0)
+            return Result<PolicyDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before issuing.");
+
+        policy.IssuedDate = dto.IssuedDate;
+        policy.UpdatedAt = DateTime.UtcNow;
+        if (policy.BoundQuote != null)
+        {
+            policy.BoundQuote.IssuedDate = dto.IssuedDate;
+            policy.BoundQuote.UpdatedAt = DateTime.UtcNow;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Notes))
+        {
+            var newBusinessTxn = policy.Transactions
+                .Where(t => t.TransactionType == TransactionType.NewBusiness)
+                .OrderByDescending(t => t.ProcessedAt)
+                .FirstOrDefault();
+            if (newBusinessTxn != null)
+                newBusinessTxn.Notes = string.IsNullOrWhiteSpace(newBusinessTxn.Notes)
+                    ? dto.Notes.Trim()
+                    : $"{newBusinessTxn.Notes}\n{dto.Notes.Trim()}";
+        }
+
+        await Db.SaveChangesAsync();
+        return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
     public async Task<Result<PolicyTransactionDto>> AddEndorsementAsync(
         Guid policyId, CreateEndorsementDto dto, UserAccessScope access)
     {

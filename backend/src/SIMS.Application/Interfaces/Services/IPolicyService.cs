@@ -10,6 +10,8 @@ public interface IPolicyService
     Task<PagedResult<PolicyListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access);
     Task<IEnumerable<PolicyListItemDto>> GetByInsuredAsync(Guid insuredId, UserAccessScope access);
     Task<Result<PolicyDto>> GetByIdAsync(Guid id, UserAccessScope access);
+    Task<Result<PolicyIssuancePacketDto>> GetIssuancePacketAsync(Guid policyId, UserAccessScope access);
+    Task<Result<PolicyDto>> IssueAsync(Guid policyId, IssuePolicyDto dto, UserAccessScope access);
 
     Task<Result<PolicyTransactionDto>> AddEndorsementAsync(Guid policyId, CreateEndorsementDto dto, UserAccessScope access);
     Task<Result<PolicyTransactionDto>> IssueEndorsementAsync(Guid policyId, Guid txnId, IssueEndorsementDto dto, UserAccessScope access);

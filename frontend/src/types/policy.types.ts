@@ -1,4 +1,5 @@
 import type { PolicyLineOfBusiness } from './quote.types'
+import type { PolicyFormType } from './policyForm.types'
 
 export type PolicyStatus = 'Active' | 'Renewed' | 'NonRenewed' | 'Expired' | 'Cancelled'
 export type PolicyTransactionStatus = 'Pending' | 'Issued'
@@ -102,6 +103,32 @@ export interface CreateEndorsement {
 export interface IssueEndorsement {
   effectiveDate?: string
   premiumChange?: number
+}
+
+export interface PolicyIssuancePacket {
+  policyId: string
+  boundQuoteId: string
+  isIssued: boolean
+  issuedDate: string | null
+  includedFormCount: number
+  forms: PolicyIssuanceForm[]
+}
+
+export interface PolicyIssuanceForm {
+  id: string
+  policyFormTemplateId: string
+  formNumber: string
+  formName: string
+  editionDate: string | null
+  sequenceOrder: number
+  formType: PolicyFormType
+  isIncluded: boolean
+  isSystemGenerated: boolean
+}
+
+export interface IssuePolicy {
+  issuedDate: string
+  notes?: string
 }
 
 export interface NonRenewPolicy {
