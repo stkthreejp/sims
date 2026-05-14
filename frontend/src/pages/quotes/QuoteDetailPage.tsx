@@ -1293,31 +1293,158 @@ export function QuoteDetailPage() {
               <QuotePolicyFormsCard quoteId={quoteId!} canManage={canCreatePolicies} />
             )}
 
-{/* Inline UW Writeup */}
+            {/* Inline UW Writeup */}
             <Card>
               <CardHead
                 title={<span className="flex items-center gap-2"><Edit2 className="h-4 w-4 text-slate-500" />Underwriting writeup</span>}
-                right={<span className="rounded-md bg-slate-100 px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">{writeup?.status ?? 'Draft'}</span>}
+                right={
+                  <>
+                    <WriteupStatusPill status={writeup?.status} />
+                    <Link to={`/quotes/${quoteId}/writeup`} className="sd-btn outline sm">Open full writeup</Link>
+                    {!writeupReadOnly && (
+                      <Btn variant="primary" disabled={saveWriteupMutation.isPending || writeupLoading || writeupIsError} onClick={() => saveWriteupMutation.mutate()}>
+                        <Save className="h-3.5 w-3.5" /> Save draft
+                      </Btn>
+                    )}
+                  </>
+                }
               />
-              <div className="divide-y divide-slate-100">
-                {[
-                  { n: '01', title: 'Account summary', body: writeup ? `${writeup.insuredName} · ${writeup.lob} · ${writeup.policyType} account effective ${formatDate(writeup.effectiveDate)}.` : 'Writeup context will load here.' },
-                  { n: '02', title: 'Risk description & operations', body: writeup?.payload.narrativeOperators || writeup?.operationType || 'No operation narrative entered yet.' },
-                  { n: '03', title: 'Equipment & values', body: writeup ? `${writeup.equipment.totalCount} scheduled item${writeup.equipment.totalCount !== 1 ? 's' : ''}; total TIV ${fmt(writeup.equipment.totalTiv)}; largest item ${fmt(writeup.equipment.largestUnitTiv)}.` : 'Equipment summary will load here.' },
-                  { n: '04', title: 'Decision rationale', body: writeup?.payload.decisionRationale || 'No decision rationale entered yet.' },
-                ].map((section, index) => (
-                  <div key={section.n} className={index === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                    <div className="flex items-center gap-3 px-5 py-3">
-                      <span className="font-mono text-[11px] font-semibold text-slate-400">{section.n}</span>
-                      <span className="text-sm font-semibold text-slate-800">{section.title}</span>
-                      <span className={`ml-auto rounded-md border px-2 py-0.5 text-[10.5px] font-semibold ${section.body.startsWith('No ') ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                        {section.body.startsWith('No ') ? 'open' : 'complete'}
-                      </span>
+              {writeupLoading ? (
+                <div className="flex h-28 items-center justify-center"><LoadingSpinner /></div>
+              ) : writeupIsError || !writeup ? (
+                <div className="px-5 py-4 text-sm text-red-700">Underwriting writeup could not be loaded.</div>
+              ) : (
+                <div>
+                  {writeupReadOnly && (
+                    <div className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-xs font-medium text-slate-500">
+                      This writeup is {writeup.status.toLowerCase()} and can be reviewed here. Reopen the full writeup workflow to change status.
                     </div>
-                    <p className="px-5 pb-4 pl-[4.5rem] text-sm leading-6 text-slate-600">{section.body}</p>
-                  </div>
-                ))}
-              </div>
+                  )}
+
+                  <InlineWriteupSection number="01" title="Account summary" defaultOpen>
+                    <div className="grid grid-cols-2 gap-4 max-[700px]:grid-cols-1">
+                      <KV label="Underwriter" value={writeup.uwName} />
+                      <KV label="Assistant UW" value={writeup.assistantUWName} />
+                      <KV label="Agent" value={writeup.agentName} />
+                      <KV label="Insured" value={writeup.insuredName} />
+                      <KV label="Line" value={LOB_LABELS[quote.lineOfBusiness]} />
+                      <KV label="Policy type" value={writeup.policyType} />
+                      <KV label="Effective" value={formatDate(writeup.effectiveDate)} />
+                      <KV label="Operation type" value={writeup.operationType} />
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                      {writeup.address || 'No address on the writeup yet.'}
+                    </div>
+                  </InlineWriteupSection>
+
+                  <InlineWriteupSection number="02" title={quote.lineOfBusiness === 'InlandMarine' ? 'Referral triggers' : 'Referral and submission notes'}>
+                    <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+                      <InlineWriteupCheckbox label="Loss ratio over 55%" checked={writeupPayload.referralLossRatioOver55} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralLossRatioOver55: value })} />
+                      {quote.lineOfBusiness === 'InlandMarine' && (
+                        <>
+                          <InlineWriteupCheckbox label="Any one piece over $500k" checked={writeupPayload.referralPieceOver500k} auto={writeup.autoReferralPieceOver500k} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralPieceOver500k: value })} />
+                          <InlineWriteupCheckbox label="Total TIV over $2M" checked={writeupPayload.referralTivOver2mil} auto={writeup.autoReferralTivOver2mil} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralTivOver2mil: value })} />
+                        </>
+                      )}
+                      <InlineWriteupCheckbox label="Any loss over $400k" checked={writeupPayload.referralLossOver400k} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralLossOver400k: value })} />
+                    </div>
+                    <InlineWriteupTextarea label="Other referral notes" value={writeupPayload.referralOtherText} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ referralOtherText: value })} />
+                    <InlineWriteupTextarea label="Reason submitted" value={writeupPayload.reasonSubmitted} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ reasonSubmitted: value })} />
+                  </InlineWriteupSection>
+
+                  <InlineWriteupSection number="03" title="Losses">
+                    <InlineWriteupTextarea label="Loss mitigation actions" value={writeupPayload.lossMitigationActions} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ lossMitigationActions: value })} />
+                    <InlineWriteupTextarea label="Losses over $25k" value={writeupPayload.lossesOver25kDescription} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ lossesOver25kDescription: value })} />
+                  </InlineWriteupSection>
+
+                  {quote.lineOfBusiness === 'InlandMarine' && (
+                    <InlineWriteupSection number="04" title="Equipment and values">
+                      <div className="grid grid-cols-4 gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
+                        <KV label="Total TIV" value={fmt(writeup.equipment.totalTiv)} />
+                        <KV label="Largest unit" value={fmt(writeup.equipment.largestUnitTiv)} />
+                        <KV label="Scheduled items" value={writeup.equipment.totalCount} />
+                        <KV label="Other units" value={writeup.equipment.countOther} />
+                      </div>
+                      <InlineWriteupCheckbox label="Equipment values checked" checked={writeupPayload.eqValueChecked} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ eqValueChecked: value })} />
+                      <InlineWriteupTextarea label="Equipment narrative" value={writeupPayload.narrativeEquipment} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeEquipment: value })} />
+                    </InlineWriteupSection>
+                  )}
+
+                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '05' : '04'} title={isAuto ? 'Fleet operations' : 'Operations and metrics'}>
+                    {quote.lineOfBusiness === 'InlandMarine' && (
+                      <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+                        <InlineWriteupCheckbox label="Waterborne exposure" checked={writeupPayload.waterborneExposure} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ waterborneExposure: value })} />
+                        <InlineWriteupCheckbox label="Recommendations outstanding" checked={writeupPayload.recommendationsOutstanding} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ recommendationsOutstanding: value })} />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+                      <label className="block">
+                        <span className="sims-field-label">Last inspection date</span>
+                        <input
+                          type="date"
+                          value={writeupPayload.lastInspectionDate ?? ''}
+                          readOnly={writeupReadOnly}
+                          onChange={(e) => patchWriteupPayload({ lastInspectionDate: e.target.value })}
+                          className="sims-input mt-1"
+                        />
+                      </label>
+                      <InlineWriteupCheckbox label="Website reviewed" checked={writeupPayload.websiteReviewed === true} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ websiteReviewed: value })} />
+                    </div>
+                    <InlineWriteupTextarea label="Operations narrative" value={writeupPayload.narrativeOperators} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeOperators: value })} />
+                    <InlineWriteupTextarea label="Recommendations detail" value={writeupPayload.recommendationsDetail} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ recommendationsDetail: value })} />
+                    <InlineWriteupTextarea label="Website issues" value={writeupPayload.websiteIssues} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ websiteIssues: value })} />
+                  </InlineWriteupSection>
+
+                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '06' : '05'} title="Underwriting notes">
+                    <InlineWriteupTextarea label="Fire suppression" value={writeupPayload.narrativeFireSuppression} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeFireSuppression: value })} />
+                    <InlineWriteupTextarea label="Other concerns" value={writeupPayload.narrativeOtherConcerns} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeOtherConcerns: value })} />
+                  </InlineWriteupSection>
+
+                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '07' : '06'} title="Conditions">
+                    <div className="space-y-2">
+                      {writeupConditions.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-sm text-slate-500">No conditions added yet.</div>
+                      ) : writeupConditions.map((condition, index) => (
+                        <div key={condition.id || index} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={condition.satisfied}
+                            disabled={writeupReadOnly}
+                            onChange={(e) => setWriteupConditions((conditions) => conditions.map((row, rowIndex) => rowIndex === index ? { ...row, satisfied: e.target.checked } : row))}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                          <input
+                            value={condition.text}
+                            readOnly={writeupReadOnly}
+                            onChange={(e) => setWriteupConditions((conditions) => conditions.map((row, rowIndex) => rowIndex === index ? { ...row, text: e.target.value } : row))}
+                            className="sims-input h-8 flex-1"
+                          />
+                          {!writeupReadOnly && (
+                            <button type="button" className="sims-icon-btn danger" onClick={() => removeWriteupCondition(condition.id)} title="Remove condition">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {!writeupReadOnly && (
+                      <div className="flex gap-2 max-[560px]:flex-col">
+                        <input
+                          value={newWriteupCondition}
+                          onChange={(e) => setNewWriteupCondition(e.target.value)}
+                          className="sims-input flex-1"
+                          placeholder="Add condition..."
+                        />
+                        <Btn variant="outline" onClick={addWriteupCondition}><Plus className="h-3.5 w-3.5" /> Add</Btn>
+                      </div>
+                    )}
+                  </InlineWriteupSection>
+
+                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '08' : '07'} title="Recommendation">
+                    <InlineWriteupTextarea label="Decision rationale" value={writeupPayload.decisionRationale} readOnly={writeupReadOnly} rows={4} onChange={(value) => patchWriteupPayload({ decisionRationale: value })} />
+                  </InlineWriteupSection>
+                </div>
+              )}
             </Card>
 
             {/* Bind checklist */}
