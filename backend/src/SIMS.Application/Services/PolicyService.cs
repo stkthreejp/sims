@@ -159,6 +159,11 @@ public class PolicyService : IPolicyService
         if (packet.Value!.IncludedFormCount == 0)
             return Result<PolicyDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before issuing.");
 
+        var assembly = (IPolicyAssemblyService)_sp.GetService(typeof(IPolicyAssemblyService))!;
+        var assemblyResult = await assembly.AssembleAndFileAsync(policyId, access.UserId);
+        if (!assemblyResult.IsSuccess)
+            return Result<PolicyDto>.Failure(assemblyResult.ErrorCode ?? "POLICY_PACKET_FAILED", assemblyResult.ErrorMessage ?? "Policy packet could not be assembled.");
+
         policy.IssuedDate = dto.IssuedDate;
         policy.UpdatedAt = DateTime.UtcNow;
         if (policy.BoundQuote != null)
