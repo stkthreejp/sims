@@ -18,12 +18,14 @@ public class PolicyAssemblyService : IPolicyAssemblyService
     private readonly ApplicationDbContext _db;
     private readonly IBlobStorageService _blob;
     private readonly IAttachmentService _attachments;
+    private readonly IDocumentMergeService _merge;
 
-    public PolicyAssemblyService(ApplicationDbContext db, IBlobStorageService blob, IAttachmentService attachments)
+    public PolicyAssemblyService(ApplicationDbContext db, IBlobStorageService blob, IAttachmentService attachments, IDocumentMergeService merge)
     {
         _db = db;
         _blob = blob;
         _attachments = attachments;
+        _merge = merge;
     }
 
     public async Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId)
@@ -33,6 +35,8 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             .Include(p => p.Carrier)
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
             .Include(p => p.Submission).ThenInclude(s => s.Locations)
+            .Include(p => p.Submission).ThenInclude(s => s.Equipment)
+            .Include(p => p.Submission).ThenInclude(s => s.AdditionalInterests)
             .Include(p => p.BoundQuote)
             .FirstOrDefaultAsync(p => p.Id == policyId);
 
@@ -96,7 +100,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         return Result<GeneratedDocumentDto>.Success(new GeneratedDocumentDto(urlResult.Value, attachmentResult.Value));
     }
 
-    private async Task<Result<byte[]>> PrepareFormPdfAsync(QuotePolicyFormSelection form, IReadOnlyDictionary<string, object?> data)
+    private async Task<Result<byte[]>> PrepareFormPdfAsync(QuotePolicyFormSelection form, DocumentMergeData data)
     {
         var template = form.PolicyFormTemplate;
         if (string.IsNullOrWhiteSpace(template.StoragePath) || string.IsNullOrWhiteSpace(template.FileName))
@@ -107,8 +111,8 @@ public class PolicyAssemblyService : IPolicyAssemblyService
 
         return extension switch
         {
-            ".pdf" => FillPdfFields(bytes, template, data),
-            ".docx" => ConvertWordToPdf(bytes, FormatType.Docx),
+            ".pdf" => FillPdfFields(bytes, template, data.Values),
+            ".docx" => ConvertWordToPdf(_merge.MergeDocx(bytes, data), FormatType.Docx),
             ".doc" => ConvertWordToPdf(bytes, FormatType.Doc),
             _ => Result<byte[]>.Failure("UNSUPPORTED_FORM_FILE", "Only PDF, DOC, and DOCX forms can be assembled into policy packets."),
         };
@@ -209,60 +213,98 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         return output.ToArray();
     }
 
-    private static IReadOnlyDictionary<string, object?> BuildPolicyData(Policy policy)
+    private static DocumentMergeData BuildPolicyData(Policy policy)
     {
         var quote = policy.BoundQuote;
         var insured = policy.Submission.Insured;
         var carrier = policy.Carrier;
 
-        var data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Policy.PolicyNumber"] = policy.PolicyNumber,
-            ["Policy.EffectiveDate"] = policy.EffectiveDate,
-            ["Policy.ExpirationDate"] = policy.ExpirationDate,
-            ["Policy.BoundDate"] = policy.BoundDate,
-            ["Policy.IssuedDate"] = policy.IssuedDate,
-            ["Policy.PremiumAmount"] = policy.PremiumAmount,
-            ["Policy.TaxesAndFees"] = policy.TaxesAndFees,
-            ["Policy.TotalPremium"] = policy.TotalPremium,
-            ["Policy.LineOfBusiness"] = policy.LineOfBusiness.ToString(),
+        var data = new DocumentMergeData();
+        var values = data.Values;
 
-            ["Quote.QuoteNumber"] = quote.QuoteNumber,
-            ["Quote.PolicyNumber"] = quote.PolicyNumber,
-            ["Quote.EffectiveDate"] = quote.EffectiveDate,
-            ["Quote.ExpirationDate"] = quote.ExpirationDate,
-            ["Quote.PremiumAmount"] = quote.PremiumAmount,
-            ["Quote.TaxesAndFees"] = quote.TaxesAndFees,
-            ["Quote.TotalPremium"] = quote.TotalPremium,
-            ["Quote.CoverageDescription"] = quote.CoverageDescription,
-            ["Quote.Deductible"] = quote.Deductible,
-            ["Quote.Limit"] = quote.Limit,
-            ["Quote.UninsuredMotoristLimit"] = quote.UninsuredMotoristLimit,
-            ["Quote.MedicalPaymentsLimit"] = quote.MedicalPaymentsLimit,
-            ["Quote.LineOfBusiness"] = quote.LineOfBusiness.ToString(),
+        values["Policy.PolicyNumber"] = policy.PolicyNumber;
+        values["Policy.EffectiveDate"] = policy.EffectiveDate;
+        values["Policy.ExpirationDate"] = policy.ExpirationDate;
+        values["Policy.BoundDate"] = policy.BoundDate;
+        values["Policy.IssuedDate"] = policy.IssuedDate;
+        values["Policy.PremiumAmount"] = policy.PremiumAmount;
+        values["Policy.TaxesAndFees"] = policy.TaxesAndFees;
+        values["Policy.TotalPremium"] = policy.TotalPremium;
+        values["Policy.LineOfBusiness"] = policy.LineOfBusiness.ToString();
 
-            ["Submission.SubmissionNumber"] = policy.Submission.SubmissionNumber,
+        values["Quote.QuoteNumber"] = quote.QuoteNumber;
+        values["Quote.PolicyNumber"] = quote.PolicyNumber;
+        values["Quote.EffectiveDate"] = quote.EffectiveDate;
+        values["Quote.ExpirationDate"] = quote.ExpirationDate;
+        values["Quote.PremiumAmount"] = quote.PremiumAmount;
+        values["Quote.TaxesAndFees"] = quote.TaxesAndFees;
+        values["Quote.TotalPremium"] = quote.TotalPremium;
+        values["Quote.CoverageDescription"] = quote.CoverageDescription;
+        values["Quote.Deductible"] = quote.Deductible;
+        values["Quote.Limit"] = quote.Limit;
+        values["Quote.UninsuredMotoristLimit"] = quote.UninsuredMotoristLimit;
+        values["Quote.MedicalPaymentsLimit"] = quote.MedicalPaymentsLimit;
+        values["Quote.LineOfBusiness"] = quote.LineOfBusiness.ToString();
 
-            ["Insured.DisplayName"] = insured.DisplayName,
-            ["Insured.Name"] = insured.DisplayName,
-            ["Insured.CompanyName"] = insured.CompanyName,
-            ["Insured.Dba"] = insured.Dba,
-            ["Insured.FirstName"] = insured.FirstName,
-            ["Insured.LastName"] = insured.LastName,
-            ["Insured.AddressLine1"] = insured.AddressLine1,
-            ["Insured.AddressLine2"] = insured.AddressLine2,
-            ["Insured.City"] = insured.City,
-            ["Insured.State"] = insured.State,
-            ["Insured.ZipCode"] = insured.ZipCode,
-            ["Insured.FullAddress"] = FormatAddress(insured.AddressLine1, insured.AddressLine2, insured.City, insured.State, insured.ZipCode),
-            ["Insured.Email"] = insured.Email,
-            ["Insured.Phone"] = insured.Phone,
+        values["Submission.SubmissionNumber"] = policy.Submission.SubmissionNumber;
 
-            ["Carrier.Name"] = carrier.Name,
-            ["Carrier.Naic"] = carrier.Naic,
-        };
+        values["Insured.DisplayName"] = insured.DisplayName;
+        values["Insured.Name"] = insured.DisplayName;
+        values["Insured.CompanyName"] = insured.CompanyName;
+        values["Insured.Dba"] = insured.Dba;
+        values["Insured.FirstName"] = insured.FirstName;
+        values["Insured.LastName"] = insured.LastName;
+        values["Insured.AddressLine1"] = insured.AddressLine1;
+        values["Insured.AddressLine2"] = insured.AddressLine2;
+        values["Insured.City"] = insured.City;
+        values["Insured.State"] = insured.State;
+        values["Insured.ZipCode"] = insured.ZipCode;
+        values["Insured.FullAddress"] = FormatAddress(insured.AddressLine1, insured.AddressLine2, insured.City, insured.State, insured.ZipCode);
+        values["Insured.Email"] = insured.Email;
+        values["Insured.Phone"] = insured.Phone;
+
+        values["Carrier.Name"] = carrier.Name;
+        values["Carrier.Naic"] = carrier.Naic;
+
+        data.RepeatingValues["Equipment"] = policy.Submission.Equipment
+            .OrderBy(e => e.ItemNumber)
+            .Select(e => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ItemNumber"] = e.ItemNumber,
+                ["Description"] = e.Description,
+                ["Year"] = e.Year,
+                ["Make"] = e.Make,
+                ["Model"] = e.Model,
+                ["SerialNumber"] = e.SerialNumber,
+                ["Value"] = e.Value,
+                ["Limit"] = e.Value,
+                ["Deductible"] = e.Deductible,
+                ["Territory"] = e.TerritoryCode,
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
+
+        data.RepeatingValues["AdditionalInterests"] = policy.Submission.AdditionalInterests
+            .OrderBy(i => i.Name)
+            .Select(i => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Name"] = i.Name,
+                ["Address"] = FormatAddress(i.AddressLine1, i.AddressLine2, i.City, i.State, i.ZipCode),
+                ["Types"] = FormatAdditionalInterestTypes(i),
+                ["LoanNumber"] = i.ScheduledItemNumbers,
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
 
         return data;
+    }
+
+    private static string FormatAdditionalInterestTypes(SubmissionAdditionalInterest interest)
+    {
+        var types = new List<string>();
+        if (interest.AdditionalInsured) types.Add("Additional Insured");
+        if (interest.LossPayee) types.Add("Loss Payee");
+        if (interest.WaiverOfSubrogation) types.Add("Waiver of Subrogation");
+        if (interest.PrimaryNonContributory) types.Add("Primary Non-Contributory");
+        return string.Join(", ", types);
     }
 
     private static string FormatMappedValue(object value, string? format)
