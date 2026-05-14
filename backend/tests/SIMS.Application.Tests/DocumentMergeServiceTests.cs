@@ -34,4 +34,16 @@ public class DocumentMergeServiceTests
 
         Assert.Equal("<tr><td>Excavator</td><td>$100,000.00</td></tr><tr><td>Loader</td><td>$75,000.00</td></tr>", result);
     }
+
+    [Fact]
+    public void MergeHtml_AllowsFormattedHtmlContent()
+    {
+        var service = new DocumentMergeService();
+        var data = new DocumentMergeData();
+        data.Values["LegalCancellationRequirements"] = "<strong>Notice</strong>: 10 days";
+
+        var result = service.MergeHtml("<p>{{LegalCancellationRequirements}}</p>", data);
+
+        Assert.Equal("<p><strong>Notice</strong>: 10 days</p>", result);
+    }
 }

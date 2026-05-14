@@ -16,6 +16,9 @@ public class DocumentMergeService : IDocumentMergeService
     public string MergeText(string template, DocumentMergeData data)
         => Merge(template, data, WebUtility.HtmlEncode);
 
+    public string MergeHtml(string template, DocumentMergeData data)
+        => Merge(template, data, value => value);
+
     public byte[] MergeDocx(byte[] bytes, DocumentMergeData data)
     {
         using var input = new MemoryStream(bytes);

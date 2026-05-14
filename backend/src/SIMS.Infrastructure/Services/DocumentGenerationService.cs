@@ -16,11 +16,13 @@ public class DocumentGenerationService : IDocumentGenerationService
 {
     private readonly IServiceProvider _sp;
     private readonly IAttachmentService _attachments;
+    private readonly IDocumentMergeService _merge;
 
-    public DocumentGenerationService(IServiceProvider sp, IAttachmentService attachments)
+    public DocumentGenerationService(IServiceProvider sp, IAttachmentService attachments, IDocumentMergeService merge)
     {
         _sp = sp;
         _attachments = attachments;
+        _merge = merge;
     }
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
@@ -40,7 +42,7 @@ public class DocumentGenerationService : IDocumentGenerationService
             return Result<GeneratedDocumentDto>.Failure("INVALID_TEMPLATE_KIND", "Email-only templates cannot be generated as documents.");
 
         // ── 2. Build tag data dictionary ──────────────────────────────────────
-        Dictionary<string, string> data;
+        DocumentMergeData data;
         try
         {
             data = await BuildDataDictionaryAsync(entityType, entityId);
@@ -51,7 +53,7 @@ public class DocumentGenerationService : IDocumentGenerationService
         }
 
         // ── 3. Fill {{tags}} in HTML ──────────────────────────────────────────
-        var filledHtml = FillTags(template.HtmlContent, data);
+        var filledHtml = _merge.MergeHtml(template.HtmlContent, data);
 
         // ── 4. Wrap in full HTML document with print-ready CSS ────────────────
         var fullHtml = BuildFullHtml(filledHtml, template.Name);
@@ -97,31 +99,6 @@ public class DocumentGenerationService : IDocumentGenerationService
     }
 
     // ── Tag replacement ───────────────────────────────────────────────────────
-
-    private static string FillTags(string html, Dictionary<string, string> data)
-    {
-        // Replace TipTap tag node spans: <span data-tag="TagName" ...>{{TagName}}</span>
-        html = Regex.Replace(
-            html,
-            @"<span[^>]*data-tag=""(\w+)""[^>]*>\{\{[^}]+\}\}</span>",
-            m =>
-            {
-                var tag = m.Groups[1].Value;
-                return data.TryGetValue(tag, out var val) ? val : $"[{tag}]";
-            });
-
-        // Also replace any plain {{TagName}} that might remain
-        html = Regex.Replace(
-            html,
-            @"\{\{(\w+)\}\}",
-            m =>
-            {
-                var tag = m.Groups[1].Value;
-                return data.TryGetValue(tag, out var val) ? val : $"[{tag}]";
-            });
-
-        return html;
-    }
 
     private static string BuildFullHtml(string bodyHtml, string title)
     {
@@ -220,40 +197,39 @@ public class DocumentGenerationService : IDocumentGenerationService
 
     // ── Data dictionary builders ──────────────────────────────────────────────
 
-    private async Task<Dictionary<string, string>> BuildDataDictionaryAsync(
+    private async Task<DocumentMergeData> BuildDataDictionaryAsync(
         TemplateEntityType entityType, Guid entityId)
     {
         var today = DateTime.Today.ToString("MM/dd/yyyy");
 
-        var data = new Dictionary<string, string>
-        {
-            ["TodayDate"] = today,
-            ["CompanyName"] = "Specialty Market Managers",
-        };
+        var data = new DocumentMergeData();
+        var d = data.Values;
+        d["TodayDate"] = today;
+        d["CompanyName"] = "Specialty Market Managers";
 
         switch (entityType)
         {
             case TemplateEntityType.Quote:
-                await AddQuoteDataAsync(data, entityId);
+                await AddQuoteDataAsync(d, entityId);
                 break;
             case TemplateEntityType.Policy:
-                await AddPolicyDataAsync(data, entityId);
+                await AddPolicyDataAsync(d, entityId);
                 break;
             case TemplateEntityType.Submission:
-                await AddSubmissionDataAsync(data, entityId);
+                await AddSubmissionDataAsync(d, entityId);
                 break;
             case TemplateEntityType.Carrier:
-                await AddCarrierDataAsync(data, entityId);
+                await AddCarrierDataAsync(d, entityId);
                 break;
             case TemplateEntityType.Agent:
-                await AddAgentDataAsync(data, entityId);
+                await AddAgentDataAsync(d, entityId);
                 break;
         }
 
         return data;
     }
 
-    private async Task AddQuoteDataAsync(Dictionary<string, string> d, Guid quoteId)
+    private async Task AddQuoteDataAsync(Dictionary<string, object?> d, Guid quoteId)
     {
         var quote = await Db.Set<Quote>()
             .Include(q => q.Carrier)
@@ -322,9 +298,13 @@ public class DocumentGenerationService : IDocumentGenerationService
 
         d["UnderwriterName"] = uw.FullName;
         d["UnderwriterEmail"] = uw.Email ?? string.Empty;
+
+        AddQuoteTagAliases(d, quote);
+        AddInsuredTagAliases(d, insured);
+        AddCarrierTagAliases(d, carrier);
     }
 
-    private async Task AddPolicyDataAsync(Dictionary<string, string> d, Guid policyId)
+    private async Task AddPolicyDataAsync(Dictionary<string, object?> d, Guid policyId)
     {
         var policy = await Db.Set<Policy>()
             .Include(p => p.Carrier)
@@ -412,10 +392,15 @@ public class DocumentGenerationService : IDocumentGenerationService
         d["UnderwriterName"] = uw.FullName;
         d["UnderwriterEmail"] = uw.Email ?? string.Empty;
 
+        AddPolicyTagAliases(d, policy);
+        AddQuoteTagAliases(d, quote);
+        AddInsuredTagAliases(d, insured);
+        AddCarrierTagAliases(d, carrier);
+
         await AddLegalCancellationDataAsync(d, insured.State, cancellation?.CancellationLegalRequirementSnapshotJson);
     }
 
-    private async Task AddLegalCancellationDataAsync(Dictionary<string, string> d, string state, string? snapshotJson)
+    private async Task AddLegalCancellationDataAsync(Dictionary<string, object?> d, string state, string? snapshotJson)
     {
         var legalState = NormalizeState(state);
         d["LegalCancellationState"] = legalState;
@@ -475,7 +460,7 @@ public class DocumentGenerationService : IDocumentGenerationService
         d["LegalCancellationRequirements"] = FormatLegalRows(rowDtos);
     }
 
-    private async Task AddSubmissionDataAsync(Dictionary<string, string> d, Guid submissionId)
+    private async Task AddSubmissionDataAsync(Dictionary<string, object?> d, Guid submissionId)
     {
         var sub = await Db.Set<Submission>()
             .Include(s => s.Insured)
@@ -510,9 +495,12 @@ public class DocumentGenerationService : IDocumentGenerationService
 
         d["UnderwriterName"] = sub.Underwriter.FullName;
         d["UnderwriterEmail"] = sub.Underwriter.Email ?? string.Empty;
+
+        d["Submission.SubmissionNumber"] = sub.SubmissionNumber;
+        AddInsuredTagAliases(d, insured);
     }
 
-    private async Task AddCarrierDataAsync(Dictionary<string, string> d, Guid carrierId)
+    private async Task AddCarrierDataAsync(Dictionary<string, object?> d, Guid carrierId)
     {
         var carrier = await Db.Set<Carrier>().FindAsync(carrierId)
             ?? throw new Exception("Carrier not found.");
@@ -524,9 +512,11 @@ public class DocumentGenerationService : IDocumentGenerationService
         d["CarrierCity"] = carrier.City ?? string.Empty;
         d["CarrierState"] = carrier.State ?? string.Empty;
         d["CarrierZip"] = carrier.ZipCode ?? string.Empty;
+
+        AddCarrierTagAliases(d, carrier);
     }
 
-    private async Task AddAgentDataAsync(Dictionary<string, string> d, Guid agentId)
+    private async Task AddAgentDataAsync(Dictionary<string, object?> d, Guid agentId)
     {
         var agent = await Db.Set<Agent>()
             .Include(a => a.Locations)
@@ -553,6 +543,60 @@ public class DocumentGenerationService : IDocumentGenerationService
         var parts = new[] { line1, city != null && state != null ? $"{city}, {state} {zip}".Trim() : null }
             .Where(p => !string.IsNullOrWhiteSpace(p));
         return string.Join(", ", parts);
+    }
+
+    private static void AddQuoteTagAliases(Dictionary<string, object?> d, Quote quote)
+    {
+        d["Quote.QuoteNumber"] = quote.QuoteNumber;
+        d["Quote.PolicyNumber"] = quote.PolicyNumber;
+        d["Quote.EffectiveDate"] = quote.EffectiveDate;
+        d["Quote.ExpirationDate"] = quote.ExpirationDate;
+        d["Quote.PremiumAmount"] = quote.PremiumAmount;
+        d["Quote.TaxesAndFees"] = quote.TaxesAndFees;
+        d["Quote.TotalPremium"] = quote.TotalPremium;
+        d["Quote.CoverageDescription"] = quote.CoverageDescription;
+        d["Quote.Deductible"] = quote.Deductible;
+        d["Quote.Limit"] = quote.Limit;
+        d["Quote.UninsuredMotoristLimit"] = quote.UninsuredMotoristLimit;
+        d["Quote.MedicalPaymentsLimit"] = quote.MedicalPaymentsLimit;
+        d["Quote.LineOfBusiness"] = quote.LineOfBusiness.ToString();
+    }
+
+    private static void AddPolicyTagAliases(Dictionary<string, object?> d, Policy policy)
+    {
+        d["Policy.PolicyNumber"] = policy.PolicyNumber;
+        d["Policy.EffectiveDate"] = policy.EffectiveDate;
+        d["Policy.ExpirationDate"] = policy.ExpirationDate;
+        d["Policy.BoundDate"] = policy.BoundDate;
+        d["Policy.IssuedDate"] = policy.IssuedDate;
+        d["Policy.PremiumAmount"] = policy.PremiumAmount;
+        d["Policy.TaxesAndFees"] = policy.TaxesAndFees;
+        d["Policy.TotalPremium"] = policy.TotalPremium;
+        d["Policy.LineOfBusiness"] = policy.LineOfBusiness.ToString();
+    }
+
+    private static void AddInsuredTagAliases(Dictionary<string, object?> d, Insured insured)
+    {
+        d["Insured.DisplayName"] = insured.DisplayName;
+        d["Insured.Name"] = insured.DisplayName;
+        d["Insured.CompanyName"] = insured.CompanyName;
+        d["Insured.Dba"] = insured.Dba;
+        d["Insured.FirstName"] = insured.FirstName;
+        d["Insured.LastName"] = insured.LastName;
+        d["Insured.AddressLine1"] = insured.AddressLine1;
+        d["Insured.AddressLine2"] = insured.AddressLine2;
+        d["Insured.City"] = insured.City;
+        d["Insured.State"] = insured.State;
+        d["Insured.ZipCode"] = insured.ZipCode;
+        d["Insured.FullAddress"] = FormatAddress(insured.AddressLine1, insured.City, insured.State, insured.ZipCode);
+        d["Insured.Email"] = insured.Email;
+        d["Insured.Phone"] = insured.Phone;
+    }
+
+    private static void AddCarrierTagAliases(Dictionary<string, object?> d, Carrier carrier)
+    {
+        d["Carrier.Name"] = carrier.Name;
+        d["Carrier.Naic"] = carrier.Naic;
     }
 
     private static string FormatLegalRows(IEnumerable<LegalRequirementSnapshotRow> rows)
