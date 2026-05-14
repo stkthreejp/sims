@@ -1,6 +1,7 @@
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.PolicyForms;
 using SIMS.Domain.Enums;
+using Microsoft.AspNetCore.Http;
 
 namespace SIMS.Application.Interfaces.Services;
 
@@ -10,6 +11,8 @@ public interface IPolicyFormService
     Task<Result<PolicyFormTemplateDto>> GetTemplateAsync(Guid id);
     Task<Result<PolicyFormTemplateDto>> CreateTemplateAsync(PolicyFormTemplateUpsertDto dto);
     Task<Result<PolicyFormTemplateDto>> UpdateTemplateAsync(Guid id, PolicyFormTemplateUpsertDto dto);
+    Task<Result<PolicyFormTemplateDto>> UploadTemplateFileAsync(Guid id, IFormFile file);
+    Task<Result<string>> GetTemplateDownloadUrlAsync(Guid id);
     Task<Result> DeleteTemplateAsync(Guid id);
     Task<Result<IReadOnlyList<PolicyFormFieldMappingDto>>> ReplaceMappingsAsync(Guid templateId, IReadOnlyList<PolicyFormFieldMappingUpsertDto> mappings);
 

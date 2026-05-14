@@ -42,6 +42,21 @@ public class PolicyFormsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("templates/{id:guid}/file")]
+    [RequestSizeLimit(52_428_800)]
+    public async Task<IActionResult> UploadTemplateFile(Guid id, IFormFile file)
+    {
+        var result = await _service.UploadTemplateFileAsync(id, file);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpGet("templates/{id:guid}/download-url")]
+    public async Task<IActionResult> GetTemplateDownloadUrl(Guid id)
+    {
+        var result = await _service.GetTemplateDownloadUrlAsync(id);
+        return result.IsSuccess ? Ok(new { url = result.Value }) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpDelete("templates/{id:guid}")]
     public async Task<IActionResult> DeleteTemplate(Guid id)
     {

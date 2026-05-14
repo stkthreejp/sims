@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.PolicyForms;
 using SIMS.Application.Interfaces.Services;
@@ -10,7 +12,26 @@ namespace SIMS.Application.Services;
 public class PolicyFormService : IPolicyFormService
 {
     private readonly IServiceProvider _sp;
-    public PolicyFormService(IServiceProvider sp) => _sp = sp;
+    private readonly IBlobStorageService _blob;
+    private readonly IFileScanService _fileScan;
+    private readonly long _maxFileSize;
+    private readonly HashSet<string> _allowedExtensions;
+    private readonly Dictionary<string, string> _contentTypesByExtension;
+
+    public PolicyFormService(IServiceProvider sp, IBlobStorageService blob, IFileScanService fileScan, IConfiguration config)
+    {
+        _sp = sp;
+        _blob = blob;
+        _fileScan = fileScan;
+        _maxFileSize = long.TryParse(config["Storage:MaxFileSizeBytes"], out var parsed) ? parsed : 52_428_800L;
+        _allowedExtensions = [".pdf", ".doc", ".docx"];
+        _contentTypesByExtension = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".pdf"] = "application/pdf",
+            [".doc"] = "application/msword",
+            [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        };
+    }
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
@@ -68,6 +89,58 @@ public class PolicyFormService : IPolicyFormService
         return await GetTemplateAsync(form.Id);
     }
 
+    public async Task<Result<PolicyFormTemplateDto>> UploadTemplateFileAsync(Guid id, IFormFile file)
+    {
+        var form = await Db.Set<PolicyFormTemplate>().FindAsync(id);
+        if (form == null)
+            return Result<PolicyFormTemplateDto>.Failure("NOT_FOUND", "Policy form template not found.");
+
+        if (file.Length == 0)
+            return Result<PolicyFormTemplateDto>.Failure("EMPTY_FILE", "File is empty.");
+
+        if (file.Length > _maxFileSize)
+            return Result<PolicyFormTemplateDto>.Failure("FILE_TOO_LARGE", $"File exceeds the {_maxFileSize / 1024 / 1024}MB limit.");
+
+        var safeFileName = System.Text.RegularExpressions.Regex.Replace(
+            Path.GetFileName(file.FileName), @"[^\w.\-() ]", "_");
+        if (string.IsNullOrWhiteSpace(safeFileName))
+            return Result<PolicyFormTemplateDto>.Failure("UNSUPPORTED_FILE_TYPE", "File name is required.");
+
+        var extension = Path.GetExtension(safeFileName).ToLowerInvariant();
+        if (!_allowedExtensions.Contains(extension) || !_contentTypesByExtension.TryGetValue(extension, out var contentType))
+            return Result<PolicyFormTemplateDto>.Failure("UNSUPPORTED_FILE_TYPE", "Only PDF, DOC, and DOCX policy forms are allowed.");
+
+        var scan = await _fileScan.ScanAsync(file);
+        if (!scan.IsAllowed)
+            return Result<PolicyFormTemplateDto>.Failure(scan.ErrorCode ?? "FILE_SCAN_FAILED", scan.ErrorMessage ?? "The uploaded file could not be scanned.");
+
+        if (!string.IsNullOrWhiteSpace(form.StoragePath))
+            await _blob.DeleteAsync(form.StoragePath);
+
+        string blobPath;
+        using (var stream = file.OpenReadStream())
+            blobPath = await _blob.UploadAsync(stream, safeFileName, contentType);
+
+        form.FileName = safeFileName;
+        form.ContentType = contentType;
+        form.StoragePath = blobPath;
+        form.IsFillable = string.Equals(extension, ".pdf", StringComparison.OrdinalIgnoreCase) && form.IsFillable;
+
+        await Db.SaveChangesAsync();
+        return await GetTemplateAsync(form.Id);
+    }
+
+    public async Task<Result<string>> GetTemplateDownloadUrlAsync(Guid id)
+    {
+        var form = await Db.Set<PolicyFormTemplate>().AsNoTracking().FirstOrDefaultAsync(f => f.Id == id);
+        if (form == null)
+            return Result<string>.Failure("NOT_FOUND", "Policy form template not found.");
+        if (string.IsNullOrWhiteSpace(form.StoragePath) || string.IsNullOrWhiteSpace(form.FileName))
+            return Result<string>.Failure("NO_FILE", "This policy form does not have an uploaded file.");
+
+        return Result<string>.Success(await _blob.GetDownloadUrlAsync(form.StoragePath, form.FileName));
+    }
+
     public async Task<Result> DeleteTemplateAsync(Guid id)
     {
         var form = await Db.Set<PolicyFormTemplate>().FindAsync(id);
@@ -75,6 +148,9 @@ public class PolicyFormService : IPolicyFormService
 
         var inUse = await Db.Set<PolicyPackageForm>().AnyAsync(p => p.PolicyFormTemplateId == id);
         if (inUse) return Result.Failure("IN_USE", "This form is used in one or more policy packages.");
+
+        if (!string.IsNullOrWhiteSpace(form.StoragePath))
+            await _blob.DeleteAsync(form.StoragePath);
 
         form.IsDeleted = true;
         form.DeletedAt = DateTime.UtcNow;

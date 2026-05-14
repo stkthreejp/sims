@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, FileText, PackagePlus, Plus, Trash2 } from 'lucide-react'
+import { Check, Download, FileText, PackagePlus, Plus, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { policyFormsApi } from '@/api/policyForms.api'
 import { carriersApi } from '@/api/carriers.api'
@@ -73,6 +73,25 @@ export function PolicyFormsAdminPage() {
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy form could not be saved'),
   })
+
+  const uploadTemplateFile = useMutation({
+    mutationFn: ({ templateId, file }: { templateId: string; file: File }) =>
+      policyFormsApi.uploadTemplateFile(templateId, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
+      toast.success('Policy form file uploaded')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy form file could not be uploaded'),
+  })
+
+  const openTemplateFile = async (templateId: string) => {
+    try {
+      const data = await policyFormsApi.getTemplateDownloadUrl(templateId)
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.errorMessage ?? 'Policy form file could not be opened')
+    }
+  }
 
   const createPackage = useMutation({
     mutationFn: () => policyFormsApi.createPackage({
@@ -163,7 +182,15 @@ export function PolicyFormsAdminPage() {
             </button>
           </div>
           <div className="divide-y max-h-[520px] overflow-auto">
-            {templates.map((template) => <TemplateRow key={template.id} template={template} />)}
+            {templates.map((template) => (
+              <TemplateRow
+                key={template.id}
+                template={template}
+                uploading={uploadTemplateFile.isPending}
+                onUpload={(file) => uploadTemplateFile.mutate({ templateId: template.id, file })}
+                onOpen={() => openTemplateFile(template.id)}
+              />
+            ))}
           </div>
         </section>
 
@@ -245,7 +272,17 @@ export function PolicyFormsAdminPage() {
   )
 }
 
-function TemplateRow({ template }: { template: PolicyFormTemplate }) {
+function TemplateRow({
+  template,
+  uploading,
+  onUpload,
+  onOpen,
+}: {
+  template: PolicyFormTemplate
+  uploading: boolean
+  onUpload: (file: File) => void
+  onOpen: () => void
+}) {
   return (
     <div className="p-3">
       <div className="flex items-start justify-between gap-3">
@@ -258,6 +295,32 @@ function TemplateRow({ template }: { template: PolicyFormTemplate }) {
         </span>
       </div>
       <p className="text-xs text-slate-400 mt-1">{template.editionDate || 'No edition'} · {template.isFillable ? 'Fillable' : 'Static'}</p>
+      {template.fileName && (
+        <p className="text-xs text-slate-500 mt-1 truncate">{template.fileName}</p>
+      )}
+      <div className="flex items-center gap-2 mt-2">
+        <label className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50 cursor-pointer">
+          <Upload className="h-3 w-3" />
+          {template.fileName ? 'Replace' : 'Upload'}
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            disabled={uploading}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) onUpload(file)
+            }}
+          />
+        </label>
+        {template.storagePath && (
+          <button type="button" onClick={onOpen} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50">
+            <Download className="h-3 w-3" />
+            Open
+          </button>
+        )}
+      </div>
     </div>
   )
 }

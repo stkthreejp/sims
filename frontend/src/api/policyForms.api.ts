@@ -18,6 +18,17 @@ export const policyFormsApi = {
   updateTemplate: (id: string, data: PolicyFormTemplateUpsert) =>
     apiClient.put<PolicyFormTemplate>(`/policy-forms/templates/${id}`, data).then((r) => r.data),
 
+  uploadTemplateFile: (id: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<PolicyFormTemplate>(`/policy-forms/templates/${id}/file`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data)
+  },
+
+  getTemplateDownloadUrl: (id: string) =>
+    apiClient.get<{ url: string }>(`/policy-forms/templates/${id}/download-url`).then((r) => r.data),
+
   deleteTemplate: (id: string) =>
     apiClient.delete(`/policy-forms/templates/${id}`),
 
