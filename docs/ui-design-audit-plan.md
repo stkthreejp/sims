@@ -85,7 +85,7 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Policies list | Page | `/policies` | Needs tweaking | Uses shared header but older table/list styling remains. | Medium |
 | Policy detail | Page | `/policies/:id` | Never updated | Mostly older utility styling. | High |
 | Quote detail | Page | `/quotes/:quoteId` | Needs tweaking | Helper cards, headers, buttons, menu styling, status pill, and inline LOB-specific UW writeup editor for IM, AL, APD, and GL moved toward SIMS style; deeper page sections still need visual pass. | High |
-| Quote writeup | Page | `/quotes/:quoteId/writeup` | Needs tweaking | Partially aligned, but many old controls and panels remain. | High |
+| Quote writeup | Page | `/quotes/:quoteId/writeup` | Needs tweaking | Full writeup page now uses LOB-specific sections for IM, AL, APD, and GL and shares the quote detail writeup payload fields; remaining work is browser polish. | High |
 | Quote rating panel | Panel | `frontend/src/components/quotes/QuoteRatingPanel.tsx` | Needs tweaking | Main shell, equipment table, endorsement card, form controls, action buttons, and calculation card moved toward SIMS style; needs browser review. | High |
 | Quote auto safety panel | Panel | `frontend/src/components/quotes/QuoteAutoSafetyPanel.tsx` | Needs tweaking | Main shell, header, actions, tabs, metrics, SAFER/OOS sections, events, and history cards moved toward SIMS style; map/detail/chart internals still need visual review. | High |
 | Task queue | Page | `/tasks` | Needs tweaking | Mixed token and older styling. | Medium |
@@ -148,3 +148,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-14 | Codex | Quote auto safety panel pass | Updated QuoteAutoSafetyPanel core shell, tabs, metric, action, and section-card styling toward SIMS visual style. Type check passed. |
 | 2026-05-14 | Codex | Quote detail UW writeup panel | Replaced the read-only UW writeup preview with LOB-aware collapsible inline editing for the actual writeup payload and conditions. Type check passed. |
 | 2026-05-14 | Codex | Non-IM UW writeup sections | Added quote detail writeup sections based on the AL, APD, and GL review sheets, excluding eligibility criteria and auto-decline checkboxes. Type check and backend build passed. |
+| 2026-05-14 | Codex | Full quote writeup page | Added the same LOB-specific UW writeup sections to the full writeup page so it matches quote detail behavior. Type check and backend build passed. |

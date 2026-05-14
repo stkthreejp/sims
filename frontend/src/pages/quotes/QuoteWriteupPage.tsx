@@ -7,6 +7,7 @@ import { ArrowLeft, FlaskConical, CheckCircle2, AlertTriangle, ChevronDown, Chev
 import { uwWriteupApi } from '@/api/uwWriteup.api'
 import type { IMWriteupPayload, WriteupCondition, UWWriteupDto } from '@/types/uwWriteup.types'
 import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
+import { LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
@@ -15,16 +16,16 @@ const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="border border-slate-200 rounded-lg overflow-hidden">
+    <div className="sd-card overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 text-sm font-semibold text-slate-700 transition-colors"
+        className="flex w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
       >
         {title}
         {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
       </button>
-      {open && <div className="px-4 py-4 space-y-4">{children}</div>}
+      {open && <div className="space-y-4 border-t border-slate-100 bg-slate-50/40 px-5 py-4">{children}</div>}
     </div>
   )
 }
@@ -99,6 +100,30 @@ function ReferralCheckbox({
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
+function ShortText({
+  label,
+  value,
+  onChange,
+  readOnly,
+}: {
+  label: string
+  value?: string
+  onChange: (value: string) => void
+  readOnly: boolean
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <input
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        readOnly={readOnly}
+        className="mt-1 w-full rounded border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+      />
+    </label>
+  )
+}
+
 export default function QuoteWriteupPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const qc = useQueryClient()
@@ -119,7 +144,7 @@ export default function QuoteWriteupPage() {
   // Sync state when data arrives
   useEffect(() => {
     if (writeup) {
-      setPayload(writeup.payload ?? EMPTY_PAYLOAD)
+      setPayload({ ...EMPTY_PAYLOAD, ...(writeup.payload ?? {}) })
       setConditions(writeup.conditions ?? [])
     }
   }, [writeup])
@@ -191,9 +216,16 @@ export default function QuoteWriteupPage() {
   }
 
   const { equipment: eq } = writeup
+  const lob = writeup.lob as PolicyLineOfBusiness
+  const lobLabel = LOB_LABELS[lob] ?? writeup.lob
+  const isInlandMarine = writeup.lob === 'InlandMarine'
+  const isAutoLiability = writeup.lob === 'AutoLiability'
+  const isAutoPhysicalDamage = writeup.lob === 'AutoPhysicalDamage'
+  const isGeneralLiability = writeup.lob === 'GeneralLiability'
+  const isAuto = isAutoLiability || isAutoPhysicalDamage || writeup.lob === 'CommercialAuto'
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-6 space-y-5">
+    <div className="mx-auto max-w-5xl space-y-5 px-6 py-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -203,7 +235,7 @@ export default function QuoteWriteupPage() {
           <div>
             <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-slate-400" />
-              IM Underwriting Writeup
+              {lobLabel} Underwriting Writeup
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
               {writeup.insuredName} · {writeup.effectiveDate}
@@ -220,7 +252,7 @@ export default function QuoteWriteupPage() {
           <FieldRow label="Assistant UW" value={writeup.assistantUWName} />
           <FieldRow label="Agent" value={writeup.agentName} />
           <FieldRow label="Named Insured" value={writeup.insuredName} />
-          <FieldRow label="Line of Business" value={writeup.lob} />
+          <FieldRow label="Line of Business" value={lobLabel} />
           <FieldRow label="Policy Type" value={writeup.policyType} />
           <FieldRow label="Effective Date" value={writeup.effectiveDate} />
           <FieldRow label="Operation Type" value={writeup.operationType} />
@@ -260,35 +292,66 @@ export default function QuoteWriteupPage() {
         </div>
       </Section>
 
+      {(isAutoPhysicalDamage || isGeneralLiability) && (
+        <Section title="Program / Market">
+          <NarrativeBlock
+            label="Program / market"
+            prompt={isAutoPhysicalDamage ? "Lloyd's / Brace selection and any placement notes." : "Lloyd's / Brace GL selection and any placement notes."}
+            value={payload.programMarket}
+            onChange={(v) => patchPayload({ programMarket: v })}
+            readOnly={isReadOnly}
+          />
+        </Section>
+      )}
+
       {/* Referral triggers */}
-      <Section title="Referral Triggers">
+      <Section title={isInlandMarine ? 'Referral Triggers' : 'Reason(s) for Referral'}>
         <div className="space-y-2">
           <ReferralCheckbox
-            label="Loss Ratio > 55%"
+            label={isInlandMarine ? 'Loss Ratio > 55%' : '4-year loss ratio > 50%'}
             value={payload.referralLossRatioOver55}
             onChange={(v) => patchPayload({ referralLossRatioOver55: v })}
             readOnly={isReadOnly}
           />
-          <ReferralCheckbox
-            label="Single piece > $500,000"
-            autoChecked={writeup.autoReferralPieceOver500k}
-            value={payload.referralPieceOver500k || writeup.autoReferralPieceOver500k}
-            onChange={(v) => patchPayload({ referralPieceOver500k: v })}
-            readOnly={isReadOnly}
-          />
-          <ReferralCheckbox
-            label="Total TIV > $2,000,000"
-            autoChecked={writeup.autoReferralTivOver2mil}
-            value={payload.referralTivOver2mil || writeup.autoReferralTivOver2mil}
-            onChange={(v) => patchPayload({ referralTivOver2mil: v })}
-            readOnly={isReadOnly}
-          />
-          <ReferralCheckbox
-            label="Loss > $400,000"
-            value={payload.referralLossOver400k}
-            onChange={(v) => patchPayload({ referralLossOver400k: v })}
-            readOnly={isReadOnly}
-          />
+          {isInlandMarine ? (
+            <>
+              <ReferralCheckbox label="Single piece > $500,000" autoChecked={writeup.autoReferralPieceOver500k} value={payload.referralPieceOver500k || writeup.autoReferralPieceOver500k} onChange={(v) => patchPayload({ referralPieceOver500k: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Total TIV > $2,000,000" autoChecked={writeup.autoReferralTivOver2mil} value={payload.referralTivOver2mil || writeup.autoReferralTivOver2mil} onChange={(v) => patchPayload({ referralTivOver2mil: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Loss > $400,000" value={payload.referralLossOver400k} onChange={(v) => patchPayload({ referralLossOver400k: v })} readOnly={isReadOnly} />
+            </>
+          ) : (
+            <ReferralCheckbox label="Any loss > $50,000" value={!!payload.referralLossOver50k} onChange={(v) => patchPayload({ referralLossOver50k: v })} readOnly={isReadOnly} />
+          )}
+          {isAuto && (
+            <>
+              <ReferralCheckbox label="FMCSA conditional / unsatisfactory" value={!!payload.referralFmcsaConditional} onChange={(v) => patchPayload({ referralFmcsaConditional: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="BASIC over threshold" value={!!payload.referralBasicOverThreshold} onChange={(v) => patchPayload({ referralBasicOverThreshold: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Schedule credit > 20%" value={!!payload.referralScheduleCreditOver20} onChange={(v) => patchPayload({ referralScheduleCreditOver20: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Premium > $100K" value={!!payload.referralPremiumOver100k} onChange={(v) => patchPayload({ referralPremiumOver100k: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Owner-operator > 30%" value={!!payload.referralOwnerOperatorOver30} onChange={(v) => patchPayload({ referralOwnerOperatorOver30: v })} readOnly={isReadOnly} />
+            </>
+          )}
+          {isAutoPhysicalDamage && (
+            <>
+              <ReferralCheckbox label="Rate reduction > 5%" value={!!payload.referralRateReduction} onChange={(v) => patchPayload({ referralRateReduction: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Unit ACV / stated amount over cap" value={!!payload.referralUnitOverCap} onChange={(v) => patchPayload({ referralUnitOverCap: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="TIV one location over threshold" value={!!payload.referralTivLocationThreshold} onChange={(v) => patchPayload({ referralTivLocationThreshold: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Tornado / hail exposure" value={!!payload.referralTornadoHail} onChange={(v) => patchPayload({ referralTornadoHail: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Coastal APD exposure" value={!!payload.referralCoastalApd} onChange={(v) => patchPayload({ referralCoastalApd: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Credit score below threshold" value={!!payload.referralCreditScoreLow} onChange={(v) => patchPayload({ referralCreditScoreLow: v })} readOnly={isReadOnly} />
+            </>
+          )}
+          {isGeneralLiability && (
+            <>
+              <ReferralCheckbox label="UW credit > 20%" value={!!payload.referralGlUwCreditOver20} onChange={(v) => patchPayload({ referralGlUwCreditOver20: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Logging revenue below threshold" value={!!payload.referralGlRevenueBelowThreshold} onChange={(v) => patchPayload({ referralGlRevenueBelowThreshold: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Sawmill / lumberyard operations" value={!!payload.referralSawmillOps} onChange={(v) => patchPayload({ referralSawmillOps: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Residential work" value={!!payload.referralResidentialWork} onChange={(v) => patchPayload({ referralResidentialWork: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Burning exposure" value={!!payload.referralBurningExposure} onChange={(v) => patchPayload({ referralBurningExposure: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Payroll change > 25%" value={!!payload.referralPayrollChangeOver25} onChange={(v) => patchPayload({ referralPayrollChangeOver25: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="Subcontractors without COI / hold harmless" value={!!payload.referralSubcontractorControls} onChange={(v) => patchPayload({ referralSubcontractorControls: v })} readOnly={isReadOnly} />
+            </>
+          )}
           <div className="flex items-center gap-2 pt-1">
             <span className="text-sm text-slate-500 shrink-0">Other:</span>
             <input
@@ -305,6 +368,15 @@ export default function QuoteWriteupPage() {
 
       {/* Losses */}
       <Section title="Losses">
+        {!isInlandMarine && (
+          <NarrativeBlock
+            label="Loss synopsis"
+            prompt="Trends, repeat drivers or units, severity drivers, attorney involvement, and shock loss concerns."
+            value={payload.lossSynopsis}
+            onChange={(v) => patchPayload({ lossSynopsis: v })}
+            readOnly={isReadOnly}
+          />
+        )}
         <NarrativeBlock
           label="Mitigation actions"
           prompt="Describe any action taken by the insured to prevent future losses."
@@ -313,16 +385,17 @@ export default function QuoteWriteupPage() {
           readOnly={isReadOnly}
         />
         <NarrativeBlock
-          label="Losses over $25,000"
+          label={isInlandMarine ? 'Losses over $25,000' : isGeneralLiability ? 'GL BI / attorney / losses over $50,000' : 'Losses over $50,000'}
           prompt="Describe each loss exceeding $25,000 — date, cause, amount, status."
-          value={payload.lossesOver25kDescription}
-          onChange={(v) => patchPayload({ lossesOver25kDescription: v })}
+          value={isInlandMarine ? payload.lossesOver25kDescription : payload.lossesOver50kDescription}
+          onChange={(v) => isInlandMarine ? patchPayload({ lossesOver25kDescription: v }) : patchPayload({ lossesOver50kDescription: v })}
           readOnly={isReadOnly}
         />
       </Section>
 
       {/* Equipment & Values */}
-      <Section title="Equipment & Values">
+      {(isInlandMarine || isAutoPhysicalDamage) && (
+      <Section title={isAutoPhysicalDamage ? 'Vehicles, Values & CAB' : 'Equipment & Values'}>
         <div className="grid grid-cols-4 gap-3 text-center">
           {[
             { label: 'Total TIV', value: fmt.format(eq.totalTiv) },
@@ -349,20 +422,56 @@ export default function QuoteWriteupPage() {
           />
           <span className="text-slate-600">Equipment values verified against appraisals / invoices</span>
         </label>
+        {isAutoPhysicalDamage && (
+          <>
+            <NarrativeBlock label="Max concentration at one location" prompt="Note highest location concentration and flood / tornado / hail concern." value={payload.maxConcentrationOneLocation} onChange={(v) => patchPayload({ maxConcentrationOneLocation: v })} readOnly={isReadOnly} />
+            <NarrativeBlock label="CAB alerts / FMCSA / ISS rating notes" prompt="Vehicle maintenance, driver, unsafe, crash, hours, FMCSA rating, ISS/CAB rating." value={payload.cabAlertsNotes} onChange={(v) => patchPayload({ cabAlertsNotes: v })} readOnly={isReadOnly} />
+          </>
+        )}
       </Section>
+      )}
+
+      {isAutoLiability && (
+        <Section title="Vehicles, FMCSA & CAB">
+          <NarrativeBlock label="Vehicle / power unit summary" prompt="Tractors, trucks, trailers, total power units, age profile, maintenance, and telematics." value={payload.narrativeEquipment} onChange={(v) => patchPayload({ narrativeEquipment: v })} readOnly={isReadOnly} />
+          <NarrativeBlock label="CAB alerts" prompt="Vehicle maintenance, driver, unsafe, crash, or hours alerts." value={payload.cabAlertsNotes} onChange={(v) => patchPayload({ cabAlertsNotes: v })} readOnly={isReadOnly} />
+          <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+            <ShortText label="FMCSA safety rating" value={payload.fmcsaSafetyRating} onChange={(v) => patchPayload({ fmcsaSafetyRating: v })} readOnly={isReadOnly} />
+            <ShortText label="ISS / CAB rating" value={payload.issCabRating} onChange={(v) => patchPayload({ issCabRating: v })} readOnly={isReadOnly} />
+          </div>
+        </Section>
+      )}
+
+      {isGeneralLiability && (
+        <Section title="Exposures & ISO Class Codes">
+          <NarrativeBlock label="Class code exposure notes" prompt="Payroll, sales, receipts, class mix, expiring to proposed change, and any referral class concerns." value={payload.glClassExposureNotes} onChange={(v) => patchPayload({ glClassExposureNotes: v })} readOnly={isReadOnly} />
+        </Section>
+      )}
 
       {/* Operations & Metrics */}
-      <Section title="Operations & Metrics">
+      <Section title={isAuto ? 'Operations & Fleet Metrics' : isGeneralLiability ? 'GL Operations Review' : 'Operations & Metrics'}>
         <div className="grid grid-cols-2 gap-4">
-          <label className="flex items-center gap-2 text-sm cursor-pointer col-span-2">
-            <input
-              type="checkbox"
-              checked={payload.waterborneExposure}
-              onChange={(e) => patchPayload({ waterborneExposure: e.target.checked })}
-              disabled={isReadOnly}
-            />
-            <span className="text-slate-600">Any waterborne exposure?</span>
-          </label>
+          {isInlandMarine && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer col-span-2">
+              <input
+                type="checkbox"
+                checked={payload.waterborneExposure}
+                onChange={(e) => patchPayload({ waterborneExposure: e.target.checked })}
+                disabled={isReadOnly}
+              />
+              <span className="text-slate-600">Any waterborne exposure?</span>
+            </label>
+          )}
+          {isGeneralLiability && (
+            <>
+              <div className="col-span-2">
+                <NarrativeBlock label="Risk characteristics" prompt="Mechanized operations, site/public controls, fire controls, residential/burning/sawmill concerns." value={payload.glRiskCharacteristics} onChange={(v) => patchPayload({ glRiskCharacteristics: v })} readOnly={isReadOnly} />
+              </div>
+              <div className="col-span-2">
+                <NarrativeBlock label="Subcontractor and contract controls" prompt="Sub counts, COI/AI, hold-harmless, timber contracts, line verification, and woods employees." value={payload.glSubcontractorControls} onChange={(v) => patchPayload({ glSubcontractorControls: v })} readOnly={isReadOnly} />
+              </div>
+            </>
+          )}
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500">Last Inspection Date</label>
             <input
@@ -419,29 +528,60 @@ export default function QuoteWriteupPage() {
         )}
       </Section>
 
+      {(isAutoLiability || isAutoPhysicalDamage) && (
+        <Section title="Drivers">
+          <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+            <ShortText label="# of drivers" value={payload.driverCount} onChange={(v) => patchPayload({ driverCount: v })} readOnly={isReadOnly} />
+            <ShortText label="Driver age span" value={payload.driverAgeSpan} onChange={(v) => patchPayload({ driverAgeSpan: v })} readOnly={isReadOnly} />
+            <ShortText label="Driver turnover %" value={payload.driverTurnoverPercent} onChange={(v) => patchPayload({ driverTurnoverPercent: v })} readOnly={isReadOnly} />
+            <ShortText label="Owner-op %" value={payload.ownerOperatorPercent} onChange={(v) => patchPayload({ ownerOperatorPercent: v })} readOnly={isReadOnly} />
+          </div>
+          <ReferralCheckbox label="MVRs in file within 90 days" value={payload.mvrInFile === true} onChange={(v) => patchPayload({ mvrInFile: v })} readOnly={isReadOnly} />
+          <NarrativeBlock label="Drivers to exclude or watch" prompt="Name, reason, MVR/CAB detail, and required action." value={payload.driversWatchNotes} onChange={(v) => patchPayload({ driversWatchNotes: v })} readOnly={isReadOnly} />
+        </Section>
+      )}
+
       {/* UW Narratives */}
       <Section title="Underwriting Notes">
         <NarrativeBlock
-          label="Operators"
-          prompt="Insured employees: avg years experience, training/certs, any concerns with operators?"
+          label={isGeneralLiability ? 'Operation' : 'Operators / Operation'}
+          prompt={isGeneralLiability ? 'What they do, where, contracts, wood types, logging type, and landowner type.' : 'Insured employees, operation mix, hauls for whom, training/certs, and concerns.'}
           value={payload.narrativeOperators}
           onChange={(v) => patchPayload({ narrativeOperators: v })}
           readOnly={isReadOnly}
         />
-        <NarrativeBlock
-          label="Equipment"
-          prompt="Age, maintenance records, cool-down procedure followed? Mortgage on units >75% value? Avg equipment age, deductible reasoning, usage patterns."
-          value={payload.narrativeEquipment}
-          onChange={(v) => patchPayload({ narrativeEquipment: v })}
-          readOnly={isReadOnly}
-        />
-        <NarrativeBlock
-          label="Fire Suppression"
-          prompt="Type of fire suppression system installed, maintenance schedule, last service date."
-          value={payload.narrativeFireSuppression}
-          onChange={(v) => patchPayload({ narrativeFireSuppression: v })}
-          readOnly={isReadOnly}
-        />
+        {isInlandMarine && (
+          <>
+            <NarrativeBlock
+              label="Equipment"
+              prompt="Age, maintenance records, cool-down procedure, average age, deductible reasoning, and usage patterns."
+              value={payload.narrativeEquipment}
+              onChange={(v) => patchPayload({ narrativeEquipment: v })}
+              readOnly={isReadOnly}
+            />
+            <NarrativeBlock
+              label="Fire Suppression"
+              prompt="Type of fire suppression system installed, maintenance schedule, last service date."
+              value={payload.narrativeFireSuppression}
+              onChange={(v) => patchPayload({ narrativeFireSuppression: v })}
+              readOnly={isReadOnly}
+            />
+          </>
+        )}
+        {(isAutoLiability || isAutoPhysicalDamage) && (
+          <>
+            <NarrativeBlock label="Drivers" prompt="Average age, turnover, DOT documentation, experience, date of hire, MVR violations, fatigue/hours management." value={payload.narrativeDrivers} onChange={(v) => patchPayload({ narrativeDrivers: v })} readOnly={isReadOnly} />
+            <NarrativeBlock label="CAB / FMCSA" prompt="BASICs, severe violations, accidents not on loss runs, radius, overall concerns and trends." value={payload.narrativeCabFmcsa} onChange={(v) => patchPayload({ narrativeCabFmcsa: v })} readOnly={isReadOnly} />
+            <NarrativeBlock label="Additional interests and contracts" prompt="Who, how many, hold-harmless, AI blanket vs scheduled, and certificate requirements." value={payload.narrativeAdditionalInterests} onChange={(v) => patchPayload({ narrativeAdditionalInterests: v })} readOnly={isReadOnly} />
+          </>
+        )}
+        {isGeneralLiability && (
+          <>
+            <NarrativeBlock label="Exposure changes" prompt="Payroll movement, class code mix, subcontractor costs, and drivers of any swing over 25%." value={payload.glExposureChanges} onChange={(v) => patchPayload({ glExposureChanges: v })} readOnly={isReadOnly} />
+            <NarrativeBlock label="Subcontractors" prompt="Count, types, COI and hold-harmless discipline, who they haul for, and AI requirements." value={payload.glSubcontractorsNarrative} onChange={(v) => patchPayload({ glSubcontractorsNarrative: v })} readOnly={isReadOnly} />
+            <NarrativeBlock label="Endorsements and additional interests" prompt="Logging endorsement limit, blanket vs scheduled AI/WOS/PNC, and certificates issued." value={payload.glEndorsementsNarrative} onChange={(v) => patchPayload({ glEndorsementsNarrative: v })} readOnly={isReadOnly} />
+          </>
+        )}
         <NarrativeBlock
           label="Other Concerns"
           prompt="Any additional risk concerns, positive attributes, or notable observations."
@@ -450,6 +590,25 @@ export default function QuoteWriteupPage() {
           readOnly={isReadOnly}
         />
       </Section>
+
+      {!isInlandMarine && (
+        <Section title="Requested Terms / Pricing">
+          <NarrativeBlock
+            label="Pricing rationale"
+            prompt={isGeneralLiability ? 'Payroll change, class code mix, sub cost, credit drivers, and target rate comparison.' : 'Exposure change, mix shift, credits/debits, telematics/safety credits, and rate adequacy.'}
+            value={payload.pricingRationale}
+            onChange={(v) => patchPayload({ pricingRationale: v })}
+            readOnly={isReadOnly}
+          />
+          <NarrativeBlock
+            label="Special terms / endorsements"
+            prompt="Requested endorsements, sublimits, deductibles, AI/WOS/PNC counts, and any file-specific terms."
+            value={payload.specialTerms}
+            onChange={(v) => patchPayload({ specialTerms: v })}
+            readOnly={isReadOnly}
+          />
+        </Section>
+      )}
 
       {/* Conditions */}
       <Section title="Conditions (if approving with conditions)">
@@ -509,7 +668,16 @@ export default function QuoteWriteupPage() {
       </Section>
 
       {/* Recommendation / Rationale */}
-      <Section title="Recommendation">
+      <Section title={isInlandMarine ? 'Recommendation' : 'Loss Control & Recommendation'}>
+        {!isInlandMarine && (
+          <NarrativeBlock
+            label="Loss control analysis"
+            prompt="Underwriter loss control analysis and any action taken as a result."
+            value={payload.lossControlAnalysis}
+            onChange={(v) => patchPayload({ lossControlAnalysis: v })}
+            readOnly={isReadOnly}
+          />
+        )}
         <NarrativeBlock
           label="Rationale"
           prompt="Summarize the risk, explain your decision, and note any concerns for the file."
