@@ -840,6 +840,7 @@ export function QuoteDetailPage() {
   const [showReduce, setShowReduce] = useState(false)
   const [overrideMode, setOverrideMode] = useState<'dollar' | 'rate'>('dollar')
   const [overrideInput, setOverrideInput] = useState('')
+  const ratingPanelRef = useRef<HTMLDivElement>(null)
 
   const { data: quote, isLoading, isError } = useQuery({
     queryKey: ['quotes', quoteId],
@@ -999,6 +1000,10 @@ export function QuoteDetailPage() {
   const schedMod = ratingSnapshot?.scheduleModifier ?? 0
   const schedCredit = schedMod < 0 ? Math.abs(manualPremium * schedMod) : 0
   const schedDebit = schedMod > 0 ? manualPremium * schedMod : 0
+  const openRatingPanel = () => {
+    setShowRating(true)
+    window.setTimeout(() => ratingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -1081,7 +1086,7 @@ export function QuoteDetailPage() {
         <StageBar status={quote.status} issuedDate={quote.issuedDate} />
 
         {showRating && (
-          <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div ref={ratingPanelRef} className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <QuoteRatingPanel
               quoteId={quoteId!}
               submissionId={quote.submissionId}
@@ -1208,7 +1213,7 @@ export function QuoteDetailPage() {
 
             {/* Coverage limits */}
             <Card>
-              <CardHead title="Coverage limits" right={<Btn variant="ghost"><Edit2 className="h-3.5 w-3.5" />Edit</Btn>} />
+              <CardHead title="Coverage limits" right={<Btn variant="ghost" onClick={openRatingPanel}><Edit2 className="h-3.5 w-3.5" />Edit</Btn>} />
               <div className="grid grid-cols-4 gap-x-6 gap-y-4 p-5 max-[800px]:grid-cols-2">
                 {quote.lineOfBusiness === 'InlandMarine' && (
                   <>
