@@ -32,13 +32,13 @@ const QUOTE_STAGES: { label: string; statuses: QuoteStatus[] }[] = [
 ]
 
 const STATUS_PILL: Record<QuoteStatus, string> = {
-  Draft:     'bg-slate-100 text-slate-600',
-  Submitted: 'bg-blue-50 text-blue-700',
-  Quoted:    'bg-sky-100 text-sky-700',
-  Bound:     'bg-blue-100 text-blue-900',
-  Declined:  'bg-red-50 text-red-700',
-  Cancelled: 'bg-slate-100 text-slate-500',
-  Expired:   'bg-amber-50 text-amber-700',
+  Draft:     'draft',
+  Submitted: 'submitted',
+  Quoted:    'quoted',
+  Bound:     'bound',
+  Declined:  'declined',
+  Cancelled: 'cancelled',
+  Expired:   'expired',
 }
 
 function fmt(n: number | null | undefined) {
@@ -105,7 +105,7 @@ function StageBar({ status, issuedDate }: { status: QuoteStatus; issuedDate: str
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
+    <div className={`sd-card ${className}`}>
       {children}
     </div>
   )
@@ -115,11 +115,11 @@ function CardHead({
   title, count, right,
 }: { title: React.ReactNode; count?: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-3.5">
-      <h2 className="text-sm font-semibold text-slate-800">
+    <div className="sd-card-head">
+      <h2>
         {title}
         {count != null && (
-          <span className="ml-2 font-normal text-slate-400 text-xs">{count}</span>
+          <span className="cnt">{count}</span>
         )}
       </h2>
       {right && <div className="flex items-center gap-2">{right}</div>}
@@ -130,7 +130,7 @@ function CardHead({
 function KV({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="sims-field-label">{label}</div>
       <div className="text-sm font-medium text-slate-800 break-words">{value ?? '—'}</div>
     </div>
   )
@@ -140,15 +140,14 @@ function Btn({ children, onClick, variant = 'ghost', disabled, className = '', t
   children: React.ReactNode; onClick?: () => void; variant?: 'ghost' | 'outline' | 'primary' | 'danger'
   disabled?: boolean; className?: string; type?: 'button' | 'submit'
 }) {
-  const base = 'inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-50'
   const cls: Record<string, string> = {
-    ghost:   'text-slate-600 hover:bg-slate-100 hover:text-slate-800',
-    outline: 'border border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:bg-sky-50',
-    primary: 'bg-sky-600 text-white hover:bg-sky-700',
-    danger:  'border border-red-200 bg-white text-red-600 hover:bg-red-50',
+    ghost:   'sd-btn ghost sm',
+    outline: 'sd-btn outline sm',
+    primary: 'sd-btn primary sm',
+    danger:  'sd-btn danger sm',
   }
   return (
-    <button type={type} disabled={disabled} onClick={onClick} className={`${base} ${cls[variant]} ${className}`}>
+    <button type={type} disabled={disabled} onClick={onClick} className={`${cls[variant]} ${className}`}>
       {children}
     </button>
   )
@@ -166,7 +165,7 @@ function MenuButton({
         {label}
       </Btn>
       {open && (
-        <div className="absolute right-0 top-9 z-20 min-w-48 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-9 z-20 min-w-48 overflow-hidden py-1" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', boxShadow: 'var(--shadow-sm)' }}>
           {children}
         </div>
       )}
@@ -180,7 +179,8 @@ function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; 
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex w-full items-center gap-2 px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+      style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-base)', fontWeight: 500 }}
     >
       {children}
     </button>
@@ -722,7 +722,7 @@ export function QuoteDetailPage() {
               <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-medium text-slate-500">
                 {quote.quoteNumber}
               </span>
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold before:block before:h-1.5 before:w-1.5 before:rounded-full before:bg-current ${STATUS_PILL[quote.status]}`}>
+              <span className={`sd-pill ${STATUS_PILL[quote.status]}`}>
                 {quote.status}
               </span>
             </h1>

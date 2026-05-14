@@ -153,37 +153,37 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
     .reduce((sum, e) => sum + e.premium, 0)
 
   return (
-    <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 space-y-4">
+    <div className="space-y-4" style={{ padding: '14px 16px', borderTop: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
       <div className="flex items-center gap-2">
-        <Calculator className="h-4 w-4 text-slate-700" />
-        <h3 className="text-sm font-semibold text-slate-800">Rating</h3>
+        <Calculator size={16} strokeWidth={1.7} style={{ color: 'var(--ink-3)' }} />
+        <h3 style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>Rating</h3>
         {isBound && (
-          <span className="inline-flex items-center gap-1 text-xs text-slate-600 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
-            <Lock className="h-3 w-3" /> Locked at bind
+          <span className="sd-lob">
+            <Lock size={12} /> Locked at bind
           </span>
         )}
       </div>
 
       {/* Equipment summary */}
-      <div className="bg-white border rounded">
-        <div className="px-4 py-2 border-b text-xs font-semibold text-slate-600 uppercase">
-          Equipment ({equipment.length})
+      <div className="sd-card">
+        <div className="sd-card-head">
+          <h3>Equipment <span className="cnt">{equipment.length}</span></h3>
         </div>
         {equipment.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-slate-400">No equipment scheduled. Add equipment items to the submission before rating.</p>
+          <p style={{ margin: 0, padding: '14px 16px', color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>No equipment scheduled. Add equipment items to the submission before rating.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+          <table className="sd-table">
+            <thead>
               <tr>
-                <th className="px-4 py-2 text-left w-10">#</th>
-                <th className="px-4 py-2 text-left">Type</th>
-                <th className="px-4 py-2 text-left">Year/Make/Model</th>
-                <th className="px-4 py-2 text-right">Value</th>
-                <th className="px-4 py-2 text-left">Deductible</th>
-                <th className="px-4 py-2 text-left">Status</th>
+                <th>#</th>
+                <th>Type</th>
+                <th>Year/Make/Model</th>
+                <th className="num">Value</th>
+                <th>Deductible</th>
+                <th>Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {equipment.map((e) => {
                 const type = equipmentTypes.find((t) => t.id === e.equipmentTypeId)
                 const dedLabel = e.deductible === null
@@ -225,14 +225,15 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
       </div>
 
       {lineOfBusiness === 'InlandMarine' && (
-        <div className="bg-white border rounded p-4 space-y-3">
+        <div className="sd-card">
+          <div className="sd-card-body space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold text-slate-700 uppercase">Optional Endorsements</h4>
-            <span className="text-xs text-slate-500">Selected premium: {formatCurrency(selectedEndorsementPremium)}</span>
+            <h4 className="sims-field-label" style={{ margin: 0 }}>Optional Endorsements</h4>
+            <span style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>Selected premium: {formatCurrency(selectedEndorsementPremium)}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {IM_OPTIONAL_ENDORSEMENTS.map((endorsement) => (
-              <label key={endorsement.key} className="flex items-center justify-between gap-3 border rounded px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+              <label key={endorsement.key} className="flex items-center justify-between gap-3 cursor-pointer" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '8px 10px', color: 'var(--ink-2)', fontSize: 'var(--fs-body)' }}>
                 <span className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -242,22 +243,24 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
                   />
                   {endorsement.label}
                 </span>
-                <span className="text-xs text-slate-500">{endorsement.premium > 0 ? formatCurrency(endorsement.premium) : 'No charge'}</span>
+                <span style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>{endorsement.premium > 0 ? formatCurrency(endorsement.premium) : 'No charge'}</span>
               </label>
             ))}
+          </div>
           </div>
         </div>
       )}
 
       {/* Schedule modifier */}
-      <div className="bg-white border rounded p-4 space-y-3">
+      <div className="sd-card">
+        <div className="sd-card-body space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-semibold text-slate-700 uppercase">Schedule Modifier (IRPM)</h4>
           <span className="text-xs text-slate-500">Allowed range: {scheduleMin.toFixed(2)}–{scheduleMax.toFixed(2)}</span>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Modifier</label>
+            <label className="sims-field-label">Modifier</label>
             <input
               type="number"
               step="0.01"
@@ -266,11 +269,11 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
               value={modifier}
               onChange={(e) => setModifier(parseFloat(e.target.value) || 1.0)}
               disabled={isBound}
-              className="w-full border rounded px-2 py-1.5 text-sm disabled:bg-slate-50"
+              className="sims-input"
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">
+            <label className="sims-field-label">
               Reason {reasonRequired && <span className="text-red-600">*</span>}
             </label>
             <input
@@ -279,9 +282,11 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
               onChange={(e) => setReason(e.target.value)}
               disabled={isBound}
               placeholder={reasonRequired ? 'Required when modifier ≠ 1.00' : 'Optional'}
-              className={`w-full border rounded px-2 py-1.5 text-sm disabled:bg-slate-50 ${reasonInvalid ? 'border-red-300' : ''}`}
+              className="sims-input"
+              style={reasonInvalid ? { borderColor: 'var(--bad-fg)' } : undefined}
             />
           </div>
+        </div>
         </div>
       </div>
 
@@ -292,19 +297,19 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
             <button
               onClick={() => rateMutation.mutate()}
               disabled={rateMutation.isPending || shadowMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="sd-btn primary sm"
             >
-              <Calculator className="h-4 w-4" />
+              <Calculator size={14} />
               {rateMutation.isPending ? 'Calculating…' : snapshot ? 'Recalculate Premium' : 'Calculate Premium'}
             </button>
             {shadowStatus?.[LOB_SHADOW_KEY[lineOfBusiness]!] && (
               <button
                 onClick={() => shadowMutation.mutate()}
                 disabled={shadowMutation.isPending || rateMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="sd-btn outline sm"
                 title="Run engine without changing the quote premium — compare to spreadsheet"
               >
-                <FlaskConical className="h-4 w-4 text-slate-500" />
+                <FlaskConical size={14} />
                 {shadowMutation.isPending ? 'Running…' : 'Shadow Rate'}
               </button>
             )}
@@ -331,27 +336,27 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
       {snapshotLoading ? (
         <p className="text-sm text-slate-400">Loading…</p>
       ) : snapshot ? (
-        <div className="bg-white border rounded">
-          <div className="px-4 py-2 border-b text-xs font-semibold text-slate-600 uppercase flex items-center justify-between">
-            <span>Calculation Detail</span>
-            <span className="text-xs font-normal text-slate-500 normal-case">
+        <div className="sd-card">
+          <div className="sd-card-head">
+            <h3>Calculation Detail</h3>
+            <span style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>
               Rated {new Date(snapshot.ratedAt).toLocaleString()}
               {snapshot.ratedByName ? ` by ${snapshot.ratedByName}` : ''}
             </span>
           </div>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+          <table className="sd-table">
+            <thead>
               <tr>
-                <th className="px-4 py-2 text-left">Item</th>
-                <th className="px-4 py-2 text-left">Type</th>
-                <th className="px-4 py-2 text-right">Stated Value</th>
-                <th className="px-4 py-2 text-left">Age Band</th>
-                <th className="px-4 py-2 text-right">Base Rate</th>
-                <th className="px-4 py-2 text-right">Ded Factor</th>
-                <th className="px-4 py-2 text-right">Line Premium</th>
+                <th>Item</th>
+                <th>Type</th>
+                <th className="num">Stated Value</th>
+                <th>Age Band</th>
+                <th className="num">Base Rate</th>
+                <th className="num">Ded Factor</th>
+                <th className="num">Line Premium</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {snapshot.lines.filter((l) => !l.exposureRef.startsWith('IM-END-')).map((l) => {
                 const inputs = safeParse(l.inputs)
                 const factors = safeParse(l.factorsApplied)

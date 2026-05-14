@@ -84,9 +84,9 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Insured edit | Page | `/insureds/:id/edit` | Needs tweaking | Older form layout and controls. | Medium |
 | Policies list | Page | `/policies` | Needs tweaking | Uses shared header but older table/list styling remains. | Medium |
 | Policy detail | Page | `/policies/:id` | Never updated | Mostly older utility styling. | High |
-| Quote detail | Page | `/quotes/:quoteId` | Never updated | Large page with heavy old utility styling. | High |
+| Quote detail | Page | `/quotes/:quoteId` | Needs tweaking | Helper cards, headers, buttons, menu styling, and status pill moved toward SIMS style; deeper page sections still need visual pass. | High |
 | Quote writeup | Page | `/quotes/:quoteId/writeup` | Needs tweaking | Partially aligned, but many old controls and panels remain. | High |
-| Quote rating panel | Panel | `frontend/src/components/quotes/QuoteRatingPanel.tsx` | Never updated | Old slate/blue cards, tables, buttons, and form controls. | High |
+| Quote rating panel | Panel | `frontend/src/components/quotes/QuoteRatingPanel.tsx` | Needs tweaking | Main shell, equipment table, endorsement card, form controls, action buttons, and calculation card moved toward SIMS style; needs browser review. | High |
 | Quote auto safety panel | Panel | `frontend/src/components/quotes/QuoteAutoSafetyPanel.tsx` | Never updated | Large panel with extensive old utility styling. | High |
 | Task queue | Page | `/tasks` | Needs tweaking | Mixed token and older styling. | Medium |
 | Task detail drawer | Drawer | `frontend/src/pages/tasks/TaskDetailDrawer.tsx` | Good | Updated to SIMS drawer, header, field, button, and activity styles; visual browser confirmation still useful. | Low |
@@ -144,3 +144,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-13 | Codex | Code-informed first pass | Initial chart created; browser visual confirmation still needed. |
 | 2026-05-13 | Codex | Shared primitives batch 1 | Updated EmptyState, ErrorBoundary, LoadingSpinner, and AddressAutocomplete to SIMS visual style. Type check passed. |
 | 2026-05-13 | Codex | Modal/drawer baseline batch | Updated GenerateDocumentModal, TaskDetailDrawer, and the user create/edit modal to SIMS visual style. Type check passed. |
+| 2026-05-14 | Codex | Quote workflow partial pass | Updated QuoteDetail helper styling and QuoteRatingPanel core surfaces toward SIMS visual style. Type check passed. |
