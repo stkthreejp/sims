@@ -953,6 +953,10 @@ export function QuoteDetailPage() {
     )
   }
 
+  const isInlandMarine = quote.lineOfBusiness === 'InlandMarine'
+  const isAutoLiability = quote.lineOfBusiness === 'AutoLiability'
+  const isAutoPhysicalDamage = quote.lineOfBusiness === 'AutoPhysicalDamage'
+  const isGeneralLiability = quote.lineOfBusiness === 'GeneralLiability'
   const isAuto = AUTO_LOBS.has(quote.lineOfBusiness)
   const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted).length
   const canBind = (quote.status === 'Quoted' || quote.status === 'Submitted') && openBlockers === 0
@@ -1337,44 +1341,124 @@ export function QuoteDetailPage() {
                     </div>
                   </InlineWriteupSection>
 
-                  <InlineWriteupSection number="02" title={quote.lineOfBusiness === 'InlandMarine' ? 'Referral triggers' : 'Referral and submission notes'}>
+                  {(isAutoPhysicalDamage || isGeneralLiability) && (
+                    <InlineWriteupSection number="02" title="Program / market">
+                      <InlineWriteupTextarea
+                        label={isAutoPhysicalDamage ? 'Program / market selection' : 'Program / market'}
+                        value={writeupPayload.programMarket}
+                        readOnly={writeupReadOnly}
+                        rows={2}
+                        onChange={(value) => patchWriteupPayload({ programMarket: value })}
+                      />
+                    </InlineWriteupSection>
+                  )}
+
+                  <InlineWriteupSection number={isAutoPhysicalDamage || isGeneralLiability ? '03' : '02'} title={isInlandMarine ? 'Referral triggers' : 'Reason(s) for referral'}>
                     <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
-                      <InlineWriteupCheckbox label="Loss ratio over 55%" checked={writeupPayload.referralLossRatioOver55} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralLossRatioOver55: value })} />
-                      {quote.lineOfBusiness === 'InlandMarine' && (
+                      <InlineWriteupCheckbox label={isInlandMarine ? 'Loss ratio over 55%' : '4-year loss ratio over 50%'} checked={writeupPayload.referralLossRatioOver55} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralLossRatioOver55: value })} />
+                      {isInlandMarine && (
                         <>
                           <InlineWriteupCheckbox label="Any one piece over $500k" checked={writeupPayload.referralPieceOver500k} auto={writeup.autoReferralPieceOver500k} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralPieceOver500k: value })} />
                           <InlineWriteupCheckbox label="Total TIV over $2M" checked={writeupPayload.referralTivOver2mil} auto={writeup.autoReferralTivOver2mil} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralTivOver2mil: value })} />
                         </>
                       )}
-                      <InlineWriteupCheckbox label="Any loss over $400k" checked={writeupPayload.referralLossOver400k} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralLossOver400k: value })} />
+                      <InlineWriteupCheckbox label={isInlandMarine ? 'Any loss over $400k' : 'Any loss over $50k'} checked={isInlandMarine ? writeupPayload.referralLossOver400k : !!writeupPayload.referralLossOver50k} readOnly={writeupReadOnly} onChange={(value) => isInlandMarine ? patchWriteupPayload({ referralLossOver400k: value }) : patchWriteupPayload({ referralLossOver50k: value })} />
+                      {(isAutoLiability || isAutoPhysicalDamage) && (
+                        <>
+                          <InlineWriteupCheckbox label="FMCSA conditional / unsatisfactory" checked={!!writeupPayload.referralFmcsaConditional} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralFmcsaConditional: value })} />
+                          <InlineWriteupCheckbox label="BASIC over threshold" checked={!!writeupPayload.referralBasicOverThreshold} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralBasicOverThreshold: value })} />
+                          <InlineWriteupCheckbox label="Schedule credit over 20%" checked={!!writeupPayload.referralScheduleCreditOver20} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralScheduleCreditOver20: value })} />
+                          <InlineWriteupCheckbox label="Premium over $100k" checked={!!writeupPayload.referralPremiumOver100k} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralPremiumOver100k: value })} />
+                          <InlineWriteupCheckbox label="Owner-op over 30%" checked={!!writeupPayload.referralOwnerOperatorOver30} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralOwnerOperatorOver30: value })} />
+                        </>
+                      )}
+                      {isAutoPhysicalDamage && (
+                        <>
+                          <InlineWriteupCheckbox label="Rate reduction over 5%" checked={!!writeupPayload.referralRateReduction} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralRateReduction: value })} />
+                          <InlineWriteupCheckbox label="Unit ACV / stated amount over cap" checked={!!writeupPayload.referralUnitOverCap} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralUnitOverCap: value })} />
+                          <InlineWriteupCheckbox label="30+ power units or premium over $100k" checked={!!writeupPayload.referralPowerUnitsOrPremium} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralPowerUnitsOrPremium: value })} />
+                          <InlineWriteupCheckbox label="TIV one location over threshold" checked={!!writeupPayload.referralTivLocationThreshold} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralTivLocationThreshold: value })} />
+                          <InlineWriteupCheckbox label="Tornado / hail TIV exposure" checked={!!writeupPayload.referralTornadoHail} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralTornadoHail: value })} />
+                          <InlineWriteupCheckbox label="Coastal APD exposure" checked={!!writeupPayload.referralCoastalApd} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralCoastalApd: value })} />
+                          <InlineWriteupCheckbox label="Credit score below threshold" checked={!!writeupPayload.referralCreditScoreLow} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralCreditScoreLow: value })} />
+                        </>
+                      )}
+                      {isGeneralLiability && (
+                        <>
+                          <InlineWriteupCheckbox label="UW credit over 20%" checked={!!writeupPayload.referralGlUwCreditOver20} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralGlUwCreditOver20: value })} />
+                          <InlineWriteupCheckbox label="Logging revenue below program threshold" checked={!!writeupPayload.referralGlRevenueBelowThreshold} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralGlRevenueBelowThreshold: value })} />
+                          <InlineWriteupCheckbox label="Sawmill / lumberyard operations" checked={!!writeupPayload.referralSawmillOps} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralSawmillOps: value })} />
+                          <InlineWriteupCheckbox label="Residential work" checked={!!writeupPayload.referralResidentialWork} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralResidentialWork: value })} />
+                          <InlineWriteupCheckbox label="Burning exposure" checked={!!writeupPayload.referralBurningExposure} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralBurningExposure: value })} />
+                          <InlineWriteupCheckbox label="Payroll change over 25%" checked={!!writeupPayload.referralPayrollChangeOver25} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralPayrollChangeOver25: value })} />
+                          <InlineWriteupCheckbox label="Subcontractors without COI / hold harmless" checked={!!writeupPayload.referralSubcontractorControls} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ referralSubcontractorControls: value })} />
+                        </>
+                      )}
                     </div>
                     <InlineWriteupTextarea label="Other referral notes" value={writeupPayload.referralOtherText} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ referralOtherText: value })} />
                     <InlineWriteupTextarea label="Reason submitted" value={writeupPayload.reasonSubmitted} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ reasonSubmitted: value })} />
                   </InlineWriteupSection>
 
-                  <InlineWriteupSection number="03" title="Losses">
+                  <InlineWriteupSection number={isAutoPhysicalDamage || isGeneralLiability ? '04' : '03'} title="Losses">
+                    {!isInlandMarine && (
+                      <InlineWriteupTextarea label="Loss synopsis" value={writeupPayload.lossSynopsis} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ lossSynopsis: value })} />
+                    )}
                     <InlineWriteupTextarea label="Loss mitigation actions" value={writeupPayload.lossMitigationActions} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ lossMitigationActions: value })} />
-                    <InlineWriteupTextarea label="Losses over $25k" value={writeupPayload.lossesOver25kDescription} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ lossesOver25kDescription: value })} />
+                    <InlineWriteupTextarea
+                      label={isInlandMarine ? 'Losses over $25k' : isGeneralLiability ? 'GL BI / attorney / losses over $50k' : 'Losses over $50k'}
+                      value={isInlandMarine ? writeupPayload.lossesOver25kDescription : writeupPayload.lossesOver50kDescription}
+                      readOnly={writeupReadOnly}
+                      onChange={(value) => isInlandMarine ? patchWriteupPayload({ lossesOver25kDescription: value }) : patchWriteupPayload({ lossesOver50kDescription: value })}
+                    />
                   </InlineWriteupSection>
 
-                  {quote.lineOfBusiness === 'InlandMarine' && (
-                    <InlineWriteupSection number="04" title="Equipment and values">
+                  {(isInlandMarine || isAutoPhysicalDamage) && (
+                    <InlineWriteupSection number="05" title={isAutoPhysicalDamage ? 'Vehicles, values and CAB' : 'Equipment and values'}>
                       <div className="grid grid-cols-4 gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
-                        <KV label="Total TIV" value={fmt(writeup.equipment.totalTiv)} />
                         <KV label="Largest unit" value={fmt(writeup.equipment.largestUnitTiv)} />
-                        <KV label="Scheduled items" value={writeup.equipment.totalCount} />
+                        <KV label="Total TIV" value={fmt(writeup.equipment.totalTiv)} />
+                        <KV label={isAutoPhysicalDamage ? 'Total power units' : 'Scheduled items'} value={writeup.equipment.totalCount} />
                         <KV label="Other units" value={writeup.equipment.countOther} />
                       </div>
-                      <InlineWriteupCheckbox label="Equipment values checked" checked={writeupPayload.eqValueChecked} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ eqValueChecked: value })} />
-                      <InlineWriteupTextarea label="Equipment narrative" value={writeupPayload.narrativeEquipment} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeEquipment: value })} />
+                      <InlineWriteupCheckbox label={isAutoPhysicalDamage ? 'Values independently verified' : 'Equipment values checked'} checked={writeupPayload.eqValueChecked} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ eqValueChecked: value })} />
+                      {isAutoPhysicalDamage && (
+                        <>
+                          <InlineWriteupTextarea label="Max concentration at one location" value={writeupPayload.maxConcentrationOneLocation} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ maxConcentrationOneLocation: value })} />
+                          <InlineWriteupTextarea label="CAB alerts / FMCSA / ISS rating notes" value={writeupPayload.cabAlertsNotes} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ cabAlertsNotes: value })} />
+                        </>
+                      )}
+                      <InlineWriteupTextarea label={isAutoPhysicalDamage ? 'Vehicles and values narrative' : 'Equipment narrative'} value={writeupPayload.narrativeEquipment} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeEquipment: value })} />
                     </InlineWriteupSection>
                   )}
 
-                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '05' : '04'} title={isAuto ? 'Fleet operations' : 'Operations and metrics'}>
-                    {quote.lineOfBusiness === 'InlandMarine' && (
+                  {isAutoLiability && (
+                    <InlineWriteupSection number="04" title="Vehicles, FMCSA and CAB">
+                      <InlineWriteupTextarea label="Vehicle / power unit summary" value={writeupPayload.narrativeEquipment} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeEquipment: value })} />
+                      <InlineWriteupTextarea label="CAB alerts" value={writeupPayload.cabAlertsNotes} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ cabAlertsNotes: value })} />
+                      <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+                        <InlineWriteupTextarea label="FMCSA safety rating" value={writeupPayload.fmcsaSafetyRating} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ fmcsaSafetyRating: value })} />
+                        <InlineWriteupTextarea label="ISS / CAB rating" value={writeupPayload.issCabRating} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ issCabRating: value })} />
+                      </div>
+                    </InlineWriteupSection>
+                  )}
+
+                  {isGeneralLiability && (
+                    <InlineWriteupSection number="05" title="Exposures and ISO class codes">
+                      <InlineWriteupTextarea label="Class code exposure notes" value={writeupPayload.glClassExposureNotes} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ glClassExposureNotes: value })} />
+                    </InlineWriteupSection>
+                  )}
+
+                  <InlineWriteupSection number={isAutoLiability ? '05' : isInlandMarine || isAutoPhysicalDamage || isGeneralLiability ? '06' : '04'} title={isAuto ? 'Operations and fleet metrics' : isGeneralLiability ? 'GL operations review' : 'Operations and metrics'}>
+                    {isInlandMarine && (
                       <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
                         <InlineWriteupCheckbox label="Waterborne exposure" checked={writeupPayload.waterborneExposure} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ waterborneExposure: value })} />
                         <InlineWriteupCheckbox label="Recommendations outstanding" checked={writeupPayload.recommendationsOutstanding} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ recommendationsOutstanding: value })} />
+                      </div>
+                    )}
+                    {isGeneralLiability && (
+                      <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+                        <InlineWriteupTextarea label="Risk characteristics" value={writeupPayload.glRiskCharacteristics} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ glRiskCharacteristics: value })} />
+                        <InlineWriteupTextarea label="Subcontractor and contract controls" value={writeupPayload.glSubcontractorControls} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ glSubcontractorControls: value })} />
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
@@ -1395,12 +1479,47 @@ export function QuoteDetailPage() {
                     <InlineWriteupTextarea label="Website issues" value={writeupPayload.websiteIssues} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ websiteIssues: value })} />
                   </InlineWriteupSection>
 
-                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '06' : '05'} title="Underwriting notes">
-                    <InlineWriteupTextarea label="Fire suppression" value={writeupPayload.narrativeFireSuppression} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeFireSuppression: value })} />
-                    <InlineWriteupTextarea label="Other concerns" value={writeupPayload.narrativeOtherConcerns} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeOtherConcerns: value })} />
+                  {(isAutoLiability || isAutoPhysicalDamage) && (
+                    <InlineWriteupSection number={isAutoLiability ? '06' : '07'} title="Drivers">
+                      <div className="grid grid-cols-2 gap-3 max-[700px]:grid-cols-1">
+                        <InlineWriteupTextarea label="# of drivers" value={writeupPayload.driverCount} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ driverCount: value })} />
+                        <InlineWriteupTextarea label="Driver age span" value={writeupPayload.driverAgeSpan} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ driverAgeSpan: value })} />
+                        <InlineWriteupTextarea label="Driver turnover %" value={writeupPayload.driverTurnoverPercent} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ driverTurnoverPercent: value })} />
+                        <InlineWriteupTextarea label="Owner-op %" value={writeupPayload.ownerOperatorPercent} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ ownerOperatorPercent: value })} />
+                      </div>
+                      <InlineWriteupCheckbox label="MVRs in file within 90 days" checked={writeupPayload.mvrInFile === true} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ mvrInFile: value })} />
+                      <InlineWriteupTextarea label="Drivers to exclude or watch" value={writeupPayload.driversWatchNotes} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ driversWatchNotes: value })} />
+                    </InlineWriteupSection>
+                  )}
+
+                  <InlineWriteupSection number={isAutoLiability ? '07' : isAutoPhysicalDamage ? '08' : isInlandMarine || isGeneralLiability ? '07' : '05'} title="Underwriting notes">
+                    {isInlandMarine && (
+                      <InlineWriteupTextarea label="Fire suppression" value={writeupPayload.narrativeFireSuppression} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeFireSuppression: value })} />
+                    )}
+                    <InlineWriteupTextarea label={isAutoLiability || isAutoPhysicalDamage ? 'Drivers' : 'Other concerns'} value={isAutoLiability || isAutoPhysicalDamage ? writeupPayload.narrativeDrivers : writeupPayload.narrativeOtherConcerns} readOnly={writeupReadOnly} onChange={(value) => isAutoLiability || isAutoPhysicalDamage ? patchWriteupPayload({ narrativeDrivers: value }) : patchWriteupPayload({ narrativeOtherConcerns: value })} />
+                    {(isAutoLiability || isAutoPhysicalDamage) && (
+                      <>
+                        <InlineWriteupTextarea label="CAB / FMCSA" value={writeupPayload.narrativeCabFmcsa} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeCabFmcsa: value })} />
+                        <InlineWriteupTextarea label="Additional interests and contracts" value={writeupPayload.narrativeAdditionalInterests} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ narrativeAdditionalInterests: value })} />
+                      </>
+                    )}
+                    {isGeneralLiability && (
+                      <>
+                        <InlineWriteupTextarea label="Exposure changes" value={writeupPayload.glExposureChanges} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ glExposureChanges: value })} />
+                        <InlineWriteupTextarea label="Subcontractors" value={writeupPayload.glSubcontractorsNarrative} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ glSubcontractorsNarrative: value })} />
+                        <InlineWriteupTextarea label="Endorsements and additional interests" value={writeupPayload.glEndorsementsNarrative} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ glEndorsementsNarrative: value })} />
+                      </>
+                    )}
                   </InlineWriteupSection>
 
-                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '07' : '06'} title="Conditions">
+                  {!isInlandMarine && (
+                    <InlineWriteupSection number={isAutoLiability || isGeneralLiability ? '08' : '09'} title="Requested terms / pricing">
+                      <InlineWriteupTextarea label="Pricing rationale" value={writeupPayload.pricingRationale} readOnly={writeupReadOnly} onChange={(value) => patchWriteupPayload({ pricingRationale: value })} />
+                      <InlineWriteupTextarea label="Special terms / endorsements" value={writeupPayload.specialTerms} readOnly={writeupReadOnly} rows={2} onChange={(value) => patchWriteupPayload({ specialTerms: value })} />
+                    </InlineWriteupSection>
+                  )}
+
+                  <InlineWriteupSection number={isInlandMarine ? '07' : isAutoLiability || isGeneralLiability ? '09' : isAutoPhysicalDamage ? '10' : '06'} title="Conditions">
                     <div className="space-y-2">
                       {writeupConditions.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-sm text-slate-500">No conditions added yet.</div>
@@ -1440,7 +1559,10 @@ export function QuoteDetailPage() {
                     )}
                   </InlineWriteupSection>
 
-                  <InlineWriteupSection number={quote.lineOfBusiness === 'InlandMarine' ? '08' : '07'} title="Recommendation">
+                  <InlineWriteupSection number={isInlandMarine ? '08' : isAutoLiability || isGeneralLiability ? '10' : isAutoPhysicalDamage ? '11' : '07'} title="Loss control and recommendation">
+                    {!isInlandMarine && (
+                      <InlineWriteupTextarea label="Loss control analysis" value={writeupPayload.lossControlAnalysis} readOnly={writeupReadOnly} rows={3} onChange={(value) => patchWriteupPayload({ lossControlAnalysis: value })} />
+                    )}
                     <InlineWriteupTextarea label="Decision rationale" value={writeupPayload.decisionRationale} readOnly={writeupReadOnly} rows={4} onChange={(value) => patchWriteupPayload({ decisionRationale: value })} />
                   </InlineWriteupSection>
                 </div>

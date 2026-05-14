@@ -84,7 +84,7 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Insured edit | Page | `/insureds/:id/edit` | Needs tweaking | Older form layout and controls. | Medium |
 | Policies list | Page | `/policies` | Needs tweaking | Uses shared header but older table/list styling remains. | Medium |
 | Policy detail | Page | `/policies/:id` | Never updated | Mostly older utility styling. | High |
-| Quote detail | Page | `/quotes/:quoteId` | Needs tweaking | Helper cards, headers, buttons, menu styling, status pill, and inline LOB-aware UW writeup editor moved toward SIMS style; deeper page sections still need visual pass. | High |
+| Quote detail | Page | `/quotes/:quoteId` | Needs tweaking | Helper cards, headers, buttons, menu styling, status pill, and inline LOB-specific UW writeup editor for IM, AL, APD, and GL moved toward SIMS style; deeper page sections still need visual pass. | High |
 | Quote writeup | Page | `/quotes/:quoteId/writeup` | Needs tweaking | Partially aligned, but many old controls and panels remain. | High |
 | Quote rating panel | Panel | `frontend/src/components/quotes/QuoteRatingPanel.tsx` | Needs tweaking | Main shell, equipment table, endorsement card, form controls, action buttons, and calculation card moved toward SIMS style; needs browser review. | High |
 | Quote auto safety panel | Panel | `frontend/src/components/quotes/QuoteAutoSafetyPanel.tsx` | Needs tweaking | Main shell, header, actions, tabs, metrics, SAFER/OOS sections, events, and history cards moved toward SIMS style; map/detail/chart internals still need visual review. | High |
@@ -147,3 +147,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-14 | Codex | Quote workflow partial pass | Updated QuoteDetail helper styling and QuoteRatingPanel core surfaces toward SIMS visual style. Type check passed. |
 | 2026-05-14 | Codex | Quote auto safety panel pass | Updated QuoteAutoSafetyPanel core shell, tabs, metric, action, and section-card styling toward SIMS visual style. Type check passed. |
 | 2026-05-14 | Codex | Quote detail UW writeup panel | Replaced the read-only UW writeup preview with LOB-aware collapsible inline editing for the actual writeup payload and conditions. Type check passed. |
+| 2026-05-14 | Codex | Non-IM UW writeup sections | Added quote detail writeup sections based on the AL, APD, and GL review sheets, excluding eligibility criteria and auto-decline checkboxes. Type check and backend build passed. |

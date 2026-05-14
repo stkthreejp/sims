@@ -20,6 +20,52 @@ export interface IMWriteupPayload {
   narrativeFireSuppression?: string
   narrativeOtherConcerns?: string
   decisionRationale?: string
+
+  programMarket?: string
+  referralRateReduction?: boolean
+  referralLossOver50k?: boolean
+  referralFmcsaConditional?: boolean
+  referralBasicOverThreshold?: boolean
+  referralScheduleCreditOver20?: boolean
+  referralPremiumOver100k?: boolean
+  referralOwnerOperatorOver30?: boolean
+  referralUnitOverCap?: boolean
+  referralPowerUnitsOrPremium?: boolean
+  referralTivLocationThreshold?: boolean
+  referralTornadoHail?: boolean
+  referralCoastalApd?: boolean
+  referralCreditScoreLow?: boolean
+  referralGlUwCreditOver20?: boolean
+  referralGlRevenueBelowThreshold?: boolean
+  referralSawmillOps?: boolean
+  referralResidentialWork?: boolean
+  referralBurningExposure?: boolean
+  referralPayrollChangeOver25?: boolean
+  referralSubcontractorControls?: boolean
+  lossSynopsis?: string
+  lossesOver50kDescription?: string
+  cabAlertsNotes?: string
+  fmcsaSafetyRating?: string
+  issCabRating?: string
+  maxConcentrationOneLocation?: string
+  driverCount?: string
+  driverAgeSpan?: string
+  driverTurnoverPercent?: string
+  ownerOperatorPercent?: string
+  mvrInFile?: boolean | null
+  driversWatchNotes?: string
+  narrativeDrivers?: string
+  narrativeCabFmcsa?: string
+  narrativeAdditionalInterests?: string
+  glClassExposureNotes?: string
+  glRiskCharacteristics?: string
+  glSubcontractorControls?: string
+  glExposureChanges?: string
+  glSubcontractorsNarrative?: string
+  glEndorsementsNarrative?: string
+  pricingRationale?: string
+  specialTerms?: string
+  lossControlAnalysis?: string
 }
 
 export interface EquipmentSummary {

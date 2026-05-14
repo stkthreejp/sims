@@ -36,6 +36,54 @@ public class IMWriteupPayload
 
     // Recommendation
     public string? DecisionRationale { get; set; }
+
+    // Non-IM review sheet fields. These remain optional so each LOB can render
+    // only the sections that apply while the payload stays backwards-compatible.
+    public string? ProgramMarket { get; set; }
+    public bool ReferralRateReduction { get; set; }
+    public bool ReferralLossOver50k { get; set; }
+    public bool ReferralFmcsaConditional { get; set; }
+    public bool ReferralBasicOverThreshold { get; set; }
+    public bool ReferralScheduleCreditOver20 { get; set; }
+    public bool ReferralPremiumOver100k { get; set; }
+    public bool ReferralOwnerOperatorOver30 { get; set; }
+    public bool ReferralUnitOverCap { get; set; }
+    public bool ReferralPowerUnitsOrPremium { get; set; }
+    public bool ReferralTivLocationThreshold { get; set; }
+    public bool ReferralTornadoHail { get; set; }
+    public bool ReferralCoastalApd { get; set; }
+    public bool ReferralCreditScoreLow { get; set; }
+    public bool ReferralGlUwCreditOver20 { get; set; }
+    public bool ReferralGlRevenueBelowThreshold { get; set; }
+    public bool ReferralSawmillOps { get; set; }
+    public bool ReferralResidentialWork { get; set; }
+    public bool ReferralBurningExposure { get; set; }
+    public bool ReferralPayrollChangeOver25 { get; set; }
+    public bool ReferralSubcontractorControls { get; set; }
+    public string? LossSynopsis { get; set; }
+    public string? LossesOver50kDescription { get; set; }
+    public string? CabAlertsNotes { get; set; }
+    public string? FmcsaSafetyRating { get; set; }
+    public string? IssCabRating { get; set; }
+    public string? MaxConcentrationOneLocation { get; set; }
+    public string? DriverCount { get; set; }
+    public string? DriverAgeSpan { get; set; }
+    public string? DriverTurnoverPercent { get; set; }
+    public string? OwnerOperatorPercent { get; set; }
+    public bool? MvrInFile { get; set; }
+    public string? DriversWatchNotes { get; set; }
+    public string? NarrativeDrivers { get; set; }
+    public string? NarrativeCabFmcsa { get; set; }
+    public string? NarrativeAdditionalInterests { get; set; }
+    public string? GlClassExposureNotes { get; set; }
+    public string? GlRiskCharacteristics { get; set; }
+    public string? GlSubcontractorControls { get; set; }
+    public string? GlExposureChanges { get; set; }
+    public string? GlSubcontractorsNarrative { get; set; }
+    public string? GlEndorsementsNarrative { get; set; }
+    public string? PricingRationale { get; set; }
+    public string? SpecialTerms { get; set; }
+    public string? LossControlAnalysis { get; set; }
 }
 
 public class EquipmentSummaryDto
