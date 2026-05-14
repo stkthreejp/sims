@@ -1,0 +1,263 @@
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check, FileText, PackagePlus, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { policyFormsApi } from '@/api/policyForms.api'
+import { carriersApi } from '@/api/carriers.api'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
+import type { PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
+
+const FORM_TYPES: PolicyFormType[] = ['Mandatory', 'Conditional', 'AdHoc']
+
+const emptyTemplate = {
+  formNumber: '',
+  name: '',
+  editionDate: '',
+  documentType: 'PolicyForm' as const,
+  fileName: '',
+  contentType: '',
+  storagePath: '',
+  isFillable: false,
+  isActive: true,
+  notes: '',
+}
+
+const emptyPackage = {
+  carrierId: '',
+  lineOfBusiness: 'InlandMarine' as PolicyLineOfBusiness,
+  state: '',
+  name: '',
+  isActive: true,
+}
+
+export function PolicyFormsAdminPage() {
+  const qc = useQueryClient()
+  const [templateForm, setTemplateForm] = useState(emptyTemplate)
+  const [packageForm, setPackageForm] = useState(emptyPackage)
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
+  const [packageRows, setPackageRows] = useState<PolicyPackageFormUpsert[]>([])
+
+  const { data: templates = [], isLoading: loadingTemplates } = useQuery({
+    queryKey: ['policy-form-templates'],
+    queryFn: () => policyFormsApi.getTemplates(true),
+  })
+
+  const { data: packages = [], isLoading: loadingPackages } = useQuery({
+    queryKey: ['policy-form-packages'],
+    queryFn: () => policyFormsApi.getPackages({ includeInactive: true }),
+  })
+
+  const { data: carriers = [] } = useQuery({
+    queryKey: ['carriers', 'active'],
+    queryFn: () => carriersApi.getAll(true),
+  })
+
+  const selectedPackage = packages.find((p) => p.id === selectedPackageId) ?? null
+
+  const packageTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates])
+
+  const createTemplate = useMutation({
+    mutationFn: () => policyFormsApi.createTemplate({
+      ...templateForm,
+      editionDate: templateForm.editionDate || undefined,
+      fileName: templateForm.fileName || undefined,
+      contentType: templateForm.contentType || undefined,
+      storagePath: templateForm.storagePath || undefined,
+      notes: templateForm.notes || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
+      setTemplateForm(emptyTemplate)
+      toast.success('Policy form saved')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy form could not be saved'),
+  })
+
+  const createPackage = useMutation({
+    mutationFn: () => policyFormsApi.createPackage({
+      ...packageForm,
+      state: packageForm.state.toUpperCase(),
+    }),
+    onSuccess: (saved) => {
+      qc.invalidateQueries({ queryKey: ['policy-form-packages'] })
+      setPackageForm(emptyPackage)
+      setSelectedPackageId(saved.id)
+      setPackageRows([])
+      toast.success('Package created')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Package could not be saved'),
+  })
+
+  const savePackageRows = useMutation({
+    mutationFn: () => policyFormsApi.replacePackageForms(selectedPackageId!, packageRows),
+    onSuccess: (saved) => {
+      qc.invalidateQueries({ queryKey: ['policy-form-packages'] })
+      setPackageRows(saved.forms.map((f) => ({
+        policyFormTemplateId: f.policyFormTemplateId,
+        sequenceOrder: f.sequenceOrder,
+        formType: f.formType,
+        triggerConditionJson: f.triggerConditionJson ?? undefined,
+        notes: f.notes ?? undefined,
+      })))
+      toast.success('Package forms saved')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Package forms could not be saved'),
+  })
+
+  const selectPackage = (pkg: PolicyPackageConfiguration) => {
+    setSelectedPackageId(pkg.id)
+    setPackageRows(pkg.forms.map((f) => ({
+      policyFormTemplateId: f.policyFormTemplateId,
+      sequenceOrder: f.sequenceOrder,
+      formType: f.formType,
+      triggerConditionJson: f.triggerConditionJson ?? undefined,
+      notes: f.notes ?? undefined,
+    })))
+  }
+
+  const addPackageRow = () => {
+    const firstTemplate = packageTemplates[0]
+    if (!firstTemplate) {
+      toast.error('Create at least one active form first')
+      return
+    }
+    setPackageRows((rows) => [
+      ...rows,
+      {
+        policyFormTemplateId: firstTemplate.id,
+        sequenceOrder: rows.length + 1,
+        formType: 'Mandatory',
+      },
+    ])
+  }
+
+  if (loadingTemplates || loadingPackages) return <LoadingSpinner />
+
+  return (
+    <div className="p-6 space-y-6 max-w-7xl">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">Policy Forms & Packages</h1>
+        <p className="text-sm text-slate-500 mt-1">Set up carrier forms and the policy packets used during issuance.</p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <section className="bg-white border rounded-lg">
+          <div className="px-4 py-3 border-b flex items-center gap-2">
+            <FileText className="h-4 w-4 text-slate-400" />
+            <h2 className="text-sm font-semibold text-slate-800">Form Library</h2>
+          </div>
+          <div className="p-4 space-y-3 border-b bg-slate-50">
+            <div className="grid grid-cols-2 gap-2">
+              <input value={templateForm.formNumber} onChange={(e) => setTemplateForm((f) => ({ ...f, formNumber: e.target.value }))} placeholder="Form number" className="border rounded px-2 py-1.5 text-sm" />
+              <input value={templateForm.editionDate} onChange={(e) => setTemplateForm((f) => ({ ...f, editionDate: e.target.value }))} placeholder="Edition" className="border rounded px-2 py-1.5 text-sm" />
+            </div>
+            <input value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} placeholder="Form name" className="w-full border rounded px-2 py-1.5 text-sm" />
+            <input value={templateForm.storagePath} onChange={(e) => setTemplateForm((f) => ({ ...f, storagePath: e.target.value }))} placeholder="Storage path or document reference" className="w-full border rounded px-2 py-1.5 text-sm" />
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" checked={templateForm.isFillable} onChange={(e) => setTemplateForm((f) => ({ ...f, isFillable: e.target.checked }))} />
+              Fillable PDF
+            </label>
+            <button onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.formNumber || !templateForm.name} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
+              <Plus className="h-4 w-4" /> Add form
+            </button>
+          </div>
+          <div className="divide-y max-h-[520px] overflow-auto">
+            {templates.map((template) => <TemplateRow key={template.id} template={template} />)}
+          </div>
+        </section>
+
+        <section className="bg-white border rounded-lg">
+          <div className="px-4 py-3 border-b flex items-center gap-2">
+            <PackagePlus className="h-4 w-4 text-slate-400" />
+            <h2 className="text-sm font-semibold text-slate-800">Packages</h2>
+          </div>
+          <div className="p-4 space-y-3 border-b bg-slate-50">
+            <select value={packageForm.carrierId} onChange={(e) => setPackageForm((f) => ({ ...f, carrierId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
+              <option value="">Select carrier</option>
+              {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={packageForm.lineOfBusiness} onChange={(e) => setPackageForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="border rounded px-2 py-1.5 text-sm">
+                {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+              </select>
+              <input value={packageForm.state} maxLength={2} onChange={(e) => setPackageForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))} placeholder="State" className="border rounded px-2 py-1.5 text-sm" />
+            </div>
+            <input value={packageForm.name} onChange={(e) => setPackageForm((f) => ({ ...f, name: e.target.value }))} placeholder="Package name" className="w-full border rounded px-2 py-1.5 text-sm" />
+            <button onClick={() => createPackage.mutate()} disabled={createPackage.isPending || !packageForm.carrierId || !packageForm.state || !packageForm.name} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
+              <Plus className="h-4 w-4" /> Create package
+            </button>
+          </div>
+          <div className="divide-y max-h-[520px] overflow-auto">
+            {packages.map((pkg) => (
+              <button key={pkg.id} onClick={() => selectPackage(pkg)} className={`w-full text-left p-3 hover:bg-slate-50 ${selectedPackageId === pkg.id ? 'bg-blue-50' : ''}`}>
+                <p className="text-sm font-medium text-slate-800">{pkg.name}</p>
+                <p className="text-xs text-slate-500">{pkg.carrierName} · {LOB_LABELS[pkg.lineOfBusiness]} · {pkg.state} · {pkg.forms.length} forms</p>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-white border rounded-lg xl:col-span-1">
+          <div className="px-4 py-3 border-b flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">Package Forms</h2>
+            {selectedPackage && <button onClick={addPackageRow} className="inline-flex items-center gap-1 px-2 py-1 text-xs border rounded hover:bg-slate-50"><Plus className="h-3 w-3" /> Add</button>}
+          </div>
+          {!selectedPackage ? (
+            <p className="p-4 text-sm text-slate-400">Select or create a package to configure the form sequence.</p>
+          ) : (
+            <div className="p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{selectedPackage.name}</p>
+                <p className="text-xs text-slate-500">{selectedPackage.carrierName} · {selectedPackage.state}</p>
+              </div>
+              <div className="space-y-2">
+                {packageRows.map((row, index) => (
+                  <div key={index} className="border rounded p-2 space-y-2">
+                    <div className="grid grid-cols-[52px_1fr] gap-2">
+                      <input type="number" value={row.sequenceOrder} onChange={(e) => setPackageRows((rows) => rows.map((r, i) => i === index ? { ...r, sequenceOrder: Number(e.target.value) || index + 1 } : r))} className="border rounded px-2 py-1.5 text-sm" />
+                      <select value={row.policyFormTemplateId} onChange={(e) => setPackageRows((rows) => rows.map((r, i) => i === index ? { ...r, policyFormTemplateId: e.target.value } : r))} className="border rounded px-2 py-1.5 text-sm">
+                        {packageTemplates.map((template) => <option key={template.id} value={template.id}>{template.formNumber} - {template.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <select value={row.formType} onChange={(e) => setPackageRows((rows) => rows.map((r, i) => i === index ? { ...r, formType: e.target.value as PolicyFormType } : r))} className="border rounded px-2 py-1.5 text-sm">
+                        {FORM_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                      </select>
+                      <button onClick={() => setPackageRows((rows) => rows.filter((_, i) => i !== index).map((r, i) => ({ ...r, sequenceOrder: i + 1 })))} className="px-2 border rounded text-slate-500 hover:text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {row.formType === 'Conditional' && (
+                      <textarea value={row.triggerConditionJson ?? ''} onChange={(e) => setPackageRows((rows) => rows.map((r, i) => i === index ? { ...r, triggerConditionJson: e.target.value } : r))} placeholder='Trigger JSON, e.g. {"path":"triaRejected","equals":true}' className="w-full border rounded px-2 py-1.5 text-xs font-mono" rows={2} />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => savePackageRows.mutate()} disabled={savePackageRows.isPending} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
+                <Check className="h-4 w-4" /> Save package forms
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+function TemplateRow({ template }: { template: PolicyFormTemplate }) {
+  return (
+    <div className="p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-800">{template.formNumber}</p>
+          <p className="text-xs text-slate-500">{template.name}</p>
+        </div>
+        <span className={`text-xs px-2 py-0.5 rounded ${template.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+          {template.isActive ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+      <p className="text-xs text-slate-400 mt-1">{template.editionDate || 'No edition'} · {template.isFillable ? 'Fillable' : 'Static'}</p>
+    </div>
+  )
+}

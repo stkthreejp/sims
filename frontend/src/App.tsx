@@ -60,6 +60,7 @@ const WorkflowsAdminPage = lazy(() => import('@/pages/admin/WorkflowsAdminPage')
 const HolidayCalendarAdminPage = lazy(() => import('@/pages/admin/HolidayCalendarAdminPage').then((m) => ({ default: m.HolidayCalendarAdminPage })))
 const EscalationRulesAdminPage = lazy(() => import('@/pages/admin/EscalationRulesAdminPage').then((m) => ({ default: m.EscalationRulesAdminPage })))
 const FeesAdminPage = lazy(() => import('@/pages/admin/FeesAdminPage').then((m) => ({ default: m.FeesAdminPage })))
+const PolicyFormsAdminPage = lazy(() => import('@/pages/admin/PolicyFormsAdminPage').then((m) => ({ default: m.PolicyFormsAdminPage })))
 const AdminRatingPage = lazy(() => import('@/pages/admin/AdminRatingPage').then((m) => ({ default: m.AdminRatingPage })))
 const AdminRatingPlanDetailPage = lazy(() => import('@/pages/admin/AdminRatingPlanDetailPage').then((m) => ({ default: m.AdminRatingPlanDetailPage })))
 const AdminRatingPlanVersionPage = lazy(() => import('@/pages/admin/AdminRatingPlanVersionPage').then((m) => ({ default: m.AdminRatingPlanVersionPage })))
@@ -186,6 +187,7 @@ export default function App() {
               <Route path="/admin/holiday-calendar" element={<HolidayCalendarAdminPage />} />
               <Route path="/admin/escalation-rules" element={<EscalationRulesAdminPage />} />
               <Route path="/admin/fees" element={<FeesAdminPage />} />
+              <Route path="/admin/policy-forms" element={<PolicyFormsAdminPage />} />
               <Route path="/admin/rating" element={<AdminRatingPage />} />
               <Route path="/admin/rating/plans/:planId" element={<AdminRatingPlanDetailPage />} />
               <Route path="/admin/rating/versions/:versionId" element={<AdminRatingPlanVersionPage />} />

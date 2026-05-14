@@ -36,6 +36,10 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<QuoteUWWriteupCondition> QuoteUWWriteupConditions => Set<QuoteUWWriteupCondition>();
     public DbSet<QuoteChecklistItem> QuoteChecklistItems => Set<QuoteChecklistItem>();
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<PolicyFormTemplate> PolicyFormTemplates => Set<PolicyFormTemplate>();
+    public DbSet<PolicyFormFieldMapping> PolicyFormFieldMappings => Set<PolicyFormFieldMapping>();
+    public DbSet<PolicyPackageConfiguration> PolicyPackageConfigurations => Set<PolicyPackageConfiguration>();
+    public DbSet<PolicyPackageForm> PolicyPackageForms => Set<PolicyPackageForm>();
     public DbSet<OutboundCommunication> OutboundCommunications => Set<OutboundCommunication>();
     public DbSet<OutboundCommunicationAttachment> OutboundCommunicationAttachments => Set<OutboundCommunicationAttachment>();
     public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();
@@ -151,6 +155,10 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Note>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<DocumentTemplate>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyFormTemplate>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyFormFieldMapping>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyPackageConfiguration>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyPackageForm>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<OutboundCommunication>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<OutboundCommunicationAttachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<InboundEmail>().HasQueryFilter(e => !e.IsDeleted);
