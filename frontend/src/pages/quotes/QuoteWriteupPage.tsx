@@ -32,9 +32,9 @@ function Section({ title, defaultOpen = true, children }: { title: string; defau
 
 function FieldRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
-    <div className="flex justify-between text-sm">
-      <span className="text-slate-400">{label}</span>
-      <span className="text-slate-700 font-medium text-right max-w-xs">{value ?? '—'}</span>
+    <div className="min-w-0">
+      <div className="sims-field-label">{label}</div>
+      <div className="break-words text-sm font-medium text-slate-800">{value ?? '-'}</div>
     </div>
   )
 }
@@ -53,16 +53,16 @@ function NarrativeBlock({
   readOnly: boolean
 }) {
   return (
-    <div className="space-y-1.5">
-      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{label}</div>
-      <div className="text-xs text-slate-400 italic">{prompt}</div>
+    <div>
+      <div className="sims-field-label">{label}</div>
+      <div className="mb-1 text-xs text-slate-500">{prompt}</div>
       <textarea
         rows={4}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         readOnly={readOnly}
-        placeholder={readOnly ? '' : 'Enter notes…'}
-        className="w-full rounded border border-slate-200 px-3 py-2 text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y disabled:bg-slate-50"
+        placeholder={readOnly ? '' : 'Enter notes...'}
+        className="sims-textarea"
       />
     </div>
   )
@@ -82,17 +82,17 @@ function ReferralCheckbox({
   readOnly: boolean
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm cursor-pointer">
+    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
       <input
         type="checkbox"
         checked={value}
         onChange={(e) => onChange(e.target.checked)}
         disabled={readOnly}
-        className="rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+        className="h-4 w-4 rounded border-slate-300"
       />
       <span className={value ? 'text-slate-800 font-medium' : 'text-slate-600'}>{label}</span>
       {autoChecked && (
-        <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">auto</span>
+        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-amber-700">auto</span>
       )}
     </label>
   )
@@ -118,7 +118,7 @@ function ShortText({
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         readOnly={readOnly}
-        className="mt-1 w-full rounded border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        className="sims-input mt-1"
       />
     </label>
   )
@@ -695,12 +695,12 @@ export default function QuoteWriteupPage() {
 
       {/* Action bar */}
       {writeup.status === 'Draft' && (
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 -mx-6 px-6 py-3 flex items-center justify-between gap-3">
+        <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-6 py-3 shadow-sm backdrop-blur">
           <button
             type="button"
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="sd-btn outline"
           >
             <Save className="h-4 w-4" />
             {saveMutation.isPending ? 'Saving…' : 'Save Draft'}
@@ -708,7 +708,7 @@ export default function QuoteWriteupPage() {
           <button
             type="button"
             onClick={() => setShowSubmitPanel(!showSubmitPanel)}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 rounded-lg text-white"
+            className="sd-btn primary"
           >
             <Send className="h-4 w-4" />
             Submit Decision
@@ -717,12 +717,12 @@ export default function QuoteWriteupPage() {
       )}
 
       {writeup.status === 'Submitted' && (
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 -mx-6 px-6 py-3 flex items-center justify-end gap-3">
+        <div className="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-6 py-3 shadow-sm backdrop-blur">
           <button
             type="button"
             onClick={() => approveMutation.mutate()}
             disabled={approveMutation.isPending}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white disabled:opacity-50"
+            className="sd-btn primary"
           >
             <ThumbsUp className="h-4 w-4" />
             {approveMutation.isPending ? 'Approving…' : 'Approve'}
@@ -732,8 +732,8 @@ export default function QuoteWriteupPage() {
 
       {/* Submit decision panel */}
       {showSubmitPanel && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
+          <div className="sims-modal w-full max-w-sm space-y-4 p-6">
             <h2 className="text-base font-semibold text-slate-800">Submit Decision</h2>
             <div className="space-y-2">
               {(['Approve', 'ApproveWithConditions', 'ReferUp', 'Decline'] as const).map((d) => (
@@ -744,7 +744,7 @@ export default function QuoteWriteupPage() {
                     value={d}
                     checked={submitDecision === d}
                     onChange={() => setSubmitDecision(d)}
-                    className="text-blue-600"
+                    className="h-4 w-4 border-slate-300"
                   />
                   <span>{DECISION_LABELS[d]}</span>
                 </label>
@@ -754,7 +754,7 @@ export default function QuoteWriteupPage() {
               <button
                 type="button"
                 onClick={() => setShowSubmitPanel(false)}
-                className="flex-1 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                className="sd-btn outline flex-1"
               >
                 Cancel
               </button>
@@ -762,7 +762,7 @@ export default function QuoteWriteupPage() {
                 type="button"
                 onClick={() => submitMutation.mutate()}
                 disabled={!submitDecision || submitMutation.isPending}
-                className="flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                className="sd-btn primary flex-1"
               >
                 {submitMutation.isPending ? 'Submitting…' : 'Confirm'}
               </button>
