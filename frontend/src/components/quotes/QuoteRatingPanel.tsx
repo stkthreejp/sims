@@ -321,7 +321,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
           </div>
 
           {lastErrorCode && (
-            <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded text-sm">
+            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm">
               <X className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-red-800">{describeRatingError(lastErrorCode)}</p>
@@ -401,9 +401,9 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
                   <td className="px-4 py-2 text-right font-medium">{formatCurrency(snapshot.endorsementPremium)}</td>
                 </tr>
               )}
-              <tr className="bg-blue-50 border-t-2 border-blue-200">
-                <td colSpan={6} className="px-4 py-3 text-right font-semibold text-blue-900">Grand Total Premium</td>
-                <td className="px-4 py-3 text-right font-bold text-blue-900 text-base">{formatCurrency(snapshot.grandTotalPremium)}</td>
+              <tr style={{ background: 'var(--info-bg)' }}>
+                <td colSpan={6} className="px-4 py-3 text-right font-semibold" style={{ color: 'var(--info)' }}>Grand Total Premium</td>
+                <td className="px-4 py-3 text-right text-base font-bold" style={{ color: 'var(--info)' }}>{formatCurrency(snapshot.grandTotalPremium)}</td>
               </tr>
             </tfoot>
           </table>
