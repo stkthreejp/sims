@@ -48,6 +48,17 @@ public class PolicyFormFieldMappingUpsertDto
     public string? Format { get; set; }
 }
 
+public class DocumentTagDto
+{
+    public string Tag { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string DataType { get; set; } = "Text";
+    public string? DefaultFormat { get; set; }
+    public bool IsRepeatable { get; set; }
+    public string? RepeatBlock { get; set; }
+}
+
 public class PolicyPackageConfigurationDto
 {
     public Guid Id { get; set; }

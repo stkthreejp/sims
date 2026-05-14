@@ -1,14 +1,56 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Download, FileText, PackagePlus, Plus, Trash2, Upload } from 'lucide-react'
+import { Check, Download, FileText, PackagePlus, Plus, Settings, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { policyFormsApi } from '@/api/policyForms.api'
 import { carriersApi } from '@/api/carriers.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
-import type { PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
+import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
 
 const FORM_TYPES: PolicyFormType[] = ['Mandatory', 'Conditional', 'AdHoc']
+const DATA_PATH_OPTIONS = [
+  'Policy.PolicyNumber',
+  'Policy.EffectiveDate',
+  'Policy.ExpirationDate',
+  'Policy.BoundDate',
+  'Policy.IssuedDate',
+  'Policy.PremiumAmount',
+  'Policy.TaxesAndFees',
+  'Policy.TotalPremium',
+  'Policy.LineOfBusiness',
+  'Quote.QuoteNumber',
+  'Quote.PolicyNumber',
+  'Quote.EffectiveDate',
+  'Quote.ExpirationDate',
+  'Quote.PremiumAmount',
+  'Quote.TaxesAndFees',
+  'Quote.TotalPremium',
+  'Quote.CoverageDescription',
+  'Quote.Deductible',
+  'Quote.Limit',
+  'Quote.UninsuredMotoristLimit',
+  'Quote.MedicalPaymentsLimit',
+  'Quote.LineOfBusiness',
+  'Submission.SubmissionNumber',
+  'Insured.DisplayName',
+  'Insured.Name',
+  'Insured.CompanyName',
+  'Insured.Dba',
+  'Insured.FirstName',
+  'Insured.LastName',
+  'Insured.AddressLine1',
+  'Insured.AddressLine2',
+  'Insured.City',
+  'Insured.State',
+  'Insured.ZipCode',
+  'Insured.FullAddress',
+  'Insured.Email',
+  'Insured.Phone',
+  'Carrier.Name',
+  'Carrier.Naic',
+]
+const FORMAT_OPTIONS = ['', 'currency', 'number', 'percent', 'MM/dd/yyyy']
 
 const emptyTemplate = {
   formNumber: '',
@@ -37,6 +79,8 @@ export function PolicyFormsAdminPage() {
   const [packageForm, setPackageForm] = useState(emptyPackage)
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
   const [packageRows, setPackageRows] = useState<PolicyPackageFormUpsert[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const [mappingRows, setMappingRows] = useState<PolicyFormFieldMappingUpsert[]>([])
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['policy-form-templates'],
@@ -53,9 +97,25 @@ export function PolicyFormsAdminPage() {
     queryFn: () => carriersApi.getAll(true),
   })
 
+  const { data: tags = [] } = useQuery({
+    queryKey: ['policy-form-tags'],
+    queryFn: policyFormsApi.getTags,
+  })
+
   const selectedPackage = packages.find((p) => p.id === selectedPackageId) ?? null
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null
 
   const packageTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates])
+  const mappingDataPaths = useMemo(() => {
+    const nonRepeatingTags = tags.filter((t) => !t.isRepeatable).map((t) => t.tag)
+    return nonRepeatingTags.length > 0 ? nonRepeatingTags : DATA_PATH_OPTIONS
+  }, [tags])
+  const tagCategories = useMemo(() => {
+    return tags.reduce<Record<string, DocumentTag[]>>((acc, tag) => {
+      acc[tag.category] = [...(acc[tag.category] ?? []), tag]
+      return acc
+    }, {})
+  }, [tags])
 
   const createTemplate = useMutation({
     mutationFn: () => policyFormsApi.createTemplate({
@@ -124,6 +184,15 @@ export function PolicyFormsAdminPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Package forms could not be saved'),
   })
 
+  const saveMappings = useMutation({
+    mutationFn: () => policyFormsApi.replaceMappings(selectedTemplateId!, mappingRows),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
+      toast.success('Field mappings saved')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Field mappings could not be saved'),
+  })
+
   const selectPackage = (pkg: PolicyPackageConfiguration) => {
     setSelectedPackageId(pkg.id)
     setPackageRows(pkg.forms.map((f) => ({
@@ -133,6 +202,33 @@ export function PolicyFormsAdminPage() {
       triggerConditionJson: f.triggerConditionJson ?? undefined,
       notes: f.notes ?? undefined,
     })))
+  }
+
+  const selectTemplateMappings = (template: PolicyFormTemplate) => {
+    setSelectedTemplateId(template.id)
+    setMappingRows(template.fieldMappings.map((m) => ({
+      pdfFieldName: m.pdfFieldName,
+      dataPath: m.dataPath,
+      format: m.format ?? undefined,
+    })))
+  }
+
+  const addMappingRow = () => {
+    setMappingRows((rows) => [
+      ...rows,
+      {
+        pdfFieldName: '',
+        dataPath: mappingDataPaths[0],
+      },
+    ])
+  }
+
+  const copyTag = async (tag: DocumentTag) => {
+    const text = tag.isRepeatable && tag.repeatBlock
+      ? `{{#${tag.repeatBlock}}}\n{{${tag.tag}}}\n{{/${tag.repeatBlock}}}`
+      : `{{${tag.tag}}}`
+    await navigator.clipboard.writeText(text)
+    toast.success('Tag copied')
   }
 
   const addPackageRow = () => {
@@ -189,9 +285,60 @@ export function PolicyFormsAdminPage() {
                 uploading={uploadTemplateFile.isPending}
                 onUpload={(file) => uploadTemplateFile.mutate({ templateId: template.id, file })}
                 onOpen={() => openTemplateFile(template.id)}
+                onMap={() => selectTemplateMappings(template)}
               />
             ))}
           </div>
+          {selectedTemplate && (
+            <div className="border-t p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">PDF field mappings</p>
+                  <p className="text-xs text-slate-500">{selectedTemplate.formNumber} - {selectedTemplate.name}</p>
+                </div>
+                <button onClick={addMappingRow} className="inline-flex items-center gap-1 px-2 py-1 text-xs border rounded hover:bg-slate-50">
+                  <Plus className="h-3 w-3" /> Add
+                </button>
+              </div>
+              <div className="space-y-2">
+                {mappingRows.length === 0 && (
+                  <p className="text-xs text-slate-400 border rounded p-3">No mapped fields yet.</p>
+                )}
+                {mappingRows.map((row, index) => (
+                  <div key={index} className="border rounded p-2 space-y-2">
+                    <input
+                      value={row.pdfFieldName}
+                      onChange={(e) => setMappingRows((rows) => rows.map((r, i) => i === index ? { ...r, pdfFieldName: e.target.value } : r))}
+                      placeholder="PDF field name"
+                      className="w-full border rounded px-2 py-1.5 text-sm"
+                    />
+                    <select
+                      value={row.dataPath}
+                      onChange={(e) => setMappingRows((rows) => rows.map((r, i) => i === index ? { ...r, dataPath: e.target.value } : r))}
+                      className="w-full border rounded px-2 py-1.5 text-sm"
+                    >
+                      {mappingDataPaths.map((path) => <option key={path} value={path}>{path}</option>)}
+                    </select>
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <select
+                        value={row.format ?? ''}
+                        onChange={(e) => setMappingRows((rows) => rows.map((r, i) => i === index ? { ...r, format: e.target.value || undefined } : r))}
+                        className="border rounded px-2 py-1.5 text-sm"
+                      >
+                        {FORMAT_OPTIONS.map((format) => <option key={format || 'plain'} value={format}>{format || 'plain text'}</option>)}
+                      </select>
+                      <button onClick={() => setMappingRows((rows) => rows.filter((_, i) => i !== index))} className="px-2 border rounded text-slate-500 hover:text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => saveMappings.mutate()} disabled={saveMappings.isPending || !selectedTemplateId} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
+                <Check className="h-4 w-4" /> Save mappings
+              </button>
+            </div>
+          )}
         </section>
 
         <section className="bg-white border rounded-lg">
@@ -267,6 +414,31 @@ export function PolicyFormsAdminPage() {
             </div>
           )}
         </section>
+
+        <section className="bg-white border rounded-lg xl:col-span-3">
+          <div className="px-4 py-3 border-b">
+            <h2 className="text-sm font-semibold text-slate-800">Approved Tags</h2>
+            <p className="text-xs text-slate-500 mt-1">Use these tags in Word, HTML, proposal, email, and application templates.</p>
+          </div>
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {Object.entries(tagCategories).map(([category, categoryTags]) => (
+              <div key={category} className="border rounded">
+                <div className="px-3 py-2 border-b bg-slate-50">
+                  <p className="text-xs font-semibold text-slate-700">{category}</p>
+                </div>
+                <div className="divide-y max-h-80 overflow-auto">
+                  {categoryTags.map((tag) => (
+                    <button key={`${tag.repeatBlock ?? 'root'}-${tag.tag}`} type="button" onClick={() => copyTag(tag)} className="w-full text-left px-3 py-2 hover:bg-slate-50">
+                      <p className="text-xs font-medium text-slate-700">{tag.label}</p>
+                      <p className="text-[11px] text-slate-500 font-mono">{tag.isRepeatable && tag.repeatBlock ? `{{#${tag.repeatBlock}}} {{${tag.tag}}} {{/${tag.repeatBlock}}}` : `{{${tag.tag}}}`}</p>
+                      <p className="text-[11px] text-slate-400">{tag.dataType}{tag.defaultFormat ? ` / ${tag.defaultFormat}` : ''}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   )
@@ -277,11 +449,13 @@ function TemplateRow({
   uploading,
   onUpload,
   onOpen,
+  onMap,
 }: {
   template: PolicyFormTemplate
   uploading: boolean
   onUpload: (file: File) => void
   onOpen: () => void
+  onMap: () => void
 }) {
   return (
     <div className="p-3">
@@ -294,7 +468,7 @@ function TemplateRow({
           {template.isActive ? 'Active' : 'Inactive'}
         </span>
       </div>
-      <p className="text-xs text-slate-400 mt-1">{template.editionDate || 'No edition'} · {template.isFillable ? 'Fillable' : 'Static'}</p>
+      <p className="text-xs text-slate-400 mt-1">{template.editionDate || 'No edition'} / {template.isFillable ? 'Fillable' : 'Static'} / {template.fieldMappings.length} mapped</p>
       {template.fileName && (
         <p className="text-xs text-slate-500 mt-1 truncate">{template.fileName}</p>
       )}
@@ -318,6 +492,12 @@ function TemplateRow({
           <button type="button" onClick={onOpen} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50">
             <Download className="h-3 w-3" />
             Open
+          </button>
+        )}
+        {template.isFillable && (
+          <button type="button" onClick={onMap} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50">
+            <Settings className="h-3 w-3" />
+            Map
           </button>
         )}
       </div>

@@ -185,6 +185,9 @@ public class PolicyFormService : IPolicyFormService
         return Result<IReadOnlyList<PolicyFormFieldMappingDto>>.Success(form.FieldMappings.Select(MapMapping).ToList());
     }
 
+    public Task<IReadOnlyList<DocumentTagDto>> GetDocumentTagsAsync()
+        => Task.FromResult<IReadOnlyList<DocumentTagDto>>(DocumentTags);
+
     public async Task<IReadOnlyList<PolicyPackageConfigurationDto>> GetPackagesAsync(Guid? carrierId = null, PolicyLineOfBusiness? lineOfBusiness = null, string? state = null, bool includeInactive = false)
     {
         var q = Db.Set<PolicyPackageConfiguration>()
@@ -353,6 +356,92 @@ public class PolicyFormService : IPolicyFormService
         DataPath = m.DataPath,
         Format = m.Format,
     };
+
+    private static readonly IReadOnlyList<DocumentTagDto> DocumentTags =
+    [
+        Tag("Insured.DisplayName", "Named insured", "Insured"),
+        Tag("Insured.Name", "Named insured", "Insured"),
+        Tag("Insured.CompanyName", "Company name", "Insured"),
+        Tag("Insured.Dba", "DBA", "Insured"),
+        Tag("Insured.FirstName", "First name", "Insured"),
+        Tag("Insured.LastName", "Last name", "Insured"),
+        Tag("Insured.AddressLine1", "Address line 1", "Insured"),
+        Tag("Insured.AddressLine2", "Address line 2", "Insured"),
+        Tag("Insured.City", "City", "Insured"),
+        Tag("Insured.State", "State", "Insured"),
+        Tag("Insured.ZipCode", "ZIP code", "Insured"),
+        Tag("Insured.FullAddress", "Full address", "Insured"),
+        Tag("Insured.Email", "Email", "Insured"),
+        Tag("Insured.Phone", "Phone", "Insured"),
+
+        Tag("Submission.SubmissionNumber", "Submission number", "Submission"),
+
+        Tag("Quote.QuoteNumber", "Quote number", "Quote"),
+        Tag("Quote.PolicyNumber", "Quoted policy number", "Quote"),
+        Tag("Quote.EffectiveDate", "Effective date", "Quote", "Date", "MM/dd/yyyy"),
+        Tag("Quote.ExpirationDate", "Expiration date", "Quote", "Date", "MM/dd/yyyy"),
+        Tag("Quote.PremiumAmount", "Premium", "Quote", "Currency", "currency"),
+        Tag("Quote.TaxesAndFees", "Taxes and fees", "Quote", "Currency", "currency"),
+        Tag("Quote.TotalPremium", "Total premium", "Quote", "Currency", "currency"),
+        Tag("Quote.CoverageDescription", "Coverage description", "Quote"),
+        Tag("Quote.Deductible", "Deductible", "Quote", "Currency", "currency"),
+        Tag("Quote.Limit", "Limit", "Quote", "Currency", "currency"),
+        Tag("Quote.UninsuredMotoristLimit", "Uninsured motorist limit", "Quote", "Currency", "currency"),
+        Tag("Quote.MedicalPaymentsLimit", "Medical payments limit", "Quote", "Currency", "currency"),
+        Tag("Quote.LineOfBusiness", "Line of business", "Quote"),
+
+        Tag("Policy.PolicyNumber", "Policy number", "Policy"),
+        Tag("Policy.EffectiveDate", "Effective date", "Policy", "Date", "MM/dd/yyyy"),
+        Tag("Policy.ExpirationDate", "Expiration date", "Policy", "Date", "MM/dd/yyyy"),
+        Tag("Policy.BoundDate", "Bound date", "Policy", "Date", "MM/dd/yyyy"),
+        Tag("Policy.IssuedDate", "Issued date", "Policy", "Date", "MM/dd/yyyy"),
+        Tag("Policy.PremiumAmount", "Premium", "Policy", "Currency", "currency"),
+        Tag("Policy.TaxesAndFees", "Taxes and fees", "Policy", "Currency", "currency"),
+        Tag("Policy.TotalPremium", "Total premium", "Policy", "Currency", "currency"),
+        Tag("Policy.LineOfBusiness", "Line of business", "Policy"),
+
+        Tag("Carrier.Name", "Carrier name", "Carrier"),
+        Tag("Carrier.Naic", "NAIC", "Carrier"),
+
+        Tag("Description", "Description", "Equipment", repeatBlock: "Equipment"),
+        Tag("Year", "Year", "Equipment", "Number", "number", "Equipment"),
+        Tag("Make", "Make", "Equipment", repeatBlock: "Equipment"),
+        Tag("Model", "Model", "Equipment", repeatBlock: "Equipment"),
+        Tag("SerialNumber", "Serial number", "Equipment", repeatBlock: "Equipment"),
+        Tag("Value", "Value", "Equipment", "Currency", "currency", "Equipment"),
+        Tag("Limit", "Limit", "Equipment", "Currency", "currency", "Equipment"),
+        Tag("Deductible", "Deductible", "Equipment", "Currency", "currency", "Equipment"),
+        Tag("Location", "Location", "Equipment", repeatBlock: "Equipment"),
+        Tag("Territory", "Territory", "Equipment", repeatBlock: "Equipment"),
+
+        Tag("Name", "Name", "Additional Interests", repeatBlock: "AdditionalInterests"),
+        Tag("Address", "Address", "Additional Interests", repeatBlock: "AdditionalInterests"),
+        Tag("Types", "Interest types", "Additional Interests", repeatBlock: "AdditionalInterests"),
+        Tag("LoanNumber", "Loan or contract number", "Additional Interests", repeatBlock: "AdditionalInterests"),
+
+        Tag("FormNumber", "Form number", "Forms", repeatBlock: "PolicyForms"),
+        Tag("FormName", "Form name", "Forms", repeatBlock: "PolicyForms"),
+        Tag("EditionDate", "Edition date", "Forms", repeatBlock: "PolicyForms"),
+        Tag("Status", "Included or excluded", "Forms", repeatBlock: "PolicyForms"),
+    ];
+
+    private static DocumentTagDto Tag(
+        string tag,
+        string label,
+        string category,
+        string dataType = "Text",
+        string? defaultFormat = null,
+        string? repeatBlock = null)
+        => new()
+        {
+            Tag = tag,
+            Label = label,
+            Category = category,
+            DataType = dataType,
+            DefaultFormat = defaultFormat,
+            IsRepeatable = repeatBlock != null,
+            RepeatBlock = repeatBlock,
+        };
 
     private static PolicyPackageConfigurationDto MapPackage(PolicyPackageConfiguration p) => new()
     {

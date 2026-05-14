@@ -71,6 +71,10 @@ public class PolicyFormsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("tags")]
+    public async Task<IActionResult> GetDocumentTags()
+        => Ok(await _service.GetDocumentTagsAsync());
+
     [HttpGet("packages")]
     public async Task<IActionResult> GetPackages(
         [FromQuery] Guid? carrierId = null,

@@ -10,6 +10,22 @@ export interface PolicyFormFieldMapping {
   format: string | null
 }
 
+export interface PolicyFormFieldMappingUpsert {
+  pdfFieldName: string
+  dataPath: string
+  format?: string
+}
+
+export interface DocumentTag {
+  tag: string
+  label: string
+  category: string
+  dataType: string
+  defaultFormat: string | null
+  isRepeatable: boolean
+  repeatBlock: string | null
+}
+
 export interface PolicyFormTemplate {
   id: string
   formNumber: string

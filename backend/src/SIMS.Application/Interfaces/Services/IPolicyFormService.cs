@@ -15,6 +15,7 @@ public interface IPolicyFormService
     Task<Result<string>> GetTemplateDownloadUrlAsync(Guid id);
     Task<Result> DeleteTemplateAsync(Guid id);
     Task<Result<IReadOnlyList<PolicyFormFieldMappingDto>>> ReplaceMappingsAsync(Guid templateId, IReadOnlyList<PolicyFormFieldMappingUpsertDto> mappings);
+    Task<IReadOnlyList<DocumentTagDto>> GetDocumentTagsAsync();
 
     Task<IReadOnlyList<PolicyPackageConfigurationDto>> GetPackagesAsync(Guid? carrierId = null, PolicyLineOfBusiness? lineOfBusiness = null, string? state = null, bool includeInactive = false);
     Task<Result<PolicyPackageConfigurationDto>> GetPackageAsync(Guid id);
