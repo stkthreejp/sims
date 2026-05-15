@@ -25,6 +25,67 @@ const STATUS_TONE: Record<TaskInstanceStatus, { label: string; bg: string; fg: s
   Cancelled:  { label: 'Cancelled',   bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)',    border: 'var(--line)' },
 }
 
+const SAMPLE_TASKS: TaskInstanceListItem[] = [
+  {
+    id: 'sample-review-quote',
+    taskTypeName: 'Review quote writeup',
+    entityType: 'Submission',
+    entityId: '00000000-0000-0000-0000-000000000001',
+    assignedUserName: 'Sample User',
+    status: 'Open',
+    priority: 'High',
+    dueDate: daysFromToday(-1),
+    isOverdue: true,
+    escalationLevel: 1,
+    createdAt: daysFromToday(-5),
+  },
+  {
+    id: 'sample-request-info',
+    taskTypeName: 'Request missing loss runs',
+    entityType: 'Submission',
+    entityId: '00000000-0000-0000-0000-000000000002',
+    assignedUserName: 'Sample User',
+    status: 'InProgress',
+    priority: 'Medium',
+    dueDate: daysFromToday(2),
+    isOverdue: false,
+    escalationLevel: 0,
+    createdAt: daysFromToday(-2),
+  },
+  {
+    id: 'sample-compliance',
+    taskTypeName: 'Resolve compliance hold',
+    entityType: 'Policy',
+    entityId: '00000000-0000-0000-0000-000000000003',
+    assignedUserName: 'Sample User',
+    status: 'Blocked',
+    priority: 'Medium',
+    dueDate: daysFromToday(4),
+    isOverdue: false,
+    escalationLevel: 0,
+    createdAt: daysFromToday(-1),
+  },
+  {
+    id: 'sample-issue-policy',
+    taskTypeName: 'Issue bound policy',
+    entityType: 'Policy',
+    entityId: '00000000-0000-0000-0000-000000000004',
+    assignedUserName: 'Sample User',
+    status: 'Closed',
+    priority: 'Low',
+    dueDate: daysFromToday(0),
+    isOverdue: false,
+    escalationLevel: 0,
+    createdAt: daysFromToday(-4),
+  },
+]
+
+function daysFromToday(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return date.toISOString()
+}
+
 function entityUrl(task: TaskInstanceListItem) {
   const base = task.entityType === 'Submission' ? '/submissions'
              : task.entityType === 'Policy'     ? '/policies'
@@ -40,6 +101,10 @@ function taskAccent(task: TaskInstanceListItem) {
   return 'transparent'
 }
 
+function isSampleTask(task: TaskInstanceListItem) {
+  return task.id.startsWith('sample-')
+}
+
 export function TaskQueuePage() {
   const qc = useQueryClient()
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -52,14 +117,17 @@ export function TaskQueuePage() {
     queryFn: tasksApi.getMyQueue,
   })
 
-  const counts = useMemo(() => ({
-    open: tasks.filter((t) => t.status === 'Open' || t.status === 'InProgress').length,
-    overdue: tasks.filter((t) => t.isOverdue).length,
-    blocked: tasks.filter((t) => t.status === 'Blocked').length,
-    closed: tasks.filter((t) => t.status === 'Closed').length,
-  }), [tasks])
+  const usingSampleTasks = tasks.length === 0
+  const queueTasks = usingSampleTasks ? SAMPLE_TASKS : tasks
 
-  const filtered = tasks.filter((t) => {
+  const counts = useMemo(() => ({
+    open: queueTasks.filter((t) => t.status === 'Open' || t.status === 'InProgress').length,
+    overdue: queueTasks.filter((t) => t.isOverdue).length,
+    blocked: queueTasks.filter((t) => t.status === 'Blocked').length,
+    closed: queueTasks.filter((t) => t.status === 'Closed').length,
+  }), [queueTasks])
+
+  const filtered = queueTasks.filter((t) => {
     if (filterStatus && t.status !== filterStatus) return false
     if (filterPriority && t.priority !== filterPriority) return false
     if (search) {
@@ -76,7 +144,7 @@ export function TaskQueuePage() {
     <div className="space-y-5 p-6">
       <PageHeader
         title="Tasks"
-        subtitle={`${counts.open} open tasks in your queue`}
+        subtitle={usingSampleTasks ? 'Showing sample task rows for UI review' : `${counts.open} open tasks in your queue`}
       />
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -126,7 +194,7 @@ export function TaskQueuePage() {
         {filtered.length === 0 ? (
           <div className="p-10 text-center text-sm" style={{ color: 'var(--ink-3)' }}>
             <CheckSquare className="mx-auto mb-2 h-8 w-8" style={{ color: 'var(--ink-4)' }} />
-            {tasks.length === 0 ? 'No tasks assigned to you.' : 'No tasks match your filters.'}
+            No tasks match your filters.
           </div>
         ) : (
           <table className="sd-table">
@@ -143,7 +211,7 @@ export function TaskQueuePage() {
               {filtered.map((task) => (
                 <tr
                   key={task.id}
-                  onClick={() => setSelectedId(task.id)}
+                  onClick={() => { if (!isSampleTask(task)) setSelectedId(task.id) }}
                   style={{ boxShadow: `inset 3px 0 0 ${taskAccent(task)}` }}
                 >
                   <td className="primary-cell">
@@ -155,6 +223,11 @@ export function TaskQueuePage() {
                         </span>
                       )}
                       {task.taskTypeName}
+                      {isSampleTask(task) && (
+                        <span className="rounded px-1.5 py-0.5 text-xs font-semibold" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
+                          Sample
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td>
@@ -173,13 +246,17 @@ export function TaskQueuePage() {
                     </div>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <Link
-                      to={entityUrl(task)}
-                      className="flex items-center gap-1 text-xs font-medium"
-                      style={{ color: 'var(--accent)' }}
-                    >
-                      {task.entityType} <ExternalLink className="h-3 w-3" />
-                    </Link>
+                    {isSampleTask(task) ? (
+                      <span className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>{task.entityType}</span>
+                    ) : (
+                      <Link
+                        to={entityUrl(task)}
+                        className="flex items-center gap-1 text-xs font-medium"
+                        style={{ color: 'var(--accent)' }}
+                      >
+                        {task.entityType} <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}
