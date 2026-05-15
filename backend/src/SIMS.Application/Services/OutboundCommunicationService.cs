@@ -11,11 +11,13 @@ public class OutboundCommunicationService : IOutboundCommunicationService
 {
     private readonly DbContext _db;
     private readonly IDocumentMergeService _merge;
+    private readonly IOutboundEmailSenderService _emailSender;
 
-    public OutboundCommunicationService(DbContext db, IDocumentMergeService merge)
+    public OutboundCommunicationService(DbContext db, IDocumentMergeService merge, IOutboundEmailSenderService emailSender)
     {
         _db = db;
         _merge = merge;
+        _emailSender = emailSender;
     }
 
     public async Task<IEnumerable<OutboundCommunicationListItemDto>> GetForEntityAsync(
@@ -150,6 +152,34 @@ public class OutboundCommunicationService : IOutboundCommunicationService
             communication.SentAt = DateTime.UtcNow;
             communication.SentById = userId;
         }
+
+        await _db.SaveChangesAsync();
+        return Result<OutboundCommunicationDto>.Success(MapToDto((await LoadByIdAsync(id))!));
+    }
+
+    public async Task<Result<OutboundCommunicationDto>> SendAsync(Guid id, Guid userId)
+    {
+        var communication = await LoadByIdAsync(id);
+        if (communication == null)
+            return Result<OutboundCommunicationDto>.Failure("NOT_FOUND", "Outbound communication not found.");
+
+        if (communication.Status != OutboundCommunicationStatus.Draft && communication.Status != OutboundCommunicationStatus.Failed)
+            return Result<OutboundCommunicationDto>.Failure("NOT_SENDABLE", "Only draft or failed communications can be sent.");
+
+        var sendResult = await _emailSender.SendAsync(communication);
+        if (!sendResult.IsSuccess)
+        {
+            communication.Status = OutboundCommunicationStatus.Failed;
+            communication.FailureReason = sendResult.ErrorMessage;
+            await _db.SaveChangesAsync();
+            return Result<OutboundCommunicationDto>.Failure(sendResult.ErrorCode ?? "SEND_FAILED", sendResult.ErrorMessage ?? "Email could not be sent.");
+        }
+
+        communication.Status = OutboundCommunicationStatus.Sent;
+        communication.FailureReason = null;
+        communication.GraphMessageId = sendResult.Value;
+        communication.SentAt = DateTime.UtcNow;
+        communication.SentById = userId;
 
         await _db.SaveChangesAsync();
         return Result<OutboundCommunicationDto>.Success(MapToDto((await LoadByIdAsync(id))!));

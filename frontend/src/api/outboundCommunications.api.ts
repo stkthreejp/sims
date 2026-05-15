@@ -31,4 +31,7 @@ export const outboundCommunicationsApi = {
         graphMessageId,
       })
       .then((r) => r.data),
+
+  send: (id: string) =>
+    apiClient.post<OutboundCommunication>(`/outbound-communications/${id}/send`).then((r) => r.data),
 }

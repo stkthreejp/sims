@@ -1,0 +1,149 @@
+using Azure.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Graph;
+using Microsoft.Graph.Models;
+using SIMS.Application.Common;
+using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Entities;
+using GraphAttachment = Microsoft.Graph.Models.Attachment;
+using SimsAttachment = SIMS.Domain.Entities.Attachment;
+
+namespace SIMS.Infrastructure.Services;
+
+public class GraphOutboundEmailSenderService : IOutboundEmailSenderService
+{
+    private const long SimpleAttachmentLimitBytes = 3_000_000;
+
+    private readonly DbContext _db;
+    private readonly IBlobStorageService _blob;
+    private readonly IConfiguration _config;
+
+    public GraphOutboundEmailSenderService(DbContext db, IBlobStorageService blob, IConfiguration config)
+    {
+        _db = db;
+        _blob = blob;
+        _config = config;
+    }
+
+    public async Task<Result<string>> SendAsync(OutboundCommunication communication, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(communication.ToAddress))
+            return Result<string>.Failure("MISSING_RECIPIENT", "The email draft does not have a recipient.");
+
+        try
+        {
+            var (graphClient, mailboxAddress) = CreateGraphClient();
+            var message = new Message
+            {
+                Subject = communication.Subject,
+                Body = new ItemBody { ContentType = BodyType.Html, Content = communication.BodyHtml },
+                ToRecipients = BuildRecipients(communication.ToAddress, communication.ToName),
+                CcRecipients = BuildRecipients(communication.CcAddresses, null),
+                BccRecipients = BuildRecipients(communication.BccAddresses, null),
+                ReplyTo = BuildRecipients(communication.FromAddress, communication.FromName),
+                Attachments = await BuildAttachmentsAsync(communication, cancellationToken),
+            };
+
+            var created = await graphClient.Users[mailboxAddress]
+                .Messages
+                .PostAsync(message, cancellationToken: cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(created?.Id))
+                return Result<string>.Failure("GRAPH_MESSAGE_NOT_CREATED", "Microsoft Graph did not return a message id.");
+
+            await graphClient.Users[mailboxAddress]
+                .Messages[created.Id]
+                .Send
+                .PostAsync(cancellationToken: cancellationToken);
+
+            return Result<string>.Success(created.Id);
+        }
+        catch (Exception ex)
+        {
+            return Result<string>.Failure("GRAPH_SEND_FAILED", ex.Message);
+        }
+    }
+
+    private (GraphServiceClient GraphClient, string MailboxAddress) CreateGraphClient()
+    {
+        var tenantId = _config["GraphApi:TenantId"]
+            ?? throw new InvalidOperationException("GraphApi:TenantId is not configured.");
+        var clientId = _config["GraphApi:ClientId"]
+            ?? throw new InvalidOperationException("GraphApi:ClientId is not configured.");
+        var clientSecret = _config["GraphApi:ClientSecret"]
+            ?? throw new InvalidOperationException("GraphApi:ClientSecret is not configured.");
+
+        var mailboxAddress = _config["GraphApi:MailboxAddress"]
+            ?? throw new InvalidOperationException("GraphApi:MailboxAddress is not configured.");
+
+        var graphClient = new GraphServiceClient(
+            new ClientSecretCredential(tenantId, clientId, clientSecret),
+            ["https://graph.microsoft.com/.default"]);
+
+        return (graphClient, mailboxAddress);
+    }
+
+    private async Task<List<GraphAttachment>?> BuildAttachmentsAsync(
+        OutboundCommunication communication,
+        CancellationToken cancellationToken)
+    {
+        if (communication.Attachments.Count == 0)
+            return null;
+
+        var attachmentIds = communication.Attachments
+            .Where(a => !a.IsDeleted)
+            .Select(a => a.AttachmentId)
+            .Distinct()
+            .ToList();
+
+        if (attachmentIds.Count == 0)
+            return null;
+
+        var attachments = await _db.Set<SimsAttachment>()
+            .AsNoTracking()
+            .Where(a => attachmentIds.Contains(a.Id))
+            .ToListAsync(cancellationToken);
+
+        var graphAttachments = new List<GraphAttachment>();
+        foreach (var attachment in attachments)
+        {
+            if (attachment.FileSizeBytes > SimpleAttachmentLimitBytes)
+                throw new InvalidOperationException($"{attachment.FileName} is too large to send as a simple email attachment.");
+
+            graphAttachments.Add(new FileAttachment
+            {
+                OdataType = "#microsoft.graph.fileAttachment",
+                Name = attachment.FileName,
+                ContentType = attachment.ContentType,
+                ContentBytes = await _blob.DownloadAsync(attachment.BlobPath),
+            });
+        }
+
+        return graphAttachments;
+    }
+
+    private static List<Recipient> BuildRecipients(string? addresses, string? displayName)
+    {
+        return SplitAddresses(addresses)
+            .Select((address, index) => new Recipient
+            {
+                EmailAddress = new EmailAddress
+                {
+                    Address = address,
+                    Name = index == 0 ? displayName : null,
+                }
+            })
+            .ToList();
+    }
+
+    private static IEnumerable<string> SplitAddresses(string? addresses)
+    {
+        if (string.IsNullOrWhiteSpace(addresses))
+            return [];
+
+        return addresses
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(a => !string.IsNullOrWhiteSpace(a));
+    }
+}

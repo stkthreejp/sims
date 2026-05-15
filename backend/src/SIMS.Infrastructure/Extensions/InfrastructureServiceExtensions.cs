@@ -85,6 +85,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IDocumentTemplateService, DocumentTemplateService>();
         services.AddScoped<IDocumentGenerationService, DocumentGenerationService>();
         services.AddScoped<IDocumentMergeService, DocumentMergeService>();
+        services.AddScoped<IOutboundEmailSenderService, GraphOutboundEmailSenderService>();
         services.AddScoped<IPolicyFormService, PolicyFormService>();
         services.AddScoped<IQuotePolicyFormSelectionService, QuotePolicyFormSelectionService>();
         services.AddScoped<IPolicyAssemblyService, PolicyAssemblyService>();

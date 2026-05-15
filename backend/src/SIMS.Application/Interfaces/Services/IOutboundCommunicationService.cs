@@ -11,4 +11,5 @@ public interface IOutboundCommunicationService
     Task<Result<OutboundCommunicationDto>> CreateDraftAsync(OutboundCommunicationCreateDto dto, Guid createdById);
     Task<Result<OutboundCommunicationDto>> UpdateDraftAsync(Guid id, OutboundCommunicationUpdateDto dto);
     Task<Result<OutboundCommunicationDto>> UpdateStatusAsync(Guid id, OutboundCommunicationStatusUpdateDto dto, Guid userId);
+    Task<Result<OutboundCommunicationDto>> SendAsync(Guid id, Guid userId);
 }

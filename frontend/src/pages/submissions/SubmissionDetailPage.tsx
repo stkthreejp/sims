@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, Check, FileText,
-  RefreshCw, AlertTriangle,
+  RefreshCw, AlertTriangle, Send,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
@@ -337,6 +337,18 @@ export function SubmissionDetailPage() {
       return [...rows, ...quoteRows.flat()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     },
     enabled: !!id && activeTab === 'activity',
+  })
+
+  const sendCommunicationMutation = useMutation({
+    mutationFn: (communicationId: string) => outboundCommunicationsApi.send(communicationId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-outbound-communications'] })
+      toast.success('Email sent')
+    },
+    onError: (e: any) => {
+      qc.invalidateQueries({ queryKey: ['submission-outbound-communications'] })
+      toast.error(e?.response?.data?.errorMessage ?? 'Failed to send email')
+    },
   })
 
   const defaultTerritoryCode = useMemo(() => {
@@ -1915,7 +1927,7 @@ export function SubmissionDetailPage() {
               </div>
             ) : (
               <table className="sd-table">
-                <thead><tr><th>Subject</th><th>To</th><th>From</th><th>Status</th><th>Attachments</th><th>Created</th></tr></thead>
+                <thead><tr><th>Subject</th><th>To</th><th>From</th><th>Status</th><th>Attachments</th><th>Created</th><th /></tr></thead>
                 <tbody>
                   {outboundCommunications.map((c) => (
                     <tr key={c.id}>
@@ -1925,6 +1937,19 @@ export function SubmissionDetailPage() {
                       <td><span className="sd-lob">{c.status}</span></td>
                       <td>{c.attachmentCount}</td>
                       <td>{new Date(c.createdAt).toLocaleString()}</td>
+                      <td>
+                        {(c.status === 'Draft' || c.status === 'Failed') && (
+                          <button
+                            type="button"
+                            className="sims-icon-btn hover:text-sky-600"
+                            title="Send email"
+                            disabled={sendCommunicationMutation.isPending}
+                            onClick={() => sendCommunicationMutation.mutate(c.id)}
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

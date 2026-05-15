@@ -53,4 +53,11 @@ public class OutboundCommunicationsController : ControllerBase
         var result = await _service.UpdateStatusAsync(id, dto, CurrentUserId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
+
+    [HttpPost("{id:guid}/send")]
+    public async Task<IActionResult> Send(Guid id)
+    {
+        var result = await _service.SendAsync(id, CurrentUserId);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
 }
