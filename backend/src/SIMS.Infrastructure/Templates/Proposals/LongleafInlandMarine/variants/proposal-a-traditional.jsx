@@ -17,6 +17,8 @@ const palA = {
 
 function ProposalA() {
   const p = window.PROPOSAL;
+  const includedEndorsements = (window.PROPOSAL_ENDORSEMENTS || []).filter(e => e.included);
+  const limitText = e => (e.limits || []).map(l => `${l.label}: ${l.value}`).join(' | ');
   return (
     <div className="propA-sheet">
       {/* HEADER */}
@@ -98,20 +100,16 @@ function ProposalA() {
           </div>
         </div>
 
-        <div className="propA-endorsements">
-          <div className="propA-endo">
-            <span>Debris Removal</span>
-            <b>{p.debris}</b>
+        {includedEndorsements.length > 0 ? (
+          <div className="propA-endorsements" style={{gridTemplateColumns: `repeat(${includedEndorsements.length}, 1fr)`}}>
+            {includedEndorsements.map((endorsement, i) => (
+              <div className="propA-endo" key={i}>
+                <span>{endorsement.name}</span>
+                <b>{limitText(endorsement)}</b>
+              </div>
+            ))}
           </div>
-          <div className="propA-endo">
-            <span>Rental Reimbursement</span>
-            <b>{p.rental}</b>
-          </div>
-          <div className="propA-endo">
-            <span>Towing &amp; Storage</span>
-            <b>{p.towing}</b>
-          </div>
-        </div>
+        ) : null}
       </section>
 
       {/* PREMIUM TABLE */}

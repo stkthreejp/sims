@@ -1,5 +1,6 @@
 using SIMS.Application.Interfaces.Services;
 using Syncfusion.HtmlConverter;
+using Syncfusion.Drawing;
 using Syncfusion.Pdf;
 using Syncfusion.Pdf.Graphics;
 
@@ -16,6 +17,8 @@ public class SyncfusionHtmlToPdfService : IHtmlToPdfService
             Margin = new PdfMargins { All = 0 },
             EnableJavaScript = true,
             AdditionalDelay = 1500,
+            MediaType = MediaType.Print,
+            ViewPortSize = new Size(816, 0),
         };
 
         using var document = converter.Convert(html, string.Empty);

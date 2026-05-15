@@ -536,12 +536,6 @@ public class ProposalGenerationService : IProposalGenerationService
         IReadOnlyList<object> forms)
     {
         var html = await File.ReadAllTextAsync(Path.Combine(templateDir, "index.html"));
-        var logoPath = Path.Combine(templateDir, "assets", "longleaf-logo.png");
-        if (File.Exists(logoPath))
-        {
-            var logo = Convert.ToBase64String(await File.ReadAllBytesAsync(logoPath));
-            html = html.Replace("assets/longleaf-logo.png", $"data:image/png;base64,{logo}");
-        }
 
         foreach (var css in new[]
         {
@@ -572,6 +566,13 @@ public class ProposalGenerationService : IProposalGenerationService
         {
             var content = await File.ReadAllTextAsync(Path.Combine(templateDir, "variants", jsx));
             html = html.Replace($"""<script type="text/babel" src="variants/{jsx}"></script>""", $"<script type=\"text/babel\">\n{content}\n</script>");
+        }
+
+        var logoPath = Path.Combine(templateDir, "assets", "longleaf-logo.png");
+        if (File.Exists(logoPath))
+        {
+            var logo = Convert.ToBase64String(await File.ReadAllBytesAsync(logoPath));
+            html = html.Replace("assets/longleaf-logo.png", $"data:image/png;base64,{logo}");
         }
 
         return html;
