@@ -411,15 +411,15 @@ export function PolicyDetailPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
         {/* Notes */}
-        <div className="bg-white border rounded-lg">
-          <div className="flex items-center justify-between px-5 py-4 border-b">
-            <h2 className="text-sm font-semibold text-slate-900">Notes ({notes.length})</h2>
+        <div className="sd-card overflow-hidden">
+          <div className="sd-card-head">
+            <h3>Notes <span className="cnt">{notes.length}</span></h3>
             {!showNoteForm && canCreateNotes && (
               <button
                 onClick={() => setShowNoteForm(true)}
-                className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                className="sd-btn outline sm"
               >
                 <Plus className="h-3.5 w-3.5" /> Add Note
               </button>
@@ -427,42 +427,42 @@ export function PolicyDetailPage() {
           </div>
 
           {showNoteForm && (
-            <div className="px-5 py-4 border-b bg-slate-50 space-y-3">
+            <div className="space-y-3 border-b px-5 py-4" style={{ background: 'var(--surface-2)', borderColor: 'var(--line-2)' }}>
               <input
                 type="text"
                 placeholder="Subject (optional)"
                 value={noteSubject}
                 onChange={(e) => setNoteSubject(e.target.value)}
-                className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="sims-input"
               />
               <textarea
                 placeholder="Note body *"
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
                 rows={3}
-                className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="sims-textarea"
               />
               <div className="flex gap-2">
                 <button
                   disabled={!noteBody.trim() || createNoteMutation.isPending}
                   onClick={() => createNoteMutation.mutate()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                  className="sd-btn primary sm"
                 >
                   <Check className="h-3.5 w-3.5" /> Save
                 </button>
-                <button onClick={() => { setShowNoteForm(false); setNoteSubject(''); setNoteBody('') }} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-white">
+                <button onClick={() => { setShowNoteForm(false); setNoteSubject(''); setNoteBody('') }} className="sd-btn outline sm">
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
               </div>
             </div>
           )}
 
-          <div className="divide-y">
+          <div>
             {sortedNotes.length === 0 && !showNoteForm && (
-              <p className="text-sm text-slate-400 px-5 py-8 text-center">No notes yet.</p>
+              <p className="px-5 py-8 text-center text-sm" style={{ color: 'var(--ink-4)' }}>No notes yet.</p>
             )}
             {sortedNotes.map((note) => (
-              <div key={note.id} className={`px-5 py-4 ${note.isPinned ? 'bg-yellow-50' : ''}`}>
+              <div key={note.id} className="border-b px-5 py-4 last:border-b-0" style={{ borderColor: 'var(--line-2)', background: note.isPinned ? 'var(--warn-bg)' : 'var(--surface)' }}>
                 {editingNote?.id === note.id ? (
                   <div className="space-y-2">
                     <input
@@ -470,23 +470,23 @@ export function PolicyDetailPage() {
                       placeholder="Subject (optional)"
                       value={editSubject}
                       onChange={(e) => setEditSubject(e.target.value)}
-                      className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="sims-input"
                     />
                     <textarea
                       value={editBody}
                       onChange={(e) => setEditBody(e.target.value)}
                       rows={3}
-                      className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className="sims-textarea"
                     />
                     <div className="flex gap-2">
                       <button
                         disabled={!editBody.trim() || updateNoteMutation.isPending}
                         onClick={() => updateNoteMutation.mutate(note)}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                        className="sd-btn primary sm"
                       >
                         <Check className="h-3 w-3" /> Save
                       </button>
-                      <button onClick={() => setEditingNote(null)} className="flex items-center gap-1.5 px-3 py-1 border rounded text-xs hover:bg-white">
+                      <button onClick={() => setEditingNote(null)} className="sd-btn outline sm">
                         <X className="h-3 w-3" /> Cancel
                       </button>
                     </div>
@@ -495,27 +495,27 @@ export function PolicyDetailPage() {
                   <>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        {note.subject && <p className="text-sm font-medium text-slate-900">{note.subject}</p>}
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap mt-0.5">{note.body}</p>
-                        <p className="text-xs text-slate-400 mt-1">
+                        {note.subject && <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{note.subject}</p>}
+                        <p className="mt-0.5 whitespace-pre-wrap text-sm" style={{ color: 'var(--ink-2)' }}>{note.body}</p>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--ink-4)' }}>
                           {note.createdByName} · {new Date(note.createdAt).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="flex gap-1 shrink-0">
+                      <div className="flex shrink-0 gap-1">
                         {canEditNotes && (
-                          <button onClick={() => togglePinMutation.mutate(note.id)} className="p-1 rounded hover:bg-slate-100">
+                          <button onClick={() => togglePinMutation.mutate(note.id)} className="sims-icon-btn">
                             {note.isPinned
                               ? <PinOff className="h-3.5 w-3.5 text-yellow-500" />
                               : <Pin className="h-3.5 w-3.5 text-slate-400" />}
                           </button>
                         )}
                         {canEditNotes && (
-                          <button onClick={() => { setEditingNote(note); setEditSubject(note.subject ?? ''); setEditBody(note.body) }} className="p-1 rounded hover:bg-slate-100">
+                          <button onClick={() => { setEditingNote(note); setEditSubject(note.subject ?? ''); setEditBody(note.body) }} className="sims-icon-btn">
                             <Pencil className="h-3.5 w-3.5 text-slate-400" />
                           </button>
                         )}
                         {canDeleteNotes && (
-                          <button onClick={() => { if (confirm('Delete note?')) deleteNoteMutation.mutate(note.id) }} className="p-1 rounded hover:bg-slate-100">
+                          <button onClick={() => { if (confirm('Delete note?')) deleteNoteMutation.mutate(note.id) }} className="sims-icon-btn hover:text-red-500">
                             <Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-500" />
                           </button>
                         )}
@@ -569,11 +569,11 @@ function PolicyIssuancePanel({
   const issued = packet?.isIssued
 
   return (
-    <div className="bg-white border rounded-lg overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+    <div className="sd-card overflow-hidden">
+      <div className="sd-card-head flex-wrap gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Policy issuance packet</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <h3>Policy issuance packet</h3>
+          <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-3)' }}>
             {issued
               ? `Issued ${packet?.issuedDate ? new Date(packet.issuedDate).toLocaleDateString() : ''}`
               : ready
@@ -582,34 +582,34 @@ function PolicyIssuancePanel({
           </p>
         </div>
         {issued ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+          <span className="sd-pill bound">
             <Check className="h-3.5 w-3.5" /> Issued
           </span>
         ) : (
           <button
             disabled={!canIssue || !ready || issuing}
             onClick={onIssue}
-            className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="sd-btn primary"
           >
             <Send className="h-3.5 w-3.5" /> Mark issued
           </button>
         )}
       </div>
-      <div className="px-5 py-4">
+      <div className="sd-card-body">
         {!packet ? (
           <div className="flex h-16 items-center justify-center"><LoadingSpinner /></div>
         ) : includedForms.length === 0 ? (
-          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+          <div className="rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
             Review the quote policy forms first. Once forms are included on the bound quote, they will appear here for issuance.
           </div>
         ) : (
-          <div className="divide-y rounded border">
+          <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>
             {includedForms.map((form) => (
-              <div key={form.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+              <div key={form.id} className="flex items-center gap-3 border-b px-3 py-2.5 text-sm last:border-b-0" style={{ borderColor: 'var(--line-2)' }}>
                 <span className="w-8 text-right font-mono text-xs font-semibold text-slate-400">{String(form.sequenceOrder).padStart(2, '0')}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-slate-800">{form.formName}</div>
-                  <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <div className="truncate font-medium" style={{ color: 'var(--ink)' }}>{form.formName}</div>
+                  <div className="mt-0.5 flex flex-wrap gap-2 text-xs" style={{ color: 'var(--ink-3)' }}>
                     <span className="font-mono">{form.formNumber}</span>
                     <span>{form.editionDate || '-'}</span>
                     <span>{form.formType}</span>
