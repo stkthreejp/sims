@@ -104,6 +104,8 @@ public class PolicyIssuancePacketDto
     public bool IsIssued { get; set; }
     public DateOnly? IssuedDate { get; set; }
     public int IncludedFormCount { get; set; }
+    public bool IsReady { get; set; }
+    public IReadOnlyList<string> ReadinessMessages { get; set; } = [];
     public IReadOnlyList<PolicyIssuanceFormDto> Forms { get; set; } = [];
 }
 
@@ -118,6 +120,9 @@ public class PolicyIssuanceFormDto
     public PolicyFormType FormType { get; set; }
     public bool IsIncluded { get; set; }
     public bool IsSystemGenerated { get; set; }
+    public string? FileName { get; set; }
+    public string ReadinessStatus { get; set; } = "Ready";
+    public string? ReadinessMessage { get; set; }
 }
 
 public class IssuePolicyDto

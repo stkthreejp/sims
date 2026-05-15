@@ -109,21 +109,16 @@ public class PolicyService : IPolicyService
 
         var forms = await Db.Set<QuotePolicyFormSelection>()
             .Include(f => f.PolicyFormTemplate)
+                .ThenInclude(t => t.FieldMappings)
             .Where(f => f.QuoteId == policy.BoundQuoteId)
             .OrderBy(f => f.SequenceOrder)
-            .Select(f => new PolicyIssuanceFormDto
-            {
-                Id = f.Id,
-                PolicyFormTemplateId = f.PolicyFormTemplateId,
-                FormNumber = f.PolicyFormTemplate.FormNumber,
-                FormName = f.PolicyFormTemplate.Name,
-                EditionDate = f.PolicyFormTemplate.EditionDate,
-                SequenceOrder = f.SequenceOrder,
-                FormType = f.FormType,
-                IsIncluded = f.IsIncluded,
-                IsSystemGenerated = f.IsSystemGenerated,
-            })
             .ToListAsync();
+
+        var formDtos = forms.Select(MapIssuanceForm).ToList();
+        var readinessMessages = formDtos
+            .Where(f => f.IsIncluded && f.ReadinessStatus == "Blocked" && !string.IsNullOrWhiteSpace(f.ReadinessMessage))
+            .Select(f => $"{f.FormNumber}: {f.ReadinessMessage!}")
+            .ToList();
 
         return Result<PolicyIssuancePacketDto>.Success(new PolicyIssuancePacketDto
         {
@@ -131,8 +126,10 @@ public class PolicyService : IPolicyService
             BoundQuoteId = policy.BoundQuoteId,
             IsIssued = policy.IssuedDate.HasValue,
             IssuedDate = policy.IssuedDate,
-            IncludedFormCount = forms.Count(f => f.IsIncluded),
-            Forms = forms,
+            IncludedFormCount = formDtos.Count(f => f.IsIncluded),
+            IsReady = readinessMessages.Count == 0 && formDtos.Any(f => f.IsIncluded),
+            ReadinessMessages = readinessMessages,
+            Forms = formDtos,
         });
     }
 
@@ -159,6 +156,8 @@ public class PolicyService : IPolicyService
             return Result<PolicyDto>.Failure(packet.ErrorCode ?? "ISSUANCE_PACKET_ERROR", packet.ErrorMessage ?? "Unable to load issuance packet.");
         if (packet.Value!.IncludedFormCount == 0)
             return Result<PolicyDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before issuing.");
+        if (!packet.Value.IsReady)
+            return Result<PolicyDto>.Failure("PACKET_NOT_READY", string.Join(" ", packet.Value.ReadinessMessages));
 
         var assembly = (IPolicyAssemblyService)_sp.GetService(typeof(IPolicyAssemblyService))!;
         var assemblyResult = await assembly.AssembleAndFileAsync(policyId, access.UserId);
@@ -196,9 +195,46 @@ public class PolicyService : IPolicyService
             return Result<GeneratedDocumentDto>.Failure(packet.ErrorCode ?? "ISSUANCE_PACKET_ERROR", packet.ErrorMessage ?? "Unable to load issuance packet.");
         if (packet.Value!.IncludedFormCount == 0)
             return Result<GeneratedDocumentDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before generating the preview packet.");
+        if (!packet.Value.IsReady)
+            return Result<GeneratedDocumentDto>.Failure("PACKET_NOT_READY", string.Join(" ", packet.Value.ReadinessMessages));
 
         var assembly = (IPolicyAssemblyService)_sp.GetService(typeof(IPolicyAssemblyService))!;
         return await assembly.AssembleAndFileAsync(policyId, access.UserId, isPreview: true);
+    }
+
+    private static PolicyIssuanceFormDto MapIssuanceForm(QuotePolicyFormSelection form)
+    {
+        var readiness = GetFormReadiness(form.PolicyFormTemplate);
+        return new PolicyIssuanceFormDto
+        {
+            Id = form.Id,
+            PolicyFormTemplateId = form.PolicyFormTemplateId,
+            FormNumber = form.PolicyFormTemplate.FormNumber,
+            FormName = form.PolicyFormTemplate.Name,
+            EditionDate = form.PolicyFormTemplate.EditionDate,
+            SequenceOrder = form.SequenceOrder,
+            FormType = form.FormType,
+            IsIncluded = form.IsIncluded,
+            IsSystemGenerated = form.IsSystemGenerated,
+            FileName = form.PolicyFormTemplate.FileName,
+            ReadinessStatus = readiness.Status,
+            ReadinessMessage = readiness.Message,
+        };
+    }
+
+    private static (string Status, string? Message) GetFormReadiness(PolicyFormTemplate template)
+    {
+        if (string.IsNullOrWhiteSpace(template.StoragePath) || string.IsNullOrWhiteSpace(template.FileName))
+            return ("Blocked", "No file has been uploaded for this form.");
+
+        var extension = Path.GetExtension(template.FileName).ToLowerInvariant();
+        if (extension is not ".pdf" and not ".doc" and not ".docx")
+            return ("Blocked", "Only PDF, DOC, and DOCX forms can be assembled.");
+
+        if (template.IsFillable && !template.FieldMappings.Any(m => !string.IsNullOrWhiteSpace(m.PdfFieldName) && !string.IsNullOrWhiteSpace(m.DataPath)))
+            return ("Warning", "Fillable PDF has no mapped fields; it will be included as uploaded.");
+
+        return ("Ready", null);
     }
 
     public async Task<Result<PolicyTransactionDto>> AddEndorsementAsync(

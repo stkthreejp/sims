@@ -111,6 +111,8 @@ export interface PolicyIssuancePacket {
   isIssued: boolean
   issuedDate: string | null
   includedFormCount: number
+  isReady: boolean
+  readinessMessages: string[]
   forms: PolicyIssuanceForm[]
 }
 
@@ -124,6 +126,9 @@ export interface PolicyIssuanceForm {
   formType: PolicyFormType
   isIncluded: boolean
   isSystemGenerated: boolean
+  fileName: string | null
+  readinessStatus: 'Ready' | 'Warning' | 'Blocked'
+  readinessMessage: string | null
 }
 
 export interface IssuePolicy {

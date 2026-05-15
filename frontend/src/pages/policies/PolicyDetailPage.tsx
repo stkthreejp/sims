@@ -581,7 +581,7 @@ function PolicyIssuancePanel({
 }) {
   const includedForms = packet?.forms.filter((form) => form.isIncluded) ?? []
   const excludedForms = packet?.forms.filter((form) => !form.isIncluded) ?? []
-  const ready = includedForms.length > 0
+  const ready = includedForms.length > 0 && (packet?.isReady ?? false)
   const issued = packet?.isIssued
 
   return (
@@ -592,8 +592,10 @@ function PolicyIssuancePanel({
           <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-3)' }}>
             {issued
               ? `Issued ${packet?.issuedDate ? new Date(packet.issuedDate).toLocaleDateString() : ''}`
-              : ready
+                : ready
                 ? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready for issuance review`
+                : includedForms.length > 0
+                  ? 'Packet needs attention before preview or issue'
                 : 'No included policy forms found yet'}
           </p>
         </div>
@@ -628,21 +630,35 @@ function PolicyIssuancePanel({
             Review the quote policy forms first. Once forms are included on the bound quote, they will appear here for issuance.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>
-            {includedForms.map((form) => (
-              <div key={form.id} className="flex items-center gap-3 border-b px-3 py-2.5 text-sm last:border-b-0" style={{ borderColor: 'var(--line-2)' }}>
-                <span className="w-8 text-right font-mono text-xs font-semibold text-slate-400">{String(form.sequenceOrder).padStart(2, '0')}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium" style={{ color: 'var(--ink)' }}>{form.formName}</div>
-                  <div className="mt-0.5 flex flex-wrap gap-2 text-xs" style={{ color: 'var(--ink-3)' }}>
-                    <span className="font-mono">{form.formNumber}</span>
-                    <span>{form.editionDate || '-'}</span>
-                    <span>{form.formType}</span>
+          <>
+            {!packet.isReady && packet.readinessMessages.length > 0 && (
+              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
+                {packet.readinessMessages[0]}
+              </div>
+            )}
+            <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>
+              {includedForms.map((form) => (
+                <div key={form.id} className="flex items-center gap-3 border-b px-3 py-2.5 text-sm last:border-b-0" style={{ borderColor: 'var(--line-2)' }}>
+                  <span className="w-8 text-right font-mono text-xs font-semibold text-slate-400">{String(form.sequenceOrder).padStart(2, '0')}</span>
+                  <ReadinessIcon status={form.readinessStatus} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium" style={{ color: 'var(--ink)' }}>{form.formName}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-2 text-xs" style={{ color: 'var(--ink-3)' }}>
+                      <span className="font-mono">{form.formNumber}</span>
+                      <span>{form.editionDate || '-'}</span>
+                      <span>{form.formType}</span>
+                      <span>{form.fileName || 'No file uploaded'}</span>
+                      {form.readinessMessage && (
+                        <span style={{ color: form.readinessStatus === 'Blocked' ? 'var(--bad-fg)' : 'var(--warn-fg)', fontWeight: 600 }}>
+                          {form.readinessMessage}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
         {excludedForms.length > 0 && (
           <p className="mt-3 text-xs text-slate-500">
@@ -651,6 +667,19 @@ function PolicyIssuancePanel({
         )}
       </div>
     </div>
+  )
+}
+
+function ReadinessIcon({ status }: { status: 'Ready' | 'Warning' | 'Blocked' }) {
+  if (status === 'Ready') {
+    return <Check className="h-4 w-4 shrink-0 text-green-700" />
+  }
+
+  return (
+    <AlertTriangle
+      className="h-4 w-4 shrink-0"
+      style={{ color: status === 'Blocked' ? 'var(--bad-fg)' : 'var(--warn-fg)' }}
+    />
   )
 }
 
