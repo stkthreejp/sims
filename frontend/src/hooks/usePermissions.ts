@@ -47,6 +47,7 @@ export function usePermissions() {
     canViewAgents: hasPermission('nav.agents'),
     canViewCarriers: hasPermission('nav.carriers'),
     canViewDocumentLibrary: hasPermission('nav.document-library'),
+    canViewComplianceDocumentation: hasPermission('nav.compliance-documentation'),
     canViewReports: hasPermission('nav.reports'),
     canViewBilling: hasPermission('nav.billing'),
     canViewRatingAdmin: hasPermission('nav.admin.rating'),

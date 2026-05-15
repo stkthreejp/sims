@@ -51,6 +51,12 @@ const InboxDetailPage = lazy(() => import('@/pages/inbox/InboxDetailPage').then(
 const DocumentLibraryPage = lazy(() => import('@/pages/documents/DocumentLibraryPage').then((m) => ({ default: m.DocumentLibraryPage })))
 const TemplateEditorPage = lazy(() => import('@/pages/documents/TemplateEditorPage').then((m) => ({ default: m.TemplateEditorPage })))
 
+// Compliance
+const ComplianceDocumentationPage = lazy(() => import('@/pages/compliance/ComplianceDocumentationPage').then((m) => ({ default: m.ComplianceDocumentationPage })))
+const ComplianceDocumentDetailPage = lazy(() => import('@/pages/compliance/ComplianceDocumentDetailPage').then((m) => ({ default: m.ComplianceDocumentDetailPage })))
+const ComplianceAttestationsPage = lazy(() => import('@/pages/compliance/ComplianceAttestationsPage').then((m) => ({ default: m.ComplianceAttestationsPage })))
+const ComplianceReviewsPage = lazy(() => import('@/pages/compliance/ComplianceReviewsPage').then((m) => ({ default: m.ComplianceReviewsPage })))
+
 // Tasks
 const TaskQueuePage = lazy(() => import('@/pages/tasks/TaskQueuePage').then((m) => ({ default: m.TaskQueuePage })))
 
@@ -179,6 +185,10 @@ export default function App() {
               <Route path="/document-library" element={<DocumentLibraryPage />} />
               <Route path="/document-library/new" element={<TemplateEditorPage />} />
               <Route path="/document-library/:id" element={<TemplateEditorPage />} />
+              <Route path="/compliance-documentation" element={<ComplianceDocumentationPage />} />
+              <Route path="/compliance-documentation/attestations" element={<ComplianceAttestationsPage />} />
+              <Route path="/compliance-documentation/reviews" element={<ComplianceReviewsPage />} />
+              <Route path="/compliance-documentation/:id" element={<ComplianceDocumentDetailPage />} />
 
               <Route path="/tasks" element={<TaskQueuePage />} />
 

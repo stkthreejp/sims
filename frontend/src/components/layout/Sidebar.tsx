@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2 } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
@@ -81,6 +81,7 @@ export function Sidebar() {
         {perms.canViewCarriers && <NavItem to="/carriers" label="Carriers" icon={ShieldCheck} />}
         {perms.canViewAgents && <NavItem to="/agents" label="Agents" icon={UserCheck} />}
         {perms.canViewReports && <NavItem to="/reports" label="Reports" icon={BarChart2} />}
+        {perms.canViewComplianceDocumentation && <NavItem to="/compliance-documentation" label="Compliance Docs" icon={FileCheck2} />}
 
         {perms.canViewBilling && (
           <>

@@ -92,6 +92,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IProposalGenerationService, ProposalGenerationService>();
         services.AddScoped<IHtmlToPdfService, SyncfusionHtmlToPdfService>();
         services.AddScoped<IOutboundCommunicationService, OutboundCommunicationService>();
+        services.AddScoped<IComplianceDocumentService, ComplianceDocumentService>();
         services.AddScoped<IInboundEmailService, InboundEmailService>();
         services.AddScoped<IEmailIngestionService, EmailIngestionService>();
         services.AddScoped<IGeminiExtractionService, GeminiExtractionService>();
@@ -222,6 +223,7 @@ public static class InfrastructureServiceExtensions
                 AppPermissions.UnderwritingManage, AppPermissions.AccountingManage,
                 AppPermissions.RatingManage, AppPermissions.ReportsView,
                 AppPermissions.NavSubmissions, AppPermissions.NavInbox, AppPermissions.NavReports,
+                AppPermissions.NavComplianceDocumentation,
             }),
             ["CSR"] = ("Customer service", new[] {
                 AppPermissions.InsuredsView, AppPermissions.InsuredsCreate, AppPermissions.InsuredsEdit,
@@ -263,6 +265,7 @@ public static class InfrastructureServiceExtensions
 
         await SeedLegalRequirementSectionsAsync(db);
         await SeedLegalTrackedSourcesAsync(db);
+        await SeedComplianceDocumentsAsync(db);
 
         // Optional first-admin bootstrap. Never seed a hard-coded password.
         var adminUserName = configuration["AdminBootstrap:UserName"] ?? "admin";
@@ -429,6 +432,46 @@ public static class InfrastructureServiceExtensions
 
             if (!exists)
                 db.LegalTrackedSources.Add(source);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedComplianceDocumentsAsync(ApplicationDbContext db)
+    {
+        var documents = new[]
+        {
+            ("IT Data Security Policy", "Security", "Policy", "Annual", new[] { "IT", "Data", "Security" }),
+            ("Business Continuity Plan", "Business Continuity", "Plan", "Annual", new[] { "BCP", "Operations" }),
+            ("Disaster Recovery Plan", "Business Continuity", "Plan", "Annual", new[] { "DR", "IT" }),
+            ("Incident Response Plan", "Security", "Plan", "Annual", new[] { "Security", "Incident Response" }),
+            ("Access Control Policy", "Security", "Policy", "Annual", new[] { "Access", "Identity" }),
+            ("Acceptable Use Policy", "IT", "Policy", "Annual", new[] { "IT", "Employees" }),
+            ("Vendor Management Policy", "Vendor Management", "Policy", "Annual", new[] { "Vendors", "Third Party" }),
+            ("Data Retention Policy", "Privacy", "Policy", "Annual", new[] { "Data", "Records" }),
+            ("Privacy Policy", "Privacy", "Policy", "Annual", new[] { "Privacy", "Data" }),
+            ("Change Management Procedure", "Operations", "Procedure", "Annual", new[] { "Change Management", "IT" }),
+            ("Backup and Recovery Procedure", "IT", "Procedure", "Annual", new[] { "Backup", "Recovery" }),
+            ("Security Awareness Training Procedure", "Security", "Procedure", "Annual", new[] { "Training", "Employees" })
+        };
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        foreach (var (title, category, type, cadence, tags) in documents)
+        {
+            var exists = await db.ComplianceDocuments.AnyAsync(d => d.Title == title);
+            if (exists)
+                continue;
+
+            db.ComplianceDocuments.Add(new ComplianceDocument
+            {
+                Title = title,
+                Category = category,
+                DocumentType = type,
+                ReviewCadence = cadence,
+                Status = "Draft",
+                NextReviewDate = today.AddMonths(3),
+                Tags = tags
+            });
         }
 
         await db.SaveChangesAsync();

@@ -74,6 +74,13 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<LegalSourceScanResult> LegalSourceScanResults => Set<LegalSourceScanResult>();
     public DbSet<LegalRequirementChangeLog> LegalRequirementChangeLogs => Set<LegalRequirementChangeLog>();
     public DbSet<LegiScanTrackedBill> LegiScanTrackedBills => Set<LegiScanTrackedBill>();
+    public DbSet<ComplianceDocument> ComplianceDocuments => Set<ComplianceDocument>();
+    public DbSet<ComplianceDocumentVersion> ComplianceDocumentVersions => Set<ComplianceDocumentVersion>();
+    public DbSet<ComplianceDocumentReview> ComplianceDocumentReviews => Set<ComplianceDocumentReview>();
+    public DbSet<ComplianceEvidence> ComplianceEvidence => Set<ComplianceEvidence>();
+    public DbSet<ComplianceAttestationCampaign> ComplianceAttestationCampaigns => Set<ComplianceAttestationCampaign>();
+    public DbSet<ComplianceAttestationRecipient> ComplianceAttestationRecipients => Set<ComplianceAttestationRecipient>();
+    public DbSet<ComplianceAuditLog> ComplianceAuditLogs => Set<ComplianceAuditLog>();
 
     // Rating
     public DbSet<EquipmentType> EquipmentTypes => Set<EquipmentType>();
@@ -194,6 +201,13 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<LegalSourceScanResult>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegalRequirementChangeLog>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<LegiScanTrackedBill>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceDocument>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceDocumentVersion>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceDocumentReview>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceEvidence>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceAttestationCampaign>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceAttestationRecipient>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceAuditLog>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaCarrierSnapshot>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaInspection>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaViolation>().HasQueryFilter(e => !e.IsDeleted);

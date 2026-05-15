@@ -42,6 +42,7 @@ public static class AppPermissions
     public const string NavAgents = "nav.agents";
     public const string NavCarriers = "nav.carriers";
     public const string NavDocumentLibrary = "nav.document-library";
+    public const string NavComplianceDocumentation = "nav.compliance-documentation";
     public const string NavReports = "nav.reports";
     public const string NavBilling = "nav.billing";
     public const string NavAdminRating = "nav.admin.rating";
@@ -90,6 +91,7 @@ public static class AppPermissions
         new(NavAgents, "Agents Section", "Navigation"),
         new(NavCarriers, "Carriers Section", "Navigation"),
         new(NavDocumentLibrary, "Document Library Section", "Navigation"),
+        new(NavComplianceDocumentation, "Compliance Documentation Section", "Navigation"),
         new(NavReports, "Reports Section", "Navigation"),
         new(NavBilling, "Accounting / Billing Section", "Navigation"),
         new(NavAdminRating, "Rating Engine Admin", "Navigation"),
