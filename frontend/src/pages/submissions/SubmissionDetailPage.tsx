@@ -922,9 +922,9 @@ export function SubmissionDetailPage() {
 
       {/* Extraction banner */}
       {showExtractionBanner && (
-        <div style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #f0d480', background: '#fdf8e1', padding: '12px 16px' }}>
+        <div style={{ marginBottom: 16, borderRadius: 'var(--r-lg)', border: '1px solid var(--warn-border)', background: 'var(--warn-bg)', padding: '12px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#7a5a0b' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--warn-fg)' }}>
               <AlertTriangle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
               <span>
                 {extractionState?.extractionStatus === 'DetectionFailed'
@@ -932,16 +932,16 @@ export function SubmissionDetailPage() {
                   : <><strong>AI extraction failed</strong> — attachment could not be read automatically. Re-run or fill in fields manually.</>}
               </span>
             </div>
-            <button onClick={() => setShowExtractionBanner(false)} style={{ background: 'none', border: 0, cursor: 'pointer', color: '#c07d10' }}><X size={15} /></button>
+            <button onClick={() => setShowExtractionBanner(false)} className="sims-icon-btn" title="Dismiss extraction alert"><X size={15} /></button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
             {extractionState?.extractionStatus === 'DetectionFailed' && (
-              <select value={reExtractLob} onChange={(e) => setReExtractLob(e.target.value)} style={{ ...inputStyle, width: 'auto' }}>
+              <select value={reExtractLob} onChange={(e) => setReExtractLob(e.target.value)} className="sims-select" style={{ width: 'auto' }}>
                 <option value="">— Select LOB hint —</option>
                 {ACTIVE_LOBS.map((l) => <option key={l} value={l}>{LOB_LABELS[l]}</option>)}
               </select>
             )}
-            <button onClick={() => reExtract.mutate()} disabled={reExtract.isPending} className="sd-btn outline sm" style={{ color: '#7a5a0b', borderColor: '#e8c97a' }}>
+            <button onClick={() => reExtract.mutate()} disabled={reExtract.isPending} className="sd-btn outline sm">
               <RefreshCw size={13} className={reExtract.isPending ? 'animate-spin' : ''} />
               {reExtract.isPending ? 'Re-extracting…' : 'Re-run Extraction'}
             </button>
@@ -950,7 +950,7 @@ export function SubmissionDetailPage() {
       )}
 
       {/* Back link */}
-      <Link to={`/insureds/${submission.insuredId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-3)', fontWeight: 500, marginBottom: 14, textDecoration: 'none' }}>
+      <Link to={`/insureds/${submission.insuredId}`} className="sd-btn ghost sm mb-3">
         <ArrowLeft size={13} /> {submission.insuredName}
       </Link>
 
@@ -969,11 +969,11 @@ export function SubmissionDetailPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={openSubmissionEditor} className="sd-btn">
+          <button onClick={openSubmissionEditor} className="sd-btn outline">
             <Pencil size={13} /> Edit submission
           </button>
           {canCreatePolicies && (
-            <button onClick={() => setShowGenerateModal(true)} className="sd-btn">
+            <button onClick={() => setShowGenerateModal(true)} className="sd-btn outline">
               <FileText size={13} /> Generate doc
             </button>
           )}
@@ -990,7 +990,7 @@ export function SubmissionDetailPage() {
         <section className="sd-card" style={{ marginTop: 14, marginBottom: 14 }}>
           <div className="sd-card-head">
             <h3>Edit submission</h3>
-            <button onClick={() => { setShowSubmissionEditor(false); setSubmissionForm(null) }} className="sd-btn ghost sm"><X size={13} /></button>
+            <button onClick={() => { setShowSubmissionEditor(false); setSubmissionForm(null) }} className="sims-icon-btn" title="Close editor"><X size={13} /></button>
           </div>
           <div className="sd-card-body">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
@@ -1082,7 +1082,7 @@ export function SubmissionDetailPage() {
             {submission.linesOfBusiness.length === 0
               ? <span style={{ color: 'var(--ink-4)', fontStyle: 'italic' }}>None</span>
               : submission.linesOfBusiness.map((l) => <span key={l} className="sd-lob">{LOB_SHORT[l] ?? l}</span>)}
-            <button type="button" onClick={() => setShowLobEditor((v) => !v)} className="sd-btn ghost sm" style={{ height: 22, padding: '0 6px' }}>
+            <button type="button" onClick={() => setShowLobEditor((v) => !v)} className="sd-btn outline sm" style={{ height: 22, padding: '0 8px' }}>
               Edit
             </button>
           </div>
@@ -1295,27 +1295,31 @@ export function SubmissionDetailPage() {
               </table>
             </div>
           ) : (
-            <div className="sd-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 118, gap: 10 }}>
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No loss history on file</p>
-              <button type="button" onClick={openLossHistory} className="sd-btn sm"><Plus size={13} /> Add loss year</button>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="No loss history on file"
+              description="Add annual loss history when it is available."
+              action={<button type="button" onClick={openLossHistory} className="sd-btn outline sm"><Plus size={13} /> Add loss year</button>}
+            />
           )}
         </section>
         <section className="sd-card">
           <div className="sd-card-head"><h3>UW Notes</h3></div>
-          <div className="sd-card-body" style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ink-2)' }}>
-            {submission.descriptionOfOperations
-              ? <p style={{ margin: 0 }}>{submission.descriptionOfOperations}</p>
-              : <p style={{ margin: 0, color: 'var(--ink-4)', fontStyle: 'italic' }}>No notes on file.</p>}
-            {submission.underwriterName && (
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--ink-3)' }}>
-                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>
-                  {submission.underwriterName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+          {submission.descriptionOfOperations ? (
+            <div className="sd-card-body" style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ink-2)' }}>
+              <p style={{ margin: 0 }}>{submission.descriptionOfOperations}</p>
+              {submission.underwriterName && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>
+                    {submission.underwriterName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <span><b style={{ color: 'var(--ink-2)' }}>{submission.underwriterName}</b></span>
                 </div>
-                <span><b style={{ color: 'var(--ink-2)' }}>{submission.underwriterName}</b></span>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState icon={FileText} title="No UW notes on file" description="Underwriting notes added to this submission will appear here." />
+          )}
         </section>
       </div>
 
