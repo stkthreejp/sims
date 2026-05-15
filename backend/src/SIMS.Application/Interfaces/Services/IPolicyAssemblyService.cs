@@ -5,5 +5,5 @@ namespace SIMS.Application.Interfaces.Services;
 
 public interface IPolicyAssemblyService
 {
-    Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId);
+    Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false);
 }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Accounting;
+using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.Policies;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
@@ -186,6 +187,18 @@ public class PolicyService : IPolicyService
 
         await Db.SaveChangesAsync();
         return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
+    public async Task<Result<GeneratedDocumentDto>> GenerateIssuancePacketPreviewAsync(Guid policyId, UserAccessScope access)
+    {
+        var packet = await GetIssuancePacketAsync(policyId, access);
+        if (!packet.IsSuccess)
+            return Result<GeneratedDocumentDto>.Failure(packet.ErrorCode ?? "ISSUANCE_PACKET_ERROR", packet.ErrorMessage ?? "Unable to load issuance packet.");
+        if (packet.Value!.IncludedFormCount == 0)
+            return Result<GeneratedDocumentDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before generating the preview packet.");
+
+        var assembly = (IPolicyAssemblyService)_sp.GetService(typeof(IPolicyAssemblyService))!;
+        return await assembly.AssembleAndFileAsync(policyId, access.UserId, isPreview: true);
     }
 
     public async Task<Result<PolicyTransactionDto>> AddEndorsementAsync(

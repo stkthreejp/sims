@@ -1,4 +1,5 @@
 using SIMS.Application.Common;
+using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.Policies;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Security;
@@ -11,6 +12,7 @@ public interface IPolicyService
     Task<IEnumerable<PolicyListItemDto>> GetByInsuredAsync(Guid insuredId, UserAccessScope access);
     Task<Result<PolicyDto>> GetByIdAsync(Guid id, UserAccessScope access);
     Task<Result<PolicyIssuancePacketDto>> GetIssuancePacketAsync(Guid policyId, UserAccessScope access);
+    Task<Result<GeneratedDocumentDto>> GenerateIssuancePacketPreviewAsync(Guid policyId, UserAccessScope access);
     Task<Result<PolicyDto>> IssueAsync(Guid policyId, IssuePolicyDto dto, UserAccessScope access);
 
     Task<Result<PolicyTransactionDto>> AddEndorsementAsync(Guid policyId, CreateEndorsementDto dto, UserAccessScope access);

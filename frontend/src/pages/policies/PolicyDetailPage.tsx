@@ -147,6 +147,16 @@ export function PolicyDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be issued'),
   })
 
+  const previewPacketMutation = useMutation({
+    mutationFn: () => policiesApi.generateIssuancePacketPreview(id!),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['attachments', 'Policy', policy?.boundQuoteId] })
+      window.open(result.url, '_blank', 'noopener,noreferrer')
+      toast.success('Policy packet preview generated')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy packet preview could not be generated'),
+  })
+
   if (isLoading) return <LoadingSpinner />
   if (!policy) return <p className="p-6 text-slate-500">Policy not found.</p>
 
@@ -381,6 +391,8 @@ export function PolicyDetailPage() {
         packet={issuancePacket}
         canIssue={canIssuePolicies && policy.status === 'Active' && !policy.issuedDate}
         issuing={issuePolicyMutation.isPending}
+        previewing={previewPacketMutation.isPending}
+        onPreview={() => previewPacketMutation.mutate()}
         onIssue={() => issuePolicyMutation.mutate()}
       />
 
@@ -556,11 +568,15 @@ function PolicyIssuancePanel({
   packet,
   canIssue,
   issuing,
+  previewing,
+  onPreview,
   onIssue,
 }: {
   packet?: PolicyIssuancePacket
   canIssue: boolean
   issuing: boolean
+  previewing: boolean
+  onPreview: () => void
   onIssue: () => void
 }) {
   const includedForms = packet?.forms.filter((form) => form.isIncluded) ?? []
@@ -586,13 +602,22 @@ function PolicyIssuancePanel({
             <Check className="h-3.5 w-3.5" /> Issued
           </span>
         ) : (
-          <button
-            disabled={!canIssue || !ready || issuing}
-            onClick={onIssue}
-            className="sd-btn primary"
-          >
-            <Send className="h-3.5 w-3.5" /> Mark issued
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              disabled={!canIssue || !ready || previewing}
+              onClick={onPreview}
+              className="sd-btn outline"
+            >
+              <FileText className="h-3.5 w-3.5" /> {previewing ? 'Generating...' : 'Preview packet'}
+            </button>
+            <button
+              disabled={!canIssue || !ready || issuing}
+              onClick={onIssue}
+              className="sd-btn primary"
+            >
+              <Send className="h-3.5 w-3.5" /> Mark issued
+            </button>
+          </div>
         )}
       </div>
       <div className="sd-card-body">

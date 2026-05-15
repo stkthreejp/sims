@@ -56,6 +56,14 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("{id:guid}/issuance-packet/preview")]
+    [Authorize(Policy = AppPermissions.PoliciesIssue)]
+    public async Task<IActionResult> GenerateIssuancePacketPreview(Guid id)
+    {
+        var result = await _policies.GenerateIssuancePacketPreviewAsync(id, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("{id:guid}/issue")]
     [Authorize(Policy = AppPermissions.PoliciesIssue)]
     public async Task<IActionResult> Issue(Guid id, [FromBody] IssuePolicyDto dto)

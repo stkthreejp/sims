@@ -3,6 +3,7 @@ import type { Policy, PolicyListItem, PolicyTransaction, CreateEndorsement, Issu
 import type { Quote } from '@/types/quote.types'
 import type { Note } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
+import type { GenerateDocumentResponse } from './documentGeneration.api'
 
 export const policiesApi = {
   getAll: (params: QueryParameters) =>
@@ -22,6 +23,9 @@ export const policiesApi = {
 
   getIssuancePacket: (id: string) =>
     apiClient.get<PolicyIssuancePacket>(`/policies/${id}/issuance-packet`).then((r) => r.data),
+
+  generateIssuancePacketPreview: (id: string) =>
+    apiClient.post<GenerateDocumentResponse>(`/policies/${id}/issuance-packet/preview`).then((r) => r.data),
 
   issue: (id: string, data: IssuePolicy) =>
     apiClient.post<Policy>(`/policies/${id}/issue`, data).then((r) => r.data),

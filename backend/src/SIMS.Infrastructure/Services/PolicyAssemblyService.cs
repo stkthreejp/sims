@@ -28,7 +28,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         _merge = merge;
     }
 
-    public async Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId)
+    public async Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false)
     {
         var policy = await _db.Policies
             .AsNoTracking()
@@ -77,7 +77,8 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             return Result<GeneratedDocumentDto>.Failure("PDF_MERGE_FAILED", $"Policy packet could not be assembled: {ex.Message}");
         }
 
-        var fileName = $"{SanitizeFileName(policy.PolicyNumber)}_PolicyPacket_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
+        var packetName = isPreview ? "PolicyPacketPreview" : "PolicyPacket";
+        var fileName = $"{SanitizeFileName(policy.PolicyNumber)}_{packetName}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
         await using var stream = new MemoryStream(packetBytes);
         var attachmentResult = await _attachments.CreateGeneratedAsync(
             DocumentEntityType.Policy,
@@ -87,7 +88,9 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             "application/pdf",
             packetBytes.LongLength,
             DocumentType.PolicyForm,
-            $"Issued policy packet for policy {policy.PolicyNumber} on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC.",
+            isPreview
+                ? $"Draft policy packet preview for policy {policy.PolicyNumber} generated on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC."
+                : $"Issued policy packet for policy {policy.PolicyNumber} on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC.",
             userId);
 
         if (!attachmentResult.IsSuccess || attachmentResult.Value == null)
