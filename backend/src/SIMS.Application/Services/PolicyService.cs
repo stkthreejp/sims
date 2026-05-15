@@ -228,8 +228,8 @@ public class PolicyService : IPolicyService
             return ("Blocked", "No file has been uploaded for this form.");
 
         var extension = Path.GetExtension(template.FileName).ToLowerInvariant();
-        if (extension is not ".pdf" and not ".doc" and not ".docx")
-            return ("Blocked", "Only PDF, DOC, and DOCX forms can be assembled.");
+        if (extension is not ".pdf" and not ".doc" and not ".docx" and not ".html" and not ".htm")
+            return ("Blocked", "Only PDF, DOC, DOCX, and HTML forms can be assembled.");
 
         if (template.IsFillable && !template.FieldMappings.Any(m => !string.IsNullOrWhiteSpace(m.PdfFieldName) && !string.IsNullOrWhiteSpace(m.DataPath)))
             return ("Warning", "Fillable PDF has no mapped fields; it will be included as uploaded.");

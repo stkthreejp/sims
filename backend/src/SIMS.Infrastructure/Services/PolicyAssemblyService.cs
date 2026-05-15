@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using System.Text;
 using SIMS.Application.Common;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
@@ -19,13 +20,15 @@ public class PolicyAssemblyService : IPolicyAssemblyService
     private readonly IBlobStorageService _blob;
     private readonly IAttachmentService _attachments;
     private readonly IDocumentMergeService _merge;
+    private readonly IHtmlToPdfService _htmlToPdf;
 
-    public PolicyAssemblyService(ApplicationDbContext db, IBlobStorageService blob, IAttachmentService attachments, IDocumentMergeService merge)
+    public PolicyAssemblyService(ApplicationDbContext db, IBlobStorageService blob, IAttachmentService attachments, IDocumentMergeService merge, IHtmlToPdfService htmlToPdf)
     {
         _db = db;
         _blob = blob;
         _attachments = attachments;
         _merge = merge;
+        _htmlToPdf = htmlToPdf;
     }
 
     public async Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false)
@@ -117,8 +120,23 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             ".pdf" => FillPdfFields(bytes, template, data.Values),
             ".docx" => ConvertWordToPdf(_merge.MergeDocx(bytes, data), FormatType.Docx),
             ".doc" => ConvertWordToPdf(bytes, FormatType.Doc),
-            _ => Result<byte[]>.Failure("UNSUPPORTED_FORM_FILE", "Only PDF, DOC, and DOCX forms can be assembled into policy packets."),
+            ".html" or ".htm" => await ConvertHtmlToPdf(bytes, data),
+            _ => Result<byte[]>.Failure("UNSUPPORTED_FORM_FILE", "Only PDF, DOC, DOCX, and HTML forms can be assembled into policy packets."),
         };
+    }
+
+    private async Task<Result<byte[]>> ConvertHtmlToPdf(byte[] bytes, DocumentMergeData data)
+    {
+        try
+        {
+            var html = Encoding.UTF8.GetString(bytes);
+            var merged = _merge.MergeHtml(html, data);
+            return Result<byte[]>.Success(await _htmlToPdf.ConvertAsync(merged));
+        }
+        catch (Exception ex)
+        {
+            return Result<byte[]>.Failure("HTML_CONVERSION_FAILED", $"HTML form could not be converted to PDF: {ex.Message}");
+        }
     }
 
     private static Result<byte[]> FillPdfFields(byte[] bytes, PolicyFormTemplate template, IReadOnlyDictionary<string, object?> data)
