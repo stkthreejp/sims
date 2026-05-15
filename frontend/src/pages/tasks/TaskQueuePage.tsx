@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { CheckSquare, AlertTriangle, Clock, ExternalLink } from 'lucide-react'
+import { AlertTriangle, CheckSquare, Clock, ExternalLink, Search } from 'lucide-react'
 import { tasksApi } from '@/api/tasks.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -11,18 +11,18 @@ import type { TaskInstanceListItem, TaskInstanceStatus, TaskPriority } from '@/t
 const STATUS_OPTIONS: TaskInstanceStatus[] = ['Open', 'InProgress', 'Blocked', 'Closed', 'Cancelled']
 const PRIORITY_OPTIONS: TaskPriority[] = ['High', 'Medium', 'Low']
 
-const PRIORITY_PILL: Record<TaskPriority, { bg: string; fg: string }> = {
-  High:   { bg: 'var(--pill-declined-bg)', fg: 'var(--pill-declined-fg)' },
-  Medium: { bg: 'var(--pill-inprog-bg)',   fg: 'var(--pill-inprog-fg)' },
-  Low:    { bg: 'var(--pill-draft-bg)',     fg: 'var(--pill-draft-fg)' },
+const PRIORITY_TONE: Record<TaskPriority, { bg: string; fg: string; border: string }> = {
+  High:   { bg: 'var(--pill-declined-bg)', fg: 'var(--pill-declined-fg)', border: 'var(--pill-declined-fg)' },
+  Medium: { bg: 'var(--pill-inprog-bg)',   fg: 'var(--pill-inprog-fg)',   border: 'var(--pill-inprog-fg)' },
+  Low:    { bg: 'var(--pill-draft-bg)',     fg: 'var(--pill-draft-fg)',    border: 'var(--line)' },
 }
 
-const STATUS_PILL: Record<TaskInstanceStatus, { bg: string; fg: string }> = {
-  Open:       { bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)' },
-  InProgress: { bg: 'var(--pill-inprog-bg)',   fg: 'var(--pill-inprog-fg)' },
-  Blocked:    { bg: 'var(--pill-declined-bg)', fg: 'var(--pill-declined-fg)' },
-  Closed:     { bg: 'var(--pill-bound-bg)',    fg: 'var(--pill-bound-fg)' },
-  Cancelled:  { bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)' },
+const STATUS_TONE: Record<TaskInstanceStatus, { label: string; bg: string; fg: string; border: string }> = {
+  Open:       { label: 'Open',        bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)',    border: 'var(--line)' },
+  InProgress: { label: 'In progress', bg: 'var(--pill-inprog-bg)',   fg: 'var(--pill-inprog-fg)',   border: 'rgba(27, 117, 186, 0.35)' },
+  Blocked:    { label: 'Blocked',     bg: '#fff0d6',                 fg: '#8a5a00',                 border: '#e4b85d' },
+  Closed:     { label: 'Closed',      bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)',    border: 'var(--line)' },
+  Cancelled:  { label: 'Cancelled',   bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)',    border: 'var(--line)' },
 }
 
 function entityUrl(task: TaskInstanceListItem) {
@@ -30,6 +30,14 @@ function entityUrl(task: TaskInstanceListItem) {
              : task.entityType === 'Policy'     ? '/policies'
              : '/insureds'
   return `${base}/${task.entityId}`
+}
+
+function taskAccent(task: TaskInstanceListItem) {
+  if (task.status === 'Blocked') return STATUS_TONE.Blocked.border
+  if (task.isOverdue) return 'rgba(155, 45, 31, 0.45)'
+  if (task.priority === 'High') return 'rgba(155, 45, 31, 0.28)'
+  if (task.status === 'InProgress') return STATUS_TONE.InProgress.border
+  return 'transparent'
 }
 
 export function TaskQueuePage() {
@@ -44,42 +52,62 @@ export function TaskQueuePage() {
     queryFn: tasksApi.getMyQueue,
   })
 
+  const counts = useMemo(() => ({
+    open: tasks.filter((t) => t.status === 'Open' || t.status === 'InProgress').length,
+    overdue: tasks.filter((t) => t.isOverdue).length,
+    blocked: tasks.filter((t) => t.status === 'Blocked').length,
+    closed: tasks.filter((t) => t.status === 'Closed').length,
+  }), [tasks])
+
   const filtered = tasks.filter((t) => {
     if (filterStatus && t.status !== filterStatus) return false
     if (filterPriority && t.priority !== filterPriority) return false
-    if (search && !t.taskTypeName.toLowerCase().includes(search.toLowerCase())) return false
+    if (search) {
+      const query = search.toLowerCase()
+      const target = `${t.taskTypeName} ${t.entityType} ${t.assignedUserName ?? ''}`.toLowerCase()
+      if (!target.includes(query)) return false
+    }
     return true
   })
 
   if (isLoading) return <LoadingSpinner />
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5 p-6">
       <PageHeader
-        title="My Task Queue"
-        subtitle={`${tasks.filter((t) => t.status === 'Open' || t.status === 'InProgress').length} open`}
+        title="Tasks"
+        subtitle={`${counts.open} open tasks in your queue`}
       />
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search tasks…"
-          className="border rounded-lg px-3 py-1.5 text-sm w-48"
-        />
+      <div className="grid gap-3 md:grid-cols-4">
+        <TaskMetric label="Open" value={counts.open} tone="open" />
+        <TaskMetric label="Overdue" value={counts.overdue} tone={counts.overdue > 0 ? 'attention' : 'muted'} />
+        <TaskMetric label="Blocked" value={counts.blocked} tone={counts.blocked > 0 ? 'warning' : 'muted'} />
+        <TaskMetric label="Closed" value={counts.closed} tone="muted" />
+      </div>
+
+      <div className="subs-toolbar flex-wrap">
+        <label className="subs-search">
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tasks..."
+            className="w-full border-0 bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
+          />
+        </label>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value as TaskInstanceStatus | '')}
-          className="border rounded-lg px-3 py-1.5 text-sm"
+          className="subs-filter"
         >
           <option value="">All statuses</option>
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_TONE[s].label}</option>)}
         </select>
         <select
           value={filterPriority}
           onChange={(e) => setFilterPriority(e.target.value as TaskPriority | '')}
-          className="border rounded-lg px-3 py-1.5 text-sm"
+          className="subs-filter"
         >
           <option value="">All priorities</option>
           {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -87,75 +115,68 @@ export function TaskQueuePage() {
         {(filterStatus || filterPriority || search) && (
           <button
             onClick={() => { setFilterStatus(''); setFilterPriority(''); setSearch('') }}
-            className="text-sm text-blue-600 hover:underline"
+            className="sd-btn ghost sm"
           >
             Clear filters
           </button>
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white border rounded-lg overflow-hidden">
+      <div className="subs-table-card">
         {filtered.length === 0 ? (
-          <div className="p-10 text-center text-slate-500 text-sm">
-            <CheckSquare className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+          <div className="p-10 text-center text-sm" style={{ color: 'var(--ink-3)' }}>
+            <CheckSquare className="mx-auto mb-2 h-8 w-8" style={{ color: 'var(--ink-4)' }} />
             {tasks.length === 0 ? 'No tasks assigned to you.' : 'No tasks match your filters.'}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="sd-table">
             <thead>
-              <tr className="border-b bg-slate-50 text-left text-xs text-slate-500 uppercase tracking-wide">
-                <th className="px-4 py-3">Task</th>
-                <th className="px-4 py-3">Priority</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Due Date</th>
-                <th className="px-4 py-3">Entity</th>
+              <tr>
+                <th>Task</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Due Date</th>
+                <th>Entity</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {filtered.map((task) => (
                 <tr
                   key={task.id}
                   onClick={() => setSelectedId(task.id)}
-                  className="hover:bg-slate-50 cursor-pointer"
+                  style={{ boxShadow: `inset 3px 0 0 ${taskAccent(task)}` }}
                 >
-                  <td className="px-4 py-3 font-medium text-slate-800">
+                  <td className="primary-cell">
                     <div className="flex items-center gap-2">
-                      {task.isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                      {task.isOverdue && <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: 'rgba(155, 45, 31, 0.78)' }} />}
                       {task.escalationLevel > 0 && (
-                        <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">
+                        <span className="rounded px-1.5 py-0.5 text-xs font-semibold" style={{ background: 'var(--pill-inprog-bg)', color: 'var(--pill-inprog-fg)' }}>
                           L{task.escalationLevel}
                         </span>
                       )}
                       {task.taskTypeName}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={{ background: PRIORITY_PILL[task.priority].bg, color: PRIORITY_PILL[task.priority].fg }}
-                    >
-                      {task.priority}
-                    </span>
+                  <td>
+                    <TonePill label={task.priority} tone={PRIORITY_TONE[task.priority]} />
                   </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={{ background: STATUS_PILL[task.status].bg, color: STATUS_PILL[task.status].fg }}
-                    >
-                      {task.status}
-                    </span>
+                  <td>
+                    <TonePill label={STATUS_TONE[task.status].label} tone={STATUS_TONE[task.status]} />
                   </td>
-                  <td className="px-4 py-3">
-                    <div className={`flex items-center gap-1 ${task.isOverdue ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
+                  <td>
+                    <div
+                      className="flex items-center gap-1"
+                      style={{ color: task.isOverdue ? 'rgba(155, 45, 31, 0.78)' : 'var(--ink-3)', fontWeight: task.isOverdue ? 600 : 500 }}
+                    >
                       <Clock className="h-3.5 w-3.5 shrink-0" />
                       {new Date(task.dueDate).toLocaleDateString()}
                     </div>
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <Link
                       to={entityUrl(task)}
-                      className="flex items-center gap-1 text-blue-600 hover:underline text-xs"
+                      className="flex items-center gap-1 text-xs font-medium"
+                      style={{ color: 'var(--accent)' }}
                     >
                       {task.entityType} <ExternalLink className="h-3 w-3" />
                     </Link>
@@ -174,6 +195,35 @@ export function TaskQueuePage() {
           onUpdated={() => qc.invalidateQueries({ queryKey: ['tasks', 'my-queue'] })}
         />
       )}
+    </div>
+  )
+}
+
+function TonePill({ label, tone }: { label: string; tone: { bg: string; fg: string } }) {
+  return (
+    <span
+      className="sd-pill"
+      style={{ background: tone.bg, color: tone.fg }}
+    >
+      {label}
+    </span>
+  )
+}
+
+function TaskMetric({ label, value, tone }: { label: string; value: number; tone: 'open' | 'attention' | 'warning' | 'muted' }) {
+  const color = tone === 'attention' ? 'rgba(155, 45, 31, 0.82)'
+    : tone === 'warning' ? '#8a5a00'
+    : tone === 'open' ? 'var(--pill-inprog-fg)'
+    : 'var(--ink-3)'
+
+  return (
+    <div className="subs-metric" style={{ borderColor: tone === 'muted' ? 'var(--line)' : 'var(--line)' }}>
+      <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 'var(--fs-xs)', fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase' }}>
+        {label}
+      </p>
+      <p style={{ margin: '3px 0 0', color, fontSize: 22, fontWeight: 650, lineHeight: 1.1 }}>
+        {value}
+      </p>
     </div>
   )
 }
