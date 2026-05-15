@@ -602,7 +602,7 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
               key={value}
               type="button"
               onClick={() => applyRadius(value)}
-              className={`rounded border px-2 py-1 text-xs font-medium ${radiusMiles === value ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+              className={`sd-btn sm ${radiusMiles === value ? 'primary' : 'outline'}`}
             >
               {value}
             </button>
@@ -614,7 +614,8 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
             onKeyDown={(e) => {
               if (e.key === 'Enter') applyRadius(Number(customRadius) || radiusMiles)
             }}
-            className="h-7 w-16 rounded border border-slate-200 px-2 text-right text-xs text-slate-700"
+            className="sims-input text-right"
+            style={{ width: 64, height: 28 }}
           />
           <span className="text-xs text-slate-500">mi</span>
         </div>
@@ -885,7 +886,7 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
             <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
             <p className="mt-1 text-xs text-slate-500">{isLoading ? 'Loading details...' : `${items.length} FMCSA event${items.length === 1 ? '' : 's'}`}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="sims-icon-btn">
             <X className="h-4 w-4" />
           </button>
         </div>

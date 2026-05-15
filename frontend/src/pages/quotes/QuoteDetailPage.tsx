@@ -394,7 +394,7 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
                     type="button"
                     disabled={saveMutation.isPending}
                     onClick={() => saveRows(forms.filter((_, rowIndex) => rowIndex !== index))}
-                    className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    className="sims-icon-btn hover:text-red-600 disabled:opacity-50"
                     title="Remove form"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -410,7 +410,8 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
             <select
               value={templateId}
               onChange={(e) => setTemplateId(e.target.value)}
-              className="min-w-64 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              className="sims-select"
+              style={{ minWidth: 256, width: 'auto' }}
             >
               <option value="">Add ad-hoc form...</option>
               {availableTemplates.map((template) => (
@@ -487,11 +488,12 @@ function ChecklistCard({ quoteId }: { quoteId: string }) {
               <button
                 disabled={item.completionSource === 'System' || toggleMutation.isPending}
                 onClick={() => toggleMutation.mutate({ itemId: item.id, isCompleted: !item.isCompleted })}
-                className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-default ${
-                  item.isCompleted
-                    ? 'border-emerald-500 bg-emerald-500 text-white'
-                    : 'border-slate-300 bg-white hover:border-sky-400'
-                }`}
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded transition-colors disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                style={{
+                  border: `1px solid ${item.isCompleted ? '#1b8754' : 'var(--line)'}`,
+                  background: item.isCompleted ? '#1b8754' : 'var(--surface)',
+                  color: item.isCompleted ? '#fff' : 'var(--ink-3)',
+                }}
               >
                 {item.isCompleted && <Check className="h-3 w-3" />}
               </button>
@@ -1187,18 +1189,22 @@ export function QuoteDetailPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex overflow-hidden rounded-md border border-amber-300 bg-white text-sm">
+              <div
+                className="flex overflow-hidden rounded-md bg-white text-sm"
+                style={{ border: '1px solid var(--line)' }}
+              >
                 <button
                   type="button"
                   onClick={() => setOverrideMode('dollar')}
-                  className={`px-3 py-2 ${overrideMode === 'dollar' ? 'bg-amber-700 text-white' : 'text-amber-800'}`}
+                  className={`px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${overrideMode === 'dollar' ? 'bg-sky-700 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   $ Give-back
                 </button>
                 <button
                   type="button"
                   onClick={() => setOverrideMode('rate')}
-                  className={`border-l border-amber-200 px-3 py-2 ${overrideMode === 'rate' ? 'bg-amber-700 text-white' : 'text-amber-800'}`}
+                  className={`px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${overrideMode === 'rate' ? 'bg-sky-700 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                  style={{ borderLeft: '1px solid var(--line)' }}
                 >
                   % New rate
                 </button>
@@ -1210,7 +1216,8 @@ export function QuoteDetailPage() {
                 value={overrideInput}
                 onChange={(e) => setOverrideInput(e.target.value)}
                 placeholder={overrideMode === 'dollar' ? 'e.g. 500' : 'e.g. 8.5'}
-                className="w-36 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-400"
+                className="sims-input"
+                style={{ width: 144 }}
               />
               <Btn
                 variant="primary"
@@ -1760,7 +1767,7 @@ export function QuoteDetailPage() {
                   ))}
                   <Link
                     to={`/submissions/${quote.submissionId}`}
-                    className="mt-2 flex w-full items-center justify-center rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                    className="sd-btn outline sm mt-2 w-full"
                   >
                     View all quotes
                   </Link>

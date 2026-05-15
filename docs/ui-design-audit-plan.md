@@ -154,3 +154,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-15 | Codex | Policy detail first pass | Applied the policy detail handoff direction to the main header, status/stage treatment, premium summary strip, detail card, and transaction table. Type check passed. |
 | 2026-05-15 | Codex | Shared documents section | Preserved the collapsible document-type headers while aligning the documents card, upload modal, bucket headers, rows, and row actions to SIMS shared styles. Type check passed. |
 | 2026-05-15 | Codex | Policy issuance and notes | Aligned the policy issuance packet and notes panel with SIMS card, form, button, and icon-action styles. Type check passed. |
+| 2026-05-15 | Codex | Quote detail button borders | Replaced raw bordered quote detail controls with SIMS button, icon button, select/input, and focus-ring styling. Type check passed. |
