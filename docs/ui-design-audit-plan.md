@@ -158,3 +158,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-15 | Codex | Quote detail final polish pass | Normalized remaining quote detail headings, UW condition actions, bind CTA focus state, and auto-safety chart button focus states. Type check passed. |
 | 2026-05-15 | Codex | Submission detail documents/activity | Removed nested card framing from the documents tab, added the activity tab count, and aligned the empty activity state to the shared SIMS empty-state pattern. Type check passed. |
 | 2026-05-15 | Codex | Submission detail tab empty states | Aligned quote, additional-interest, and prior-carrier empty states plus related row icon actions with shared SIMS patterns. Type check passed. |
+| 2026-05-15 | Codex | Submission detail exposures tab | Aligned driver, vehicle, equipment, and GL classification empty states plus row icon actions with shared SIMS patterns. Type check passed. |

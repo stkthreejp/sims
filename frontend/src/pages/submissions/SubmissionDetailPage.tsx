@@ -1399,7 +1399,7 @@ export function SubmissionDetailPage() {
                 <button className="sd-btn ghost sm" onClick={() => { setShowDriverForm(true); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }}><Plus size={12} /> Add</button>
               </div>
               {drivers.length === 0 && !showDriverForm ? (
-                <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No drivers added yet</div>
+                <EmptyState icon={FileText} title="No drivers added yet" description="Add scheduled drivers for auto submissions." />
               ) : (
                 <table className="sd-table">
                   <thead><tr><th>#</th><th>Name</th><th>DOB</th><th>License</th><th>State</th><th>Hired</th><th /></tr></thead>
@@ -1414,8 +1414,8 @@ export function SubmissionDetailPage() {
                         <td>{d.dateHired ?? '—'}</td>
                         <td style={{ padding: '8px 14px' }}>
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => { setDriverForm({ driverNumber: d.driverNumber, name: d.name, dateOfBirth: d.dateOfBirth ?? undefined, licenseNumber: d.licenseNumber ?? undefined, licenseState: d.licenseState ?? undefined, dateHired: d.dateHired ?? undefined }); setEditingDriverId(d.id); setShowDriverForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                            <button onClick={() => { if (confirm('Remove driver?')) deleteDriverMutation.mutate(d.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                            <button onClick={() => { setDriverForm({ driverNumber: d.driverNumber, name: d.name, dateOfBirth: d.dateOfBirth ?? undefined, licenseNumber: d.licenseNumber ?? undefined, licenseState: d.licenseState ?? undefined, dateHired: d.dateHired ?? undefined }); setEditingDriverId(d.id); setShowDriverForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit driver"><Pencil size={12} /></button>
+                            <button onClick={() => { if (confirm('Remove driver?')) deleteDriverMutation.mutate(d.id) }} className="sims-icon-btn hover:text-red-500" title="Remove driver"><Trash2 size={12} /></button>
                           </div>
                         </td>
                       </tr>
@@ -1469,7 +1469,7 @@ export function SubmissionDetailPage() {
                   <button className="sd-btn ghost sm" onClick={() => { setShowVehicleForm(true); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }}><Plus size={12} /> Add</button>
                 </div>
                 {vehicles.length === 0 && !showVehicleForm ? (
-                  <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No vehicles added yet</div>
+                  <EmptyState icon={FileText} title="No vehicles added yet" description="Add scheduled vehicles for auto submissions." />
                 ) : (
                   <table className="sd-table">
                     <thead><tr><th>Unit</th><th>Year / Make / Model</th><th>VIN</th><th>Class</th><th>GVW</th><th>Radius</th><th>Stated Value</th><th /></tr></thead>
@@ -1485,8 +1485,8 @@ export function SubmissionDetailPage() {
                           <td>{v.apdStatedValue ? formatCurrency(v.apdStatedValue) : '—'}</td>
                           <td style={{ padding: '8px 14px' }}>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined, apdVehicleClass: v.apdVehicleClass ?? undefined, apdRoadType: v.apdRoadType ?? undefined, apdAnnualMiles: v.apdAnnualMiles ?? undefined, apdOperationCode: v.apdOperationCode ?? undefined, apdState: v.apdState ?? undefined, apdStatedValue: v.apdStatedValue ?? undefined, apdCompDeductible: v.apdCompDeductible ?? undefined, apdCollDeductible: v.apdCollDeductible ?? undefined, apdDriverAgeCode: v.apdDriverAgeCode ?? undefined, apdDriverPointsCode: v.apdDriverPointsCode ?? undefined, apdDriverExpMod: v.apdDriverExpMod ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                              <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                              <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined, apdVehicleClass: v.apdVehicleClass ?? undefined, apdRoadType: v.apdRoadType ?? undefined, apdAnnualMiles: v.apdAnnualMiles ?? undefined, apdOperationCode: v.apdOperationCode ?? undefined, apdState: v.apdState ?? undefined, apdStatedValue: v.apdStatedValue ?? undefined, apdCompDeductible: v.apdCompDeductible ?? undefined, apdCollDeductible: v.apdCollDeductible ?? undefined, apdDriverAgeCode: v.apdDriverAgeCode ?? undefined, apdDriverPointsCode: v.apdDriverPointsCode ?? undefined, apdDriverExpMod: v.apdDriverExpMod ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit vehicle"><Pencil size={12} /></button>
+                              <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="sims-icon-btn hover:text-red-500" title="Remove vehicle"><Trash2 size={12} /></button>
                             </div>
                           </td>
                         </tr>
@@ -1589,7 +1589,7 @@ export function SubmissionDetailPage() {
                 <button type="button" className="sd-btn ghost sm" onClick={openNewEquipmentForm}><Plus size={12} /> Add</button>
               </div>
               {equipment.length === 0 && !showEquipmentForm ? (
-                <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No equipment scheduled yet</div>
+                <EmptyState icon={FileText} title="No equipment scheduled yet" description="Add scheduled equipment for Inland Marine submissions." />
               ) : (
                 <table className="sd-table">
                   <thead><tr><th>Item</th><th>Year / Make / Model</th><th>Type</th><th className="num">Value</th><th>Ded.</th><th>Sett.</th><th>Terr.</th><th /></tr></thead>
@@ -1608,8 +1608,8 @@ export function SubmissionDetailPage() {
                           <td>{eq.territoryCode ?? '—'}</td>
                           <td style={{ padding: '8px 14px' }}>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button type="button" onClick={() => { setEquipmentForm({ itemNumber: eq.itemNumber, year: eq.year ?? undefined, make: eq.make ?? undefined, model: eq.model ?? undefined, description: eq.description ?? undefined, serialNumber: eq.serialNumber ?? undefined, value: eq.value ?? undefined, equipmentTypeId: eq.equipmentTypeId, territoryCode: eq.territoryCode, deductible: eq.deductible, settlementBasis: eq.settlementBasis }); setEditingEquipmentId(eq.id); setShowEquipmentForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                              <button type="button" onClick={() => { if (confirm('Remove equipment item?')) deleteEquipmentMutation.mutate(eq.id) }} disabled={deleteEquipmentMutation.isPending} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                              <button type="button" onClick={() => { setEquipmentForm({ itemNumber: eq.itemNumber, year: eq.year ?? undefined, make: eq.make ?? undefined, model: eq.model ?? undefined, description: eq.description ?? undefined, serialNumber: eq.serialNumber ?? undefined, value: eq.value ?? undefined, equipmentTypeId: eq.equipmentTypeId, territoryCode: eq.territoryCode, deductible: eq.deductible, settlementBasis: eq.settlementBasis }); setEditingEquipmentId(eq.id); setShowEquipmentForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit equipment"><Pencil size={12} /></button>
+                              <button type="button" onClick={() => { if (confirm('Remove equipment item?')) deleteEquipmentMutation.mutate(eq.id) }} disabled={deleteEquipmentMutation.isPending} className="sims-icon-btn hover:text-red-500" title="Remove equipment"><Trash2 size={12} /></button>
                             </div>
                           </td>
                         </tr>
@@ -1696,7 +1696,7 @@ export function SubmissionDetailPage() {
                 )}
 
                 {glClassifications.length === 0 && !showGlClassForm ? (
-                  <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No GL classifications entered yet</div>
+                  <EmptyState icon={FileText} title="No GL classifications entered yet" description="Add class codes and exposures for General Liability submissions." />
                 ) : (
                   <table className="sd-table">
                     <thead><tr><th>Loc.</th><th>Class Code</th><th>Description</th><th>Premium Basis</th><th className="num">Exposure</th><th /></tr></thead>
@@ -1722,11 +1722,12 @@ export function SubmissionDetailPage() {
                                   setEditingGlClassId(classification.id)
                                   setShowGlClassForm(true)
                                 }}
-                                className="sd-btn ghost sm"
+                                className="sims-icon-btn hover:text-sky-600"
+                                title="Edit GL exposure"
                               >
                                 <Pencil size={12} />
                               </button>
-                              <button onClick={() => { if (confirm('Remove GL exposure?')) deleteGlClassMutation.mutate(classification.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                              <button onClick={() => { if (confirm('Remove GL exposure?')) deleteGlClassMutation.mutate(classification.id) }} className="sims-icon-btn hover:text-red-500" title="Remove GL exposure"><Trash2 size={12} /></button>
                             </div>
                           </td>
                         </tr>
