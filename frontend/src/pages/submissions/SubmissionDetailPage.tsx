@@ -808,12 +808,16 @@ export function SubmissionDetailPage() {
 
       {/* Quote rows */}
       {quotes.length === 0 && !showQuoteForm ? (
-        <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-          <div style={{ color: 'var(--ink-2)', fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>No quotes yet</div>
-          <button className="sd-btn sm" style={{ marginTop: 12 }} onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
-            <Plus size={13} /> Add Quote
-          </button>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="No quotes yet"
+          description="Add the first carrier quote for this submission."
+          action={
+            <button className="sd-btn outline sm" onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
+              <Plus size={13} /> Add Quote
+            </button>
+          }
+        />
       ) : (
         <div>
           {quotes.map((q) => (
@@ -845,8 +849,8 @@ export function SubmissionDetailPage() {
                   {q.status !== 'Bound' && (
                     <button
                       onClick={(e) => { e.stopPropagation(); if (confirm('Delete this quote?')) deleteQuoteMutation.mutate(q.id) }}
-                      className="sd-btn sm ghost"
-                      style={{ color: 'var(--bad-fg)' }}
+                      className="sims-icon-btn hover:text-red-500"
+                      title="Delete quote"
                     >
                       <Trash2 size={12} />
                     </button>
@@ -1802,10 +1806,14 @@ export function SubmissionDetailPage() {
               </div>
             )}
             {additionalInterests.length === 0 && !showAdditionalInterestForm ? (
-              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                <div style={{ color: 'var(--ink-2)', fontWeight: 600, marginBottom: 4 }}>No additional interests entered</div>
-                <button className="sd-btn outline sm" style={{ marginTop: 10 }} onClick={() => { setShowAdditionalInterestForm(true); setAdditionalInterestForm({ ...emptyAdditionalInterestForm(), lineOfBusiness: submission?.linesOfBusiness[0] ?? ACTIVE_LOBS[0] }); setEditingAdditionalInterestId(null) }}><Plus size={13} /> Add Interest</button>
-              </div>
+              <EmptyState
+                icon={FileText}
+                title="No additional interests entered"
+                description="Add additional insureds, loss payees, or waiver requests as needed."
+                action={
+                  <button className="sd-btn outline sm" onClick={() => { setShowAdditionalInterestForm(true); setAdditionalInterestForm({ ...emptyAdditionalInterestForm(), lineOfBusiness: submission?.linesOfBusiness[0] ?? ACTIVE_LOBS[0] }); setEditingAdditionalInterestId(null) }}><Plus size={13} /> Add Interest</button>
+                }
+              />
             ) : (
               <table className="sd-table">
                 <thead><tr><th>Name</th><th>LOB</th><th>Requested</th><th>Applies To</th><th>Address</th><th /></tr></thead>
@@ -1827,8 +1835,8 @@ export function SubmissionDetailPage() {
                         <td>{address || '-'}</td>
                         <td style={{ padding: '8px 14px' }}>
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => { setAdditionalInterestForm({ lineOfBusiness: a.lineOfBusiness, name: a.name, addressLine1: a.addressLine1 ?? undefined, addressLine2: a.addressLine2 ?? undefined, city: a.city ?? undefined, state: a.state ?? undefined, zipCode: a.zipCode ?? undefined, email: a.email ?? undefined, phone: a.phone ?? undefined, appliesToType: a.appliesToType, scheduledItemNumbers: a.scheduledItemNumbers ?? undefined, additionalInsured: a.additionalInsured, lossPayee: a.lossPayee, waiverOfSubrogation: a.waiverOfSubrogation, primaryNonContributory: a.primaryNonContributory, notes: a.notes ?? undefined }); setEditingAdditionalInterestId(a.id); setShowAdditionalInterestForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                            <button onClick={() => { if (confirm('Remove additional interest?')) deleteAdditionalInterestMutation.mutate(a.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                            <button onClick={() => { setAdditionalInterestForm({ lineOfBusiness: a.lineOfBusiness, name: a.name, addressLine1: a.addressLine1 ?? undefined, addressLine2: a.addressLine2 ?? undefined, city: a.city ?? undefined, state: a.state ?? undefined, zipCode: a.zipCode ?? undefined, email: a.email ?? undefined, phone: a.phone ?? undefined, appliesToType: a.appliesToType, scheduledItemNumbers: a.scheduledItemNumbers ?? undefined, additionalInsured: a.additionalInsured, lossPayee: a.lossPayee, waiverOfSubrogation: a.waiverOfSubrogation, primaryNonContributory: a.primaryNonContributory, notes: a.notes ?? undefined }); setEditingAdditionalInterestId(a.id); setShowAdditionalInterestForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit additional interest"><Pencil size={12} /></button>
+                            <button onClick={() => { if (confirm('Remove additional interest?')) deleteAdditionalInterestMutation.mutate(a.id) }} className="sims-icon-btn hover:text-red-500" title="Remove additional interest"><Trash2 size={12} /></button>
                           </div>
                         </td>
                       </tr>
@@ -1866,10 +1874,14 @@ export function SubmissionDetailPage() {
               </div>
             )}
             {priorCarriers.length === 0 && !showCarrierForm ? (
-              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                <div style={{ color: 'var(--ink-2)', fontWeight: 600, marginBottom: 4 }}>No prior carrier history</div>
-                <button className="sd-btn outline sm" style={{ marginTop: 10 }} onClick={() => { setShowCarrierForm(true); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null) }}><Plus size={13} /> Add Prior Carrier</button>
-              </div>
+              <EmptyState
+                icon={FileText}
+                title="No prior carrier history"
+                description="Add prior carrier details when they are available."
+                action={
+                  <button className="sd-btn outline sm" onClick={() => { setShowCarrierForm(true); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null) }}><Plus size={13} /> Add Prior Carrier</button>
+                }
+              />
             ) : (
               <>
                 <table className="sd-table">
@@ -1884,8 +1896,8 @@ export function SubmissionDetailPage() {
                         <td className="num">{p.premium != null ? fmtMoney(p.premium) : '—'}</td>
                         <td style={{ padding: '8px 14px' }}>
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => { setCarrierForm({ carrierName: p.carrierName, lineOfBusiness: p.lineOfBusiness ?? undefined, policyNumber: p.policyNumber ?? undefined, expirationDate: p.expirationDate ?? undefined, premium: p.premium ?? undefined }); setEditingCarrierId(p.id); setShowCarrierForm(true) }} className="sd-btn ghost sm"><Pencil size={12} /></button>
-                            <button onClick={() => { if (confirm('Remove prior carrier?')) deletePriorCarrierMutation.mutate(p.id) }} className="sd-btn ghost sm" style={{ color: 'var(--bad-fg)' }}><Trash2 size={12} /></button>
+                            <button onClick={() => { setCarrierForm({ carrierName: p.carrierName, lineOfBusiness: p.lineOfBusiness ?? undefined, policyNumber: p.policyNumber ?? undefined, expirationDate: p.expirationDate ?? undefined, premium: p.premium ?? undefined }); setEditingCarrierId(p.id); setShowCarrierForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit prior carrier"><Pencil size={12} /></button>
+                            <button onClick={() => { if (confirm('Remove prior carrier?')) deletePriorCarrierMutation.mutate(p.id) }} className="sims-icon-btn hover:text-red-500" title="Remove prior carrier"><Trash2 size={12} /></button>
                           </div>
                         </td>
                       </tr>
