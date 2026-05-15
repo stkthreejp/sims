@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Upload, Trash2, Download, FileText, ChevronDown, ChevronRight,
-  Paperclip, Loader2, Plus,
+  Paperclip, Loader2, Plus, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { attachmentsApi } from '@/api/attachments.api'
@@ -63,17 +63,22 @@ function UploadDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-        <h2 className="text-base font-semibold text-slate-800">Upload Document</h2>
+    <div className="sims-modal-backdrop">
+      <div className="sims-modal max-w-md">
+        <div className="sims-modal-head">
+          <h2 className="sims-modal-title">Upload document</h2>
+          <button type="button" onClick={onClose} className="sims-icon-btn" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-        {/* Document type */}
+        <div className="sims-modal-body space-y-4">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Document Type *</label>
+          <label className="sims-field-label">Document Type *</label>
           <select
             value={docType}
             onChange={(e) => setDocType(e.target.value as DocumentType)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="sims-select"
           >
             {DOCUMENT_TYPES_BY_ENTITY[entityType].map((t) => (
               <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t]}</option>
@@ -87,9 +92,11 @@ function UploadDialog({
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
-          className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-            dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-          }`}
+          className="cursor-pointer rounded-lg border border-dashed p-6 text-center transition-colors"
+          style={{
+            borderColor: dragging ? 'var(--accent)' : 'var(--line)',
+            background: dragging ? 'var(--accent-soft)' : 'var(--surface-2)',
+          }}
         >
           <input
             ref={fileRef}
@@ -107,40 +114,41 @@ function UploadDialog({
             </div>
           ) : (
             <div>
-              <Upload className="h-7 w-7 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">Drop file here or <span className="text-blue-600">browse</span></p>
-              <p className="text-xs text-slate-400 mt-1">Up to 50 MB</p>
+              <Upload className="mx-auto mb-2 h-7 w-7" style={{ color: 'var(--ink-4)' }} />
+              <p className="text-sm" style={{ color: 'var(--ink-3)' }}>Drop file here or <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>browse</span></p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--ink-4)' }}>Up to 50 MB</p>
             </div>
           )}
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Description <span className="text-slate-400">(optional)</span></label>
+          <label className="sims-field-label">Description <span className="normal-case tracking-normal text-slate-400">(optional)</span></label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="e.g. 2024 loss runs from prior carrier"
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="sims-input"
           />
         </div>
+        </div>
 
-        <div className="flex gap-2 pt-1">
+        <div className="sims-modal-foot">
+          <button
+            onClick={onClose}
+            className="sd-btn outline"
+          >
+            Cancel
+          </button>
           <button
             onClick={() => uploadMutation.mutate()}
             disabled={!selectedFile || uploadMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-40"
+            className="sd-btn primary"
           >
             {uploadMutation.isPending
               ? <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
               : <><Upload className="h-4 w-4" /> Upload</>
             }
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-slate-300 rounded-md text-sm hover:bg-slate-50"
-          >
-            Cancel
           </button>
         </div>
       </div>
@@ -182,12 +190,12 @@ function DocumentRow({
   }
 
   return (
-    <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 group">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="group flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[var(--hover)]">
+      <div className="flex min-w-0 items-center gap-3">
         <FileText className={`h-4 w-4 shrink-0 ${fileIconColor(attachment.contentType)}`} />
         <div className="min-w-0">
-          <p className="text-sm text-slate-800 truncate">{attachment.fileName}</p>
-          <div className="flex items-center gap-2 mt-0.5">
+          <p className="truncate text-sm font-medium" style={{ color: 'var(--ink)' }}>{attachment.fileName}</p>
+          <div className="mt-0.5 flex items-center gap-2">
             <span className="text-xs text-slate-400">{formatBytes(attachment.fileSizeBytes)}</span>
             {attachment.description && (
               <span className="text-xs text-slate-400 truncate">· {attachment.description}</span>
@@ -200,27 +208,27 @@ function DocumentRow({
       </div>
 
       {confirming ? (
-        <div className="flex items-center gap-1 shrink-0 ml-2">
+        <div className="ml-2 flex shrink-0 items-center gap-1">
           <span className="text-xs text-slate-500 mr-1">Delete?</span>
           <button
             onClick={() => { onDelete(); setConfirming(false) }}
-            className="px-2 py-1 rounded text-xs bg-red-600 text-white hover:bg-red-700"
+            className="sd-btn danger sm"
           >
             Yes
           </button>
           <button
             onClick={() => setConfirming(false)}
-            className="px-2 py-1 rounded text-xs border border-slate-300 hover:bg-slate-50"
+            className="sd-btn outline sm"
           >
             No
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 ml-2">
+        <div className="ml-2 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button
             onClick={handleDownload}
             disabled={downloading}
-            className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+            className="sims-icon-btn hover:text-sky-600"
             title="Download"
           >
             {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
@@ -228,7 +236,7 @@ function DocumentRow({
           {canDelete && (
             <button
               onClick={() => setConfirming(true)}
-              className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
+              className="sims-icon-btn hover:text-red-500"
               title="Delete"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -264,18 +272,19 @@ function DocumentZone({
   }, [defaultOpen])
 
   return (
-    <div className="border border-slate-200 rounded-lg overflow-hidden">
+    <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-controls={contentId}
-        className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors"
+        className="flex w-full items-center justify-between px-4 py-2.5 transition-colors hover:bg-[var(--hover)]"
+        style={{ background: 'var(--surface-2)' }}
       >
         <div className="flex items-center gap-2">
-          {open ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
-          <span className="text-sm font-medium text-slate-700">{label}</span>
+          {open ? <ChevronDown className="h-3.5 w-3.5" style={{ color: 'var(--ink-4)' }} /> : <ChevronRight className="h-3.5 w-3.5" style={{ color: 'var(--ink-4)' }} />}
+          <span className="text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>{label}</span>
           {attachments.length > 0 && (
-            <span className="px-1.5 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-medium">
+            <span className="rounded-full px-1.5 py-0.5 text-xs font-medium" style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}>
               {attachments.length}
             </span>
           )}
@@ -285,7 +294,7 @@ function DocumentZone({
       {open && (
         <div id={contentId} className="px-2 py-1">
           {attachments.length === 0 ? (
-            <p className="text-xs text-slate-400 px-3 py-2 italic">No documents uploaded</p>
+            <p className="px-3 py-2 text-xs" style={{ color: 'var(--ink-4)' }}>No documents uploaded</p>
           ) : (
             attachments.map((a) => (
               <DocumentRow key={a.id} attachment={a} onDelete={() => onDelete(a.id)} canDelete={canDelete} />
@@ -337,20 +346,20 @@ export function DocumentsSection({
   const totalCount = attachments.length
 
   return (
-    <div className="space-y-3">
+    <div className="sd-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Paperclip className="h-4 w-4 text-slate-400" />
-          <h2 className="text-base font-semibold text-slate-800">Documents</h2>
+      <div className="sd-card-head">
+        <h3>
+          <Paperclip className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />
+          Documents
           {totalCount > 0 && (
-            <span className="text-xs text-slate-400">({totalCount} file{totalCount !== 1 ? 's' : ''})</span>
+            <span className="cnt">{totalCount} file{totalCount !== 1 ? 's' : ''}</span>
           )}
-        </div>
+        </h3>
         {canUpload && (
           <button
             onClick={() => setShowUpload(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+            className="sd-btn primary sm"
           >
             <Plus className="h-3.5 w-3.5" /> Upload
           </button>
@@ -359,11 +368,11 @@ export function DocumentsSection({
 
       {/* Zones */}
       {isLoading ? (
-        <div className="flex items-center gap-2 py-4 text-sm text-slate-400">
+        <div className="flex items-center gap-2 px-4 py-5 text-sm" style={{ color: 'var(--ink-3)' }}>
           <Loader2 className="h-4 w-4 animate-spin" /> Loading documents…
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 p-4">
           {docTypes.map((t) => (
             <DocumentZone
               key={t}

@@ -101,7 +101,7 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Document library | Page | `/document-library` | Needs tweaking | Uses shared header but old list/card styling remains. | Medium |
 | Template editor page | Page | `/document-library/new`, `/document-library/:id` | Never updated | Older editor page shell and controls. | High |
 | Template editor | Editor surface | `frontend/src/components/editor/TemplateEditor.tsx` | Never updated | Large editor surface with old toolbar/control styling. | High |
-| Documents section | Panel | `frontend/src/components/documents/DocumentsSection.tsx` | Never updated | Old document list/upload styling. | High |
+| Documents section | Panel | `frontend/src/components/documents/DocumentsSection.tsx` | Needs tweaking | Collapsible document-type buckets preserved and restyled with SIMS card, modal, button, zone header, and row action treatment; needs browser review across policy/submission/insured/agent/carrier usage. | High |
 | Generate document modal | Modal | `frontend/src/components/documents/GenerateDocumentModal.tsx` | Good | Updated to SIMS modal, select, footer, and button patterns. | Low |
 | Cash balance badge | Shared accounting component | `frontend/src/components/accounting/CashBalanceBadge.tsx` | Needs tweaking | Needs visual confirmation; no strong token signals. | Low |
 | Billing activity | Page | `/billing/activity` | Needs tweaking | Uses shared header but many old tables/cards/buttons remain. | Medium |
@@ -152,3 +152,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-14 | Codex | Quote detail support panels | Aligned the bind modal, notes editor/actions, and documents table/actions with the shared SIMS modal, form, table, and icon-button styles. |
 | 2026-05-14 | Codex | Task queue page | Aligned the task queue with the task mockup direction using SIMS summary cards, search/filter controls, table styling, restrained status-based color cues, and clearly marked sample rows when the real queue is empty. Type check passed. |
 | 2026-05-15 | Codex | Policy detail first pass | Applied the policy detail handoff direction to the main header, status/stage treatment, premium summary strip, detail card, and transaction table. Type check passed. |
+| 2026-05-15 | Codex | Shared documents section | Preserved the collapsible document-type headers while aligning the documents card, upload modal, bucket headers, rows, and row actions to SIMS shared styles. Type check passed. |

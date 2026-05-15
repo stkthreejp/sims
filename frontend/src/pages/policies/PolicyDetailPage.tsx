@@ -530,7 +530,7 @@ export function PolicyDetailPage() {
       </div>
 
       {/* Documents */}
-      <div className="bg-white border rounded-lg p-5">
+      <div>
         <DocumentsSection entityType="Policy" entityId={policy.boundQuoteId} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
       </div>
     </div>
