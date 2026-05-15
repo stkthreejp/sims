@@ -6,13 +6,23 @@ import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
-import { POLICY_STATUS_LABELS, POLICY_STATUS_COLORS } from '@/types/policy.types'
+import { POLICY_STATUS_LABELS } from '@/types/policy.types'
 import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { usePermissions } from '@/hooks/usePermissions'
+
+const POLICY_STATUS_PILL: Record<Policy['status'], string> = {
+  Active: 'bound',
+  Renewed: 'quoted',
+  NonRenewed: 'expired',
+  Expired: 'expired',
+  Cancelled: 'cancelled',
+}
+
+const POLICY_STAGES = ['Bound', 'In Force', 'Renewal', 'Closed']
 
 export function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -144,28 +154,41 @@ export function PolicyDetailPage() {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
+  const daysRemaining = Math.ceil((new Date(policy.expirationDate).getTime() - Date.now()) / 86400000)
+  const activeStage = policy.status === 'Cancelled' || policy.status === 'NonRenewed' || policy.status === 'Expired'
+    ? 3
+    : daysRemaining <= 45 ? 2 : 1
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-2 text-sm text-slate-500">
+    <div className="space-y-5 p-6">
+      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink-3)' }}>
+        <Link to="/policies" className="hover:text-slate-900">Policies</Link>
+        <span>/</span>
         <Link to={`/insureds/${policy.insuredId}`} className="hover:text-slate-900">{policy.insuredName}</Link>
         <span>/</span>
-        <Link to={`/submissions/${policy.submissionId}`} className="hover:text-slate-900">{policy.submissionNumber}</Link>
-        <span>/</span>
-        <span className="text-slate-700">{policy.policyNumber}</span>
+        <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{policy.policyNumber}</span>
       </div>
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">{policy.policyNumber}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{policy.insuredName} · {policy.carrierName}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="m-0 text-[22px] font-semibold tracking-[-0.01em]" style={{ color: 'var(--ink)' }}>{policy.carrierName}</h1>
+            <span className="rounded-md px-2 py-1 font-mono text-xs" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>{policy.policyNumber}</span>
+            <span className={`sd-pill ${POLICY_STATUS_PILL[policy.status]}`}>{POLICY_STATUS_LABELS[policy.status]}</span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm" style={{ color: 'var(--ink-3)' }}>
+            <span className="sd-lob">{LOB_LABELS[policy.lineOfBusiness]}</span>
+            <span>Insured <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{policy.insuredName}</b></span>
+            <span>From submission <Link to={`/submissions/${policy.submissionId}`} style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>{policy.submissionNumber}</Link></span>
+            <span>Bound <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{formatDate(policy.boundDate)}</b></span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {policy.status === 'Active' && canEndorsePolicies && (
             <button
               onClick={() => setActionModal('endorse')}
-              className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm text-slate-700 hover:bg-slate-50"
+              className="sd-btn primary"
             >
               <FileSignature className="h-3.5 w-3.5" /> Endorse
             </button>
@@ -174,13 +197,13 @@ export function PolicyDetailPage() {
             <>
               <button
                 onClick={() => setActionModal('nonRenew')}
-                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm text-slate-700 hover:bg-slate-50"
+                className="sd-btn outline"
               >
                 <FileX2 className="h-3.5 w-3.5" /> Non-Renew
               </button>
               <button
                 onClick={() => setActionModal('cancel')}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 rounded text-sm text-red-700 hover:bg-red-50"
+                className="sd-btn danger"
               >
                 <Ban className="h-3.5 w-3.5" /> Cancel
               </button>
@@ -189,15 +212,34 @@ export function PolicyDetailPage() {
           {canCreatePolicies && (
             <button
               onClick={() => setShowGenerateModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm text-slate-700 hover:bg-slate-50"
+              className="sd-btn outline"
             >
               <FileText className="h-3.5 w-3.5" /> Generate Document
             </button>
           )}
-          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${POLICY_STATUS_COLORS[policy.status]}`}>
-            {POLICY_STATUS_LABELS[policy.status]}
-          </span>
         </div>
+      </div>
+
+      <div className="grid overflow-hidden rounded-xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+        {POLICY_STAGES.map((stage, index) => {
+          const done = index < activeStage
+          const active = index === activeStage
+          return (
+            <div
+              key={stage}
+              className="flex items-center justify-center gap-2 border-r px-3 py-2 text-xs font-semibold last:border-r-0"
+              style={{
+                borderColor: 'var(--line)',
+                background: done ? '#e8f2e9' : active ? 'var(--accent-soft)' : 'var(--surface)',
+                color: done ? '#1b6238' : active ? 'var(--accent-ink)' : 'var(--ink-3)',
+              }}
+            >
+              {done && <Check className="h-3.5 w-3.5" />}
+              <span className="font-mono text-[10px] opacity-70">{String(index + 1).padStart(2, '0')}</span>
+              {stage}
+            </div>
+          )
+        })}
       </div>
 
       {showGenerateModal && (
@@ -239,8 +281,19 @@ export function PolicyDetailPage() {
         />
       )}
 
+      <div className="grid gap-3 md:grid-cols-4">
+        <PolicyMetric label="Total premium" value={formatCurrency(policy.totalPremium)} helper={`Base ${formatCurrency(policy.premiumAmount)}`} hero />
+        <PolicyMetric label="Commission" value={formatCurrency(policy.agentCommissionAmount)} helper={`${(policy.agentCommissionRate * 100).toFixed(1)}% agent commission`} />
+        <PolicyMetric label="Limit / deductible" value={`${policy.limit != null ? formatCurrency(policy.limit) : '-'} / ${policy.deductible != null ? formatCurrency(policy.deductible) : '-'}`} helper="Current policy terms" />
+        <PolicyMetric label="Term" value={formatDate(policy.effectiveDate)} helper={`Expires ${formatDate(policy.expirationDate)} · ${Math.max(daysRemaining, 0)} days left`} />
+      </div>
+
       {/* Policy details */}
-      <div className="bg-white border rounded-lg p-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+      <div className="sd-card">
+        <div className="sd-card-head">
+          <h3>Policy details</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-4 p-5 text-sm md:grid-cols-4">
         <div>
           <p className="text-xs text-slate-500 mb-0.5">Line of Business</p>
           <p className="font-medium">{LOB_LABELS[policy.lineOfBusiness]}</p>
@@ -322,6 +375,7 @@ export function PolicyDetailPage() {
           </div>
         )}
       </div>
+      </div>
 
       <PolicyIssuancePanel
         packet={issuancePacket}
@@ -332,12 +386,12 @@ export function PolicyDetailPage() {
 
       {/* Transactions */}
       {policy.transactions.length > 0 && (
-        <div className="bg-white border rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b">
-            <h2 className="text-sm font-semibold text-slate-900">Transaction History</h2>
+        <div className="sd-card overflow-hidden">
+          <div className="sd-card-head">
+            <h3>Transaction history <span className="cnt">{policy.transactions.length}</span></h3>
           </div>
-          <table className="min-w-full divide-y divide-slate-100 text-sm">
-            <thead className="bg-slate-50">
+          <table className="sd-table">
+            <thead>
               <tr>
                 <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Txn #</th>
                 <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Type</th>
@@ -348,7 +402,7 @@ export function PolicyDetailPage() {
                 <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Processed By</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {policy.transactions.map((t) => (
                 <TransactionRows key={t.id} transaction={t} />
               ))}
@@ -483,6 +537,21 @@ export function PolicyDetailPage() {
   )
 }
 
+function PolicyMetric({ label, value, helper, hero = false }: { label: string; value: string; helper: string; hero?: boolean }) {
+  return (
+    <div className="sd-card p-4" style={{ background: hero ? 'var(--accent-soft)' : 'var(--surface)', borderColor: hero ? '#cfe0ef' : 'var(--line)' }}>
+      <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.04em]" style={{ color: 'var(--ink-3)' }}>{label}</p>
+      <p className="m-0 mt-1 truncate text-xl font-semibold tracking-[-0.01em]" style={{ color: hero ? 'var(--accent-ink)' : 'var(--ink)' }}>{value}</p>
+      <p className="m-0 mt-1 truncate text-xs" style={{ color: 'var(--ink-3)' }}>{helper}</p>
+    </div>
+  )
+}
+
+function formatDate(value: string | null) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString()
+}
+
 function PolicyIssuancePanel({
   packet,
   canIssue,
@@ -563,24 +632,22 @@ function PolicyIssuancePanel({
 function TransactionRows({ transaction: t }: { transaction: PolicyTransaction }) {
   return (
     <>
-      <tr className="hover:bg-slate-50">
-        <td className="px-5 py-2.5 font-mono text-xs text-slate-600">{t.transactionNumber}</td>
-        <td className="px-5 py-2.5 text-slate-700">{t.transactionType}</td>
-        <td className="px-5 py-2.5">
-          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-            t.status === 'Issued' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-          }`}>
+      <tr>
+        <td className="id">{t.transactionNumber}</td>
+        <td>{t.transactionType}</td>
+        <td>
+          <span className={`sd-pill ${t.status === 'Issued' ? 'bound' : 'inprogress'}`}>
             {t.status}
           </span>
         </td>
-        <td className="px-5 py-2.5 text-slate-500">{new Date(t.effectiveDate).toLocaleDateString()}</td>
-        <td className="px-5 py-2.5 text-right">
-          <span className={t.premiumChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+        <td>{formatDate(t.effectiveDate)}</td>
+        <td className="num">
+          <span style={{ color: t.premiumChange >= 0 ? 'var(--ink-2)' : 'var(--bad-fg)' }}>
             {t.premiumChange >= 0 ? '+' : ''}{formatCurrency(t.premiumChange)}
           </span>
         </td>
-        <td className="px-5 py-2.5 text-right font-medium text-slate-700">{formatCurrency(t.newTotalPremium)}</td>
-        <td className="px-5 py-2.5 text-slate-500">{t.processedByName}</td>
+        <td className="num font-medium">{formatCurrency(t.newTotalPremium)}</td>
+        <td>{t.processedByName}</td>
       </tr>
       {t.transactionType === 'Cancellation' && (
         <CancellationTransactionDetails transaction={t} />

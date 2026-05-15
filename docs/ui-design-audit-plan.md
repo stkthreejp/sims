@@ -83,7 +83,7 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Insured create | Page | `/insureds/new` | Needs tweaking | Older form layout and controls. | Medium |
 | Insured edit | Page | `/insureds/:id/edit` | Needs tweaking | Older form layout and controls. | Medium |
 | Policies list | Page | `/policies` | Needs tweaking | Uses shared header but older table/list styling remains. | Medium |
-| Policy detail | Page | `/policies/:id` | Never updated | Mostly older utility styling. | High |
+| Policy detail | Page | `/policies/:id` | Needs tweaking | First pass moved the header, status pill, stage bar, premium summary, policy details card, and transaction table toward the policy detail handoff; notes, issuance packet, documents, and legal/cancellation modules still need polish. | High |
 | Quote detail | Page | `/quotes/:quoteId` | Needs tweaking | Helper cards, headers, buttons, menu styling, status pill, bind modal, notes, documents table/actions, and inline LOB-specific UW writeup editor for IM, AL, APD, and GL moved toward SIMS style; deeper page sections still need visual pass. | High |
 | Quote writeup | Page | `/quotes/:quoteId/writeup` | Needs tweaking | Full writeup page now uses LOB-specific sections for IM, AL, APD, and GL and shares the quote detail writeup payload fields; remaining work is browser polish. | High |
 | Quote rating panel | Panel | `frontend/src/components/quotes/QuoteRatingPanel.tsx` | Needs tweaking | Main shell, equipment table, endorsement card, form controls, action buttons, and calculation card moved toward SIMS style; needs browser review. | High |
@@ -151,3 +151,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-14 | Codex | Full quote writeup page | Added the same LOB-specific UW writeup sections to the full writeup page so it matches quote detail behavior. Type check and backend build passed. |
 | 2026-05-14 | Codex | Quote detail support panels | Aligned the bind modal, notes editor/actions, and documents table/actions with the shared SIMS modal, form, table, and icon-button styles. |
 | 2026-05-14 | Codex | Task queue page | Aligned the task queue with the task mockup direction using SIMS summary cards, search/filter controls, table styling, restrained status-based color cues, and clearly marked sample rows when the real queue is empty. Type check passed. |
+| 2026-05-15 | Codex | Policy detail first pass | Applied the policy detail handoff direction to the main header, status/stage treatment, premium summary strip, detail card, and transaction table. Type check passed. |
