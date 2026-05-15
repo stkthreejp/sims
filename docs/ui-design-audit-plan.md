@@ -155,3 +155,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-15 | Codex | Shared documents section | Preserved the collapsible document-type headers while aligning the documents card, upload modal, bucket headers, rows, and row actions to SIMS shared styles. Type check passed. |
 | 2026-05-15 | Codex | Policy issuance and notes | Aligned the policy issuance packet and notes panel with SIMS card, form, button, and icon-action styles. Type check passed. |
 | 2026-05-15 | Codex | Quote detail button borders | Replaced raw bordered quote detail controls with SIMS button, icon button, select/input, and focus-ring styling. Type check passed. |
+| 2026-05-15 | Codex | Quote detail final polish pass | Normalized remaining quote detail headings, UW condition actions, bind CTA focus state, and auto-safety chart button focus states. Type check passed. |

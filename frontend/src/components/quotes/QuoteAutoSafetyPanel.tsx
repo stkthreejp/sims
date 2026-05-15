@@ -854,7 +854,7 @@ function TrendChart({
               type="button"
               key={bucket.label}
               onClick={() => onBucketClick(bucket)}
-              className="group flex h-32 flex-col justify-end rounded px-1 hover:bg-slate-50"
+              className="group flex h-32 flex-col justify-end rounded px-1 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
               title={`${bucket.label} months ago: ${bucket.outOfServiceCount} OOS / ${bucket.totalCount} total`}
             >
               <div className="relative mx-auto w-full max-w-9 rounded-t bg-emerald-500/80 transition group-hover:bg-emerald-600" style={{ height: `${totalHeight}px` }}>
@@ -866,7 +866,7 @@ function TrendChart({
       </div>
       <div className="mt-2 grid grid-cols-6 gap-2 text-center text-[11px] text-slate-500">
         {buckets.map((bucket) => (
-          <button key={bucket.label} type="button" onClick={() => onBucketClick(bucket)} className="rounded px-1 py-1 hover:bg-slate-50">
+          <button key={bucket.label} type="button" onClick={() => onBucketClick(bucket)} className="rounded px-1 py-1 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200">
             <div className="font-medium text-slate-600">{bucket.label}</div>
             <div>{bucket.outOfServiceCount}/{bucket.totalCount}</div>
             <div>{bucket.outOfServiceRate == null ? '-' : `${bucket.outOfServiceRate}%`}</div>

@@ -193,7 +193,7 @@ function InlineWriteupSection({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50"
+        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
       >
         <span className="font-mono text-[11px] font-semibold text-slate-400">{number}</span>
         <span className="text-sm font-semibold text-slate-800">{title}</span>
@@ -1184,7 +1184,7 @@ export function QuoteDetailPage() {
             <div className="mb-3 flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-amber-700" />
               <div>
-                <h2 className="text-sm font-semibold text-amber-900">Reduce agent commission</h2>
+                <h3 className="text-sm font-semibold text-amber-900">Reduce agent commission</h3>
                 <p className="text-xs text-amber-700">Carrier net and SMM commission stay unchanged. Agent give-back reduces total premium.</p>
               </div>
             </div>
@@ -1632,7 +1632,7 @@ export function QuoteDetailPage() {
                             className="sims-input h-8 flex-1"
                           />
                           {!writeupReadOnly && (
-                            <button type="button" className="sims-icon-btn danger" onClick={() => removeWriteupCondition(condition.id)} title="Remove condition">
+                            <button type="button" className="sims-icon-btn hover:text-red-500" onClick={() => removeWriteupCondition(condition.id)} title="Remove condition">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           )}
@@ -1689,7 +1689,7 @@ export function QuoteDetailPage() {
                 <button
                   disabled={!canBind}
                   onClick={() => canBind && setShowBind(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-white py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-white py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <CheckCircle2 className="h-4 w-4" /> Bind this quote
                 </button>
