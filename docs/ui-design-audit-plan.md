@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Audit the existing SIMS frontend against the May 2026 SIMS UI Guide and track which pages and components are already visually consistent, which need small adjustments, and which have not been updated to the guide yet.
+Audit the existing SIMS frontend against the May 2026 SIMS UI Guide and track which pages and components are already visually consistent, which need small adjustments, and which have not been updated to the guide yet. Starting 2026-05-15, the audit also tracks whether each frontend surface is wired to real backend data/actions.
 
-The current standard is **visual consistency with the guide**, not strict token-by-token compliance. Exact implementation cleanup can happen during the redesign pass.
+The current standard is **visual consistency with the guide** and **practical backend wiring**, not strict token-by-token compliance. Exact implementation cleanup can happen during the redesign pass.
 
 ## Source Of Truth
 
@@ -31,7 +31,7 @@ Include all visible frontend surfaces:
 
 Embedded UI must be tracked separately from the page that opens it. For example, a page can be marked good while its modal is marked needs tweaking or never updated.
 
-## Status Categories
+## UI Status Categories
 
 | Status | Meaning |
 |---|---|
@@ -39,6 +39,17 @@ Embedded UI must be tracked separately from the page that opens it. For example,
 | Needs tweaking | Mostly aligned or partially modernized, but has visible mismatches such as old buttons, spacing, tables, colors, cards, forms, or status treatments. |
 | Never updated | Still primarily uses the older visual language and does not read as part of the SIMS UI Guide system. |
 | Blocked / needs data | Cannot be fairly judged without a valid record, route state, backend data, or workflow setup. |
+
+## Backend Wiring Categories
+
+| Status | Meaning |
+|---|---|
+| Wired | Uses real backend API/data/actions for the intended workflow. |
+| Partially wired | Some real data/actions are connected, but part of the UI is static, placeholder, sample-only, or missing persistence. |
+| Not wired | UI exists but does not connect to a real backend endpoint/action yet. |
+| Mock/sample only | UI intentionally uses sample data for visual design and must be replaced before go-live. |
+| Needs verification | Wiring has not been checked yet or requires a valid record/workflow to confirm. |
+| Blocked / needs endpoint | Frontend need is clear, but the backend endpoint/data contract is missing or incomplete. |
 
 ## Audit Checklist
 
@@ -56,9 +67,23 @@ Use this checklist during the visual pass:
 - Icons use the established stroke style and inherit color from context.
 - No obvious old visual language dominates: `text-slate-*`, `text-gray-*`, `bg-blue-*`, `rounded-lg`, heavy shadows, nested cards, or oversized controls.
 
+## Backend Wiring Checklist
+
+Use this checklist during the wiring pass:
+
+- Page loads real data from the backend instead of hardcoded, sample, or stale local data.
+- Tables, cards, counts, tabs, and badges reflect backend data accurately.
+- Create, edit, delete, upload, download, generate, send, bind, issue, approve, and status-change buttons call real backend actions.
+- Forms persist all user-entered fields that appear meaningful in the UI.
+- Empty states distinguish between truly no data and data that failed to load.
+- Sample/mock data is clearly marked and tracked for removal before go-live.
+- API clients point to existing backend endpoints and handle loading/error states.
+- Backend endpoints that exist but are unused by the frontend are noted for follow-up.
+- Features blocked by missing endpoints are marked `Blocked / needs endpoint`.
+
 ## Working Audit Chart
 
-This first chart is a code-informed starting point. It should be confirmed and corrected during the browser visual audit.
+This first chart is a code-informed starting point. It should be confirmed and corrected during the browser visual audit. Existing rows created before the backend wiring track was added should be treated as `Needs verification` for wiring until back-checked.
 
 | Item | Type | Location | Current Status | Notes | Priority |
 |---|---|---|---|---|---|
@@ -131,11 +156,13 @@ This first chart is a code-informed starting point. It should be confirmed and c
 ## Recommended Rollout Order
 
 1. Confirm this chart visually in the browser and mark any route that is blocked by data.
-2. Fix shared primitives first: empty state, error state, loading spinner, address autocomplete, modal/drawer base patterns.
-3. Update high-visibility workflow pages: quote detail, quote writeup, policy detail, agent detail, carrier detail, inbox detail.
-4. Update embedded high-impact panels: quote rating, auto safety, documents section, template editor, generate document modal.
-5. Sweep list/create/edit pages: insureds, policies, agents, carriers, submissions create, document library.
-6. Bring billing and admin pages into alignment in batches by shared pattern: list/table pages first, then complex workflow pages.
+2. During each page pass, check visual consistency and backend wiring separately.
+3. Fix shared primitives first: empty state, error state, loading spinner, address autocomplete, modal/drawer base patterns.
+4. Update high-visibility workflow pages: quote detail, quote writeup, policy detail, agent detail, carrier detail, inbox detail.
+5. Update embedded high-impact panels: quote rating, auto safety, documents section, template editor, generate document modal.
+6. Sweep list/create/edit pages: insureds, policies, agents, carriers, submissions create, document library.
+7. Bring billing and admin pages into alignment in batches by shared pattern: list/table pages first, then complex workflow pages.
+8. Back-check pages already marked visually good for backend wiring and update rows as `Wired`, `Partially wired`, `Not wired`, or `Needs verification`.
 
 ## Visual Audit Progress
 
@@ -160,3 +187,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-15 | Codex | Submission detail tab empty states | Aligned quote, additional-interest, and prior-carrier empty states plus related row icon actions with shared SIMS patterns. Type check passed. |
 | 2026-05-15 | Codex | Submission detail exposures tab | Aligned driver, vehicle, equipment, and GL classification empty states plus row icon actions with shared SIMS patterns. Type check passed. |
 | 2026-05-15 | Codex | Submission detail final shell pass | Aligned extraction alert, page action buttons, editor close action, LOB editor trigger, loss-history empty state, and UW notes empty state. Type check passed. |
+| 2026-05-15 | Codex | Audit plan wiring track | Added backend wiring statuses and checklist; existing completed UI rows need wiring back-checks going forward. |
