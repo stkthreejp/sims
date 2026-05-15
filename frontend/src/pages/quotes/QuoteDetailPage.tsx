@@ -120,12 +120,12 @@ function CardHead({
 }: { title: React.ReactNode; count?: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="sd-card-head">
-      <h2>
+      <h3>
         {title}
         {count != null && (
           <span className="cnt">{count}</span>
         )}
-      </h2>
+      </h3>
       {right && <div className="flex items-center gap-2">{right}</div>}
     </div>
   )
