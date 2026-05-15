@@ -210,13 +210,13 @@ public class DocumentGenerationService : IDocumentGenerationService
         switch (entityType)
         {
             case TemplateEntityType.Quote:
-                await AddQuoteDataAsync(d, entityId);
+                await AddQuoteDataAsync(data, entityId);
                 break;
             case TemplateEntityType.Policy:
-                await AddPolicyDataAsync(d, entityId);
+                await AddPolicyDataAsync(data, entityId);
                 break;
             case TemplateEntityType.Submission:
-                await AddSubmissionDataAsync(d, entityId);
+                await AddSubmissionDataAsync(data, entityId);
                 break;
             case TemplateEntityType.Carrier:
                 await AddCarrierDataAsync(d, entityId);
@@ -229,14 +229,18 @@ public class DocumentGenerationService : IDocumentGenerationService
         return data;
     }
 
-    private async Task AddQuoteDataAsync(Dictionary<string, object?> d, Guid quoteId)
+    private async Task AddQuoteDataAsync(DocumentMergeData data, Guid quoteId)
     {
+        var d = data.Values;
         var quote = await Db.Set<Quote>()
             .Include(q => q.Carrier)
             .Include(q => q.Submission).ThenInclude(s => s.Insured)
             .Include(q => q.Submission).ThenInclude(s => s.Agent)
                 .ThenInclude(a => a!.Locations)
             .Include(q => q.Submission).ThenInclude(s => s.Underwriter)
+            .Include(q => q.Submission).ThenInclude(s => s.Equipment)
+                .ThenInclude(e => e.EquipmentType)
+            .Include(q => q.Submission).ThenInclude(s => s.AdditionalInterests)
             .FirstOrDefaultAsync(q => q.Id == quoteId)
             ?? throw new Exception("Quote not found.");
 
@@ -302,10 +306,13 @@ public class DocumentGenerationService : IDocumentGenerationService
         AddQuoteTagAliases(d, quote);
         AddInsuredTagAliases(d, insured);
         AddCarrierTagAliases(d, carrier);
+        AddSubmissionRepeatingValues(data, quote.Submission, quote.LineOfBusiness);
+        await AddPolicyFormRepeatingValuesAsync(data, quote.Id);
     }
 
-    private async Task AddPolicyDataAsync(Dictionary<string, object?> d, Guid policyId)
+    private async Task AddPolicyDataAsync(DocumentMergeData data, Guid policyId)
     {
+        var d = data.Values;
         var policy = await Db.Set<Policy>()
             .Include(p => p.Carrier)
             .Include(p => p.BoundQuote)
@@ -313,6 +320,9 @@ public class DocumentGenerationService : IDocumentGenerationService
             .Include(p => p.Submission).ThenInclude(s => s.Agent)
                 .ThenInclude(a => a!.Locations)
             .Include(p => p.Submission).ThenInclude(s => s.Underwriter)
+            .Include(p => p.Submission).ThenInclude(s => s.Equipment)
+                .ThenInclude(e => e.EquipmentType)
+            .Include(p => p.Submission).ThenInclude(s => s.AdditionalInterests)
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
             .FirstOrDefaultAsync(p => p.Id == policyId)
             ?? throw new Exception("Policy not found.");
@@ -396,6 +406,8 @@ public class DocumentGenerationService : IDocumentGenerationService
         AddQuoteTagAliases(d, quote);
         AddInsuredTagAliases(d, insured);
         AddCarrierTagAliases(d, carrier);
+        AddSubmissionRepeatingValues(data, policy.Submission, policy.LineOfBusiness);
+        await AddPolicyFormRepeatingValuesAsync(data, policy.BoundQuoteId);
 
         await AddLegalCancellationDataAsync(d, insured.State, cancellation?.CancellationLegalRequirementSnapshotJson);
     }
@@ -460,12 +472,16 @@ public class DocumentGenerationService : IDocumentGenerationService
         d["LegalCancellationRequirements"] = FormatLegalRows(rowDtos);
     }
 
-    private async Task AddSubmissionDataAsync(Dictionary<string, object?> d, Guid submissionId)
+    private async Task AddSubmissionDataAsync(DocumentMergeData data, Guid submissionId)
     {
+        var d = data.Values;
         var sub = await Db.Set<Submission>()
             .Include(s => s.Insured)
             .Include(s => s.Agent).ThenInclude(a => a!.Locations)
             .Include(s => s.Underwriter)
+            .Include(s => s.Equipment)
+                .ThenInclude(e => e.EquipmentType)
+            .Include(s => s.AdditionalInterests)
             .FirstOrDefaultAsync(s => s.Id == submissionId)
             ?? throw new Exception("Submission not found.");
 
@@ -498,6 +514,7 @@ public class DocumentGenerationService : IDocumentGenerationService
 
         d["Submission.SubmissionNumber"] = sub.SubmissionNumber;
         AddInsuredTagAliases(d, insured);
+        AddSubmissionRepeatingValues(data, sub, null);
     }
 
     private async Task AddCarrierDataAsync(Dictionary<string, object?> d, Guid carrierId)
@@ -597,6 +614,73 @@ public class DocumentGenerationService : IDocumentGenerationService
     {
         d["Carrier.Name"] = carrier.Name;
         d["Carrier.Naic"] = carrier.Naic;
+    }
+
+    private static void AddSubmissionRepeatingValues(DocumentMergeData data, Submission submission, PolicyLineOfBusiness? lineOfBusiness)
+    {
+        data.RepeatingValues["Equipment"] = submission.Equipment
+            .Where(e => !e.IsDeleted)
+            .OrderBy(e => e.ItemNumber)
+            .Select(e => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ItemNumber"] = e.ItemNumber,
+                ["Description"] = e.Description,
+                ["Year"] = e.Year,
+                ["Make"] = e.Make,
+                ["Model"] = e.Model,
+                ["SerialNumber"] = e.SerialNumber,
+                ["Value"] = e.Value,
+                ["Limit"] = e.Value,
+                ["Deductible"] = e.Deductible,
+                ["Location"] = string.Empty,
+                ["Territory"] = e.TerritoryCode,
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
+
+        data.RepeatingValues["AdditionalInterests"] = submission.AdditionalInterests
+            .Where(i => !i.IsDeleted && (!lineOfBusiness.HasValue || i.LineOfBusiness == lineOfBusiness.Value))
+            .OrderBy(i => i.Name)
+            .Select(i => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Name"] = i.Name,
+                ["Address"] = FormatAddress(i.AddressLine1, i.AddressLine2, i.City, i.State, i.ZipCode),
+                ["Types"] = FormatAdditionalInterestTypes(i),
+                ["LoanNumber"] = i.ScheduledItemNumbers,
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
+    }
+
+    private async Task AddPolicyFormRepeatingValuesAsync(DocumentMergeData data, Guid quoteId)
+    {
+        var forms = await Db.Set<QuotePolicyFormSelection>()
+            .AsNoTracking()
+            .Include(f => f.PolicyFormTemplate)
+            .Where(f => f.QuoteId == quoteId && f.IsIncluded)
+            .OrderBy(f => f.SequenceOrder)
+            .ToListAsync();
+
+        data.RepeatingValues["PolicyForms"] = forms
+            .Select(f => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["FormNumber"] = f.PolicyFormTemplate.FormNumber,
+                ["FormName"] = f.PolicyFormTemplate.Name,
+                ["EditionDate"] = f.PolicyFormTemplate.EditionDate,
+                ["Status"] = f.IsIncluded ? "Included" : "Excluded",
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
+    }
+
+    private static string FormatAddress(params string?[] parts)
+        => string.Join(", ", parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim()));
+
+    private static string FormatAdditionalInterestTypes(SubmissionAdditionalInterest interest)
+    {
+        var types = new List<string>();
+        if (interest.AdditionalInsured) types.Add("Additional Insured");
+        if (interest.LossPayee) types.Add("Loss Payee");
+        if (interest.WaiverOfSubrogation) types.Add("Waiver of Subrogation");
+        if (interest.PrimaryNonContributory) types.Add("Primary Non-Contributory");
+        return string.Join(", ", types);
     }
 
     private static string FormatLegalRows(IEnumerable<LegalRequirementSnapshotRow> rows)
