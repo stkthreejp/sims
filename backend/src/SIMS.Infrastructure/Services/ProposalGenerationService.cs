@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Attachments;
+using SIMS.Application.DTOs.OutboundCommunications;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
@@ -25,12 +26,18 @@ public class ProposalGenerationService : IProposalGenerationService
     private readonly ApplicationDbContext _db;
     private readonly IAttachmentService _attachments;
     private readonly IHtmlToPdfService _htmlToPdf;
+    private readonly IOutboundCommunicationService _outboundCommunications;
 
-    public ProposalGenerationService(ApplicationDbContext db, IAttachmentService attachments, IHtmlToPdfService htmlToPdf)
+    public ProposalGenerationService(
+        ApplicationDbContext db,
+        IAttachmentService attachments,
+        IHtmlToPdfService htmlToPdf,
+        IOutboundCommunicationService outboundCommunications)
     {
         _db = db;
         _attachments = attachments;
         _htmlToPdf = htmlToPdf;
+        _outboundCommunications = outboundCommunications;
     }
 
     public async Task<Result<string>> GenerateInlandMarineHtmlAsync(Guid quoteId)
@@ -183,30 +190,24 @@ public class ProposalGenerationService : IProposalGenerationService
         if (string.IsNullOrWhiteSpace(fromAddress))
             return Result<ProposalSendDraftDto>.Failure("MISSING_SENDER", "The underwriter does not have an email address.");
 
-        var insuredName = quote.Submission.Insured.DisplayName;
-        var communication = new OutboundCommunication
+        var draftResult = await _outboundCommunications.CreateDraftAsync(new OutboundCommunicationCreateDto
         {
             EntityType = OutboundCommunicationEntityType.Quote,
             EntityId = quoteId,
             ToAddress = recipientEmail.Trim(),
-            ToName = quote.Submission.Agent?.Name ?? insuredName,
+            ToName = quote.Submission.Agent?.Name ?? quote.Submission.Insured.DisplayName,
             FromAddress = fromAddress.Trim(),
             FromName = quote.Submission.Underwriter.FullName,
             SenderType = OutboundCommunicationSenderType.CurrentUser,
-            Subject = $"Inland Marine Proposal - {insuredName}",
-            BodyHtml = BuildProposalEmailBody(quote),
-            Status = OutboundCommunicationStatus.Draft,
-            CreatedById = userId,
-        };
-        communication.Attachments.Add(new OutboundCommunicationAttachment
-        {
-            AttachmentId = generatedResult.Value.Attachment.Id,
-        });
+            Subject = "Inland Marine Proposal - {{Insured.DisplayName}}",
+            BodyHtml = BuildProposalEmailBody(),
+            AttachmentIds = [generatedResult.Value.Attachment.Id],
+        }, userId);
 
-        _db.OutboundCommunications.Add(communication);
-        await _db.SaveChangesAsync();
+        if (!draftResult.IsSuccess || draftResult.Value == null)
+            return Result<ProposalSendDraftDto>.Failure(draftResult.ErrorCode ?? "EMAIL_DRAFT_FAILED", draftResult.ErrorMessage ?? "Proposal email draft could not be created.");
 
-        return Result<ProposalSendDraftDto>.Success(new ProposalSendDraftDto(generatedResult.Value, communication.Id));
+        return Result<ProposalSendDraftDto>.Success(new ProposalSendDraftDto(generatedResult.Value, draftResult.Value.Id));
     }
 
     private static object BuildProposalData(Quote quote, QuoteRatingSnapshot? snapshot)
@@ -602,21 +603,16 @@ public class ProposalGenerationService : IProposalGenerationService
         decimal premiumNum,
         string? note = null);
 
-    private static string BuildProposalEmailBody(Quote quote)
+    private static string BuildProposalEmailBody()
     {
-        var insuredName = HtmlEncoder.Default.Encode(quote.Submission.Insured.DisplayName);
-        var carrierName = HtmlEncoder.Default.Encode(quote.Carrier.Name);
-        var underwriterName = HtmlEncoder.Default.Encode(quote.Submission.Underwriter.FullName);
-        var premium = HtmlEncoder.Default.Encode(FormatMoney(quote.TotalPremium != 0m ? quote.TotalPremium : quote.PremiumAmount));
-
-        return $"""
-            <p>Please find attached our Inland Marine proposal for {insuredName}.</p>
-            <p><strong>Carrier:</strong> {carrierName}<br/>
-            <strong>Effective:</strong> {quote.EffectiveDate:MM/dd/yyyy}<br/>
-            <strong>Expiration:</strong> {quote.ExpirationDate:MM/dd/yyyy}<br/>
-            <strong>Total Premium:</strong> {premium}</p>
+        return """
+            <p>Please find attached our Inland Marine proposal for {{Insured.DisplayName}}.</p>
+            <p><strong>Carrier:</strong> {{Carrier.Name}}<br/>
+            <strong>Effective:</strong> {{Quote.EffectiveDate | MM/dd/yyyy}}<br/>
+            <strong>Expiration:</strong> {{Quote.ExpirationDate | MM/dd/yyyy}}<br/>
+            <strong>Total Premium:</strong> {{Quote.TotalPremium | currency}}</p>
             <p>Please review and let us know if you would like to bind coverage.</p>
-            <p>Thank you,<br/>{underwriterName}</p>
+            <p>Thank you,<br/>{{UnderwriterName}}</p>
             """;
     }
 

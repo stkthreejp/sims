@@ -919,8 +919,9 @@ export function QuoteDetailPage() {
     mutationFn: () => documentGenerationApi.createInlandMarineProposalSendDraft(quoteId!),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['quote-attachments', quoteId] })
+      qc.invalidateQueries({ queryKey: ['submission-outbound-communications', quote?.submissionId] })
       window.open(data.generatedDocument.url, '_blank', 'noopener,noreferrer')
-      toast.success('Proposal draft created and filed')
+      toast.success('Proposal PDF filed and email draft created')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to create proposal draft'),
   })
