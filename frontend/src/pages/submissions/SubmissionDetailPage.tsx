@@ -22,6 +22,7 @@ import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { EmptyState } from '@/components/common/EmptyState'
 import { formatCurrency } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
@@ -1322,7 +1323,7 @@ export function SubmissionDetailPage() {
           { key: 'additional-interests', label: 'Additional interests', count: additionalInterests.length > 0 ? additionalInterests.length : undefined },
           { key: 'prior-carriers', label: 'Prior carriers', count: priorCarriers.length > 0 ? priorCarriers.length : undefined },
           { key: 'documents', label: 'Documents' },
-          { key: 'activity', label: 'Activity' },
+          { key: 'activity', label: 'Activity', count: outboundCommunications.length > 0 ? outboundCommunications.length : undefined },
         ] as { key: Tab; label: string; count?: number }[]).map(({ key, label, count }) => (
           <button
             key={key}
@@ -1904,12 +1905,7 @@ export function SubmissionDetailPage() {
 
       {/* Documents tab */}
       {activeTab === 'documents' && (
-        <section className="sd-card">
-          <div className="sd-card-head"><h3>Documents</h3></div>
-          <div style={{ padding: '14px 16px' }}>
-            <DocumentsSection entityType="Submission" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
-          </div>
-        </section>
+        <DocumentsSection entityType="Submission" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
       )}
 
       {/* Activity tab */}
@@ -1918,9 +1914,11 @@ export function SubmissionDetailPage() {
           <div className="sd-card-head"><h3>Activity <span className="cnt">{outboundCommunications.length}</span></h3></div>
           <div className="sd-card-body tight">
             {outboundCommunications.length === 0 ? (
-              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                <div style={{ color: 'var(--ink-2)', fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>No communication activity recorded yet</div>
-              </div>
+              <EmptyState
+                icon={Send}
+                title="No communication activity recorded yet"
+                description="Generated and sent emails for this submission will appear here."
+              />
             ) : (
               <table className="sd-table">
                 <thead><tr><th>Subject</th><th>To</th><th>From</th><th>Status</th><th>Attachments</th><th>Created</th><th /></tr></thead>

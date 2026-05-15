@@ -156,3 +156,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-15 | Codex | Policy issuance and notes | Aligned the policy issuance packet and notes panel with SIMS card, form, button, and icon-action styles. Type check passed. |
 | 2026-05-15 | Codex | Quote detail button borders | Replaced raw bordered quote detail controls with SIMS button, icon button, select/input, and focus-ring styling. Type check passed. |
 | 2026-05-15 | Codex | Quote detail final polish pass | Normalized remaining quote detail headings, UW condition actions, bind CTA focus state, and auto-safety chart button focus states. Type check passed. |
+| 2026-05-15 | Codex | Submission detail documents/activity | Removed nested card framing from the documents tab, added the activity tab count, and aligned the empty activity state to the shared SIMS empty-state pattern. Type check passed. |
