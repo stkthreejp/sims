@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Calculator, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download,
-  Edit2, FileOutput, FileText, MoreHorizontal, Pin, Plus, RefreshCw,
-  Save, ShieldCheck, Trash2, TrendingDown, Upload, X,
+  Edit2, ExternalLink, FileOutput, FileText, MoreHorizontal, Pin, Plus, RefreshCw,
+  Save, Send, ShieldCheck, Trash2, TrendingDown, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
@@ -16,6 +16,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { attachmentsApi } from '@/api/attachments.api'
 import { documentGenerationApi } from '@/api/documentGeneration.api'
+import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { uwWriteupApi } from '@/api/uwWriteup.api'
 import type { IMWriteupPayload, WriteupCondition } from '@/types/uwWriteup.types'
 import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
@@ -830,6 +831,85 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 
+// ── Activity card ─────────────────────────────────────────────────────────────
+
+function ActivityCard({ quoteId }: { quoteId: string }) {
+  const qc = useQueryClient()
+
+  const { data: communications = [] } = useQuery({
+    queryKey: ['quote-outbound-communications', quoteId],
+    queryFn: () => outboundCommunicationsApi.getForEntity('Quote', quoteId),
+  })
+
+  const sendMutation = useMutation({
+    mutationFn: (communicationId: string) => outboundCommunicationsApi.send(communicationId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quote-outbound-communications', quoteId] })
+      toast.success('Email sent')
+    },
+    onError: (e: any) => {
+      qc.invalidateQueries({ queryKey: ['quote-outbound-communications', quoteId] })
+      toast.error(e?.response?.data?.errorMessage ?? 'Failed to send email')
+    },
+  })
+
+  return (
+    <Card>
+      <CardHead title="Activity" count={communications.length || undefined} />
+      {communications.length === 0 ? (
+        <p className="px-5 py-6 text-sm text-slate-400">No quote communication activity yet.</p>
+      ) : (
+        <table className="sd-table">
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>To</th>
+              <th>From</th>
+              <th>Status</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {communications.map((c) => (
+              <tr key={c.id}>
+                <td className="primary-cell">{c.subject}</td>
+                <td>{c.toName ? `${c.toName} <${c.toAddress}>` : c.toAddress}</td>
+                <td>{c.fromAddress}</td>
+                <td><span className="sd-lob">{c.status}</span></td>
+                <td>
+                  <div className="flex justify-end gap-1">
+                    {(c.status === 'Draft' || c.status === 'Failed') && (
+                      <button
+                        type="button"
+                        className="sims-icon-btn hover:text-sky-600"
+                        title="Send email"
+                        disabled={sendMutation.isPending}
+                        onClick={() => sendMutation.mutate(c.id)}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {c.status === 'Sent' && c.graphMessageWebLink && (
+                      <button
+                        type="button"
+                        className="sims-icon-btn hover:text-sky-600"
+                        title="Open in Outlook"
+                        onClick={() => window.open(c.graphMessageWebLink!, '_blank', 'noopener,noreferrer')}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  )
+}
+
 export function QuoteDetailPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const navigate = useNavigate()
@@ -919,7 +999,7 @@ export function QuoteDetailPage() {
     mutationFn: () => documentGenerationApi.createInlandMarineProposalSendDraft(quoteId!),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['quote-attachments', quoteId] })
-      qc.invalidateQueries({ queryKey: ['submission-outbound-communications', quote?.submissionId] })
+      qc.invalidateQueries({ queryKey: ['quote-outbound-communications', quoteId] })
       window.open(data.generatedDocument.url, '_blank', 'noopener,noreferrer')
       toast.success('Proposal PDF filed and email draft created')
     },
@@ -1580,6 +1660,9 @@ export function QuoteDetailPage() {
 
             {/* Documents */}
             <DocumentsCard quoteId={quoteId!} />
+
+            {/* Activity */}
+            <ActivityCard quoteId={quoteId!} />
 
             {/* Notes */}
             <NotesCard quoteId={quoteId!} />

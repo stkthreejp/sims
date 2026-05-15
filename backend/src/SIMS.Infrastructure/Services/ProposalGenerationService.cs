@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.OutboundCommunications;
@@ -27,17 +28,20 @@ public class ProposalGenerationService : IProposalGenerationService
     private readonly IAttachmentService _attachments;
     private readonly IHtmlToPdfService _htmlToPdf;
     private readonly IOutboundCommunicationService _outboundCommunications;
+    private readonly string? _mailboxAddress;
 
     public ProposalGenerationService(
         ApplicationDbContext db,
         IAttachmentService attachments,
         IHtmlToPdfService htmlToPdf,
-        IOutboundCommunicationService outboundCommunications)
+        IOutboundCommunicationService outboundCommunications,
+        IConfiguration config)
     {
         _db = db;
         _attachments = attachments;
         _htmlToPdf = htmlToPdf;
         _outboundCommunications = outboundCommunications;
+        _mailboxAddress = config["GraphApi:MailboxAddress"];
     }
 
     public async Task<Result<string>> GenerateInlandMarineHtmlAsync(Guid quoteId)
@@ -186,7 +190,9 @@ public class ProposalGenerationService : IProposalGenerationService
         if (string.IsNullOrWhiteSpace(recipientEmail))
             return Result<ProposalSendDraftDto>.Failure("MISSING_RECIPIENT", "No agent or insured email address is available for this proposal.");
 
-        var fromAddress = quote.Submission.Underwriter.Email;
+        var fromAddress = IsLocalPlaceholderEmail(quote.Submission.Underwriter.Email)
+            ? _mailboxAddress
+            : quote.Submission.Underwriter.Email;
         if (string.IsNullOrWhiteSpace(fromAddress))
             return Result<ProposalSendDraftDto>.Failure("MISSING_SENDER", "The underwriter does not have an email address.");
 
@@ -615,6 +621,9 @@ public class ProposalGenerationService : IProposalGenerationService
             <p>Thank you,<br/>{{UnderwriterName}}</p>
             """;
     }
+
+    private static bool IsLocalPlaceholderEmail(string? email)
+        => string.IsNullOrWhiteSpace(email) || email.EndsWith(".local", StringComparison.OrdinalIgnoreCase);
 
     private static string? ExtractState(string? address)
     {

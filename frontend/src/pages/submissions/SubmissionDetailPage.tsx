@@ -330,12 +330,8 @@ export function SubmissionDetailPage() {
   })
 
   const { data: outboundCommunications = [] } = useQuery({
-    queryKey: ['submission-outbound-communications', id, quotes.map((q) => q.id).join('|')],
-    queryFn: async () => {
-      const rows = await outboundCommunicationsApi.getForEntity('Submission', id!)
-      const quoteRows = await Promise.all(quotes.map((q) => outboundCommunicationsApi.getForEntity('Quote', q.id)))
-      return [...rows, ...quoteRows.flat()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    },
+    queryKey: ['submission-outbound-communications', id],
+    queryFn: () => outboundCommunicationsApi.getForEntity('Submission', id!),
     enabled: !!id && activeTab === 'activity',
   })
 

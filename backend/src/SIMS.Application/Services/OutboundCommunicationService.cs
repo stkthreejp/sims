@@ -167,7 +167,7 @@ public class OutboundCommunicationService : IOutboundCommunicationService
             return Result<OutboundCommunicationDto>.Failure("NOT_SENDABLE", "Only draft or failed communications can be sent.");
 
         var sendResult = await _emailSender.SendAsync(communication);
-        if (!sendResult.IsSuccess)
+        if (!sendResult.IsSuccess || sendResult.Value == null)
         {
             communication.Status = OutboundCommunicationStatus.Failed;
             communication.FailureReason = sendResult.ErrorMessage;
