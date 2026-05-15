@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Save, Upload, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { documentTemplatesApi } from '@/api/documentTemplates.api'
+import { policyFormsApi } from '@/api/policyForms.api'
 import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
@@ -45,6 +46,11 @@ export function TemplateEditorPage() {
     queryKey: ['document-templates', id],
     queryFn: () => documentTemplatesApi.getById(id!),
     enabled: !isNew,
+  })
+
+  const { data: approvedTags = [] } = useQuery({
+    queryKey: ['policy-form-tags'],
+    queryFn: policyFormsApi.getTags,
   })
 
   // Populate form when template loads
@@ -276,6 +282,7 @@ export function TemplateEditorPage() {
             setIsDirty(true)
           }}
           entityType={entityType}
+          approvedTags={approvedTags}
         />
       </div>
     </div>

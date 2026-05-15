@@ -11,7 +11,7 @@ import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Placeholder from '@tiptap/extension-placeholder'
 import { TagNode } from './TagNode'
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   Bold, Italic, Underline as UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
   AlignJustify, List, ListOrdered, Image as ImageIcon, Table as TableIcon,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { TemplateEntityType, TagGroup } from '@/lib/templateTags'
 import { TEMPLATE_TAGS } from '@/lib/templateTags'
+import type { DocumentTag } from '@/types/policyForm.types'
 
 // ── Toolbar button ─────────────────────────────────────────────────────────────
 function ToolbarBtn({
@@ -145,10 +146,26 @@ interface TemplateEditorProps {
   content: string
   onChange: (html: string) => void
   entityType: TemplateEntityType
+  approvedTags?: DocumentTag[]
 }
 
-export function TemplateEditor({ content, onChange, entityType }: TemplateEditorProps) {
-  const tagGroups = TEMPLATE_TAGS[entityType] ?? TEMPLATE_TAGS.General
+export function TemplateEditor({ content, onChange, entityType, approvedTags = [] }: TemplateEditorProps) {
+  const tagGroups = useMemo<TagGroup[]>(() => {
+    if (approvedTags.length === 0) return TEMPLATE_TAGS[entityType] ?? TEMPLATE_TAGS.General
+
+    const groups = approvedTags
+      .filter((tag) => !tag.isRepeatable)
+      .reduce<Record<string, TagGroup>>((acc, tag) => {
+        acc[tag.category] ??= { label: tag.category, tags: [] }
+        acc[tag.category].tags.push({
+          name: tag.defaultFormat ? `${tag.tag} | ${tag.defaultFormat}` : tag.tag,
+          description: tag.label,
+        })
+        return acc
+      }, {})
+
+    return [...Object.values(groups), ...(TEMPLATE_TAGS.General ?? [])]
+  }, [approvedTags, entityType])
 
   const editor = useEditor({
     extensions: [
