@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   Bold, Italic, Underline as UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
   AlignJustify, List, ListOrdered, Image as ImageIcon, Table as TableIcon,
-  Undo, Redo, ChevronDown, Tag,
+  Undo, Redo, ChevronDown, Tag, Rows3,
 } from 'lucide-react'
 import type { TemplateEntityType, TagGroup } from '@/lib/templateTags'
 import { TEMPLATE_TAGS } from '@/lib/templateTags'
@@ -141,6 +141,67 @@ function TagPicker({
   )
 }
 
+function RepeatBlockPicker({
+  blocks,
+  onInsert,
+}: {
+  blocks: Record<string, DocumentTag[]>
+  onInsert: (blockName: string, tags: DocumentTag[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const entries = Object.entries(blocks)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  if (entries.length === 0) return null
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o) }}
+        className="flex items-center gap-1 px-2 py-1.5 rounded text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 font-medium"
+      >
+        <Rows3 className="h-3.5 w-3.5" />
+        Repeat Block
+        <ChevronDown className="h-3 w-3" />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+          <div className="max-h-72 overflow-y-auto py-1">
+            {entries.map(([blockName, tags]) => (
+              <button
+                key={blockName}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  onInsert(blockName, tags)
+                  setOpen(false)
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-emerald-50"
+              >
+                <p className="text-xs font-semibold text-slate-700">{blockName}</p>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {tags.slice(0, 4).map((tag) => tag.label).join(', ')}
+                  {tags.length > 4 ? '...' : ''}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main editor ────────────────────────────────────────────────────────────────
 interface TemplateEditorProps {
   content: string
@@ -166,6 +227,14 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
     return [...Object.values(groups), ...(TEMPLATE_TAGS.General ?? [])]
   }, [approvedTags, entityType])
+  const repeatBlocks = useMemo(() => {
+    return approvedTags
+      .filter((tag) => tag.isRepeatable && tag.repeatBlock)
+      .reduce<Record<string, DocumentTag[]>>((acc, tag) => {
+        acc[tag.repeatBlock!] = [...(acc[tag.repeatBlock!] ?? []), tag]
+        return acc
+      }, {})
+  }, [approvedTags])
 
   const editor = useEditor({
     extensions: [
@@ -198,6 +267,16 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
       type: 'templateTag',
       attrs: { tag },
     }).run()
+  }, [editor])
+
+  const insertRepeatBlock = useCallback((blockName: string, tags: DocumentTag[]) => {
+    const visibleTags = tags.slice(0, 4)
+    const body = visibleTags.map((tag) => `<span data-tag="${tag.tag}">{{${tag.tag}}}</span>`).join(' ')
+    editor?.chain().focus().insertContent(`
+      <p>{{#${blockName}}}</p>
+      <p>${body}</p>
+      <p>{{/${blockName}}}</p>
+    `).run()
   }, [editor])
 
   const [imageModalOpen, setImageModalOpen] = useState(false)
@@ -316,6 +395,7 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
         {/* Tag picker */}
         <TagPicker groups={tagGroups} onInsert={insertTag} />
+        <RepeatBlockPicker blocks={repeatBlocks} onInsert={insertRepeatBlock} />
       </div>
 
       {/* Editor area */}
