@@ -21,6 +21,7 @@ public class OutboundCommunicationConfiguration : IEntityTypeConfiguration<Outbo
         builder.Property(c => c.BodyHtml).IsRequired();
         builder.Property(c => c.FailureReason).HasMaxLength(1000);
         builder.Property(c => c.GraphMessageId).HasMaxLength(500);
+        builder.Property(c => c.GraphMessageWebLink).HasMaxLength(2000);
 
         builder.HasIndex(c => new { c.EntityType, c.EntityId, c.IsDeleted });
         builder.HasIndex(c => c.Status);

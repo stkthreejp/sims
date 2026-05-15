@@ -22,6 +22,7 @@ public class OutboundCommunication : BaseEntity
     public OutboundCommunicationStatus Status { get; set; } = OutboundCommunicationStatus.Draft;
     public string? FailureReason { get; set; }
     public string? GraphMessageId { get; set; }
+    public string? GraphMessageWebLink { get; set; }
 
     public Guid CreatedById { get; set; }
     public User CreatedBy { get; set; } = null!;

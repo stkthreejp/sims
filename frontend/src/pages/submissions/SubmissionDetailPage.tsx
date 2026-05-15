@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, Check, FileText,
-  RefreshCw, AlertTriangle, Send,
+  RefreshCw, AlertTriangle, ExternalLink, Send,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { submissionsApi } from '@/api/submissions.api'
@@ -1947,6 +1947,16 @@ export function SubmissionDetailPage() {
                             onClick={() => sendCommunicationMutation.mutate(c.id)}
                           >
                             <Send className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {c.status === 'Sent' && c.graphMessageWebLink && (
+                          <button
+                            type="button"
+                            className="sims-icon-btn hover:text-sky-600"
+                            title="Open in Outlook"
+                            onClick={() => window.open(c.graphMessageWebLink!, '_blank', 'noopener,noreferrer')}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </td>

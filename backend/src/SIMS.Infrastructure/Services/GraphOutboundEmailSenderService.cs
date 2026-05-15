@@ -26,10 +26,10 @@ public class GraphOutboundEmailSenderService : IOutboundEmailSenderService
         _config = config;
     }
 
-    public async Task<Result<string>> SendAsync(OutboundCommunication communication, CancellationToken cancellationToken = default)
+    public async Task<Result<OutboundEmailSendResult>> SendAsync(OutboundCommunication communication, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(communication.ToAddress))
-            return Result<string>.Failure("MISSING_RECIPIENT", "The email draft does not have a recipient.");
+            return Result<OutboundEmailSendResult>.Failure("MISSING_RECIPIENT", "The email draft does not have a recipient.");
 
         try
         {
@@ -50,18 +50,18 @@ public class GraphOutboundEmailSenderService : IOutboundEmailSenderService
                 .PostAsync(message, cancellationToken: cancellationToken);
 
             if (string.IsNullOrWhiteSpace(created?.Id))
-                return Result<string>.Failure("GRAPH_MESSAGE_NOT_CREATED", "Microsoft Graph did not return a message id.");
+                return Result<OutboundEmailSendResult>.Failure("GRAPH_MESSAGE_NOT_CREATED", "Microsoft Graph did not return a message id.");
 
             await graphClient.Users[mailboxAddress]
                 .Messages[created.Id]
                 .Send
                 .PostAsync(cancellationToken: cancellationToken);
 
-            return Result<string>.Success(created.Id);
+            return Result<OutboundEmailSendResult>.Success(new OutboundEmailSendResult(created.Id, created.WebLink));
         }
         catch (Exception ex)
         {
-            return Result<string>.Failure("GRAPH_SEND_FAILED", ex.Message);
+            return Result<OutboundEmailSendResult>.Failure("GRAPH_SEND_FAILED", ex.Message);
         }
     }
 

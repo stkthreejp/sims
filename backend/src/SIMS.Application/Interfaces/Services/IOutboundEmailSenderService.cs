@@ -5,5 +5,7 @@ namespace SIMS.Application.Interfaces.Services;
 
 public interface IOutboundEmailSenderService
 {
-    Task<Result<string>> SendAsync(OutboundCommunication communication, CancellationToken cancellationToken = default);
+    Task<Result<OutboundEmailSendResult>> SendAsync(OutboundCommunication communication, CancellationToken cancellationToken = default);
 }
+
+public sealed record OutboundEmailSendResult(string MessageId, string? WebLink);

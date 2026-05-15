@@ -177,7 +177,8 @@ public class OutboundCommunicationService : IOutboundCommunicationService
 
         communication.Status = OutboundCommunicationStatus.Sent;
         communication.FailureReason = null;
-        communication.GraphMessageId = sendResult.Value;
+        communication.GraphMessageId = sendResult.Value.MessageId;
+        communication.GraphMessageWebLink = sendResult.Value.WebLink;
         communication.SentAt = DateTime.UtcNow;
         communication.SentById = userId;
 
@@ -528,6 +529,7 @@ public class OutboundCommunicationService : IOutboundCommunicationService
         FromAddress = c.FromAddress,
         Subject = c.Subject,
         Status = c.Status,
+        GraphMessageWebLink = c.GraphMessageWebLink,
         SentAt = c.SentAt,
         CreatedByName = c.CreatedBy?.FullName ?? string.Empty,
         AttachmentCount = c.Attachments?.Count ?? 0,
@@ -552,6 +554,7 @@ public class OutboundCommunicationService : IOutboundCommunicationService
         Status = c.Status,
         FailureReason = c.FailureReason,
         GraphMessageId = c.GraphMessageId,
+        GraphMessageWebLink = c.GraphMessageWebLink,
         CreatedByName = c.CreatedBy?.FullName ?? string.Empty,
         SentByName = c.SentBy?.FullName,
         SentAt = c.SentAt,

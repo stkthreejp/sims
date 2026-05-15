@@ -12,6 +12,7 @@ public class OutboundCommunicationListItemDto
     public string FromAddress { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public OutboundCommunicationStatus Status { get; set; }
+    public string? GraphMessageWebLink { get; set; }
     public DateTime? SentAt { get; set; }
     public string CreatedByName { get; set; } = string.Empty;
     public int AttachmentCount { get; set; }
@@ -36,6 +37,7 @@ public class OutboundCommunicationDto
     public OutboundCommunicationStatus Status { get; set; }
     public string? FailureReason { get; set; }
     public string? GraphMessageId { get; set; }
+    public string? GraphMessageWebLink { get; set; }
     public string CreatedByName { get; set; } = string.Empty;
     public string? SentByName { get; set; }
     public DateTime? SentAt { get; set; }

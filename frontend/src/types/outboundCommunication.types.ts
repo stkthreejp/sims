@@ -27,6 +27,7 @@ export interface OutboundCommunicationListItem {
   fromAddress: string
   subject: string
   status: OutboundCommunicationStatus
+  graphMessageWebLink: string | null
   sentAt: string | null
   createdByName: string
   attachmentCount: number
@@ -55,6 +56,7 @@ export interface OutboundCommunication {
   status: OutboundCommunicationStatus
   failureReason: string | null
   graphMessageId: string | null
+  graphMessageWebLink: string | null
   createdByName: string
   sentByName: string | null
   sentAt: string | null
