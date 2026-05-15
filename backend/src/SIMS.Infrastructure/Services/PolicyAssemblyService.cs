@@ -55,7 +55,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             return Result<GeneratedDocumentDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before issuing.");
 
         var preparedPdfs = new List<byte[]>();
-        var data = BuildPolicyData(policy);
+        var data = BuildPolicyData(policy, forms);
         foreach (var form in forms)
         {
             var prepared = await PrepareFormPdfAsync(form, data);
@@ -216,7 +216,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         return output.ToArray();
     }
 
-    private static DocumentMergeData BuildPolicyData(Policy policy)
+    private static DocumentMergeData BuildPolicyData(Policy policy, IReadOnlyList<QuotePolicyFormSelection> forms)
     {
         var quote = policy.BoundQuote;
         var insured = policy.Submission.Insured;
@@ -282,6 +282,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
                 ["Value"] = e.Value,
                 ["Limit"] = e.Value,
                 ["Deductible"] = e.Deductible,
+                ["Location"] = string.Empty,
                 ["Territory"] = e.TerritoryCode,
             } as IReadOnlyDictionary<string, object?>)
             .ToList();
@@ -294,6 +295,18 @@ public class PolicyAssemblyService : IPolicyAssemblyService
                 ["Address"] = FormatAddress(i.AddressLine1, i.AddressLine2, i.City, i.State, i.ZipCode),
                 ["Types"] = FormatAdditionalInterestTypes(i),
                 ["LoanNumber"] = i.ScheduledItemNumbers,
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
+
+        data.RepeatingValues["PolicyForms"] = forms
+            .Where(f => f.IsIncluded)
+            .OrderBy(f => f.SequenceOrder)
+            .Select(f => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["FormNumber"] = f.PolicyFormTemplate.FormNumber,
+                ["FormName"] = f.PolicyFormTemplate.Name,
+                ["EditionDate"] = f.PolicyFormTemplate.EditionDate,
+                ["Status"] = "Included",
             } as IReadOnlyDictionary<string, object?>)
             .ToList();
 

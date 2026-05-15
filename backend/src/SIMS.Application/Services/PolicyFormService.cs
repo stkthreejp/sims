@@ -403,6 +403,7 @@ public class PolicyFormService : IPolicyFormService
         Tag("Carrier.Name", "Carrier name", "Carrier"),
         Tag("Carrier.Naic", "NAIC", "Carrier"),
 
+        Tag("ItemNumber", "Item number", "Equipment", "Number", "number", "Equipment"),
         Tag("Description", "Description", "Equipment", repeatBlock: "Equipment"),
         Tag("Year", "Year", "Equipment", "Number", "number", "Equipment"),
         Tag("Make", "Make", "Equipment", repeatBlock: "Equipment"),
