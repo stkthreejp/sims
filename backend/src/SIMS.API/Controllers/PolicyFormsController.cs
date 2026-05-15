@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using SIMS.Application.DTOs.PolicyForms;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Enums;
@@ -12,8 +13,15 @@ namespace SIMS.API.Controllers;
 public class PolicyFormsController : ControllerBase
 {
     private readonly IPolicyFormService _service;
+    private readonly IPolicyAssemblyService _assembly;
 
-    public PolicyFormsController(IPolicyFormService service) => _service = service;
+    private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    public PolicyFormsController(IPolicyFormService service, IPolicyAssemblyService assembly)
+    {
+        _service = service;
+        _assembly = assembly;
+    }
 
     [HttpGet("templates")]
     public async Task<IActionResult> GetTemplates([FromQuery] bool includeInactive = false)
@@ -55,6 +63,13 @@ public class PolicyFormsController : ControllerBase
     {
         var result = await _service.GetTemplateDownloadUrlAsync(id);
         return result.IsSuccess ? Ok(new { url = result.Value }) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("templates/{id:guid}/test-merge")]
+    public async Task<IActionResult> TestMergeTemplate(Guid id, [FromBody] PolicyFormTestMergeDto dto)
+    {
+        var result = await _assembly.TestMergeTemplateAsync(id, dto.PolicyId, CurrentUserId);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpDelete("templates/{id:guid}")]

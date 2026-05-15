@@ -10,6 +10,7 @@ import type {
   PolicyPackageFormUpsert,
 } from '@/types/policyForm.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
+import type { GenerateDocumentResponse } from './documentGeneration.api'
 
 export const policyFormsApi = {
   getTemplates: (includeInactive = false) =>
@@ -31,6 +32,9 @@ export const policyFormsApi = {
 
   getTemplateDownloadUrl: (id: string) =>
     apiClient.get<{ url: string }>(`/policy-forms/templates/${id}/download-url`).then((r) => r.data),
+
+  testMergeTemplate: (id: string, policyId: string) =>
+    apiClient.post<GenerateDocumentResponse>(`/policy-forms/templates/${id}/test-merge`, { policyId }).then((r) => r.data),
 
   replaceMappings: (id: string, mappings: PolicyFormFieldMappingUpsert[]) =>
     apiClient.put<PolicyFormFieldMapping[]>(`/policy-forms/templates/${id}/mappings`, mappings).then((r) => r.data),

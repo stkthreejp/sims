@@ -33,6 +33,11 @@ public class PolicyFormTemplateUpsertDto
     public string? Notes { get; set; }
 }
 
+public class PolicyFormTestMergeDto
+{
+    public Guid PolicyId { get; set; }
+}
+
 public class PolicyFormFieldMappingDto
 {
     public Guid Id { get; set; }

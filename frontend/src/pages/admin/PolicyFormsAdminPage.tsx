@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Download, FileText, PackagePlus, Plus, Settings, Trash2, Upload } from 'lucide-react'
+import { Check, Download, FileText, PackagePlus, Play, Plus, Settings, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { policyFormsApi } from '@/api/policyForms.api'
 import { carriersApi } from '@/api/carriers.api'
+import { policiesApi } from '@/api/policies.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
+import type { PolicyListItem } from '@/types/policy.types'
 import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
 
 const FORM_TYPES: PolicyFormType[] = ['Mandatory', 'Conditional', 'AdHoc']
@@ -81,6 +83,7 @@ export function PolicyFormsAdminPage() {
   const [packageRows, setPackageRows] = useState<PolicyPackageFormUpsert[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [mappingRows, setMappingRows] = useState<PolicyFormFieldMappingUpsert[]>([])
+  const [testPolicyId, setTestPolicyId] = useState('')
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['policy-form-templates'],
@@ -102,8 +105,14 @@ export function PolicyFormsAdminPage() {
     queryFn: policyFormsApi.getTags,
   })
 
+  const { data: policyPage } = useQuery({
+    queryKey: ['policies', 'policy-form-test-data'],
+    queryFn: () => policiesApi.getAll({ page: 1, pageSize: 50, sortBy: 'createdAt', sortDir: 'desc' }),
+  })
+
   const selectedPackage = packages.find((p) => p.id === selectedPackageId) ?? null
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null
+  const policyOptions = policyPage?.items ?? []
 
   const packageTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates])
   const mappingDataPaths = useMemo(() => {
@@ -116,6 +125,12 @@ export function PolicyFormsAdminPage() {
       return acc
     }, {})
   }, [tags])
+
+  useEffect(() => {
+    if (!testPolicyId && policyOptions.length > 0) {
+      setTestPolicyId(policyOptions[0].id)
+    }
+  }, [policyOptions, testPolicyId])
 
   const createTemplate = useMutation({
     mutationFn: () => policyFormsApi.createTemplate({
@@ -142,6 +157,15 @@ export function PolicyFormsAdminPage() {
       toast.success('Policy form file uploaded')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy form file could not be uploaded'),
+  })
+
+  const testMergeTemplate = useMutation({
+    mutationFn: (templateId: string) => policyFormsApi.testMergeTemplate(templateId, testPolicyId),
+    onSuccess: (data) => {
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+      toast.success('Test merge created')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Test merge could not be created'),
   })
 
   const openTemplateFile = async (templateId: string) => {
@@ -276,6 +300,18 @@ export function PolicyFormsAdminPage() {
             <button onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.formNumber || !templateForm.name} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
               <Plus className="h-4 w-4" /> Add form
             </button>
+            <div className="pt-2 border-t">
+              <label className="block text-xs font-medium text-slate-500 mb-1">Test data policy</label>
+              <select value={testPolicyId} onChange={(e) => setTestPolicyId(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">
+                {policyOptions.length === 0 ? (
+                  <option value="">No policies found</option>
+                ) : (
+                  policyOptions.map((policy) => (
+                    <option key={policy.id} value={policy.id}>{formatPolicyOption(policy)}</option>
+                  ))
+                )}
+              </select>
+            </div>
           </div>
           <div className="divide-y max-h-[520px] overflow-auto">
             {templates.map((template) => (
@@ -286,6 +322,9 @@ export function PolicyFormsAdminPage() {
                 onUpload={(file) => uploadTemplateFile.mutate({ templateId: template.id, file })}
                 onOpen={() => openTemplateFile(template.id)}
                 onMap={() => selectTemplateMappings(template)}
+                onTest={() => testMergeTemplate.mutate(template.id)}
+                canTest={Boolean(testPolicyId && template.storagePath)}
+                testing={testMergeTemplate.isPending}
               />
             ))}
           </div>
@@ -450,12 +489,18 @@ function TemplateRow({
   onUpload,
   onOpen,
   onMap,
+  onTest,
+  canTest,
+  testing,
 }: {
   template: PolicyFormTemplate
   uploading: boolean
   onUpload: (file: File) => void
   onOpen: () => void
   onMap: () => void
+  onTest: () => void
+  canTest: boolean
+  testing: boolean
 }) {
   return (
     <div className="p-3">
@@ -478,7 +523,7 @@ function TemplateRow({
           {template.fileName ? 'Replace' : 'Upload'}
           <input
             type="file"
-            accept=".pdf,.doc,.docx"
+            accept=".pdf,.doc,.docx,.html,.htm"
             disabled={uploading}
             className="hidden"
             onChange={(e) => {
@@ -494,6 +539,10 @@ function TemplateRow({
             Open
           </button>
         )}
+        <button type="button" onClick={onTest} disabled={!canTest || testing} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+          <Play className="h-3 w-3" />
+          Test
+        </button>
         {template.isFillable && (
           <button type="button" onClick={onMap} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50">
             <Settings className="h-3 w-3" />
@@ -503,4 +552,8 @@ function TemplateRow({
       </div>
     </div>
   )
+}
+
+function formatPolicyOption(policy: PolicyListItem) {
+  return `${policy.policyNumber} - ${policy.insuredName}`
 }

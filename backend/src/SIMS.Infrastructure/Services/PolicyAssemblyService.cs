@@ -33,27 +33,11 @@ public class PolicyAssemblyService : IPolicyAssemblyService
 
     public async Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false)
     {
-        var policy = await _db.Policies
-            .AsNoTracking()
-            .Include(p => p.Carrier)
-            .Include(p => p.Submission).ThenInclude(s => s.Insured)
-            .Include(p => p.Submission).ThenInclude(s => s.Locations)
-            .Include(p => p.Submission).ThenInclude(s => s.Equipment)
-            .Include(p => p.Submission).ThenInclude(s => s.AdditionalInterests)
-            .Include(p => p.BoundQuote)
-            .FirstOrDefaultAsync(p => p.Id == policyId);
-
+        var policy = await LoadPolicyForAssemblyAsync(policyId);
         if (policy == null)
             return Result<GeneratedDocumentDto>.Failure("NOT_FOUND", "Policy not found.");
 
-        var forms = await _db.QuotePolicyFormSelections
-            .AsNoTracking()
-            .Include(f => f.PolicyFormTemplate)
-                .ThenInclude(t => t.FieldMappings)
-            .Where(f => f.QuoteId == policy.BoundQuoteId && f.IsIncluded)
-            .OrderBy(f => f.SequenceOrder)
-            .ToListAsync();
-
+        var forms = await LoadIncludedFormsAsync(policy.BoundQuoteId);
         if (forms.Count == 0)
             return Result<GeneratedDocumentDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before issuing.");
 
@@ -105,6 +89,79 @@ public class PolicyAssemblyService : IPolicyAssemblyService
 
         return Result<GeneratedDocumentDto>.Success(new GeneratedDocumentDto(urlResult.Value, attachmentResult.Value));
     }
+
+    public async Task<Result<GeneratedDocumentDto>> TestMergeTemplateAsync(Guid templateId, Guid policyId, Guid userId)
+    {
+        var policy = await LoadPolicyForAssemblyAsync(policyId);
+        if (policy == null)
+            return Result<GeneratedDocumentDto>.Failure("NOT_FOUND", "Policy not found.");
+
+        var template = await _db.PolicyFormTemplates
+            .AsNoTracking()
+            .Include(t => t.FieldMappings)
+            .FirstOrDefaultAsync(t => t.Id == templateId);
+
+        if (template == null)
+            return Result<GeneratedDocumentDto>.Failure("NOT_FOUND", "Policy form template not found.");
+
+        var forms = await LoadIncludedFormsAsync(policy.BoundQuoteId);
+        var data = BuildPolicyData(policy, forms);
+        var testSelection = new QuotePolicyFormSelection
+        {
+            PolicyFormTemplateId = template.Id,
+            PolicyFormTemplate = template,
+            SequenceOrder = 1,
+            IsIncluded = true,
+        };
+
+        var prepared = await PrepareFormPdfAsync(testSelection, data);
+        if (!prepared.IsSuccess || prepared.Value == null)
+            return Result<GeneratedDocumentDto>.Failure(
+                prepared.ErrorCode ?? "FORM_PREP_FAILED",
+                prepared.ErrorMessage ?? "Form could not be prepared.");
+
+        var fileName = $"{SanitizeFileName(policy.PolicyNumber)}_{SanitizeFileName(template.FormNumber)}_TestMerge_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
+        await using var stream = new MemoryStream(prepared.Value);
+        var attachmentResult = await _attachments.CreateGeneratedAsync(
+            DocumentEntityType.Policy,
+            policy.BoundQuoteId,
+            stream,
+            fileName,
+            "application/pdf",
+            prepared.Value.LongLength,
+            DocumentType.PolicyForm,
+            $"Test merge for {template.FormNumber} using policy {policy.PolicyNumber} generated on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC.",
+            userId);
+
+        if (!attachmentResult.IsSuccess || attachmentResult.Value == null)
+            return Result<GeneratedDocumentDto>.Failure(attachmentResult.ErrorCode ?? "ATTACHMENT_SAVE_FAILED", attachmentResult.ErrorMessage ?? "Test merge could not be stored.");
+
+        var urlResult = await _attachments.GetDownloadUrlAsync(attachmentResult.Value.Id, userId);
+        if (!urlResult.IsSuccess || string.IsNullOrWhiteSpace(urlResult.Value))
+            return Result<GeneratedDocumentDto>.Failure(urlResult.ErrorCode ?? "DOWNLOAD_URL_FAILED", urlResult.ErrorMessage ?? "Test merge was stored, but a download URL could not be created.");
+
+        return Result<GeneratedDocumentDto>.Success(new GeneratedDocumentDto(urlResult.Value, attachmentResult.Value));
+    }
+
+    private Task<Policy?> LoadPolicyForAssemblyAsync(Guid policyId)
+        => _db.Policies
+            .AsNoTracking()
+            .Include(p => p.Carrier)
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Submission).ThenInclude(s => s.Locations)
+            .Include(p => p.Submission).ThenInclude(s => s.Equipment)
+            .Include(p => p.Submission).ThenInclude(s => s.AdditionalInterests)
+            .Include(p => p.BoundQuote)
+            .FirstOrDefaultAsync(p => p.Id == policyId);
+
+    private Task<List<QuotePolicyFormSelection>> LoadIncludedFormsAsync(Guid quoteId)
+        => _db.QuotePolicyFormSelections
+            .AsNoTracking()
+            .Include(f => f.PolicyFormTemplate)
+                .ThenInclude(t => t.FieldMappings)
+            .Where(f => f.QuoteId == quoteId && f.IsIncluded)
+            .OrderBy(f => f.SequenceOrder)
+            .ToListAsync();
 
     private async Task<Result<byte[]>> PrepareFormPdfAsync(QuotePolicyFormSelection form, DocumentMergeData data)
     {
