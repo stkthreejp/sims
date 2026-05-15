@@ -67,21 +67,29 @@ public class GraphOutboundEmailSenderService : IOutboundEmailSenderService
 
     private (GraphServiceClient GraphClient, string MailboxAddress) CreateGraphClient()
     {
-        var tenantId = _config["GraphApi:TenantId"]
-            ?? throw new InvalidOperationException("GraphApi:TenantId is not configured.");
-        var clientId = _config["GraphApi:ClientId"]
-            ?? throw new InvalidOperationException("GraphApi:ClientId is not configured.");
-        var clientSecret = _config["GraphApi:ClientSecret"]
-            ?? throw new InvalidOperationException("GraphApi:ClientSecret is not configured.");
+        var tenantId = GetRequiredConfig("GraphApi:TenantId", "MicrosoftAuth:TenantId");
+        var clientId = GetRequiredConfig("GraphApi:ClientId", "MicrosoftAuth:ClientId");
+        var clientSecret = GetRequiredConfig("GraphApi:ClientSecret");
 
-        var mailboxAddress = _config["GraphApi:MailboxAddress"]
-            ?? throw new InvalidOperationException("GraphApi:MailboxAddress is not configured.");
+        var mailboxAddress = GetRequiredConfig("GraphApi:MailboxAddress");
 
         var graphClient = new GraphServiceClient(
             new ClientSecretCredential(tenantId, clientId, clientSecret),
             ["https://graph.microsoft.com/.default"]);
 
         return (graphClient, mailboxAddress);
+    }
+
+    private string GetRequiredConfig(params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            var value = _config[key];
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        throw new InvalidOperationException($"{string.Join(" or ", keys)} is not configured.");
     }
 
     private async Task<List<GraphAttachment>?> BuildAttachmentsAsync(
