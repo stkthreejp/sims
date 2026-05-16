@@ -131,6 +131,20 @@ public class IssuePolicyDto
     public string? Notes { get; set; }
 }
 
+public class VoidTestBindDto
+{
+    public string? Reason { get; set; }
+}
+
+public class VoidTestBindResultDto
+{
+    public Guid PolicyId { get; set; }
+    public Guid QuoteId { get; set; }
+    public string PolicyNumber { get; set; } = string.Empty;
+    public long? VoidedInvoiceId { get; set; }
+    public Guid? ReversalTransactionId { get; set; }
+}
+
 public class NonRenewPolicyDto
 {
     public DateOnly NonRenewedDate { get; set; }

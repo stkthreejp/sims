@@ -30,6 +30,9 @@ export const policiesApi = {
   issue: (id: string, data: IssuePolicy) =>
     apiClient.post<Policy>(`/policies/${id}/issue`, data).then((r) => r.data),
 
+  voidTestBind: (id: string, reason?: string) =>
+    apiClient.post(`/policies/${id}/void-test-bind`, { reason }).then((r) => r.data),
+
   createRenewalQuote: (id: string) =>
     apiClient.post<Quote>(`/policies/${id}/renew`).then((r) => r.data),
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Ban, FileSignature, FileX2, Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
 import { toast } from 'sonner'
@@ -26,6 +26,7 @@ const POLICY_STAGES = ['Bound', 'In Force', 'Renewal', 'Closed']
 
 export function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const qc = useQueryClient()
 
   const [showGenerateModal, setShowGenerateModal] = useState(false)
@@ -85,7 +86,7 @@ export function PolicyDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] }),
   })
 
-  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canCreatePolicies, canIssuePolicies, canEndorsePolicies, canCancelPolicies } = usePermissions()
+  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canCreatePolicies, canIssuePolicies, canEndorsePolicies, canCancelPolicies, isAdmin } = usePermissions()
 
   const { data: issuancePacket } = useQuery({
     queryKey: ['policies', id, 'issuance-packet'],
@@ -157,6 +158,17 @@ export function PolicyDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy packet preview could not be generated'),
   })
 
+  const voidTestBindMutation = useMutation({
+    mutationFn: () => policiesApi.voidTestBind(id!, 'Test bind cleanup'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies'] })
+      qc.invalidateQueries({ queryKey: ['quotes'] })
+      toast.success('Test bind voided')
+      navigate(`/quotes/${policy?.boundQuoteId}`)
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Test bind could not be voided'),
+  })
+
   if (isLoading) return <LoadingSpinner />
   if (!policy) return <p className="p-6 text-slate-500">Policy not found.</p>
 
@@ -168,6 +180,7 @@ export function PolicyDetailPage() {
   const activeStage = policy.status === 'Cancelled' || policy.status === 'NonRenewed' || policy.status === 'Expired'
     ? 3
     : daysRemaining <= 45 ? 2 : 1
+  const canVoidTestBind = isAdmin && policy.status === 'Active' && !policy.issuedDate && policy.insuredName.toLowerCase().includes('test')
 
   return (
     <div className="space-y-5 p-6">
@@ -225,6 +238,19 @@ export function PolicyDetailPage() {
               className="sd-btn outline"
             >
               <FileText className="h-3.5 w-3.5" /> Generate Document
+            </button>
+          )}
+          {canVoidTestBind && (
+            <button
+              onClick={() => {
+                if (window.confirm('Void this test bind and reverse its invoice? This is only for test insureds.')) {
+                  voidTestBindMutation.mutate()
+                }
+              }}
+              disabled={voidTestBindMutation.isPending}
+              className="sd-btn danger"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Void Test Bind
             </button>
           )}
         </div>

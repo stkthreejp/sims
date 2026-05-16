@@ -7,6 +7,7 @@ using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Security;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Entities.Accounting;
 using SIMS.Domain.Enums;
 using System.Text.Json;
 
@@ -16,13 +17,15 @@ public class PolicyService : IPolicyService
 {
     private readonly IServiceProvider _sp;
     private readonly IInvoicingService _invoicing;
+    private readonly IVoidService _voids;
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
-    public PolicyService(IServiceProvider sp, IInvoicingService invoicing)
+    public PolicyService(IServiceProvider sp, IInvoicingService invoicing, IVoidService voids)
     {
         _sp = sp;
         _invoicing = invoicing;
+        _voids = voids;
     }
 
     public async Task<PagedResult<PolicyListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -200,6 +203,107 @@ public class PolicyService : IPolicyService
 
         var assembly = (IPolicyAssemblyService)_sp.GetService(typeof(IPolicyAssemblyService))!;
         return await assembly.AssembleAndFileAsync(policyId, access.UserId, isPreview: true);
+    }
+
+    public async Task<Result<VoidTestBindResultDto>> VoidTestBindAsync(Guid policyId, VoidTestBindDto dto, UserAccessScope access, bool isAdmin)
+    {
+        if (!isAdmin)
+            return Result<VoidTestBindResultDto>.Failure("ADMIN_REQUIRED", "Only admins can void a test bind.");
+
+        var db = Db;
+        var policy = await db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+
+        if (policy == null)
+            return Result<VoidTestBindResultDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (!IsTestInsured(policy))
+            return Result<VoidTestBindResultDto>.Failure("NOT_TEST_RECORD", "Only policies for test insureds can be voided this way.");
+        if (policy.IssuedDate.HasValue)
+            return Result<VoidTestBindResultDto>.Failure("POLICY_ISSUED", "Issued policies cannot be voided with the test bind cleanup.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<VoidTestBindResultDto>.Failure("INVALID_STATUS", "Only active, unissued test policies can be voided this way.");
+
+        var activeTransactions = policy.Transactions.Where(t => !t.IsDeleted).ToList();
+        if (activeTransactions.Count != 1 || activeTransactions[0].TransactionType != TransactionType.NewBusiness)
+            return Result<VoidTestBindResultDto>.Failure("TRANSACTIONS_EXIST", "Only a simple new-business bind can be voided this way.");
+
+        var transaction = activeTransactions[0];
+        var invoice = await db.Set<Invoice>()
+            .FirstOrDefaultAsync(i => i.PolicyTransactionId == transaction.Id && i.Status != "Voided");
+
+        if (invoice != null && invoice.ClearedAmount > 0)
+            return Result<VoidTestBindResultDto>.Failure("PAYMENTS_EXIST", "This invoice has payment activity. Void the cash activity first.");
+
+        var payables = invoice == null
+            ? new List<Payable>()
+            : await db.Set<Payable>().Where(p => p.InvoiceId == invoice.Id).ToListAsync();
+
+        if (payables.Any(p => p.PaidAmount > 0))
+            return Result<VoidTestBindResultDto>.Failure("DISBURSEMENTS_EXIST", "This bind has payable payment activity and cannot be test-voided.");
+
+        await using var dbTransaction = await db.Database.BeginTransactionAsync();
+
+        Guid? reversalTransactionId = null;
+        if (invoice != null)
+        {
+            var voidResult = await _voids.VoidInvoiceAsync(
+                invoice.Id,
+                string.IsNullOrWhiteSpace(dto.Reason) ? "Void test bind" : dto.Reason,
+                access.UserId,
+                isAdmin);
+
+            if (!voidResult.Success)
+                return Result<VoidTestBindResultDto>.Failure(voidResult.ErrorCode ?? "INVOICE_VOID_FAILED", voidResult.ErrorMessage ?? "Invoice could not be voided.");
+
+            reversalTransactionId = voidResult.ReversalTransactionId;
+            foreach (var payable in payables)
+                payable.Status = "Voided";
+        }
+
+        var policyNumber = policy.PolicyNumber;
+        var quoteId = policy.BoundQuoteId;
+
+        policy.BoundQuote.Status = QuoteStatus.Quoted;
+        policy.BoundQuote.PolicyNumber = null;
+        policy.BoundQuote.BoundDate = null;
+        policy.BoundQuote.IssuedDate = null;
+        policy.BoundQuote.CancelledDate = null;
+
+        transaction.IsDeleted = true;
+        transaction.DeletedAt = DateTime.UtcNow;
+        transaction.Notes = string.IsNullOrWhiteSpace(dto.Reason)
+            ? "Voided as test bind cleanup."
+            : $"Voided as test bind cleanup: {dto.Reason}";
+
+        policy.IsDeleted = true;
+        policy.DeletedAt = DateTime.UtcNow;
+
+        var usage = await db.Set<PolicyNumberSequenceUsage>()
+            .FirstOrDefaultAsync(u => u.PolicyId == policy.Id || (u.QuoteId == quoteId && u.FullPolicyNumber == policyNumber));
+        if (usage != null)
+        {
+            usage.PolicyId = null;
+            usage.IsDeleted = true;
+            usage.DeletedAt = DateTime.UtcNow;
+        }
+
+        await RecalculateSubmissionStatusAsync(policy.SubmissionId);
+        await db.SaveChangesAsync();
+        await dbTransaction.CommitAsync();
+
+        return Result<VoidTestBindResultDto>.Success(new VoidTestBindResultDto
+        {
+            PolicyId = policy.Id,
+            QuoteId = quoteId,
+            PolicyNumber = policyNumber,
+            VoidedInvoiceId = invoice?.Id,
+            ReversalTransactionId = reversalTransactionId,
+        });
     }
 
     private static PolicyIssuanceFormDto MapIssuanceForm(QuotePolicyFormSelection form)
@@ -537,6 +641,38 @@ public class PolicyService : IPolicyService
             .IgnoreQueryFilters()
             .CountAsync(t => t.TransactionNumber.StartsWith(prefix));
         return $"{prefix}{(count + 1):D5}";
+    }
+
+    private async Task RecalculateSubmissionStatusAsync(Guid submissionId)
+    {
+        var submission = await Db.Set<Submission>()
+            .Include(s => s.Quotes)
+            .FirstOrDefaultAsync(s => s.Id == submissionId);
+
+        if (submission == null)
+            return;
+
+        submission.Status = submission.Quotes.Any(q => !q.IsDeleted && q.Status == QuoteStatus.Bound)
+            ? SubmissionStatus.Bound
+            : SubmissionStatus.Quoted;
+    }
+
+    private static bool IsTestInsured(Policy policy)
+    {
+        var insured = policy.Submission?.Insured;
+        if (insured == null)
+            return false;
+
+        var values = new[]
+        {
+            insured.DisplayName,
+            insured.CompanyName,
+            insured.FirstName,
+            insured.LastName,
+            insured.Email,
+        };
+
+        return values.Any(v => !string.IsNullOrWhiteSpace(v) && v.Contains("test", StringComparison.OrdinalIgnoreCase));
     }
 
     private static PolicyListItemDto MapToListItemDto(Policy p) => new()

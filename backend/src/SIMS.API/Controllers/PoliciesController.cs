@@ -72,6 +72,14 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("{id:guid}/void-test-bind")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> VoidTestBind(Guid id, [FromBody] VoidTestBindDto dto)
+    {
+        var result = await _policies.VoidTestBindAsync(id, dto, CurrentAccess, User.IsInRole("Admin"));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // --- Endorsements ---
 
     [HttpPost("{id:guid}/endorsements")]
