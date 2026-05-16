@@ -822,11 +822,22 @@ export function SubmissionDetailPage() {
         <div>
           {quotes.map((q) => (
             <div key={q.id}>
-              <div className="sd-quote">
+              <div
+                className="sd-quote"
+                role="link"
+                tabIndex={0}
+                onClick={() => navigate(`/quotes/${q.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    navigate(`/quotes/${q.id}`)
+                  }
+                }}
+              >
                 <div className="badge">{LOB_SHORT[q.lineOfBusiness] ?? q.lineOfBusiness}</div>
                 <div className="body">
                   <div className="top">
-                    <Link to={`/quotes/${q.id}`} className="carrier hover:underline">{q.carrierName}</Link>
+                    <span className="carrier">{q.carrierName}</span>
                     <span className={`sd-pill ${QUOTE_STATUS_PILL[q.status]}`}>{QUOTE_STATUS_LABELS[q.status]}</span>
                     <div className="prem" style={{ marginLeft: 'auto' }}>
                       <div className="s">Quoted premium</div>
@@ -836,7 +847,7 @@ export function SubmissionDetailPage() {
                     </div>
                   </div>
                   <div className="meta">
-                    <Link to={`/quotes/${q.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }} className="hover:underline">{q.quoteNumber}</Link>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>{q.quoteNumber}</span>
                     <span className="sep">·</span>
                     <span>{new Date(q.effectiveDate).toLocaleDateString()} → {new Date(q.expirationDate).toLocaleDateString()}</span>
                     {q.hasCommissionOverride && <><span className="sep">·</span><span style={{ color: 'var(--warn-fg)' }}>commission override</span></>}
@@ -844,7 +855,7 @@ export function SubmissionDetailPage() {
                 </div>
                 <div className="acts">
                   {q.status === 'Bound' && (
-                    <Link to={`/policies/${q.id}`} className="sd-btn sm outline">View Policy</Link>
+                    <Link to={`/policies/${q.id}`} className="sd-btn sm outline" onClick={(e) => e.stopPropagation()}>View Policy</Link>
                   )}
                   {q.status !== 'Bound' && (
                     <button
