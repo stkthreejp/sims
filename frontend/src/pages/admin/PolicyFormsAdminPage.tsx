@@ -11,6 +11,28 @@ import type { PolicyListItem } from '@/types/policy.types'
 import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
 
 const FORM_TYPES: PolicyFormType[] = ['Mandatory', 'Conditional', 'AdHoc']
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  'DC',
+]
+const TRIGGER_FIELDS = [
+  { path: 'Quote.PremiumAmount', label: 'Base premium', kind: 'number' },
+  { path: 'Quote.TotalPremium', label: 'Total premium', kind: 'number' },
+  { path: 'Rating.GrandTotalPremium', label: 'Rated grand total', kind: 'number' },
+  { path: 'Rating.DebrisRemoval', label: 'Debris Removal premium', kind: 'number' },
+  { path: 'Rating.RentalReimbursement', label: 'Rental Reimbursement premium', kind: 'number' },
+  { path: 'Rating.TowingStorageRecovery', label: 'Towing, Storage & Recovery premium', kind: 'number' },
+  { path: 'Rating.NewlyAcquiredEquipment', label: 'Newly Acquired Equipment premium', kind: 'number' },
+  { path: 'Rating.Tria', label: 'TRIA premium', kind: 'number' },
+  { path: 'Rating.EndorsementPremium', label: 'Endorsement premium', kind: 'number' },
+  { path: 'Submission.LossPayeeCount', label: 'Loss payee count', kind: 'number' },
+  { path: 'Quote.IsFilingState', label: 'Filing state', kind: 'boolean' },
+  { path: 'Quote.LineOfBusiness', label: 'Line of business', kind: 'lob' },
+] as const
 const DATA_PATH_OPTIONS = [
   'Policy.PolicyNumber',
   'Policy.EffectiveDate',
@@ -53,6 +75,15 @@ const DATA_PATH_OPTIONS = [
   'Carrier.Naic',
 ]
 const FORMAT_OPTIONS = ['', 'currency', 'number', 'percent', 'MM/dd/yyyy']
+const DEFAULT_TRIGGER_CONDITION = JSON.stringify({ path: 'Quote.PremiumAmount', greaterThan: 0 })
+type TriggerField = typeof TRIGGER_FIELDS[number]
+type TriggerFieldPath = TriggerField['path']
+type TriggerOperator = 'equals' | 'notEquals' | 'greaterThan' | 'lessThan'
+type TriggerConfig = {
+  path: TriggerFieldPath
+  operator: TriggerOperator
+  value: string | number | boolean
+}
 
 const emptyTemplate = {
   formNumber: '',
@@ -73,6 +104,65 @@ const emptyPackage = {
   state: '',
   name: '',
   isActive: true,
+}
+
+function getTriggerField(path: string | undefined) {
+  return TRIGGER_FIELDS.find((field) => field.path === path) ?? TRIGGER_FIELDS[0]
+}
+
+function parseTriggerCondition(triggerConditionJson?: string): TriggerConfig {
+  try {
+    const parsed = triggerConditionJson ? JSON.parse(triggerConditionJson) : {}
+    const field = getTriggerField(parsed.path)
+
+    if (field.kind === 'boolean') {
+      if (typeof parsed.notEquals === 'boolean') {
+        return { path: field.path, operator: 'notEquals', value: parsed.notEquals }
+      }
+      return { path: field.path, operator: 'equals', value: typeof parsed.equals === 'boolean' ? parsed.equals : true }
+    }
+
+    if (field.kind === 'lob') {
+      if (typeof parsed.notEquals === 'string') {
+        return { path: field.path, operator: 'notEquals', value: parsed.notEquals }
+      }
+      return { path: field.path, operator: 'equals', value: typeof parsed.equals === 'string' ? parsed.equals : 'InlandMarine' }
+    }
+
+    if (typeof parsed.lessThan === 'number') {
+      return { path: field.path, operator: 'lessThan', value: parsed.lessThan }
+    }
+    if (typeof parsed.equals === 'number') {
+      return { path: field.path, operator: 'equals', value: parsed.equals }
+    }
+    return {
+      path: field.path,
+      operator: 'greaterThan',
+      value: typeof parsed.greaterThan === 'number' ? parsed.greaterThan : 0,
+    }
+  } catch {
+    return { path: 'Quote.PremiumAmount', operator: 'greaterThan', value: 0 }
+  }
+}
+
+function buildTriggerCondition(config: TriggerConfig) {
+  const field = getTriggerField(config.path)
+  const value = field.kind === 'number' ? Number(config.value) || 0 : config.value
+  return JSON.stringify({ path: config.path, [config.operator]: value })
+}
+
+function describeTriggerCondition(config: TriggerConfig) {
+  const field = getTriggerField(config.path)
+  const operatorLabels: Record<TriggerOperator, string> = {
+    equals: 'is',
+    notEquals: 'is not',
+    greaterThan: 'is greater than',
+    lessThan: 'is less than',
+  }
+  const value = typeof config.value === 'boolean'
+    ? (config.value ? 'Yes' : 'No')
+    : config.value
+  return `${field.label} ${operatorLabels[config.operator]} ${value}`
 }
 
 export function PolicyFormsAdminPage() {
@@ -115,6 +205,11 @@ export function PolicyFormsAdminPage() {
   const policyOptions = policyPage?.items ?? []
 
   const packageTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates])
+  const derivedPackageName = useMemo(() => {
+    const carrierName = carriers.find((carrier) => carrier.id === packageForm.carrierId)?.name
+    if (!carrierName || !packageForm.lineOfBusiness || !packageForm.state) return ''
+    return `${carrierName} - ${LOB_LABELS[packageForm.lineOfBusiness]} - ${packageForm.state}`
+  }, [carriers, packageForm.carrierId, packageForm.lineOfBusiness, packageForm.state])
   const mappingDataPaths = useMemo(() => {
     const nonRepeatingTags = tags.filter((t) => !t.isRepeatable).map((t) => t.tag)
     return nonRepeatingTags.length > 0 ? nonRepeatingTags : DATA_PATH_OPTIONS
@@ -180,6 +275,7 @@ export function PolicyFormsAdminPage() {
   const createPackage = useMutation({
     mutationFn: () => policyFormsApi.createPackage({
       ...packageForm,
+      name: derivedPackageName,
       state: packageForm.state.toUpperCase(),
     }),
     onSuccess: (saved) => {
@@ -193,7 +289,13 @@ export function PolicyFormsAdminPage() {
   })
 
   const savePackageRows = useMutation({
-    mutationFn: () => policyFormsApi.replacePackageForms(selectedPackageId!, packageRows),
+    mutationFn: () => policyFormsApi.replacePackageForms(selectedPackageId!, packageRows.map((row, index) => ({
+      ...row,
+      sequenceOrder: Number(row.sequenceOrder) || index + 1,
+      triggerConditionJson: row.formType === 'Conditional'
+        ? buildTriggerCondition(parseTriggerCondition(row.triggerConditionJson))
+        : undefined,
+    }))),
     onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ['policy-form-packages'] })
       setPackageRows(saved.forms.map((f) => ({
@@ -205,7 +307,7 @@ export function PolicyFormsAdminPage() {
       })))
       toast.success('Package forms saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Package forms could not be saved'),
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? e?.response?.data?.message ?? 'Package forms could not be saved'),
   })
 
   const saveMappings = useMutation({
@@ -269,6 +371,17 @@ export function PolicyFormsAdminPage() {
         formType: 'Mandatory',
       },
     ])
+  }
+
+  const updatePackageRowType = (index: number, formType: PolicyFormType) => {
+    setPackageRows((rows) => rows.map((row, i) => {
+      if (i !== index) return row
+      return {
+        ...row,
+        formType,
+        triggerConditionJson: formType === 'Conditional' ? (row.triggerConditionJson ?? DEFAULT_TRIGGER_CONDITION) : undefined,
+      }
+    }))
   }
 
   if (loadingTemplates || loadingPackages) return <LoadingSpinner />
@@ -394,10 +507,15 @@ export function PolicyFormsAdminPage() {
               <select value={packageForm.lineOfBusiness} onChange={(e) => setPackageForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="border rounded px-2 py-1.5 text-sm">
                 {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
               </select>
-              <input value={packageForm.state} maxLength={2} onChange={(e) => setPackageForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))} placeholder="State" className="border rounded px-2 py-1.5 text-sm" />
+              <select value={packageForm.state} onChange={(e) => setPackageForm((f) => ({ ...f, state: e.target.value }))} className="border rounded px-2 py-1.5 text-sm">
+                <option value="">State</option>
+                {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+              </select>
             </div>
-            <input value={packageForm.name} onChange={(e) => setPackageForm((f) => ({ ...f, name: e.target.value }))} placeholder="Package name" className="w-full border rounded px-2 py-1.5 text-sm" />
-            <button onClick={() => createPackage.mutate()} disabled={createPackage.isPending || !packageForm.carrierId || !packageForm.state || !packageForm.name} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
+            <div className="border rounded px-2 py-1.5 text-sm bg-white text-slate-700 min-h-9">
+              {derivedPackageName || 'Package name will be Carrier - LOB - State'}
+            </div>
+            <button onClick={() => createPackage.mutate()} disabled={createPackage.isPending || !derivedPackageName} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
               <Plus className="h-4 w-4" /> Create package
             </button>
           </div>
@@ -434,7 +552,7 @@ export function PolicyFormsAdminPage() {
                       </select>
                     </div>
                     <div className="grid grid-cols-[1fr_auto] gap-2">
-                      <select value={row.formType} onChange={(e) => setPackageRows((rows) => rows.map((r, i) => i === index ? { ...r, formType: e.target.value as PolicyFormType } : r))} className="border rounded px-2 py-1.5 text-sm">
+                      <select value={row.formType} onChange={(e) => updatePackageRowType(index, e.target.value as PolicyFormType)} className="border rounded px-2 py-1.5 text-sm">
                         {FORM_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
                       </select>
                       <button onClick={() => setPackageRows((rows) => rows.filter((_, i) => i !== index).map((r, i) => ({ ...r, sequenceOrder: i + 1 })))} className="px-2 border rounded text-slate-500 hover:text-red-600">
@@ -442,7 +560,10 @@ export function PolicyFormsAdminPage() {
                       </button>
                     </div>
                     {row.formType === 'Conditional' && (
-                      <textarea value={row.triggerConditionJson ?? ''} onChange={(e) => setPackageRows((rows) => rows.map((r, i) => i === index ? { ...r, triggerConditionJson: e.target.value } : r))} placeholder='Trigger JSON, e.g. {"path":"triaRejected","equals":true}' className="w-full border rounded px-2 py-1.5 text-xs font-mono" rows={2} />
+                      <ConditionalTriggerBuilder
+                        value={row.triggerConditionJson}
+                        onChange={(triggerConditionJson) => setPackageRows((rows) => rows.map((r, i) => i === index ? { ...r, triggerConditionJson } : r))}
+                      />
                     )}
                   </div>
                 ))}
@@ -479,6 +600,95 @@ export function PolicyFormsAdminPage() {
           </div>
         </section>
       </div>
+    </div>
+  )
+}
+
+function ConditionalTriggerBuilder({
+  value,
+  onChange,
+}: {
+  value?: string
+  onChange: (value: string) => void
+}) {
+  const config = parseTriggerCondition(value)
+  const field = getTriggerField(config.path)
+
+  const update = (patch: Partial<TriggerConfig>) => {
+    const nextField = patch.path ? getTriggerField(patch.path) : field
+    const next: TriggerConfig = {
+      ...config,
+      ...patch,
+      path: nextField.path,
+    }
+
+    if (patch.path) {
+      if (nextField.kind === 'boolean') {
+        next.operator = 'equals'
+        next.value = true
+      } else if (nextField.kind === 'lob') {
+        next.operator = 'equals'
+        next.value = 'InlandMarine'
+      } else {
+        next.operator = 'greaterThan'
+        next.value = 0
+      }
+    }
+
+    onChange(buildTriggerCondition(next))
+  }
+
+  return (
+    <div className="rounded border border-blue-100 bg-blue-50 p-2 space-y-2">
+      <div className="grid grid-cols-1 gap-2">
+        <select
+          value={config.path}
+          onChange={(e) => update({ path: e.target.value as TriggerFieldPath })}
+          className="border rounded px-2 py-1.5 text-sm bg-white"
+        >
+          {TRIGGER_FIELDS.map((triggerField) => (
+            <option key={triggerField.path} value={triggerField.path}>{triggerField.label}</option>
+          ))}
+        </select>
+
+        {field.kind === 'boolean' ? (
+          <div className="grid grid-cols-2 gap-2">
+            <select value={config.operator} onChange={(e) => update({ operator: e.target.value as TriggerOperator })} className="border rounded px-2 py-1.5 text-sm bg-white">
+              <option value="equals">is</option>
+              <option value="notEquals">is not</option>
+            </select>
+            <select value={String(config.value)} onChange={(e) => update({ value: e.target.value === 'true' })} className="border rounded px-2 py-1.5 text-sm bg-white">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+        ) : field.kind === 'lob' ? (
+          <div className="grid grid-cols-2 gap-2">
+            <select value={config.operator} onChange={(e) => update({ operator: e.target.value as TriggerOperator })} className="border rounded px-2 py-1.5 text-sm bg-white">
+              <option value="equals">is</option>
+              <option value="notEquals">is not</option>
+            </select>
+            <select value={String(config.value)} onChange={(e) => update({ value: e.target.value })} className="border rounded px-2 py-1.5 text-sm bg-white">
+              {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <select value={config.operator} onChange={(e) => update({ operator: e.target.value as TriggerOperator })} className="border rounded px-2 py-1.5 text-sm bg-white">
+              <option value="greaterThan">greater than</option>
+              <option value="lessThan">less than</option>
+              <option value="equals">equals</option>
+            </select>
+            <input
+              type="number"
+              value={Number(config.value)}
+              onChange={(e) => update({ value: Number(e.target.value) || 0 })}
+              className="border rounded px-2 py-1.5 text-sm bg-white"
+            />
+          </div>
+        )}
+      </div>
+      <p className="text-[11px] text-blue-700">{describeTriggerCondition(config)}</p>
     </div>
   )
 }

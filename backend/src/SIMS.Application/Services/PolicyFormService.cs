@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -274,22 +275,50 @@ public class PolicyFormService : IPolicyFormService
         if (existingTemplateCount != templateIds.Count)
             return Result<PolicyPackageConfigurationDto>.Failure("VALIDATION", "One or more selected forms were not found.");
 
+        foreach (var form in forms.Where(f => f.FormType == PolicyFormType.Conditional && !string.IsNullOrWhiteSpace(f.TriggerConditionJson)))
+        {
+            if (!TryNormalizeJson(form.TriggerConditionJson, out _))
+                return Result<PolicyPackageConfigurationDto>.Failure("VALIDATION", "Conditional form rules must be valid trigger rules.");
+        }
+
         Db.Set<PolicyPackageForm>().RemoveRange(package.Forms);
         foreach (var form in forms.OrderBy(f => f.SequenceOrder))
         {
+            var triggerConditionJson = form.FormType == PolicyFormType.Conditional && TryNormalizeJson(form.TriggerConditionJson, out var normalized)
+                ? normalized
+                : null;
+
             package.Forms.Add(new PolicyPackageForm
             {
                 PolicyPackageConfigurationId = packageId,
                 PolicyFormTemplateId = form.PolicyFormTemplateId,
                 SequenceOrder = form.SequenceOrder,
                 FormType = form.FormType,
-                TriggerConditionJson = string.IsNullOrWhiteSpace(form.TriggerConditionJson) ? null : form.TriggerConditionJson.Trim(),
+                TriggerConditionJson = triggerConditionJson,
                 Notes = form.Notes?.Trim(),
             });
         }
 
         await Db.SaveChangesAsync();
         return await GetPackageAsync(packageId);
+    }
+
+    private static bool TryNormalizeJson(string? json, out string? normalized)
+    {
+        normalized = null;
+        if (string.IsNullOrWhiteSpace(json))
+            return true;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            normalized = doc.RootElement.GetRawText();
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static string? ValidateTemplate(PolicyFormTemplateUpsertDto dto)
