@@ -56,6 +56,7 @@ const ComplianceDocumentationPage = lazy(() => import('@/pages/compliance/Compli
 const ComplianceDocumentDetailPage = lazy(() => import('@/pages/compliance/ComplianceDocumentDetailPage').then((m) => ({ default: m.ComplianceDocumentDetailPage })))
 const ComplianceAttestationsPage = lazy(() => import('@/pages/compliance/ComplianceAttestationsPage').then((m) => ({ default: m.ComplianceAttestationsPage })))
 const ComplianceReviewsPage = lazy(() => import('@/pages/compliance/ComplianceReviewsPage').then((m) => ({ default: m.ComplianceReviewsPage })))
+const ComplianceEvidenceReportPage = lazy(() => import('@/pages/compliance/ComplianceEvidenceReportPage').then((m) => ({ default: m.ComplianceEvidenceReportPage })))
 
 // Tasks
 const TaskQueuePage = lazy(() => import('@/pages/tasks/TaskQueuePage').then((m) => ({ default: m.TaskQueuePage })))
@@ -188,6 +189,7 @@ export default function App() {
               <Route path="/compliance-documentation" element={<ComplianceDocumentationPage />} />
               <Route path="/compliance-documentation/attestations" element={<ComplianceAttestationsPage />} />
               <Route path="/compliance-documentation/reviews" element={<ComplianceReviewsPage />} />
+              <Route path="/compliance-documentation/:id/report" element={<ComplianceEvidenceReportPage />} />
               <Route path="/compliance-documentation/:id" element={<ComplianceDocumentDetailPage />} />
 
               <Route path="/tasks" element={<TaskQueuePage />} />

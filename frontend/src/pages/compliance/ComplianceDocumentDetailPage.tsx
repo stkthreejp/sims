@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle, Check, GitCompare, Loader2, Save, Send } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Check, FileText, GitCompare, Loader2, Save, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { usersApi } from '@/api/users.api'
@@ -204,6 +204,14 @@ export function ComplianceDocumentDetailPage() {
         >
           {publishMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
           Publish
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate(`/compliance-documentation/${document.id}/report`)}
+          className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <FileText className="h-4 w-4" />
+          Report
         </button>
       </div>
 
