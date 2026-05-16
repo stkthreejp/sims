@@ -61,3 +61,10 @@ public record InvoiceDetailDto(
     IReadOnlyList<InvoiceLineDto> Lines,
     IReadOnlyList<LedgerEntryDto> LedgerEntries
 );
+
+public record InvoicePreviewDto(
+    decimal GrossPremium,
+    decimal TotalFees,
+    decimal TotalAmount,
+    IReadOnlyList<InvoiceLineDto> Lines
+);

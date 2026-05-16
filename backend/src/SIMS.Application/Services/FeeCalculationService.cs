@@ -47,6 +47,16 @@ public class FeeCalculationService : IFeeCalculationService
         // Step 2: Filter exclusions
         resolved = resolved
             .Where(v => !(v.ExcludeOnEndorsements && ctx.IsEndorsement))
+            .Where(v => !(v.ExcludeOnRenewal && IsTransaction(ctx, "Renewal")))
+            .Where(v => !(v.ExcludeOnOriginalBinder && ctx.IsOriginalBinder))
+            .Where(v => !(v.ExcludeOnMultiCarrierPolicy && ctx.IsMultiCarrierPolicy))
+            .Where(v => !(v.ApplyWhenPackagePolicyOnly && !ctx.IsPackagePolicy))
+            .Where(v => !(v.DoNotApplyWhenPackagePolicyOnly && ctx.IsPackagePolicy))
+            .Where(v => !(v.OnlyAppliesToIssuanceState && v.StateCode != null && !string.Equals(v.StateCode, ctx.StateCode, StringComparison.OrdinalIgnoreCase)))
+            .Where(v => !(v.AppliesToFlatCancellations && !ctx.IsFlatCancellation))
+            .Where(v => !(v.StateCountMin.HasValue && ctx.StateCount < v.StateCountMin.Value))
+            .Where(v => !(v.StateCountMax.HasValue && ctx.StateCount > v.StateCountMax.Value))
+            .Where(v => !IsExcludedTransactionType(v, ctx.TransactionType))
             .Where(v => !(v.ExcludeWhenNotFiling && !ctx.IsFilingState))
             .ToList();
 
@@ -143,6 +153,15 @@ public class FeeCalculationService : IFeeCalculationService
         (v.StateCode != null ? 1 : 0) +
         (v.City != null ? 1 : 0) +
         (v.LicenseType != null ? 1 : 0);
+
+    private static bool IsTransaction(PolicyContext ctx, string transactionType) =>
+        string.Equals(ctx.TransactionType, transactionType, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsExcludedTransactionType(FeeRuleVersion rule, string transactionType) =>
+        !string.IsNullOrWhiteSpace(rule.ExcludedPolicyTransactionTypes) &&
+        rule.ExcludedPolicyTransactionTypes
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Any(t => string.Equals(t, transactionType, StringComparison.OrdinalIgnoreCase));
 
     private static decimal ComputeStratified(decimal premium, List<FeePremiumBracket> brackets)
     {

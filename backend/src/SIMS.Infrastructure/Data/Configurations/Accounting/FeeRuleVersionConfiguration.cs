@@ -18,6 +18,7 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
         b.Property(x => x.CalcType).IsRequired().HasMaxLength(20);
         b.Property(x => x.InstallmentBehavior).IsRequired().HasMaxLength(30);
         b.Property(x => x.PremiumThresholdBasis).HasMaxLength(20);
+        b.Property(x => x.ExcludedPolicyTransactionTypes).HasMaxLength(500);
         b.Property(x => x.RoundingMode).IsRequired().HasMaxLength(30);
         b.Property(x => x.PayableRouting).IsRequired().HasMaxLength(20);
         b.Property(x => x.Notes).HasMaxLength(2000);

@@ -38,10 +38,16 @@ const EMPTY: VersionForm = {
   commissionable: false, installmentBehavior: 'PerInstallment',
   splitByParticipation: false, fullyEarned: false, fullyEarnedDays: null,
   excludeTerrorism: false, multiplyByLocations: false, multiplyByVehicles: false,
+  applyOnlyOnce: false, mandatoryCharge: false,
   sendToAccounting: true, applyAutomatically: true,
+  applyWhenPackagePolicyOnly: false, doNotApplyWhenPackagePolicyOnly: false,
+  applyToChildLines: false, onlyAppliesToIssuanceState: false, appliesToFlatCancellations: false,
   premiumMinThreshold: null, premiumMaxThreshold: null, premiumThresholdBasis: null,
+  stateCountMin: null, stateCountMax: null,
   roundingMode: 'NearestCent', excludeWhenNotFiling: false, excludeOnEndorsements: false,
-  payableRouting: 'NotPayable', payablePayeeId: null, notes: null,
+  excludeOnRenewal: false, excludeOnOriginalBinder: false, excludeOnMultiCarrierPolicy: false,
+  payHomeState: false, excludedPolicyTransactionTypes: null,
+  payableRouting: 'NotPayable', payablePayeeId: null, masterPayeeWhenHomeState: false, notes: null,
   premiumBrackets: [], nonTaxableStates: [],
 }
 
@@ -363,6 +369,20 @@ export function FeesAdminPage() {
             <input type="checkbox" checked={form.applyAutomatically} onChange={e => set('applyAutomatically', e.target.checked)} className="rounded" />
             <span className="text-sm text-gray-700">Apply Automatically</span>
           </label>
+          {([
+            ['applyWhenPackagePolicyOnly', 'Apply when Package Policy Only'],
+            ['doNotApplyWhenPackagePolicyOnly', 'Do not apply when Package Policy Only'],
+            ['applyToChildLines', 'Apply to Child Lines'],
+            ['applyOnlyOnce', 'Apply Only Once'],
+            ['onlyAppliesToIssuanceState', 'Only applies to state of issuance'],
+            ['appliesToFlatCancellations', 'Applies to Flat Cancellations'],
+            ['mandatoryCharge', 'Mandatory Charge'],
+          ] as [keyof VersionForm, string][]).map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={!!form[key]} onChange={e => set(key, e.target.checked as any)} className="rounded" />
+              <span className="text-sm text-gray-700">{label}</span>
+            </label>
+          ))}
           <Field label="Min Premium ($)">
             <input type="number" step="0.01" value={form.premiumMinThreshold ?? ''} onChange={e => set('premiumMinThreshold', e.target.value ? Number(e.target.value) : null)} className={inputCls} />
           </Field>
@@ -375,6 +395,12 @@ export function FeesAdminPage() {
               <option value="ByLine">By Line</option>
               <option value="ByPolicy">By Policy</option>
             </select>
+          </Field>
+          <Field label="Min States">
+            <input type="number" step="1" value={form.stateCountMin ?? ''} onChange={e => set('stateCountMin', e.target.value ? Number(e.target.value) : null)} className={inputCls} />
+          </Field>
+          <Field label="Max States">
+            <input type="number" step="1" value={form.stateCountMax ?? ''} onChange={e => set('stateCountMax', e.target.value ? Number(e.target.value) : null)} className={inputCls} />
           </Field>
         </div>
 
@@ -393,9 +419,13 @@ export function FeesAdminPage() {
               <input type="number" value={form.payablePayeeId ?? ''} onChange={e => set('payablePayeeId', e.target.value ? Number(e.target.value) : null)} className={inputCls} />
             </Field>
           )}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.masterPayeeWhenHomeState} onChange={e => set('masterPayeeWhenHomeState', e.target.checked)} className="rounded" />
+            <span className="text-sm text-gray-700">Master payee when home state</span>
+          </label>
         </div>
 
-        <SectionHeader label="Behavior Flags" />
+        <SectionHeader label="Exclusions and Behavior Flags" />
         <div className="grid grid-cols-3 gap-3">
           {([
             ['commissionable', 'Commissionable'],
@@ -406,6 +436,10 @@ export function FeesAdminPage() {
             ['splitByParticipation', 'Split by Participation'],
             ['excludeWhenNotFiling', 'Exclude When Not Filing'],
             ['excludeOnEndorsements', 'Exclude on Endorsements'],
+            ['excludeOnRenewal', 'Exclude on Renewal'],
+            ['excludeOnOriginalBinder', 'Exclude on Original Binder'],
+            ['excludeOnMultiCarrierPolicy', 'Exclude on Multi-Carrier Policy'],
+            ['payHomeState', 'Pay Home State'],
           ] as [keyof VersionForm, string][]).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={!!form[key]} onChange={e => set(key, e.target.checked as any)} className="rounded" />
@@ -420,6 +454,9 @@ export function FeesAdminPage() {
               <option value="PerInstallment">Per Installment</option>
               <option value="DownpaymentOnly">Downpayment Only</option>
             </select>
+          </Field>
+          <Field label="Exclude on Policy Transaction Types">
+            <input value={form.excludedPolicyTransactionTypes ?? ''} onChange={e => set('excludedPolicyTransactionTypes', e.target.value || null)} placeholder="Renewal, Cancellation, Audit" className={inputCls} />
           </Field>
         </div>
 

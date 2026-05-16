@@ -40,21 +40,36 @@ public class FeeRuleVersion
     public bool MultiplyByLocations { get; set; } = false;
     public bool MultiplyByVehicles { get; set; } = false;
     public bool SendToAccounting { get; set; } = true;
+    public bool ApplyOnlyOnce { get; set; } = false;
+    public bool MandatoryCharge { get; set; } = false;
 
     // Auto Apply
     public bool ApplyAutomatically { get; set; } = true;
+    public bool ApplyWhenPackagePolicyOnly { get; set; } = false;
+    public bool DoNotApplyWhenPackagePolicyOnly { get; set; } = false;
+    public bool ApplyToChildLines { get; set; } = false;
+    public bool OnlyAppliesToIssuanceState { get; set; } = false;
+    public bool AppliesToFlatCancellations { get; set; } = false;
     public decimal? PremiumMinThreshold { get; set; }
     public decimal? PremiumMaxThreshold { get; set; }
     public string? PremiumThresholdBasis { get; set; }  // 'ByLine'|'ByPolicy'
+    public int? StateCountMin { get; set; }
+    public int? StateCountMax { get; set; }
     public string RoundingMode { get; set; } = "NearestCent";
 
     // Exclusions
     public bool ExcludeWhenNotFiling { get; set; } = false;
     public bool ExcludeOnEndorsements { get; set; } = false;
+    public bool ExcludeOnRenewal { get; set; } = false;
+    public bool ExcludeOnOriginalBinder { get; set; } = false;
+    public bool ExcludeOnMultiCarrierPolicy { get; set; } = false;
+    public bool PayHomeState { get; set; } = false;
+    public string? ExcludedPolicyTransactionTypes { get; set; }
 
     // Payable routing
     public string PayableRouting { get; set; } = "NotPayable";  // 'NotPayable'|'Company'|'Entity'
     public long? PayablePayeeId { get; set; }
+    public bool MasterPayeeWhenHomeState { get; set; } = false;
 
     // Audit
     public Guid CreatedBy { get; set; }

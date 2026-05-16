@@ -50,15 +50,30 @@ export interface FeeRuleVersion {
   multiplyByLocations: boolean
   multiplyByVehicles: boolean
   sendToAccounting: boolean
+  applyOnlyOnce: boolean
+  mandatoryCharge: boolean
   applyAutomatically: boolean
+  applyWhenPackagePolicyOnly: boolean
+  doNotApplyWhenPackagePolicyOnly: boolean
+  applyToChildLines: boolean
+  onlyAppliesToIssuanceState: boolean
+  appliesToFlatCancellations: boolean
   premiumMinThreshold: number | null
   premiumMaxThreshold: number | null
   premiumThresholdBasis: string | null
+  stateCountMin: number | null
+  stateCountMax: number | null
   roundingMode: RoundingMode
   excludeWhenNotFiling: boolean
   excludeOnEndorsements: boolean
+  excludeOnRenewal: boolean
+  excludeOnOriginalBinder: boolean
+  excludeOnMultiCarrierPolicy: boolean
+  payHomeState: boolean
+  excludedPolicyTransactionTypes: string | null
   payableRouting: PayableRouting
   payablePayeeId: number | null
+  masterPayeeWhenHomeState: boolean
   notes: string | null
   premiumBrackets: FeePremiumBracket[]
   nonTaxableStates: string[]

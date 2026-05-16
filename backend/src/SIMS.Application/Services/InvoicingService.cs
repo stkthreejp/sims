@@ -161,6 +161,58 @@ public class InvoicingService : IInvoicingService
             await db.SaveChangesAsync(ct);
         }
 
+        var payableFeeLines = invoice.Lines
+            .Where(l => l.Amount > 0 && l.PayableRouting is "Company" or "Entity")
+            .ToList();
+        if (payableFeeLines.Count > 0)
+        {
+            var payeeIds = payableFeeLines
+                .Where(l => l.PayableRouting == "Entity" && l.PayablePayeeId.HasValue)
+                .Select(l => l.PayablePayeeId!.Value)
+                .Distinct()
+                .ToList();
+            var payees = payeeIds.Count == 0
+                ? new Dictionary<long, Payee>()
+                : await db.Set<Payee>().Where(p => payeeIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
+
+            foreach (var line in payableFeeLines)
+            {
+                string linePayeeName;
+                Guid? lineCarrierId = null;
+                if (line.PayableRouting == "Company")
+                {
+                    linePayeeName = payeeName;
+                    lineCarrierId = carrierId;
+                }
+                else if (line.PayablePayeeId.HasValue && payees.TryGetValue(line.PayablePayeeId.Value, out var payee))
+                {
+                    linePayeeName = payee.Name;
+                }
+                else
+                {
+                    linePayeeName = line.FeeDisplayName;
+                }
+
+                db.Set<Payable>().Add(new Payable
+                {
+                    TenantId = 1,
+                    InvoiceId = invoice.Id,
+                    CarrierId = lineCarrierId,
+                    PayeeName = linePayeeName,
+                    GlAccountId = line.LedgerAccountId,
+                    Amount = line.Amount,
+                    PaidAmount = 0,
+                    InvoiceDate = invoice.InvoiceDate,
+                    DueDate = invoice.InvoiceDate.AddDays(30),
+                    Status = "Open",
+                    CreatedBy = userId,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+
         return Result<InvoiceDetailDto>.Success(await LoadDetailAsync(invoice.Id, ct));
     }
 

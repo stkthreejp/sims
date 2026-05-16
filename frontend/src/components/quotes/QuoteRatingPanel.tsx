@@ -102,6 +102,8 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rating-snapshot', quoteId] })
+      qc.invalidateQueries({ queryKey: ['quotes', quoteId] })
+      qc.invalidateQueries({ queryKey: ['quote-invoice-preview', quoteId] })
       qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', submissionId] })
       toast.success('Premium calculated')
     },

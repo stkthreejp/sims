@@ -271,6 +271,8 @@ public class QuoteService : IQuoteService
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Quote is already bound.");
 
+        await using var dbTransaction = await Db.Database.BeginTransactionAsync();
+
         var policyNumberResult = await _policyNumbers.GenerateForBindAsync(quote, access.UserId);
         if (!policyNumberResult.IsSuccess || policyNumberResult.Value == null)
             return Result<QuoteDto>.Failure(policyNumberResult.ErrorCode ?? "POLICY_NUMBER_ERROR", policyNumberResult.ErrorMessage ?? "Policy number could not be assigned.");
@@ -374,7 +376,11 @@ public class QuoteService : IQuoteService
             VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
             PolicyTransactionId: transaction.Id
         );
-        await invoicing.BindAsync(invoiceReq, access.UserId);
+        var invoiceResult = await invoicing.BindAsync(invoiceReq, access.UserId);
+        if (!invoiceResult.IsSuccess)
+            return Result<QuoteDto>.Failure(invoiceResult.ErrorCode ?? "INVOICE_FAILED", invoiceResult.ErrorMessage ?? "Invoice could not be created.");
+
+        await dbTransaction.CommitAsync();
 
         await _workflowEngine.FireEventAsync(
             "quote.status.bound",
@@ -383,6 +389,56 @@ public class QuoteService : IQuoteService
             BuildQuoteContext(quote));
 
         return Result<QuoteDto>.Success(MapToDto(quote));
+    }
+
+    public async Task<Result<InvoicePreviewDto>> GetInvoicePreviewAsync(Guid id, UserAccessScope access)
+    {
+        var quote = await Db.Set<Quote>()
+            .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
+            .Include(qt => qt.Submission).ThenInclude(s => s.Locations)
+            .Include(qt => qt.Submission).ThenInclude(s => s.Vehicles)
+            .Where(qt => qt.Id == id && !qt.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+
+        if (quote == null)
+            return Result<InvoicePreviewDto>.Failure("NOT_FOUND", "Quote not found.");
+
+        var feeCalc = (IFeeCalculationService)_sp.GetService(typeof(IFeeCalculationService))!;
+        var ctx = new PolicyContext(
+            EffectiveDate: quote.EffectiveDate,
+            GrossPremium: quote.PremiumAmount,
+            StateCode: quote.Submission?.Insured?.State ?? "",
+            IsEndorsement: false,
+            IsFilingState: quote.IsFilingState,
+            CarrierId: quote.CarrierId,
+            CompanyId: quote.CompanyId,
+            ProducerId: quote.ProducerId,
+            LineOfBusiness: quote.LineOfBusiness.ToString(),
+            City: null,
+            LicenseType: null,
+            LocationCount: quote.Submission?.Locations?.Count(l => !l.IsDeleted) ?? 1,
+            VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1);
+
+        var calcResult = await feeCalc.CalculateAsync(ctx);
+        var lines = calcResult.Lines
+            .Select(l => new InvoiceLineDto(
+                Id: 0,
+                FeeCode: l.FeeCode,
+                FeeDisplayName: l.FeeDisplayName,
+                FeeCategory: l.FeeCategory,
+                Amount: l.Amount,
+                IsTaxable: l.IsTaxable,
+                AccountCode: "",
+                AccountLabel: ""))
+            .ToList();
+
+        var totalFees = lines.Sum(l => l.Amount);
+        return Result<InvoicePreviewDto>.Success(new InvoicePreviewDto(
+            GrossPremium: quote.PremiumAmount,
+            TotalFees: totalFees,
+            TotalAmount: quote.PremiumAmount + totalFees,
+            Lines: lines));
     }
 
     public async Task<Result<QuoteDto>> ApplyCommissionOverrideAsync(

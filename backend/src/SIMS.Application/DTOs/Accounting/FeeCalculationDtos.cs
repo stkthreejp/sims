@@ -13,7 +13,14 @@ public record PolicyContext(
     string? City,
     string? LicenseType,      // 'Admitted'|'Non-Admitted'
     int LocationCount = 1,
-    int VehicleCount = 1
+    int VehicleCount = 1,
+    string TransactionType = "NewBusiness",
+    bool IsOriginalBinder = true,
+    bool IsPackagePolicy = false,
+    bool IsChildLine = false,
+    bool IsMultiCarrierPolicy = false,
+    bool IsFlatCancellation = false,
+    int StateCount = 1
 );
 
 public record InvoiceLine(

@@ -936,6 +936,12 @@ export function QuoteDetailPage() {
     enabled: !!quoteId,
   })
 
+  const { data: invoicePreview } = useQuery({
+    queryKey: ['quote-invoice-preview', quoteId],
+    queryFn: () => quotesApi.getInvoicePreview(quoteId!),
+    enabled: !!quoteId,
+  })
+
   const { data: writeup, isLoading: writeupLoading, isError: writeupIsError } = useQuery({
     queryKey: ['uw-writeup', quoteId],
     queryFn: () => uwWriteupApi.get(quoteId!),
@@ -969,6 +975,7 @@ export function QuoteDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['quotes', quoteId] })
       qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', quote?.submissionId] })
+      qc.invalidateQueries({ queryKey: ['quote-invoice-preview', quoteId] })
       setShowReduce(false)
       setOverrideInput('')
       toast.success('Commission give-back applied')
@@ -1677,6 +1684,46 @@ export function QuoteDetailPage() {
 
           {/* ── Sidebar ── */}
           <div className="flex flex-col gap-4 max-[1100px]:flex-row max-[1100px]:flex-wrap max-[600px]:flex-col">
+
+            {/* Bind invoice preview */}
+            <Card>
+              <div className="px-4 py-3">
+                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Bind invoice preview</h3>
+                {invoicePreview ? (
+                  <>
+                    {[
+                      { label: 'Premium', value: formatCurrency(invoicePreview.grossPremium) },
+                      { label: 'Taxes & fees', value: formatCurrency(invoicePreview.totalFees) },
+                      { label: 'Invoice total', value: formatCurrency(invoicePreview.totalAmount) },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between border-b border-slate-100 py-2 text-xs last:border-0">
+                        <span className="text-slate-500">{row.label}</span>
+                        <span className="font-medium text-slate-700">{row.value}</span>
+                      </div>
+                    ))}
+                    <div className="mt-3 space-y-1">
+                      {invoicePreview.lines.length > 0 ? invoicePreview.lines.map((line) => (
+                        <div key={`${line.feeCode}-${line.feeDisplayName}`} className="flex items-start justify-between rounded-md bg-slate-50 px-2 py-1.5 text-[11px]">
+                          <span className="min-w-0 pr-2 text-slate-600">
+                            <span className="font-medium text-slate-700">{line.feeDisplayName}</span>
+                            <span className="ml-1 text-slate-400">{line.feeCategory}</span>
+                          </span>
+                          <span className="font-semibold tabular-nums text-slate-800">{formatCurrency(line.amount)}</span>
+                        </div>
+                      )) : (
+                        <div className="rounded-md bg-amber-50 px-2 py-2 text-[11px] font-medium text-amber-700">
+                          No automatic fee rules match this quote.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-md bg-slate-50 px-2 py-2 text-[11px] text-slate-500">
+                    Fee preview will appear when the quote is loaded.
+                  </div>
+                )}
+              </div>
+            </Card>
 
             {/* Bind CTA */}
             {(canBind || ((quote.status === 'Quoted' || quote.status === 'Submitted') && openBlockers > 0)) && (

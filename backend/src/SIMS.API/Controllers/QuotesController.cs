@@ -86,6 +86,13 @@ public class QuotesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("{id:guid}/invoice-preview")]
+    public async Task<IActionResult> GetInvoicePreview(Guid id)
+    {
+        var result = await _quoteService.GetInvoicePreviewAsync(id, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpGet("{id:guid}/auto-safety")]
     public async Task<IActionResult> GetAutoSafety(Guid id)
     {

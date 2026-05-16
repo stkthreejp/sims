@@ -157,6 +157,24 @@ export interface CommissionOverrideRequest {
   newAgentRate?: number     // new agent rate as decimal (e.g. 0.08 for 8%)
 }
 
+export interface InvoicePreviewLine {
+  id: number
+  feeCode: string
+  feeDisplayName: string
+  feeCategory: string
+  amount: number
+  isTaxable: boolean
+  accountCode: string
+  accountLabel: string
+}
+
+export interface InvoicePreview {
+  grossPremium: number
+  totalFees: number
+  totalAmount: number
+  lines: InvoicePreviewLine[]
+}
+
 export interface Note {
   id: string
   quoteId: string
