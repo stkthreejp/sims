@@ -259,6 +259,9 @@ public class ComplianceDocumentService : IComplianceDocumentService
         if (document?.CurrentDraftVersion == null)
             return Result<ComplianceDocumentDetailDto>.Failure("NOT_FOUND", "Draft not found.");
 
+        if (document.Status != "Under Review")
+            return Result<ComplianceDocumentDetailDto>.Failure("VALIDATION", "Draft must be submitted for review before publishing.");
+
         var draft = document.CurrentDraftVersion;
         draft.Status = "Published";
         draft.ApprovedById = userId;
