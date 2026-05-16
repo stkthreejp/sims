@@ -9,6 +9,7 @@ public class Attachment : BaseEntity
     public Guid? SubmissionId { get; set; }
     public Guid? CarrierId { get; set; }
     public Guid? AgentId { get; set; }
+    public Guid? InsuredId { get; set; }
 
     public DocumentEntityType EntityType { get; set; }
     public DocumentType DocumentType { get; set; }
@@ -26,5 +27,6 @@ public class Attachment : BaseEntity
     public Submission? Submission { get; set; }
     public Carrier? Carrier { get; set; }
     public Agent? Agent { get; set; }
+    public Insured? Insured { get; set; }
     public User UploadedBy { get; set; } = null!;
 }

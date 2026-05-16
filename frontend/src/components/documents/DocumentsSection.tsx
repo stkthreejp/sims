@@ -146,7 +146,7 @@ function UploadDialog({
             className="sd-btn primary"
           >
             {uploadMutation.isPending
-              ? <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</>
               : <><Upload className="h-4 w-4" /> Upload</>
             }
           </button>
@@ -198,10 +198,10 @@ function DocumentRow({
           <div className="mt-0.5 flex items-center gap-2">
             <span className="text-xs text-slate-400">{formatBytes(attachment.fileSizeBytes)}</span>
             {attachment.description && (
-              <span className="text-xs text-slate-400 truncate">· {attachment.description}</span>
+              <span className="text-xs text-slate-400 truncate">- {attachment.description}</span>
             )}
             <span className="text-xs text-slate-400">
-              · {attachment.uploadedByName} · {new Date(attachment.createdAt).toLocaleDateString()}
+              - {attachment.uploadedByName} - {new Date(attachment.createdAt).toLocaleDateString()}
             </span>
           </div>
         </div>
@@ -369,7 +369,7 @@ export function DocumentsSection({
       {/* Zones */}
       {isLoading ? (
         <div className="flex items-center gap-2 px-4 py-5 text-sm" style={{ color: 'var(--ink-3)' }}>
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading documents…
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading documents...
         </div>
       ) : (
         <div className="space-y-2 p-4">

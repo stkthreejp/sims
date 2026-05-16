@@ -52,4 +52,5 @@ public enum DocumentEntityType
     Policy,
     Carrier,
     Agent,
+    Insured,
 }

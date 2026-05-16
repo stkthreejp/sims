@@ -33,6 +33,9 @@ public class AttachmentsController : ControllerBase
     [HttpGet("api/v1/agents/{entityId:guid}/attachments")]
     public Task<IActionResult> GetAgent(Guid entityId) => GetAll(DocumentEntityType.Agent, entityId);
 
+    [HttpGet("api/v1/insureds/{entityId:guid}/attachments")]
+    public Task<IActionResult> GetInsured(Guid entityId) => GetAll(DocumentEntityType.Insured, entityId);
+
     private async Task<IActionResult> GetAll(DocumentEntityType entityType, Guid entityId)
         => Ok(await _attachmentService.GetByEntityAsync(entityType, entityId, CurrentUserId));
 
@@ -61,6 +64,12 @@ public class AttachmentsController : ControllerBase
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadAgent(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Agent, entityId, file, documentType, description);
+
+    [HttpPost("api/v1/insureds/{entityId:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [RequestSizeLimit(52_428_800)]
+    public Task<IActionResult> UploadInsured(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
+        => Upload(DocumentEntityType.Insured, entityId, file, documentType, description);
 
     private async Task<IActionResult> Upload(DocumentEntityType entityType, Guid entityId, IFormFile file, DocumentType documentType, string? description)
     {

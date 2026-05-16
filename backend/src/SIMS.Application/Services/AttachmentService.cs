@@ -65,6 +65,7 @@ public class AttachmentService : IAttachmentService
             DocumentEntityType.Submission => q.Where(a => a.SubmissionId == entityId),
             DocumentEntityType.Carrier    => q.Where(a => a.CarrierId == entityId),
             DocumentEntityType.Agent      => q.Where(a => a.AgentId == entityId),
+            DocumentEntityType.Insured    => q.Where(a => a.InsuredId == entityId),
             _ => q,
         };
 
@@ -128,6 +129,7 @@ public class AttachmentService : IAttachmentService
             case DocumentEntityType.Submission: attachment.SubmissionId = entityId; break;
             case DocumentEntityType.Carrier:    attachment.CarrierId = entityId;    break;
             case DocumentEntityType.Agent:      attachment.AgentId = entityId;      break;
+            case DocumentEntityType.Insured:    attachment.InsuredId = entityId;    break;
         }
 
         _db.Set<Attachment>().Add(attachment);
@@ -192,6 +194,7 @@ public class AttachmentService : IAttachmentService
             case DocumentEntityType.Submission: attachment.SubmissionId = entityId; break;
             case DocumentEntityType.Carrier:    attachment.CarrierId = entityId;    break;
             case DocumentEntityType.Agent:      attachment.AgentId = entityId;      break;
+            case DocumentEntityType.Insured:    attachment.InsuredId = entityId;    break;
         }
 
         _db.Set<Attachment>().Add(attachment);
@@ -257,6 +260,8 @@ public class AttachmentService : IAttachmentService
                 await CanAccessEntityAsync(DocumentEntityType.Carrier, attachment.CarrierId.Value, userId),
             DocumentEntityType.Agent when attachment.AgentId.HasValue =>
                 await CanAccessEntityAsync(DocumentEntityType.Agent, attachment.AgentId.Value, userId),
+            DocumentEntityType.Insured when attachment.InsuredId.HasValue =>
+                await CanAccessEntityAsync(DocumentEntityType.Insured, attachment.InsuredId.Value, userId),
             _ => false,
         };
 
@@ -278,6 +283,7 @@ public class AttachmentService : IAttachmentService
                  q.Submission.AssistantUWId == userId)),
             DocumentEntityType.Carrier => await _db.Set<Carrier>().AsNoTracking().AnyAsync(c => c.Id == entityId),
             DocumentEntityType.Agent => await _db.Set<Agent>().AsNoTracking().AnyAsync(a => a.Id == entityId),
+            DocumentEntityType.Insured => await _db.Set<Insured>().AsNoTracking().AnyAsync(i => i.Id == entityId),
             _ => false,
         };
     }
@@ -289,6 +295,7 @@ public class AttachmentService : IAttachmentService
             DocumentEntityType.Policy => await _db.Set<Quote>().AsNoTracking().AnyAsync(q => q.Id == entityId),
             DocumentEntityType.Carrier => await _db.Set<Carrier>().AsNoTracking().AnyAsync(c => c.Id == entityId),
             DocumentEntityType.Agent => await _db.Set<Agent>().AsNoTracking().AnyAsync(a => a.Id == entityId),
+            DocumentEntityType.Insured => await _db.Set<Insured>().AsNoTracking().AnyAsync(i => i.Id == entityId),
             _ => false,
         };
 
