@@ -122,7 +122,7 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Users | Page | `/users` | Needs tweaking | Old table, search, status, and page action styling remain. | Medium |
 | User create/edit modal | Modal | `frontend/src/pages/users/UsersPage.tsx` | Good | Modal now uses SIMS modal, field, role chip, and footer button patterns. | Low |
 | Inbox list | Page | `/inbox` | Needs tweaking | Smaller surface but old utility styling remains. | Medium |
-| Inbox detail | Page | `/inbox/:id` | Never updated | Mostly older utility styling. | High |
+| Inbox detail | Page | `/inbox/:id` | Good | Restyled message header, body, attachments, empty state, and create-submission modal to SIMS card/button/modal patterns; backend wiring verified for email load, insured search, attachment selection, download links, linked submission navigation, and create-submission action. Browser confirmation still useful. | Low |
 | Document library | Page | `/document-library` | Needs tweaking | Uses shared header but old list/card styling remains. | Medium |
 | Template editor page | Page | `/document-library/new`, `/document-library/:id` | Never updated | Older editor page shell and controls. | High |
 | Template editor | Editor surface | `frontend/src/components/editor/TemplateEditor.tsx` | Never updated | Large editor surface with old toolbar/control styling. | High |
@@ -190,3 +190,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-15 | Codex | Audit plan wiring track | Added backend wiring statuses and checklist; existing completed UI rows need wiring back-checks going forward. |
 | 2026-05-15 | Codex | Agent detail first pass | Aligned core agent detail cards, forms, documents, empty states, and icon actions with SIMS patterns; backend wiring appears real for primary workflows. Type check passed. |
 | 2026-05-15 | Codex | Carrier detail first pass | Aligned core carrier detail forms, cards, documents, empty states, modals, and icon actions with SIMS patterns; backend wiring appears real for primary workflows. Type check passed. |
+| 2026-05-16 | Codex | Inbox detail pass | Aligned the inbox detail page and create-submission modal with SIMS header, card, button, modal, field, attachment-row, and empty-state patterns; verified existing real backend wiring for inbound email detail, insured search, selected attachment submission creation, attachment downloads, and linked submission navigation. Type check passed. |
