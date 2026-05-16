@@ -19,6 +19,7 @@ import { inboundEmailsApi } from '@/api/inboundEmails.api'
 import type { CreateSubmissionResult } from '@/api/inboundEmails.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { EmptyState } from '@/components/common/EmptyState'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { EmailAttachmentDocumentType } from '@/types/inboundEmail.types'
 import type { InsuredListItem } from '@/types/insured.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
@@ -153,11 +154,7 @@ export function InboxDetailPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex h-48 items-center justify-center" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
-        Loading email...
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (isError || !email) {
@@ -236,7 +233,11 @@ export function InboxDetailPage() {
                   {email.bodyText.replace(/<[^>]+>/g, '')}
                 </div>
               ) : (
-                <p style={{ margin: 0, color: 'var(--ink-4)', fontSize: 'var(--fs-body)' }}>No body content</p>
+                <EmptyState
+                  icon={FileText}
+                  title="No body content"
+                  description="This email did not include readable body text."
+                />
               )}
             </div>
           </div>
