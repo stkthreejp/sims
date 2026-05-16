@@ -10,6 +10,13 @@ public record FeeDefinitionDto(
     int LedgerAccountId
 );
 
+public record LedgerAccountOptionDto(
+    int Id,
+    string InternalCode,
+    string ExternalLabel,
+    string AccountType
+);
+
 public record FeeRuleVersionDto(
     long Id,
     long FeeDefinitionId,

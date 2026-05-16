@@ -13,6 +13,13 @@ export interface FeeDefinition {
   ledgerAccountId: number
 }
 
+export interface LedgerAccountOption {
+  id: number
+  internalCode: string
+  externalLabel: string
+  accountType: string
+}
+
 export interface FeePremiumBracket {
   id?: number
   tierFrom: number

@@ -110,6 +110,11 @@ export function FeesAdminPage() {
     queryFn: () => carriersApi.getAll(true),
   })
 
+  const { data: ledgerAccounts = [] } = useQuery({
+    queryKey: ['admin', 'fees', 'ledger-accounts'],
+    queryFn: () => feesApi.getLedgerAccounts(),
+  })
+
   const { data: premiumCharges = [], isLoading: loadingPremiumCharges } = useQuery({
     queryKey: ['admin', 'premium-charges', 'additional-interests'],
     queryFn: () => premiumChargesApi.getAdditionalInterestRates(),
@@ -756,8 +761,15 @@ export function FeesAdminPage() {
                 <Field label="Calc Order">
                   <input type="number" value={defForm.calculationOrder} onChange={e => setDefForm(p => ({ ...p, calculationOrder: Number(e.target.value) }))} className={inputCls} />
                 </Field>
-                <Field label="Ledger Account ID">
-                  <input type="number" value={defForm.ledgerAccountId || ''} onChange={e => setDefForm(p => ({ ...p, ledgerAccountId: Number(e.target.value) }))} className={inputCls} />
+                <Field label="Ledger Account">
+                  <select value={defForm.ledgerAccountId || ''} onChange={e => setDefForm(p => ({ ...p, ledgerAccountId: Number(e.target.value) }))} className={selectCls}>
+                    <option value="">Select ledger account</option>
+                    {ledgerAccounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.internalCode} - {account.externalLabel} ({account.accountType})
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">

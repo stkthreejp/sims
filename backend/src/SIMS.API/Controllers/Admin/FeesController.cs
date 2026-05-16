@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Entities.Accounting;
 using System.Security.Claims;
 
 namespace SIMS.API.Controllers.Admin;
@@ -12,11 +14,28 @@ namespace SIMS.API.Controllers.Admin;
 public class FeesController : ControllerBase
 {
     private readonly IFeeAdminService _svc;
-    public FeesController(IFeeAdminService svc) => _svc = svc;
+    private readonly DbContext _db;
+    public FeesController(IFeeAdminService svc, DbContext db)
+    {
+        _svc = svc;
+        _db = db;
+    }
 
     private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     // --- Fee Definitions ---
+
+    [HttpGet("ledger-accounts")]
+    public async Task<IActionResult> GetLedgerAccounts(CancellationToken ct)
+    {
+        var accounts = await _db.Set<LedgerAccount>()
+            .Where(a => a.TenantId == 1 && a.IsActive)
+            .OrderBy(a => a.InternalCode)
+            .Select(a => new LedgerAccountOptionDto(a.Id, a.InternalCode, a.ExternalLabel, a.AccountType))
+            .ToListAsync(ct);
+
+        return Ok(accounts);
+    }
 
     [HttpGet("definitions")]
     public async Task<IActionResult> GetDefinitions(CancellationToken ct)
