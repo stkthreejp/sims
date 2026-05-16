@@ -89,6 +89,7 @@ function daysFromToday(days: number) {
 function entityUrl(task: TaskInstanceListItem) {
   const base = task.entityType === 'Submission' ? '/submissions'
              : task.entityType === 'Policy'     ? '/policies'
+             : task.entityType === 'ComplianceDocument' ? '/compliance-documentation'
              : '/insureds'
   return `${base}/${task.entityId}`
 }

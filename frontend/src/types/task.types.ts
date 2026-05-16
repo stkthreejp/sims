@@ -1,4 +1,4 @@
-export type TaskEntityType = 'Account' | 'Submission' | 'Policy'
+export type TaskEntityType = 'Account' | 'Submission' | 'Policy' | 'ComplianceDocument'
 export type TaskInstanceStatus = 'Open' | 'InProgress' | 'Blocked' | 'Closed' | 'Cancelled'
 export type TaskPriority = 'Low' | 'Medium' | 'High'
 export type TaskAuditAction =

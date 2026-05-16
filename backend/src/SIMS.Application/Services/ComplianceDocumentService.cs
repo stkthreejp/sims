@@ -8,11 +8,14 @@ using SIMS.Application.Common;
 using SIMS.Application.DTOs.Compliance;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Enums;
 
 namespace SIMS.Application.Services;
 
 public class ComplianceDocumentService : IComplianceDocumentService
 {
+    private const string ReviewTaskTypeName = "Review Compliance Document";
+
     private readonly IServiceProvider _sp;
     private readonly long _maxFileSize;
     private readonly HashSet<string> _allowedExtensions;
@@ -227,6 +230,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
         var oldStatus = document.Status;
         document.Status = "Under Review";
         AddAudit(document.Id, document.CurrentDraftVersion.Id, "SubmittedForReview", "Status", oldStatus, document.Status, dto.Notes, userId);
+        await AddReviewTaskAsync(document, userId, ct);
 
         await Db.SaveChangesAsync(ct);
         return await GetDocumentAsync(document.Id, ct);
@@ -777,6 +781,60 @@ public class ComplianceDocumentService : IComplianceDocumentService
             NewValue = newValue,
             Comment = comment,
             UserId = userId,
+        });
+    }
+
+    private async Task AddReviewTaskAsync(ComplianceDocument document, Guid userId, CancellationToken ct)
+    {
+        if (!document.ApproverId.HasValue)
+            return;
+
+        var hasOpenTask = await Db.Set<TaskInstance>().AnyAsync(t =>
+            t.EntityType == TaskEntityType.ComplianceDocument &&
+            t.EntityId == document.Id &&
+            t.AssignedUserId == document.ApproverId.Value &&
+            (t.Status == TaskInstanceStatus.Open || t.Status == TaskInstanceStatus.InProgress),
+            ct);
+
+        if (hasOpenTask)
+            return;
+
+        var taskType = await Db.Set<TaskType>()
+            .FirstOrDefaultAsync(t => t.Name == ReviewTaskTypeName, ct);
+
+        if (taskType == null)
+        {
+            taskType = new TaskType
+            {
+                Name = ReviewTaskTypeName,
+                Description = "Review a compliance document submitted for approval.",
+                DefaultPriority = TaskPriority.Medium,
+                IsActive = true,
+            };
+            Db.Set<TaskType>().Add(taskType);
+        }
+
+        var task = new TaskInstance
+        {
+            TaskType = taskType,
+            EntityType = TaskEntityType.ComplianceDocument,
+            EntityId = document.Id,
+            AssignedUserId = document.ApproverId.Value,
+            Status = TaskInstanceStatus.Open,
+            Priority = taskType.DefaultPriority,
+            DueDate = DateTime.UtcNow.AddDays(7),
+            ReferenceUrl = $"/compliance-documentation/{document.Id}",
+        };
+
+        Db.Set<TaskInstance>().Add(task);
+        Db.Set<TaskAuditEntry>().Add(new TaskAuditEntry
+        {
+            TaskInstanceId = task.Id,
+            UserId = userId,
+            Action = TaskAuditAction.Created,
+            NewValue = "Submitted for review",
+            Notes = $"Compliance document submitted for review: {document.Title}",
+            Timestamp = DateTime.UtcNow,
         });
     }
 
