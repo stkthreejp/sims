@@ -33,6 +33,12 @@ export const complianceDocumentsApi = {
   saveDraft: (id: string, data: { htmlContent: string; changeSummary?: string | null }) =>
     apiClient.put<ComplianceDocumentDetail>(`/compliance-documents/${id}/draft`, data).then((r) => r.data),
 
+  submitForReview: (id: string, data: { notes?: string | null }) =>
+    apiClient.post<ComplianceDocumentDetail>(`/compliance-documents/${id}/submit-review`, data).then((r) => r.data),
+
+  requireChanges: (id: string, data: { notes?: string | null }) =>
+    apiClient.post<ComplianceDocumentDetail>(`/compliance-documents/${id}/require-changes`, data).then((r) => r.data),
+
   publishDraft: (id: string, data: { notes?: string | null; effectiveDate?: string | null }) =>
     apiClient.post<ComplianceDocumentDetail>(`/compliance-documents/${id}/publish`, data).then((r) => r.data),
 

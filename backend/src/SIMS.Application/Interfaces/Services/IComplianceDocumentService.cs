@@ -15,6 +15,8 @@ public interface IComplianceDocumentService
     Task<Result<ComplianceDocumentDetailDto>> CreateDocumentAsync(ComplianceDocumentCreateDto dto, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceDocumentDetailDto>> UpdateDocumentAsync(Guid id, ComplianceDocumentUpdateDto dto, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceDocumentDetailDto>> SaveDraftAsync(Guid id, ComplianceDraftSaveDto dto, Guid userId, CancellationToken ct = default);
+    Task<Result<ComplianceDocumentDetailDto>> SubmitForReviewAsync(Guid id, ComplianceWorkflowActionDto dto, Guid userId, CancellationToken ct = default);
+    Task<Result<ComplianceDocumentDetailDto>> RequireChangesAsync(Guid id, ComplianceWorkflowActionDto dto, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceDocumentDetailDto>> PublishDraftAsync(Guid id, CompliancePublishDto dto, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceDocumentReviewDto>> AddReviewAsync(Guid id, ComplianceReviewCreateDto dto, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceEvidenceDto>> AddEvidenceAsync(Guid id, ComplianceEvidenceCreateDto dto, Guid userId, CancellationToken ct = default);

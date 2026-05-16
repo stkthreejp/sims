@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, GitCompare, Loader2, Save } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Check, GitCompare, Loader2, Save, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { usersApi } from '@/api/users.api'
@@ -10,6 +10,7 @@ import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { ComplianceAttestationCampaign, ComplianceAttestationRecipient, ComplianceAuditLog } from '@/types/compliance.types'
+import type { User } from '@/types/user.types'
 
 const CATEGORIES = ['IT', 'Security', 'Business Continuity', 'Privacy', 'Operations', 'Vendor Management', 'HR', 'Finance']
 const TYPES = ['Policy', 'Plan', 'Procedure', 'Standard', 'Checklist', 'Evidence']
@@ -24,6 +25,8 @@ export function ComplianceDocumentDetailPage() {
   const [category, setCategory] = useState('IT')
   const [documentType, setDocumentType] = useState('Policy')
   const [status, setStatus] = useState('Draft')
+  const [ownerId, setOwnerId] = useState('')
+  const [approverId, setApproverId] = useState('')
   const [reviewCadence, setReviewCadence] = useState('Annual')
   const [nextReviewDate, setNextReviewDate] = useState('')
   const [tagsText, setTagsText] = useState('')
@@ -59,6 +62,11 @@ export function ComplianceDocumentDetailPage() {
     enabled: !!id,
   })
 
+  const usersQuery = useQuery({
+    queryKey: ['users', 'compliance-owner-picker'],
+    queryFn: () => usersApi.getAll({ page: 1, pageSize: 200 }),
+  })
+
   useEffect(() => {
     const document = documentQuery.data
     if (!document) return
@@ -67,6 +75,8 @@ export function ComplianceDocumentDetailPage() {
     setCategory(document.category)
     setDocumentType(document.documentType)
     setStatus(document.status)
+    setOwnerId(document.ownerId ?? '')
+    setApproverId(document.approverId ?? '')
     setReviewCadence(document.reviewCadence)
     setNextReviewDate(document.nextReviewDate ?? '')
     setTagsText(document.tags.join(', '))
@@ -81,6 +91,8 @@ export function ComplianceDocumentDetailPage() {
       category,
       documentType,
       status,
+      ownerId: ownerId || null,
+      approverId: approverId || null,
       reviewCadence,
       nextReviewDate: nextReviewDate || null,
       tags: parseTags(tagsText),
@@ -119,7 +131,29 @@ export function ComplianceDocumentDetailPage() {
     onError: () => toast.error('Could not publish draft'),
   })
 
-  const busy = updateMutation.isPending || draftMutation.isPending || publishMutation.isPending
+  const submitMutation = useMutation({
+    mutationFn: () => complianceDocumentsApi.submitForReview(id!, { notes: changeSummary || null }),
+    onSuccess: (document) => {
+      qc.setQueryData(['compliance-documents', id], document)
+      qc.invalidateQueries({ queryKey: ['compliance-documents'] })
+      qc.invalidateQueries({ queryKey: ['compliance-documents', id, 'audit-log'] })
+      toast.success('Draft submitted for review')
+    },
+    onError: () => toast.error('Could not submit for review'),
+  })
+
+  const requireChangesMutation = useMutation({
+    mutationFn: () => complianceDocumentsApi.requireChanges(id!, { notes: changeSummary || null }),
+    onSuccess: (document) => {
+      qc.setQueryData(['compliance-documents', id], document)
+      qc.invalidateQueries({ queryKey: ['compliance-documents'] })
+      qc.invalidateQueries({ queryKey: ['compliance-documents', id, 'audit-log'] })
+      toast.success('Changes requested')
+    },
+    onError: () => toast.error('Could not request changes'),
+  })
+
+  const busy = updateMutation.isPending || draftMutation.isPending || publishMutation.isPending || submitMutation.isPending || requireChangesMutation.isPending
 
   if (documentQuery.isLoading) return <LoadingSpinner />
   if (!documentQuery.data) return <div className="p-6 text-sm text-slate-500">Compliance document not found.</div>
@@ -165,7 +199,7 @@ export function ComplianceDocumentDetailPage() {
         <button
           type="button"
           onClick={() => publishMutation.mutate()}
-          disabled={busy || !document.currentDraftVersion}
+          disabled={busy || !document.currentDraftVersion || document.status !== 'Under Review'}
           className="inline-flex items-center gap-1.5 rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
         >
           {publishMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
@@ -179,6 +213,18 @@ export function ComplianceDocumentDetailPage() {
             <SelectField label="Category" value={category} values={CATEGORIES} onChange={(value) => { setCategory(value); setIsDirty(true) }} />
             <SelectField label="Type" value={documentType} values={TYPES} onChange={(value) => { setDocumentType(value); setIsDirty(true) }} />
             <SelectField label="Status" value={status} values={STATUSES} onChange={(value) => { setStatus(value); setIsDirty(true) }} />
+            <UserSelectField
+              label="Owner"
+              value={ownerId}
+              users={usersQuery.data?.items ?? []}
+              onChange={(value) => { setOwnerId(value); setIsDirty(true) }}
+            />
+            <UserSelectField
+              label="Approver"
+              value={approverId}
+              users={usersQuery.data?.items ?? []}
+              onChange={(value) => { setApproverId(value); setIsDirty(true) }}
+            />
             <SelectField label="Review Cadence" value={reviewCadence} values={CADENCES} onChange={(value) => { setReviewCadence(value); setIsDirty(true) }} />
             <label className="block text-sm font-medium text-slate-700">
               Next Review
@@ -212,6 +258,8 @@ export function ComplianceDocumentDetailPage() {
 
             <div className="rounded border bg-white p-3 text-sm text-slate-600">
               <div className="font-medium text-slate-800">Review</div>
+              <div className="mt-2">Owner: {document.ownerName ?? '-'}</div>
+              <div>Approver: {document.approverName ?? '-'}</div>
               <div className="mt-2">Last reviewed: {formatDate(document.lastReviewedDate)}</div>
               <div>Next review: {formatDate(document.nextReviewDate)}</div>
               <div>Effective: {formatDate(document.effectiveDate)}</div>
@@ -238,6 +286,35 @@ export function ComplianceDocumentDetailPage() {
               Compare Draft
             </button>
           </div>
+
+          <section className="mb-5 rounded border bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Review Workflow</div>
+                <div className="mt-1 text-xs text-slate-500">Save a draft, submit it for review, then approve or request changes.</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => submitMutation.mutate()}
+                  disabled={busy || !document.currentDraftVersion || document.status === 'Under Review'}
+                  className="inline-flex items-center gap-1.5 rounded border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4" />
+                  Submit for Review
+                </button>
+                <button
+                  type="button"
+                  onClick={() => requireChangesMutation.mutate()}
+                  disabled={busy || !document.currentDraftVersion || document.status !== 'Under Review'}
+                  className="inline-flex items-center gap-1.5 rounded border border-amber-200 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Require Changes
+                </button>
+              </div>
+            </div>
+          </section>
 
           {showCompare && canCompare && (
             <section className="mb-5 rounded border bg-white p-4">
@@ -411,6 +488,26 @@ function SelectField({ label, value, values, onChange }: { label: string; value:
         className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
       >
         {values.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </label>
+  )
+}
+
+function UserSelectField({ label, value, users, onChange }: { label: string; value: string; users: User[]; onChange: (value: string) => void }) {
+  return (
+    <label className="block text-sm font-medium text-slate-700">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+      >
+        <option value="">Unassigned</option>
+        {users.map((user) => (
+          <option key={user.id} value={user.id}>
+            {user.fullName || user.userName}
+          </option>
+        ))}
       </select>
     </label>
   )

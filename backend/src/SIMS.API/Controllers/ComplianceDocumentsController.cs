@@ -90,6 +90,20 @@ public class ComplianceDocumentsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("{id:guid}/submit-review")]
+    public async Task<IActionResult> SubmitForReview(Guid id, [FromBody] ComplianceWorkflowActionDto dto, CancellationToken ct)
+    {
+        var result = await _service.SubmitForReviewAsync(id, dto, CurrentUserId(), ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/require-changes")]
+    public async Task<IActionResult> RequireChanges(Guid id, [FromBody] ComplianceWorkflowActionDto dto, CancellationToken ct)
+    {
+        var result = await _service.RequireChangesAsync(id, dto, CurrentUserId(), ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("{id:guid}/publish")]
     public async Task<IActionResult> PublishDraft(Guid id, [FromBody] CompliancePublishDto dto, CancellationToken ct)
     {

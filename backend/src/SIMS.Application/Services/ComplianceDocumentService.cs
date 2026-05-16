@@ -180,6 +180,46 @@ public class ComplianceDocumentService : IComplianceDocumentService
         return await GetDocumentAsync(document.Id, ct);
     }
 
+    public async Task<Result<ComplianceDocumentDetailDto>> SubmitForReviewAsync(Guid id, ComplianceWorkflowActionDto dto, Guid userId, CancellationToken ct = default)
+    {
+        var document = await Db.Set<ComplianceDocument>()
+            .Include(d => d.CurrentDraftVersion)
+            .FirstOrDefaultAsync(d => d.Id == id, ct);
+
+        if (document == null)
+            return Result<ComplianceDocumentDetailDto>.Failure("NOT_FOUND", "Compliance document not found.");
+
+        if (document.CurrentDraftVersion == null)
+            return Result<ComplianceDocumentDetailDto>.Failure("VALIDATION", "A draft is required before submitting for review.");
+
+        var oldStatus = document.Status;
+        document.Status = "Under Review";
+        AddAudit(document.Id, document.CurrentDraftVersion.Id, "SubmittedForReview", "Status", oldStatus, document.Status, dto.Notes, userId);
+
+        await Db.SaveChangesAsync(ct);
+        return await GetDocumentAsync(document.Id, ct);
+    }
+
+    public async Task<Result<ComplianceDocumentDetailDto>> RequireChangesAsync(Guid id, ComplianceWorkflowActionDto dto, Guid userId, CancellationToken ct = default)
+    {
+        var document = await Db.Set<ComplianceDocument>()
+            .Include(d => d.CurrentDraftVersion)
+            .FirstOrDefaultAsync(d => d.Id == id, ct);
+
+        if (document == null)
+            return Result<ComplianceDocumentDetailDto>.Failure("NOT_FOUND", "Compliance document not found.");
+
+        if (document.CurrentDraftVersion == null)
+            return Result<ComplianceDocumentDetailDto>.Failure("VALIDATION", "A draft is required before requesting changes.");
+
+        var oldStatus = document.Status;
+        document.Status = "Needs Update";
+        AddAudit(document.Id, document.CurrentDraftVersion.Id, "ChangesRequested", "Status", oldStatus, document.Status, dto.Notes, userId);
+
+        await Db.SaveChangesAsync(ct);
+        return await GetDocumentAsync(document.Id, ct);
+    }
+
     public async Task<Result<ComplianceDocumentDetailDto>> PublishDraftAsync(Guid id, CompliancePublishDto dto, Guid userId, CancellationToken ct = default)
     {
         var document = await Db.Set<ComplianceDocument>()

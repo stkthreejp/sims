@@ -163,6 +163,11 @@ public class CompliancePublishDto
     public DateOnly? EffectiveDate { get; set; }
 }
 
+public class ComplianceWorkflowActionDto
+{
+    public string? Notes { get; set; }
+}
+
 public class ComplianceReviewCreateDto
 {
     public string Status { get; set; } = "Completed";
