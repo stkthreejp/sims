@@ -588,6 +588,13 @@ function PolicyIssuancePanel({
   const excludedForms = packet?.forms.filter((form) => !form.isIncluded) ?? []
   const ready = includedForms.length > 0 && (packet?.isReady ?? false)
   const issued = packet?.isIssued
+  const actionBlockedReason = !canIssue
+    ? 'You do not have permission to issue policies.'
+    : includedForms.length === 0
+      ? 'No forms are included in this packet.'
+      : !ready
+        ? (packet?.readinessMessages[0] ?? 'Resolve packet readiness items before preview or issue.')
+        : null
 
   return (
     <div className="sd-card overflow-hidden">
@@ -598,7 +605,7 @@ function PolicyIssuancePanel({
             {issued
               ? `Issued ${packet?.issuedDate ? new Date(packet.issuedDate).toLocaleDateString() : ''}`
                 : ready
-                ? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready for issuance review`
+                ? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready. Preview, then issue.`
                 : includedForms.length > 0
                   ? 'Packet needs attention before preview or issue'
                 : 'No included policy forms found yet'}
@@ -614,6 +621,7 @@ function PolicyIssuancePanel({
               disabled={!canIssue || !ready || previewing}
               onClick={onPreview}
               className="sd-btn outline"
+              title={actionBlockedReason ?? 'Generate a draft packet PDF for review'}
             >
               <FileText className="h-3.5 w-3.5" /> {previewing ? 'Generating...' : 'Preview packet'}
             </button>
@@ -621,8 +629,9 @@ function PolicyIssuancePanel({
               disabled={!canIssue || !ready || issuing}
               onClick={onIssue}
               className="sd-btn primary"
+              title={actionBlockedReason ?? 'File the final policy packet and mark this policy issued'}
             >
-              <Send className="h-3.5 w-3.5" /> Mark issued
+              <Send className="h-3.5 w-3.5" /> Issue policy
             </button>
           </div>
         )}
@@ -639,6 +648,11 @@ function PolicyIssuancePanel({
             {!packet.isReady && packet.readinessMessages.length > 0 && (
               <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
                 {packet.readinessMessages[0]}
+              </div>
+            )}
+            {ready && !issued && (
+              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
+                Preview creates a draft PDF for review. Issue policy creates and files the final issued packet.
               </div>
             )}
             <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>

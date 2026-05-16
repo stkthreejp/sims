@@ -346,15 +346,29 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
     saveMutation.mutate(nextRows.map(toUpsert))
   }
 
+  const openTemplate = async (form: QuotePolicyFormSelection) => {
+    try {
+      const result = await policyFormsApi.getTemplateDownloadUrl(form.policyFormTemplateId)
+      window.open(result.url, '_blank', 'noopener,noreferrer')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.errorMessage ?? 'Form file could not be opened')
+    }
+  }
+
   const selectedIds = new Set(forms.map((f) => f.policyFormTemplateId))
   const availableTemplates = templates.filter((t) => !selectedIds.has(t.id))
   const includedCount = forms.filter((f) => f.isIncluded).length
+  const readyForWorkflow = includedCount > 0
 
   return (
     <Card>
       <CardHead
-        title={<span className="flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" />Policy forms for proposal</span>}
-        count={includedCount}
+        title={<span className="flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" />Policy forms</span>}
+        count={
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${readyForWorkflow ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+            {readyForWorkflow ? `${includedCount} selected` : 'Required'}
+          </span>
+        }
         right={canManage && (
           <Btn variant="outline" disabled={resetMutation.isPending} onClick={() => resetMutation.mutate()}>
             <RefreshCw className="h-3.5 w-3.5" /> Refresh from package
@@ -362,6 +376,11 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
         )}
       />
       <div className="px-5 py-4">
+        <div className="mb-3 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: readyForWorkflow ? '#bbf7d0' : '#f5d7a3', background: readyForWorkflow ? '#f0fdf4' : 'var(--warn-bg)', color: readyForWorkflow ? '#166534' : 'var(--warn-fg)' }}>
+          {readyForWorkflow
+            ? 'These forms will drive the proposal form list and the issued policy packet.'
+            : 'Select the policy forms before sending a proposal or binding this quote.'}
+        </div>
         {isLoading ? (
           <div className="flex h-20 items-center justify-center"><LoadingSpinner /></div>
         ) : forms.length === 0 ? (
@@ -387,8 +406,17 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
                     <span>{form.editionDate || '-'}</span>
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{form.formType}</span>
                     {!form.isIncluded && <span className="rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700">Excluded</span>}
+                    {form.isSystemGenerated && <span className="rounded bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-700">Package</span>}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => openTemplate(form)}
+                  className="sims-icon-btn disabled:opacity-40"
+                  title="Open form file"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </button>
                 {canManage && forms.length > 1 && (
                   <div className="flex shrink-0 items-center gap-1">
                     <button
