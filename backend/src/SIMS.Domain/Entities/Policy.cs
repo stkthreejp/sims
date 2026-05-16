@@ -5,6 +5,11 @@ namespace SIMS.Domain.Entities;
 public class Policy : BaseEntity
 {
     public string PolicyNumber { get; set; } = string.Empty;
+    public string? BasePolicyNumber { get; set; }
+    public int PolicyTermNumber { get; set; } = 1;
+    public Guid? PolicyNumberSequenceId { get; set; }
+    public Guid? PolicyNumberAssignmentId { get; set; }
+    public Guid? WritingCompanyId { get; set; }
     public Guid SubmissionId { get; set; }
     public Guid BoundQuoteId { get; set; }
     public Guid CarrierId { get; set; }

@@ -29,6 +29,9 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<Policy> Policies => Set<Policy>();
+    public DbSet<PolicyNumberSequence> PolicyNumberSequences => Set<PolicyNumberSequence>();
+    public DbSet<PolicyNumberAssignment> PolicyNumberAssignments => Set<PolicyNumberAssignment>();
+    public DbSet<PolicyNumberSequenceUsage> PolicyNumberSequenceUsages => Set<PolicyNumberSequenceUsage>();
     public DbSet<PolicyTransaction> PolicyTransactions => Set<PolicyTransaction>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
@@ -159,6 +162,9 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Submission>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Quote>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Policy>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyNumberSequence>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyNumberAssignment>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyNumberSequenceUsage>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransaction>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Note>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);

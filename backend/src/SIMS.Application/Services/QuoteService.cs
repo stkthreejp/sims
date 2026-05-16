@@ -17,6 +17,7 @@ public class QuoteService : IQuoteService
     private readonly ICarrierCommissionService _carrierCommissions;
     private readonly IAgentCommissionService _agentCommissions;
     private readonly IQuoteChecklistService _checklist;
+    private readonly IPolicyNumberService _policyNumbers;
 
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
@@ -26,13 +27,15 @@ public class QuoteService : IQuoteService
         IWorkflowEngineService workflowEngine,
         ICarrierCommissionService carrierCommissions,
         IAgentCommissionService agentCommissions,
-        IQuoteChecklistService checklist)
+        IQuoteChecklistService checklist,
+        IPolicyNumberService policyNumbers)
     {
         _sp = sp;
         _workflowEngine = workflowEngine;
         _carrierCommissions = carrierCommissions;
         _agentCommissions = agentCommissions;
         _checklist = checklist;
+        _policyNumbers = policyNumbers;
     }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -268,10 +271,13 @@ public class QuoteService : IQuoteService
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Quote is already bound.");
 
-        var policyNumber = await GeneratePolicyNumberAsync();
+        var policyNumberResult = await _policyNumbers.GenerateForBindAsync(quote, access.UserId);
+        if (!policyNumberResult.IsSuccess || policyNumberResult.Value == null)
+            return Result<QuoteDto>.Failure(policyNumberResult.ErrorCode ?? "POLICY_NUMBER_ERROR", policyNumberResult.ErrorMessage ?? "Policy number could not be assigned.");
+        var policyNumber = policyNumberResult.Value;
 
         quote.Status = QuoteStatus.Bound;
-        quote.PolicyNumber = policyNumber;
+        quote.PolicyNumber = policyNumber.PolicyNumber;
         quote.BoundDate = dto.BoundDate;
         quote.EffectiveDate = dto.EffectiveDate;
         quote.ExpirationDate = dto.ExpirationDate;
@@ -293,7 +299,11 @@ public class QuoteService : IQuoteService
         // Create the Policy record
         var policy = new Policy
         {
-            PolicyNumber = policyNumber,
+            PolicyNumber = policyNumber.PolicyNumber,
+            BasePolicyNumber = policyNumber.BasePolicyNumber,
+            PolicyTermNumber = policyNumber.TermNumber,
+            PolicyNumberSequenceId = policyNumber.SequenceId,
+            PolicyNumberAssignmentId = policyNumber.AssignmentId,
             SubmissionId = quote.SubmissionId,
             BoundQuoteId = quote.Id,
             CarrierId = quote.CarrierId,
@@ -317,6 +327,17 @@ public class QuoteService : IQuoteService
             submission.Status = SubmissionStatus.Bound;
 
         await Db.SaveChangesAsync();
+
+        if (policyNumber.SequenceId.HasValue)
+        {
+            var usage = await Db.Set<PolicyNumberSequenceUsage>()
+                .FirstOrDefaultAsync(u => u.QuoteId == quote.Id && u.FullPolicyNumber == policy.PolicyNumber);
+            if (usage != null)
+            {
+                usage.PolicyId = policy.Id;
+                await Db.SaveChangesAsync();
+            }
+        }
 
         // NewBusiness transaction
         var txnNumber = await GenerateTransactionNumberAsync();
@@ -475,16 +496,6 @@ public class QuoteService : IQuoteService
             .IgnoreQueryFilters()
             .CountAsync(q => q.QuoteNumber.StartsWith(prefix));
         return $"{prefix}{(count + 1):D4}";
-    }
-
-    private async Task<string> GeneratePolicyNumberAsync()
-    {
-        var year = DateTime.UtcNow.Year;
-        var prefix = $"POL-{year}-";
-        var count = await Db.Set<Policy>()
-            .IgnoreQueryFilters()
-            .CountAsync(p => p.PolicyNumber.StartsWith(prefix));
-        return $"{prefix}{(count + 1):D5}";
     }
 
     private async Task<string> GenerateTransactionNumberAsync()

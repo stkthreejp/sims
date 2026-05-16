@@ -11,6 +11,8 @@ public class PolicyConfiguration : IEntityTypeConfiguration<Policy>
         builder.ToTable("policies");
         builder.HasKey(p => p.Id);
         builder.Property(p => p.PolicyNumber).IsRequired().HasMaxLength(50);
+        builder.Property(p => p.BasePolicyNumber).HasMaxLength(50);
+        builder.Property(p => p.PolicyTermNumber).HasDefaultValue(1);
         builder.HasIndex(p => p.PolicyNumber).IsUnique();
 
         builder.Property(p => p.PremiumAmount).HasPrecision(18, 2);
