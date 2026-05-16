@@ -7,6 +7,7 @@ public record OpenPayableDto(
     long InvoiceId,
     string InvoiceNumber,
     string PayeeName,
+    long? PayeeId,
     Guid? CarrierId,
     decimal Amount,
     decimal PaidAmount,
@@ -27,6 +28,7 @@ public record AgingBucketDto(
 
 public record AgingRowDto(
     string PayeeName,
+    long? PayeeId,
     Guid? CarrierId,
     decimal Current,
     decimal Days31to60,

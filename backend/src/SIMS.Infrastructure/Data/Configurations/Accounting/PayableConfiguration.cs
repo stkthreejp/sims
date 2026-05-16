@@ -25,9 +25,15 @@ public class PayableConfiguration : IEntityTypeConfiguration<Payable>
             .HasForeignKey(e => e.GlAccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(e => e.Payee)
+            .WithMany()
+            .HasForeignKey(e => e.PayeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(e => e.Status);
         builder.HasIndex(e => e.InvoiceId);
         builder.HasIndex(e => e.CarrierId);
+        builder.HasIndex(e => e.PayeeId);
         builder.HasIndex(e => e.DueDate);
     }
 }

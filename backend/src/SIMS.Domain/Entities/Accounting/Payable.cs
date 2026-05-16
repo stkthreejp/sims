@@ -8,6 +8,7 @@ public class Payable
 
     // Payee — either a Carrier (by Guid) or a named free-text entry
     public Guid? CarrierId { get; set; }   // FK → Carrier.Id
+    public long? PayeeId { get; set; }
     public string PayeeName { get; set; } = string.Empty;
 
     // GL account to debit on disbursement (e.g. 2100 Carrier AP)
@@ -25,6 +26,7 @@ public class Payable
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Invoice Invoice { get; set; } = null!;
+    public Payee? Payee { get; set; }
     public LedgerAccount GlAccount { get; set; } = null!;
     public ICollection<DisbursementLine> DisbursementLines { get; set; } = new List<DisbursementLine>();
 }

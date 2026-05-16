@@ -3,6 +3,7 @@ export interface OpenPayable {
   invoiceId: number
   invoiceNumber: string
   payeeName: string
+  payeeId: number | null
   carrierId: string | null
   amount: number
   paidAmount: number
@@ -23,6 +24,7 @@ export interface AgingBucket {
 
 export interface AgingRow {
   payeeName: string
+  payeeId: number | null
   carrierId: string | null
   current: number
   days31to60: number

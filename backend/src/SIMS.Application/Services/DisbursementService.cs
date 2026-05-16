@@ -42,9 +42,10 @@ public class DisbursementService : IDisbursementService
         );
 
         var rows = payables
-            .GroupBy(p => p.PayeeName)
+            .GroupBy(p => new { p.PayeeId, p.PayeeName })
             .Select(g => new AgingRowDto(
-                g.Key,
+                g.Key.PayeeName,
+                g.Key.PayeeId,
                 g.First().CarrierId,
                 g.Sum(p => Bucket(p, 0, 30)),
                 g.Sum(p => Bucket(p, 31, 60)),
@@ -71,6 +72,7 @@ public class DisbursementService : IDisbursementService
                 p.InvoiceId,
                 p.Invoice.InvoiceNumber,
                 p.PayeeName,
+                p.PayeeId,
                 p.CarrierId,
                 p.Amount,
                 p.PaidAmount,

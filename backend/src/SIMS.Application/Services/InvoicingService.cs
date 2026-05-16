@@ -179,6 +179,7 @@ public class InvoicingService : IInvoicingService
             {
                 string linePayeeName;
                 Guid? lineCarrierId = null;
+                long? linePayeeId = null;
                 if (line.PayableRouting == "Company")
                 {
                     linePayeeName = payeeName;
@@ -187,6 +188,7 @@ public class InvoicingService : IInvoicingService
                 else if (line.PayablePayeeId.HasValue && payees.TryGetValue(line.PayablePayeeId.Value, out var payee))
                 {
                     linePayeeName = payee.Name;
+                    linePayeeId = payee.Id;
                 }
                 else
                 {
@@ -198,6 +200,7 @@ public class InvoicingService : IInvoicingService
                     TenantId = 1,
                     InvoiceId = invoice.Id,
                     CarrierId = lineCarrierId,
+                    PayeeId = linePayeeId,
                     PayeeName = linePayeeName,
                     GlAccountId = line.LedgerAccountId,
                     Amount = line.Amount,

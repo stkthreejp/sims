@@ -17,6 +17,8 @@ import type { OpenPayable, AgingRow } from '@/types/disbursement.types'
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) =>
   new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const payeeSubledgerKey = (payee: { payeeId: number | null; payeeName: string }) =>
+  payee.payeeId ? `payee:${payee.payeeId}` : `name:${payee.payeeName}`
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -230,7 +232,7 @@ function AgingTab() {
   const togglePayable = (id: number) =>
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  const togglePayee = (name: string, ids: number[]) => {
+  const togglePayee = (ids: number[]) => {
     const allSelected = ids.every((id) => selected.has(id))
     setSelected((prev) => {
       const n = new Set(prev)
@@ -252,12 +254,13 @@ function AgingTab() {
 
   const bucketCols = ['Current', '31–60d', '61–90d', '90+d', 'Total'] as const
 
-  // Group payables by payeeName for row expansion
+  // Group payables by vendor subledger when present, falling back to payee name for legacy rows.
   const byPayee = useMemo(() => {
     const map = new Map<string, OpenPayable[]>()
     for (const p of aging.payables) {
-      if (!map.has(p.payeeName)) map.set(p.payeeName, [])
-      map.get(p.payeeName)!.push(p)
+      const key = payeeSubledgerKey(p)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(p)
     }
     return map
   }, [aging.payables])
@@ -318,23 +321,24 @@ function AgingTab() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {aging.rows.map((row: AgingRow) => {
-                  const rowPayables = byPayee.get(row.payeeName) ?? []
+                  const rowKey = payeeSubledgerKey(row)
+                  const rowPayables = byPayee.get(rowKey) ?? []
                   const rowIds = rowPayables.map((p) => p.id)
                   const allRowSelected = rowIds.length > 0 && rowIds.every((id) => selected.has(id))
                   const someRowSelected = rowIds.some((id) => selected.has(id))
-                  const isExpanded = expandedPayees.has(row.payeeName)
+                  const isExpanded = expandedPayees.has(rowKey)
 
                   return (
                     <>
                       {/* Payee group row */}
-                      <tr key={row.payeeName} className="bg-gray-50 font-medium hover:bg-gray-100 cursor-pointer"
-                        onClick={() => toggleExpand(row.payeeName)}>
+                      <tr key={rowKey} className="bg-gray-50 font-medium hover:bg-gray-100 cursor-pointer"
+                        onClick={() => toggleExpand(rowKey)}>
                         <td className="px-4 py-2">
                           <input
                             type="checkbox"
                             checked={allRowSelected}
                             ref={(el) => { if (el) el.indeterminate = someRowSelected && !allRowSelected }}
-                            onChange={(e) => { e.stopPropagation(); togglePayee(row.payeeName, rowIds) }}
+                            onChange={(e) => { e.stopPropagation(); togglePayee(rowIds) }}
                             onClick={(e) => e.stopPropagation()}
                             className="rounded"
                           />

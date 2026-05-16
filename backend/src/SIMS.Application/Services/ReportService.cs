@@ -76,7 +76,7 @@ public class ReportService : IReportService
             .OrderBy(p => p.DueDate)
             .Select(p => new OpenPayableDto(
                 p.Id, p.InvoiceId, p.Invoice.InvoiceNumber,
-                p.PayeeName, p.CarrierId,
+                p.PayeeName, p.PayeeId, p.CarrierId,
                 p.Amount, p.PaidAmount, p.Amount - p.PaidAmount,
                 p.InvoiceDate, p.DueDate,
                 Math.Max(0, today.DayNumber - p.DueDate.DayNumber),
@@ -98,7 +98,7 @@ public class ReportService : IReportService
             .OrderBy(p => p.DueDate)
             .Select(p => new OpenPayableDto(
                 p.Id, p.InvoiceId, p.Invoice.InvoiceNumber,
-                p.PayeeName, null,
+                p.PayeeName, p.PayeeId, null,
                 p.Amount, p.PaidAmount, p.Amount - p.PaidAmount,
                 p.InvoiceDate, p.DueDate,
                 Math.Max(0, today.DayNumber - p.DueDate.DayNumber),
@@ -248,9 +248,9 @@ public class ReportService : IReportService
         );
 
         var rows = payables
-            .GroupBy(p => p.PayeeName)
+            .GroupBy(p => new { p.PayeeId, p.PayeeName })
             .Select(g => new AgingRowDto(
-                g.Key, g.First().CarrierId,
+                g.Key.PayeeName, g.Key.PayeeId, g.First().CarrierId,
                 g.Sum(p => Bucket(p, 0, 30)),
                 g.Sum(p => Bucket(p, 31, 60)),
                 g.Sum(p => Bucket(p, 61, 90)),
