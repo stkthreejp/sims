@@ -779,7 +779,14 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
       {attachments.length === 0 ? (
         <p className="px-5 py-6 text-sm text-slate-400">No documents yet.</p>
       ) : (
-        <table className="sd-table">
+        <table className="sd-table w-full table-fixed">
+          <colgroup>
+            <col className="w-[54%]" />
+            <col className="w-[10%]" />
+            <col className="w-[16%]" />
+            <col className="w-[12%]" />
+            <col className="w-[8%]" />
+          </colgroup>
           <thead>
             <tr>
               <th>File</th>
@@ -792,17 +799,17 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
           <tbody>
             {attachments.map((a) => (
               <tr key={a.id}>
-                <td>
-                  <div className="flex items-center gap-2">
+                <td className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
                     <FileText className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
-                    <span className="cursor-pointer font-medium text-sky-700 hover:text-sky-800" onClick={() => downloadMutation.mutate(a.id)}>
+                    <span className="min-w-0 cursor-pointer break-all font-medium text-sky-700 hover:text-sky-800" onClick={() => downloadMutation.mutate(a.id)}>
                       {a.fileName}
                     </span>
                   </div>
-                  {a.description && <p className="mt-0.5 pl-5.5 text-xs text-slate-400">{a.description}</p>}
+                  {a.description && <p className="mt-0.5 break-words pl-5.5 text-xs text-slate-400">{a.description}</p>}
                 </td>
-                <td className="id">{fmtBytes(a.fileSizeBytes)}</td>
-                <td>{a.uploadedByName}</td>
+                <td className="id whitespace-normal">{fmtBytes(a.fileSizeBytes)}</td>
+                <td className="break-words">{a.uploadedByName}</td>
                 <td className="id">{formatDate(a.createdAt)}</td>
                 <td>
                   <div className="flex items-center justify-end gap-1">
@@ -861,7 +868,14 @@ function ActivityCard({ quoteId }: { quoteId: string }) {
       {communications.length === 0 ? (
         <p className="px-5 py-6 text-sm text-slate-400">No quote communication activity yet.</p>
       ) : (
-        <table className="sd-table">
+        <table className="sd-table w-full table-fixed">
+          <colgroup>
+            <col className="w-[18%]" />
+            <col className="w-[42%]" />
+            <col className="w-[25%]" />
+            <col className="w-[9%]" />
+            <col className="w-[6%]" />
+          </colgroup>
           <thead>
             <tr>
               <th>Subject</th>
@@ -874,10 +888,10 @@ function ActivityCard({ quoteId }: { quoteId: string }) {
           <tbody>
             {communications.map((c) => (
               <tr key={c.id}>
-                <td className="primary-cell">{c.subject}</td>
-                <td>{c.toName ? `${c.toName} <${c.toAddress}>` : c.toAddress}</td>
-                <td>{c.fromAddress}</td>
-                <td><span className="sd-lob">{c.status}</span></td>
+                <td className="primary-cell break-words">{c.subject}</td>
+                <td className="break-words">{c.toName ? `${c.toName} <${c.toAddress}>` : c.toAddress}</td>
+                <td className="break-words">{c.fromAddress}</td>
+                <td><span className="sd-lob whitespace-nowrap">{c.status}</span></td>
                 <td>
                   <div className="flex justify-end gap-1">
                     {(c.status === 'Draft' || c.status === 'Failed') && (
