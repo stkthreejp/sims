@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { agentsApi } from '@/api/agents.api'
 import type { AgentLocation, AgentContact, AgentLocationInput, AgentContactInput } from '@/types/agent.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { EmptyState } from '@/components/common/EmptyState'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -113,22 +114,23 @@ function LocationForm({
     <div className="space-y-3 pt-2">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Office Label</label>
+          <label className="sims-field-label">Office Label</label>
           <input
             value={form.name}
             onChange={set('name')}
             placeholder="e.g. Main Office, Downtown Branch"
-            className="w-full border rounded px-2 py-1.5 text-sm"
+            className="sims-input"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Office Phone</label>
+          <label className="sims-field-label">Office Phone</label>
           <input
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: formatPhoneInput(e.target.value) })}
             type="text"
             placeholder="(555) 123-4567"
-            className={`w-full border rounded px-2 py-1.5 text-sm ${phoneError ? 'border-red-400' : ''}`}
+            className="sims-input"
+            aria-invalid={!!phoneError}
           />
           {phoneError && <p className="text-xs text-red-600 mt-0.5">Enter a valid 10-digit number</p>}
         </div>
@@ -136,7 +138,7 @@ function LocationForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Street Address</label>
+          <label className="sims-field-label">Street Address</label>
           <AddressAutocomplete
             value={form.addressLine1}
             onChange={(val) => setForm({ ...form, addressLine1: val })}
@@ -146,32 +148,33 @@ function LocationForm({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Suite / Unit</label>
+          <label className="sims-field-label">Suite / Unit</label>
           <input
             value={form.addressLine2}
             onChange={set('addressLine2')}
             placeholder="Apt, Suite, Unit…"
-            className="w-full border rounded px-2 py-1.5 text-sm"
+            className="sims-input"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-          <input value={form.city} onChange={set('city')} placeholder="City" className="w-full border rounded px-2 py-1.5 text-sm" />
+          <label className="sims-field-label">City</label>
+          <input value={form.city} onChange={set('city')} placeholder="City" className="sims-input" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-          <input value={form.state} onChange={set('state')} maxLength={2} placeholder="TX" className="w-full border rounded px-2 py-1.5 text-sm uppercase" />
+          <label className="sims-field-label">State</label>
+          <input value={form.state} onChange={set('state')} maxLength={2} placeholder="TX" className="sims-input uppercase" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">ZIP</label>
+          <label className="sims-field-label">ZIP</label>
           <input
             value={form.zipCode}
             onChange={set('zipCode')}
             placeholder="78701"
-            className={`w-full border rounded px-2 py-1.5 text-sm ${zipError ? 'border-red-400' : ''}`}
+            className="sims-input"
+            aria-invalid={!!zipError}
           />
           {zipError && <p className="text-xs text-red-600 mt-0.5">Invalid ZIP code</p>}
         </div>
@@ -186,13 +189,13 @@ function LocationForm({
         <button
           onClick={onSave}
           disabled={isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary sm"
         >
           <Check className="h-3.5 w-3.5" /> Save Office
         </button>
         <button
           onClick={onCancel}
-          className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+          className="sd-btn outline sm"
         >
           <X className="h-3.5 w-3.5" /> Cancel
         </button>
@@ -226,21 +229,21 @@ function ContactForm({
     <div className="space-y-3 pt-2">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">First Name *</label>
+          <label className="sims-field-label">First Name *</label>
           <input
             value={form.firstName}
             onChange={set('firstName')}
             placeholder="First name"
-            className="w-full border rounded px-2 py-1.5 text-sm"
+            className="sims-input"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
-          <input value={form.lastName} onChange={set('lastName')} placeholder="Last name" className="w-full border rounded px-2 py-1.5 text-sm" />
+          <label className="sims-field-label">Last Name</label>
+          <input value={form.lastName} onChange={set('lastName')} placeholder="Last name" className="sims-input" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Title / Role</label>
-          <input value={form.title} onChange={set('title')} placeholder="e.g. Producer, Account Mgr" className="w-full border rounded px-2 py-1.5 text-sm" />
+          <label className="sims-field-label">Title / Role</label>
+          <input value={form.title} onChange={set('title')} placeholder="e.g. Producer, Account Mgr" className="sims-input" />
         </div>
         <div className="flex items-end pb-0">
           <div className="flex items-center gap-2 mb-2">
@@ -251,24 +254,26 @@ function ContactForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+          <label className="sims-field-label">Email</label>
           <input
             value={form.email}
             onChange={set('email')}
             type="text"
             placeholder="email@example.com"
-            className={`w-full border rounded px-2 py-1.5 text-sm ${emailError ? 'border-red-400' : ''}`}
+            className="sims-input"
+            aria-invalid={!!emailError}
           />
           {emailError && <p className="text-xs text-red-600 mt-0.5">Enter a valid email address</p>}
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Direct Phone</label>
+          <label className="sims-field-label">Direct Phone</label>
           <input
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: formatPhoneInput(e.target.value) })}
             type="text"
             placeholder="(555) 123-4567"
-            className={`w-full border rounded px-2 py-1.5 text-sm ${phoneError ? 'border-red-400' : ''}`}
+            className="sims-input"
+            aria-invalid={!!phoneError}
           />
           {phoneError && <p className="text-xs text-red-600 mt-0.5">Enter a valid 10-digit number</p>}
         </div>
@@ -277,11 +282,11 @@ function ContactForm({
         <button
           onClick={onSave}
           disabled={isPending || !form.firstName.trim()}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary sm"
         >
           <Check className="h-3.5 w-3.5" /> Save Contact
         </button>
-        <button onClick={onCancel} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50">
+        <button onClick={onCancel} className="sd-btn outline sm">
           <X className="h-3.5 w-3.5" /> Cancel
         </button>
       </div>
@@ -508,15 +513,15 @@ export function AgentDetailPage() {
   const infoPhoneError = infoForm.phone && !isValidPhone(infoForm.phone)
 
   if (isLoading) return <LoadingSpinner />
-  if (!agent) return <div className="p-6 text-sm text-slate-500">Agent not found.</div>
+  if (!agent) return <EmptyState icon={UserCircle} title="Agent not found" description="The requested agent record could not be loaded." />
 
   const primaryLocation = agent.locations.find((l) => l.isPrimary) ?? agent.locations[0]
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-500">
-        <Link to="/agents" className="hover:text-slate-700 flex items-center gap-1">
+        <Link to="/agents" className="sd-btn ghost sm">
           <ArrowLeft className="h-4 w-4" /> Agents
         </Link>
         <span>/</span>
@@ -524,12 +529,12 @@ export function AgentDetailPage() {
       </div>
 
       {/* Agent info panel */}
-      <div className="bg-white border rounded-lg p-5">
+      <div className="sd-card p-5">
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-semibold text-slate-900">{agent.name}</h1>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${agent.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`sd-pill ${agent.isActive ? 'bound' : 'draft'}`}>
                 {agent.isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
@@ -538,7 +543,7 @@ export function AgentDetailPage() {
           {!editingInfo && (
             <button
               onClick={startEditInfo}
-              className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50 text-slate-600"
+              className="sd-btn outline sm"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit
             </button>
@@ -553,7 +558,7 @@ export function AgentDetailPage() {
                 <input
                   value={infoForm.name}
                   onChange={(e) => setInfoForm({ ...infoForm, name: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  className="sims-input"
                 />
               </div>
               <div>
@@ -561,7 +566,7 @@ export function AgentDetailPage() {
                 <input
                   value={infoForm.agencyName}
                   onChange={(e) => setInfoForm({ ...infoForm, agencyName: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  className="sims-input"
                 />
               </div>
               <div>
@@ -569,7 +574,7 @@ export function AgentDetailPage() {
                 <input
                   value={infoForm.licenseNumber}
                   onChange={(e) => setInfoForm({ ...infoForm, licenseNumber: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  className="sims-input"
                 />
               </div>
               <div>
@@ -578,7 +583,8 @@ export function AgentDetailPage() {
                   value={infoForm.email}
                   onChange={(e) => setInfoForm({ ...infoForm, email: e.target.value })}
                   type="text"
-                  className={`w-full border rounded px-2 py-1.5 text-sm ${infoEmailError ? 'border-red-400' : ''}`}
+                  className="sims-input"
+                  aria-invalid={!!infoEmailError}
                 />
                 {infoEmailError && <p className="text-xs text-red-600 mt-0.5">Enter a valid email</p>}
               </div>
@@ -588,7 +594,8 @@ export function AgentDetailPage() {
                   value={infoForm.phone}
                   onChange={(e) => setInfoForm({ ...infoForm, phone: formatPhoneInput(e.target.value) })}
                   type="text"
-                  className={`w-full border rounded px-2 py-1.5 text-sm ${infoPhoneError ? 'border-red-400' : ''}`}
+                  className="sims-input"
+                  aria-invalid={!!infoPhoneError}
                 />
                 {infoPhoneError && <p className="text-xs text-red-600 mt-0.5">Enter a valid 10-digit number</p>}
               </div>
@@ -612,13 +619,13 @@ export function AgentDetailPage() {
                   updateInfoMutation.mutate()
                 }}
                 disabled={updateInfoMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                className="sd-btn primary sm"
               >
                 <Check className="h-3.5 w-3.5" /> Save
               </button>
               <button
                 onClick={() => setEditingInfo(false)}
-                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+                className="sd-btn outline sm"
               >
                 <X className="h-3.5 w-3.5" /> Cancel
               </button>
@@ -637,7 +644,7 @@ export function AgentDetailPage() {
                 <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Email</span>
                 <p className="text-slate-800 mt-0.5 flex items-center gap-1">
                   <Mail className="h-3.5 w-3.5 text-slate-400" />
-                  <a href={`mailto:${agent.email}`} className="hover:text-blue-600">{agent.email}</a>
+                  <a href={`mailto:${agent.email}`} className="hover:text-sky-700">{agent.email}</a>
                 </p>
               </div>
             )}
@@ -664,12 +671,10 @@ export function AgentDetailPage() {
       </div>
 
       {/* Documents */}
-      <div className="bg-white border rounded-lg p-5">
-        <DocumentsSection entityType="Agent" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
-      </div>
+      <DocumentsSection entityType="Agent" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
 
       {/* Commission Schedules */}
-      <div className="bg-white border rounded-lg p-5">
+      <div className="sd-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
             <Percent className="h-4 w-4 text-slate-400" />
@@ -678,7 +683,7 @@ export function AgentDetailPage() {
           {!showAddCommission && (
             <button
               onClick={() => setShowAddCommission(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              className="sd-btn primary sm"
             >
               <Plus className="h-3.5 w-3.5" /> Add Rate
             </button>
@@ -687,7 +692,7 @@ export function AgentDetailPage() {
 
         {/* Add commission form */}
         {showAddCommission && (
-          <div className="mb-4 p-3 border border-blue-200 rounded-lg bg-blue-50/40">
+          <div className="mb-4 rounded-lg p-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
             <p className="text-xs font-medium text-slate-600 mb-2">New Commission Rate</p>
             <div className="grid grid-cols-3 gap-3">
               <div>
@@ -695,7 +700,7 @@ export function AgentDetailPage() {
                 <select
                   value={commissionForm.lineOfBusiness}
                   onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm bg-white"
+                  className="sims-select"
                 >
                   {LOB_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -712,7 +717,7 @@ export function AgentDetailPage() {
                   value={commissionForm.rate}
                   onChange={(e) => setCommissionForm({ ...commissionForm, rate: e.target.value })}
                   placeholder="e.g. 15"
-                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  className="sims-input"
                 />
               </div>
               <div>
@@ -721,7 +726,7 @@ export function AgentDetailPage() {
                   type="date"
                   value={commissionForm.effectiveDate}
                   onChange={(e) => setCommissionForm({ ...commissionForm, effectiveDate: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  className="sims-input"
                 />
               </div>
             </div>
@@ -735,13 +740,13 @@ export function AgentDetailPage() {
                   addCommissionMutation.mutate()
                 }}
                 disabled={addCommissionMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                className="sd-btn primary sm"
               >
                 <Check className="h-3.5 w-3.5" /> Save Rate
               </button>
               <button
                 onClick={() => { setShowAddCommission(false); setCommissionForm({ lineOfBusiness: '', rate: '', effectiveDate: '' }) }}
-                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+                className="sd-btn outline sm"
               >
                 <X className="h-3.5 w-3.5" /> Cancel
               </button>
@@ -750,13 +755,11 @@ export function AgentDetailPage() {
         )}
 
         {commissions.length === 0 && !showAddCommission ? (
-          <div className="text-center py-6 border border-dashed rounded-lg">
-            <BanknoteIcon className="h-7 w-7 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No commission rates configured.</p>
-            <button onClick={() => setShowAddCommission(true)} className="mt-2 text-sm text-blue-600 hover:underline">
-              Add the first rate
-            </button>
-          </div>
+          <EmptyState
+            icon={BanknoteIcon}
+            title="No commission rates configured"
+            action={<button onClick={() => setShowAddCommission(true)} className="sd-btn outline sm">Add the first rate</button>}
+          />
         ) : (
           (() => {
             const byLob = commissions.reduce<Record<string, AgentCommission[]>>((acc, c) => {
@@ -830,7 +833,7 @@ export function AgentDetailPage() {
                                           if (confirm('Disable this commission rate?'))
                                             disableCommissionMutation.mutate(r.id)
                                         }}
-                                        className="text-slate-400 hover:text-red-600 px-1"
+                                        className="sims-icon-btn hover:text-red-500"
                                         title="Disable"
                                       >
                                         <X className="h-3.5 w-3.5" />
@@ -865,7 +868,7 @@ export function AgentDetailPage() {
           {!showNewLocation && (
             <button
               onClick={() => { setShowNewLocation(true); setShowNewContact(null) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              className="sd-btn primary sm"
             >
               <Plus className="h-3.5 w-3.5" /> Add Office
             </button>
@@ -874,7 +877,7 @@ export function AgentDetailPage() {
 
         {/* New location form */}
         {showNewLocation && (
-          <div className="bg-white border border-blue-200 rounded-lg p-4">
+          <div className="sd-card p-4">
             <h3 className="text-sm font-medium text-slate-700 mb-1">New Office</h3>
             <LocationForm
               form={newLocForm}
@@ -887,16 +890,11 @@ export function AgentDetailPage() {
         )}
 
         {agent.locations.length === 0 && !showNewLocation && (
-          <div className="bg-white border border-dashed rounded-lg p-8 text-center">
-            <Building2 className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No offices added yet.</p>
-            <button
-              onClick={() => setShowNewLocation(true)}
-              className="mt-3 text-sm text-blue-600 hover:underline"
-            >
-              Add the first office
-            </button>
-          </div>
+          <EmptyState
+            icon={Building2}
+            title="No offices added yet"
+            action={<button onClick={() => setShowNewLocation(true)} className="sd-btn outline sm">Add the first office</button>}
+          />
         )}
 
         {/* Location cards */}
@@ -906,7 +904,7 @@ export function AgentDetailPage() {
           const addressParts = [location.addressLine1, location.addressLine2, location.city && location.state ? `${location.city}, ${location.state} ${location.zipCode ?? ''}`.trim() : null].filter(Boolean)
 
           return (
-            <div key={location.id} className="bg-white border rounded-lg overflow-hidden">
+            <div key={location.id} className="sd-card overflow-hidden">
               {/* Location header */}
               <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b">
                 <div className="flex items-center gap-2">
@@ -944,7 +942,7 @@ export function AgentDetailPage() {
                       setEditLocForm(locationToForm(location))
                       setCollapsedLocations((prev) => { const n = new Set(prev); n.delete(location.id); return n })
                     }}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-white"
+                    className="sims-icon-btn hover:text-sky-600"
                     title="Edit office"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -954,7 +952,7 @@ export function AgentDetailPage() {
                       if (confirm(`Delete "${location.name || 'this office'}" and all its contacts?`))
                         deleteLocationMutation.mutate(location.id)
                     }}
-                    className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-white"
+                    className="sims-icon-btn hover:text-red-500"
                     title="Delete office"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -1024,7 +1022,7 @@ export function AgentDetailPage() {
                                   </div>
                                   <div className="flex items-center gap-3 mt-0.5">
                                     {contact.email && (
-                                      <a href={`mailto:${contact.email}`} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                      <a href={`mailto:${contact.email}`} className="text-xs text-sky-700 hover:underline flex items-center gap-1">
                                         <Mail className="h-3 w-3" /> {contact.email}
                                       </a>
                                     )}
@@ -1043,7 +1041,8 @@ export function AgentDetailPage() {
                                     setEditContactForm(contactToForm(contact))
                                     setShowNewContact(null)
                                   }}
-                                  className="p-1 text-slate-400 hover:text-blue-600 rounded"
+                                  className="sims-icon-btn hover:text-sky-600"
+                                  title="Edit contact"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
@@ -1052,7 +1051,8 @@ export function AgentDetailPage() {
                                     if (confirm(`Delete contact ${fullName}?`))
                                       deleteContactMutation.mutate({ locationId: location.id, contactId: contact.id })
                                   }}
-                                  className="p-1 text-slate-400 hover:text-red-600 rounded"
+                                  className="sims-icon-btn hover:text-red-500"
+                                  title="Delete contact"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -1088,7 +1088,7 @@ export function AgentDetailPage() {
                           setNewContactForm(emptyContactForm())
                           setEditingContact(null)
                         }}
-                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 mt-1"
+                        className="sd-btn ghost sm mt-1"
                       >
                         <Plus className="h-3.5 w-3.5" /> Add Contact
                       </button>
