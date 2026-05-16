@@ -24,6 +24,7 @@ public interface IComplianceDocumentService
     Task<Result<ComplianceEvidenceAttachmentDto>> UploadEvidenceAttachmentAsync(Guid evidenceId, IFormFile file, string? description, Guid userId, CancellationToken ct = default);
     Task<Result<string>> GetEvidenceAttachmentDownloadUrlAsync(Guid attachmentId, Guid userId, CancellationToken ct = default);
     Task<Result> DeleteEvidenceAttachmentAsync(Guid attachmentId, Guid userId, CancellationToken ct = default);
+    Task<Result<ComplianceDocumentPdfDto>> GenerateDocumentPdfAsync(Guid id, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceVersionCompareDto>> CompareVersionsAsync(Guid id, Guid? fromVersionId = null, Guid? toVersionId = null, CancellationToken ct = default);
     Task<IReadOnlyList<ComplianceAuditLogDto>> GetAuditLogAsync(Guid documentId, CancellationToken ct = default);
     Task<IReadOnlyList<ComplianceAttestationCampaignDto>> GetAttestationCampaignsAsync(Guid? documentId = null, CancellationToken ct = default);

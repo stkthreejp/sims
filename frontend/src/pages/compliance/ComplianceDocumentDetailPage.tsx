@@ -154,7 +154,23 @@ export function ComplianceDocumentDetailPage() {
     onError: () => toast.error('Could not request changes'),
   })
 
-  const busy = updateMutation.isPending || draftMutation.isPending || publishMutation.isPending || submitMutation.isPending || requireChangesMutation.isPending
+  const exportPdfMutation = useMutation({
+    mutationFn: () => complianceDocumentsApi.exportPdf(id!),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = `${safeFileName(title || documentQuery.data?.title || 'compliance-document')}.pdf`
+      window.document.body.appendChild(link)
+      link.click()
+      window.document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      toast.success('PDF exported')
+    },
+    onError: () => toast.error('Could not export PDF'),
+  })
+
+  const busy = updateMutation.isPending || draftMutation.isPending || publishMutation.isPending || submitMutation.isPending || requireChangesMutation.isPending || exportPdfMutation.isPending
 
   if (documentQuery.isLoading) return <LoadingSpinner />
   if (!documentQuery.data) return <div className="p-6 text-sm text-slate-500">Compliance document not found.</div>
@@ -214,6 +230,15 @@ export function ComplianceDocumentDetailPage() {
         >
           <FileText className="h-4 w-4" />
           Report
+        </button>
+        <button
+          type="button"
+          onClick={() => exportPdfMutation.mutate()}
+          disabled={exportPdfMutation.isPending}
+          className="sd-btn outline sm"
+        >
+          {exportPdfMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Document PDF
         </button>
       </div>
 
@@ -1132,4 +1157,8 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function safeFileName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'compliance-document'
 }

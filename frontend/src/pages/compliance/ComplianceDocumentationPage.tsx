@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/utils'
 const ALL = 'All'
 const STATUSES = [ALL, 'Draft', 'Active', 'Under Review', 'Needs Update', 'Retired']
 const CATEGORIES = [ALL, 'IT', 'Security', 'Business Continuity', 'Privacy', 'Operations', 'Vendor Management', 'HR', 'Finance']
+type MetricFilter = 'All' | 'Active' | 'DraftReview' | 'Overdue'
 
 export function ComplianceDocumentationPage() {
   const navigate = useNavigate()
@@ -19,6 +20,7 @@ export function ComplianceDocumentationPage() {
   const [status, setStatus] = useState(ALL)
   const [category, setCategory] = useState(ALL)
   const [search, setSearch] = useState('')
+  const [metricFilter, setMetricFilter] = useState<MetricFilter>('All')
 
   const summaryQuery = useQuery({
     queryKey: ['compliance-documents', 'summary'],
@@ -53,6 +55,28 @@ export function ComplianceDocumentationPage() {
 
   const documents = documentsQuery.data ?? []
   const categories = useMemo(() => Array.from(new Set([...CATEGORIES, ...documents.map((d) => d.category)])), [documents])
+  const filteredDocuments = useMemo(() => {
+    if (metricFilter === 'Active') return documents.filter((document) => document.status === 'Active')
+    if (metricFilter === 'DraftReview') return documents.filter((document) => document.status === 'Draft' || document.status === 'Under Review')
+    if (metricFilter === 'Overdue') {
+      const today = startOfToday()
+      return documents.filter((document) => {
+        const nextReview = parseDate(document.nextReviewDate)
+        return !!nextReview && nextReview < today
+      })
+    }
+    return documents
+  }, [documents, metricFilter])
+
+  const chooseMetricFilter = (filter: MetricFilter) => {
+    setMetricFilter(filter)
+    setStatus(ALL)
+  }
+
+  const updateStatusFilter = (value: string) => {
+    setStatus(value)
+    setMetricFilter('All')
+  }
 
   return (
     <div className="space-y-5 p-6" style={{ background: 'var(--surface-2)' }}>
@@ -91,15 +115,15 @@ export function ComplianceDocumentationPage() {
       />
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <Metric icon={FileText} label="Total Documents" value={summaryQuery.data?.totalDocuments ?? 0} />
-        <Metric icon={CheckCircle2} label="Active" value={summaryQuery.data?.activeDocuments ?? 0} />
-        <Metric icon={FileCheck2} label="Draft / Review" value={summaryQuery.data?.draftDocuments ?? 0} />
-        <Metric icon={AlertTriangle} label="Overdue" value={summaryQuery.data?.overdue ?? 0} tone="danger" />
+        <Metric icon={FileText} label="Total Documents" value={summaryQuery.data?.totalDocuments ?? 0} active={metricFilter === 'All'} onClick={() => chooseMetricFilter('All')} />
+        <Metric icon={CheckCircle2} label="Active" value={summaryQuery.data?.activeDocuments ?? 0} active={metricFilter === 'Active'} onClick={() => chooseMetricFilter('Active')} />
+        <Metric icon={FileCheck2} label="Draft / Review" value={summaryQuery.data?.draftDocuments ?? 0} active={metricFilter === 'DraftReview'} onClick={() => chooseMetricFilter('DraftReview')} />
+        <Metric icon={AlertTriangle} label="Overdue" value={summaryQuery.data?.overdue ?? 0} tone="danger" active={metricFilter === 'Overdue'} onClick={() => chooseMetricFilter('Overdue')} />
       </section>
 
       <section className="sd-card">
         <div className="sd-card-head flex-wrap gap-3">
-          <SelectFilter label="Status" value={status} values={STATUSES} onChange={setStatus} />
+          <SelectFilter label="Status" value={status} values={STATUSES} onChange={updateStatusFilter} />
           <SelectFilter label="Category" value={category} values={categories} onChange={setCategory} />
           <label className="relative min-w-[260px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4" style={{ color: 'var(--ink-4)' }} />
@@ -114,7 +138,7 @@ export function ComplianceDocumentationPage() {
 
         {documentsQuery.isLoading ? (
           <div className="p-8"><LoadingSpinner /></div>
-        ) : documents.length === 0 ? (
+        ) : filteredDocuments.length === 0 ? (
           <div className="p-6">
             <EmptyState icon={FileText} title="No compliance documents" description="Create the first document or adjust the filters." />
           </div>
@@ -132,7 +156,7 @@ export function ComplianceDocumentationPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {documents.map((document) => (
+                {filteredDocuments.map((document) => (
                   <tr
                     key={document.id}
                     onClick={() => navigate(`/compliance-documentation/${document.id}`)}
@@ -170,15 +194,20 @@ export function ComplianceDocumentationPage() {
   )
 }
 
-function Metric({ icon: Icon, label, value, tone = 'default' }: { icon: React.ElementType; label: string; value: number; tone?: 'default' | 'danger' }) {
+function Metric({ icon: Icon, label, value, tone = 'default', active = false, onClick }: { icon: React.ElementType; label: string; value: number; tone?: 'default' | 'danger'; active?: boolean; onClick: () => void }) {
   return (
-    <div className="sd-card p-4">
+    <button
+      type="button"
+      onClick={onClick}
+      className="sd-card p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md"
+      style={{ borderColor: active ? 'var(--accent)' : 'var(--line)' }}
+    >
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>{label}</div>
         <Icon className={`h-4 w-4 ${tone === 'danger' ? 'text-red-500' : 'text-slate-400'}`} />
       </div>
       <div className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</div>
-    </div>
+    </button>
   )
 }
 
@@ -207,4 +236,16 @@ function StatusPill({ status }: { status: string }) {
         : 'border-amber-200 bg-amber-50 text-amber-700'
 
   return <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${styles}`}>{status}</span>
+}
+
+function parseDate(value: string | null) {
+  if (!value) return null
+  const date = new Date(`${value}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function startOfToday() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return today
 }

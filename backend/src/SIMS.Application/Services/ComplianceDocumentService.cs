@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
     private IBlobStorageService Blob => (IBlobStorageService)_sp.GetService(typeof(IBlobStorageService))!;
     private IFileScanService FileScan => (IFileScanService)_sp.GetService(typeof(IFileScanService))!;
+    private IHtmlToPdfService HtmlToPdf => (IHtmlToPdfService)_sp.GetService(typeof(IHtmlToPdfService))!;
 
     public ComplianceDocumentService(IServiceProvider sp, IConfiguration config)
     {
@@ -433,6 +435,30 @@ public class ComplianceDocumentService : IComplianceDocumentService
         return Result.Success();
     }
 
+    public async Task<Result<ComplianceDocumentPdfDto>> GenerateDocumentPdfAsync(Guid id, Guid userId, CancellationToken ct = default)
+    {
+        var document = await LoadDetailQuery().FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (document == null)
+            return Result<ComplianceDocumentPdfDto>.Failure("NOT_FOUND", "Compliance document not found.");
+
+        var version = document.CurrentPublishedVersion ?? document.CurrentDraftVersion;
+        if (version == null)
+            return Result<ComplianceDocumentPdfDto>.Failure("NO_VERSION", "A draft or published version is required before exporting a PDF.");
+
+        var html = BuildDocumentPdfHtml(document, version);
+        var bytes = await HtmlToPdf.ConvertAsync(html, ct);
+        var suffix = version.Status == "Published" ? $"v{version.VersionNumber}" : $"draft-v{version.VersionNumber}";
+
+        AddAudit(document.Id, version.Id, "PdfExported", null, null, suffix, null, userId);
+        await Db.SaveChangesAsync(ct);
+
+        return Result<ComplianceDocumentPdfDto>.Success(new ComplianceDocumentPdfDto
+        {
+            FileName = $"{SafeFileName(document.Title)}-{suffix}.pdf",
+            Content = bytes,
+        });
+    }
+
     public async Task<Result<ComplianceVersionCompareDto>> CompareVersionsAsync(Guid id, Guid? fromVersionId = null, Guid? toVersionId = null, CancellationToken ct = default)
     {
         var document = await Db.Set<ComplianceDocument>()
@@ -779,6 +805,79 @@ public class ComplianceDocumentService : IComplianceDocumentService
             "manual" => reviewedDate,
             _ => reviewedDate.AddYears(1),
         };
+
+    private static string BuildDocumentPdfHtml(ComplianceDocument document, ComplianceDocumentVersion version)
+    {
+        var title = WebUtility.HtmlEncode(document.Title);
+        var subtitle = WebUtility.HtmlEncode($"{document.Category} / {document.DocumentType}");
+        var status = WebUtility.HtmlEncode($"{version.Status} v{version.VersionNumber}");
+        var owner = WebUtility.HtmlEncode(document.Owner?.FullName ?? "-");
+        var approver = WebUtility.HtmlEncode(document.Approver?.FullName ?? "-");
+        var effectiveDate = WebUtility.HtmlEncode(document.EffectiveDate?.ToString("yyyy-MM-dd") ?? "-");
+        var nextReview = WebUtility.HtmlEncode(document.NextReviewDate?.ToString("yyyy-MM-dd") ?? "-");
+        var generated = WebUtility.HtmlEncode(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'"));
+        var tags = document.Tags.Length == 0
+            ? "<span class=\"muted\">No tags</span>"
+            : string.Join("", document.Tags.Select(tag => $"<span class=\"tag\">{WebUtility.HtmlEncode(tag)}</span>"));
+
+        var html = new StringBuilder();
+        html.Append("""
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: Letter; margin: 0.55in; }
+    body { margin: 0; color: #1f2933; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; }
+    header { border-bottom: 1px solid #d7dde4; padding-bottom: 16px; margin-bottom: 18px; }
+    .eyebrow { color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 6px 0 4px; color: #111827; font-size: 22px; line-height: 1.2; }
+    .subtitle { color: #526170; font-size: 12px; }
+    .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 18px 0; }
+    .box { border: 1px solid #d7dde4; border-radius: 6px; padding: 8px 10px; background: #f8fafc; }
+    .label { color: #64748b; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .value { color: #111827; font-size: 12px; font-weight: 600; margin-top: 2px; }
+    .tags { display: flex; gap: 5px; flex-wrap: wrap; margin: 10px 0 18px; }
+    .tag { border-radius: 4px; background: #eef3f8; color: #334155; padding: 2px 6px; font-size: 10px; }
+    .content { border-top: 1px solid #d7dde4; padding-top: 18px; }
+    .content h1, .content h2, .content h3 { color: #111827; line-height: 1.25; }
+    .content table { width: 100%; border-collapse: collapse; }
+    .content th, .content td { border: 1px solid #d7dde4; padding: 6px; vertical-align: top; }
+    .muted { color: #64748b; }
+  </style>
+</head>
+<body>
+""");
+        html.Append($"""
+  <header>
+    <div class="eyebrow">Compliance Document</div>
+    <h1>{title}</h1>
+    <div class="subtitle">{subtitle}</div>
+  </header>
+  <section class="meta">
+    <div class="box"><div class="label">Version</div><div class="value">{status}</div></div>
+    <div class="box"><div class="label">Owner</div><div class="value">{owner}</div></div>
+    <div class="box"><div class="label">Approver</div><div class="value">{approver}</div></div>
+    <div class="box"><div class="label">Effective</div><div class="value">{effectiveDate}</div></div>
+    <div class="box"><div class="label">Next Review</div><div class="value">{nextReview}</div></div>
+    <div class="box"><div class="label">Generated</div><div class="value">{generated}</div></div>
+  </section>
+  <div class="tags">{tags}</div>
+  <main class="content">
+    {version.HtmlContent}
+  </main>
+</body>
+</html>
+""");
+
+        return html.ToString();
+    }
+
+    private static string SafeFileName(string value)
+    {
+        var cleaned = Regex.Replace(value.ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
+        return string.IsNullOrWhiteSpace(cleaned) ? "compliance-document" : cleaned;
+    }
 
     private static IReadOnlyList<ComplianceDiffPartDto> BuildDiff(string fromText, string toText)
     {

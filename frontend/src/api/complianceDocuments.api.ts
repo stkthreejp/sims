@@ -25,6 +25,9 @@ export const complianceDocumentsApi = {
   getAuditLog: (id: string) =>
     apiClient.get<ComplianceAuditLog[]>(`/compliance-documents/${id}/audit-log`).then((r) => r.data),
 
+  exportPdf: (id: string) =>
+    apiClient.get<Blob>(`/compliance-documents/${id}/pdf`, { responseType: 'blob' }).then((r) => r.data),
+
   create: (data: ComplianceDocumentCreate) =>
     apiClient.post<ComplianceDocumentDetail>('/compliance-documents', data).then((r) => r.data),
 

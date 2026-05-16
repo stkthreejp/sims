@@ -221,6 +221,12 @@ public class ComplianceVersionCompareDto
     public IReadOnlyList<ComplianceDiffPartDto> Parts { get; set; } = [];
 }
 
+public class ComplianceDocumentPdfDto
+{
+    public string FileName { get; set; } = string.Empty;
+    public byte[] Content { get; set; } = [];
+}
+
 public class ComplianceDiffPartDto
 {
     public string Text { get; set; } = string.Empty;

@@ -68,6 +68,15 @@ public class ComplianceDocumentsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id:guid}/pdf")]
+    public async Task<IActionResult> ExportDocumentPdf(Guid id, CancellationToken ct)
+    {
+        var result = await _service.GenerateDocumentPdfAsync(id, CurrentUserId(), ct);
+        return result.IsSuccess
+            ? File(result.Value!.Content, "application/pdf", result.Value.FileName)
+            : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateDocument([FromBody] ComplianceDocumentCreateDto dto, CancellationToken ct)
     {
