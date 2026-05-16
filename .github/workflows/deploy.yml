@@ -22,10 +22,25 @@ jobs:
       - name: Log in to ACR
         run: az acr login --name ${{ secrets.ACR_NAME }}
 
+      - name: Mirror .NET base images to ACR
+        run: |
+          az acr import \
+            --name ${{ secrets.ACR_NAME }} \
+            --source mcr.microsoft.com/dotnet/aspnet:8.0 \
+            --image dotnet/aspnet:8.0 \
+            --force
+          az acr import \
+            --name ${{ secrets.ACR_NAME }} \
+            --source mcr.microsoft.com/dotnet/sdk:8.0 \
+            --image dotnet/sdk:8.0 \
+            --force
+
       - name: Build and push API image
         run: |
           docker build \
             -f backend/src/SIMS.API/Dockerfile \
+            --build-arg ASPNET_IMAGE=${{ env.ACR_LOGIN_SERVER }}/dotnet/aspnet:8.0 \
+            --build-arg SDK_IMAGE=${{ env.ACR_LOGIN_SERVER }}/dotnet/sdk:8.0 \
             -t ${{ env.ACR_LOGIN_SERVER }}/sims-api:${{ github.sha }} \
             -t ${{ env.ACR_LOGIN_SERVER }}/sims-api:latest \
             backend/

@@ -1,4 +1,7 @@
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+ARG ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:8.0
+ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0
+
+FROM ${ASPNET_IMAGE} AS base
 WORKDIR /app
 RUN apt-get update && \
     apt-get install -yq --no-install-recommends \
@@ -10,7 +13,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 EXPOSE 8080
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM ${SDK_IMAGE} AS build
 WORKDIR /src
 COPY ["src/SIMS.API/SIMS.API.csproj", "src/SIMS.API/"]
 COPY ["src/SIMS.Application/SIMS.Application.csproj", "src/SIMS.Application/"]
