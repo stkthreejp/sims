@@ -20,6 +20,12 @@ export interface LedgerAccountOption {
   accountType: string
 }
 
+export interface PayeeOption {
+  id: number
+  name: string
+  payeeType: string
+}
+
 export interface FeePremiumBracket {
   id?: number
   tierFrom: number

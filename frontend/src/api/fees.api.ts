@@ -1,9 +1,12 @@
 import { apiClient } from './client'
-import type { FeeDefinition, FeeRuleVersion, FeeAuditLogEntry, LedgerAccountOption } from '@/types/fee.types'
+import type { FeeDefinition, FeeRuleVersion, FeeAuditLogEntry, LedgerAccountOption, PayeeOption } from '@/types/fee.types'
 
 export const feesApi = {
   getLedgerAccounts: () =>
     apiClient.get<LedgerAccountOption[]>('/admin/fees/ledger-accounts').then((r) => r.data),
+
+  getPayees: () =>
+    apiClient.get<PayeeOption[]>('/admin/fees/payees').then((r) => r.data),
 
   // Definitions
   getDefinitions: () =>

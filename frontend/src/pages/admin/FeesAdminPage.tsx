@@ -115,6 +115,11 @@ export function FeesAdminPage() {
     queryFn: () => feesApi.getLedgerAccounts(),
   })
 
+  const { data: payees = [] } = useQuery({
+    queryKey: ['admin', 'fees', 'payees'],
+    queryFn: () => feesApi.getPayees(),
+  })
+
   const { data: premiumCharges = [], isLoading: loadingPremiumCharges } = useQuery({
     queryKey: ['admin', 'premium-charges', 'additional-interests'],
     queryFn: () => premiumChargesApi.getAdditionalInterestRates(),
@@ -200,6 +205,14 @@ export function FeesAdminPage() {
 
   function set<K extends keyof VersionForm>(key: K, val: VersionForm[K]) {
     setForm(p => ({ ...p, [key]: val }))
+  }
+
+  function setPayableRouting(value: VersionForm['payableRouting']) {
+    setForm(p => ({
+      ...p,
+      payableRouting: value,
+      payablePayeeId: value === 'Entity' ? p.payablePayeeId : null,
+    }))
   }
 
   function setPremium<K extends keyof PremiumChargeForm>(key: K, val: PremiumChargeForm[K]) {
@@ -413,15 +426,22 @@ export function FeesAdminPage() {
         <SectionHeader label="Payable Routing" />
         <div className="grid grid-cols-2 gap-5">
           <Field label="Routing">
-            <select value={form.payableRouting} onChange={e => set('payableRouting', e.target.value as any)} className={selectCls}>
+            <select value={form.payableRouting} onChange={e => setPayableRouting(e.target.value as VersionForm['payableRouting'])} className={selectCls}>
               <option value="NotPayable">Not Payable</option>
               <option value="Company">Payable to Company</option>
-              <option value="Entity">Payable to Entity</option>
+              <option value="Entity">Payable to Third Party / Vendor</option>
             </select>
           </Field>
           {form.payableRouting === 'Entity' && (
-            <Field label="Payee ID">
-              <input type="number" value={form.payablePayeeId ?? ''} onChange={e => set('payablePayeeId', e.target.value ? Number(e.target.value) : null)} className={inputCls} />
+            <Field label="Third Party / Vendor">
+              <select value={form.payablePayeeId ?? ''} onChange={e => set('payablePayeeId', e.target.value ? Number(e.target.value) : null)} className={selectCls}>
+                <option value="">Select payee</option>
+                {payees.map(payee => (
+                  <option key={payee.id} value={payee.id}>
+                    {payee.name} ({payee.payeeType})
+                  </option>
+                ))}
+              </select>
             </Field>
           )}
           <label className="flex items-center gap-2 cursor-pointer">

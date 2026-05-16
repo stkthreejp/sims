@@ -37,6 +37,18 @@ public class FeesController : ControllerBase
         return Ok(accounts);
     }
 
+    [HttpGet("payees")]
+    public async Task<IActionResult> GetPayees(CancellationToken ct)
+    {
+        var payees = await _db.Set<Payee>()
+            .Where(p => p.TenantId == 1 && p.IsActive)
+            .OrderBy(p => p.Name)
+            .Select(p => new PayeeOptionDto(p.Id, p.Name, p.PayeeType))
+            .ToListAsync(ct);
+
+        return Ok(payees);
+    }
+
     [HttpGet("definitions")]
     public async Task<IActionResult> GetDefinitions(CancellationToken ct)
         => Ok(await _svc.GetDefinitionsAsync(ct));

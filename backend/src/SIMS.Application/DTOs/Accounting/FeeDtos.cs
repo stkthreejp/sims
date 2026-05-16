@@ -17,6 +17,12 @@ public record LedgerAccountOptionDto(
     string AccountType
 );
 
+public record PayeeOptionDto(
+    long Id,
+    string Name,
+    string PayeeType
+);
+
 public record FeeRuleVersionDto(
     long Id,
     long FeeDefinitionId,
