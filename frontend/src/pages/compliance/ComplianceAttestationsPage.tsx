@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, Clock, FileCheck2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
+import { EmptyState } from '@/components/common/EmptyState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { formatDate, formatDateTime } from '@/lib/utils'
@@ -41,7 +42,7 @@ export function ComplianceAttestationsPage() {
   const completedCount = assigned.length - pendingCount
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5 p-6" style={{ background: 'var(--surface-2)' }}>
       <PageHeader
         title="My Attestations"
         subtitle="Review and acknowledge assigned compliance document versions"
@@ -49,7 +50,7 @@ export function ComplianceAttestationsPage() {
           <button
             type="button"
             onClick={() => navigate('/compliance-documentation')}
-            className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="sd-btn outline"
           >
             <ArrowLeft className="h-4 w-4" />
             Compliance Register
@@ -63,14 +64,14 @@ export function ComplianceAttestationsPage() {
         <Metric icon={FileCheck2} label="Total Assigned" value={assigned.length} />
       </section>
 
-      <section className="rounded border bg-white">
-        <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+      <section className="sd-card">
+        <div className="sd-card-head flex-wrap gap-2">
           {(['Pending', 'Completed', 'All'] as FilterKey[]).map((option) => (
             <button
               key={option}
               type="button"
               onClick={() => setFilter(option)}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${filter === option ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`sd-btn sm ${filter === option ? 'primary' : 'ghost'}`}
             >
               {option}
             </button>
@@ -80,7 +81,9 @@ export function ComplianceAttestationsPage() {
         {campaignsQuery.isLoading ? (
           <div className="p-8"><LoadingSpinner /></div>
         ) : visible.length === 0 ? (
-          <div className="p-6 text-sm text-slate-500">No attestations match this view.</div>
+          <div className="p-6">
+            <EmptyState icon={FileCheck2} title="No attestations" description="No attestations match this view." />
+          </div>
         ) : (
           <div className="divide-y">
             {visible.map(({ campaign, recipient }) => (
@@ -146,14 +149,14 @@ function AttestationRow({
           <button
             type="button"
             onClick={onOpen}
-            className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="sd-btn outline sm"
           >
             Open Document
           </button>
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
-            className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="sd-btn outline sm"
           >
             {expanded ? 'Hide' : 'View'}
           </button>
@@ -161,8 +164,8 @@ function AttestationRow({
       </div>
 
       {expanded && (
-        <div className="mt-4 rounded border bg-slate-50 p-4">
-          <div className="text-sm leading-6 text-slate-700">{campaign.statement}</div>
+        <div className="mt-4 rounded-lg p-4" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+          <div className="text-sm leading-6" style={{ color: 'var(--ink-2)' }}>{campaign.statement}</div>
           {pending ? (
             <div className="mt-4 space-y-3">
               <label className="block text-sm font-medium text-slate-700">
@@ -171,7 +174,7 @@ function AttestationRow({
                   value={comment}
                   onChange={(event) => setComment(event.target.value)}
                   rows={3}
-                  className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+                  className="sims-textarea mt-1"
                   placeholder="Optional"
                 />
               </label>
@@ -180,7 +183,7 @@ function AttestationRow({
                   type="button"
                   onClick={() => submitMutation.mutate('Declined')}
                   disabled={submitMutation.isPending}
-                  className="inline-flex items-center gap-1.5 rounded border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  className="sd-btn danger"
                 >
                   <XCircle className="h-4 w-4" />
                   Decline
@@ -189,7 +192,7 @@ function AttestationRow({
                   type="button"
                   onClick={() => submitMutation.mutate('Attested')}
                   disabled={submitMutation.isPending}
-                  className="inline-flex items-center gap-1.5 rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  className="sd-btn success"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Attest
@@ -208,12 +211,12 @@ function AttestationRow({
 function Metric({ icon: Icon, label, value, tone = 'default' }: { icon: React.ElementType; label: string; value: number; tone?: 'default' | 'pending' | 'complete' }) {
   const color = tone === 'pending' ? 'text-amber-500' : tone === 'complete' ? 'text-green-500' : 'text-slate-400'
   return (
-    <div className="rounded border bg-white p-4">
+    <div className="sd-card p-4">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
+        <div className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>{label}</div>
         <Icon className={`h-4 w-4 ${color}`} />
       </div>
-      <div className="mt-2 text-xl font-semibold text-slate-800">{value.toLocaleString()}</div>
+      <div className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</div>
     </div>
   )
 }

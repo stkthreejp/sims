@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle, CalendarClock, CheckCircle2, Search } from 'lucide-react'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
+import { EmptyState } from '@/components/common/EmptyState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { formatDate } from '@/lib/utils'
@@ -65,7 +66,7 @@ export function ComplianceReviewsPage() {
   }, [documentsQuery.data])
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5 p-6" style={{ background: 'var(--surface-2)' }}>
       <PageHeader
         title="Compliance Review Queue"
         subtitle="Documents due for owner review or compliance follow-up"
@@ -73,7 +74,7 @@ export function ComplianceReviewsPage() {
           <button
             type="button"
             onClick={() => navigate('/compliance-documentation')}
-            className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="sd-btn outline"
           >
             <ArrowLeft className="h-4 w-4" />
             Compliance Register
@@ -87,27 +88,27 @@ export function ComplianceReviewsPage() {
         <Metric icon={CheckCircle2} label="Missing Review Date" value={counts.missingDate} />
       </section>
 
-      <section className="rounded border bg-white">
-        <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+      <section className="sd-card">
+        <div className="sd-card-head flex-wrap gap-3">
           <div className="flex flex-wrap gap-2">
             {(['Needs Review', 'Overdue', 'Due Soon', 'All'] as QueueFilter[]).map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => setFilter(option)}
-                className={`rounded px-3 py-1.5 text-sm font-medium ${filter === option ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                className={`sd-btn sm ${filter === option ? 'primary' : 'ghost'}`}
               >
                 {option}
               </button>
             ))}
           </div>
           <label className="relative min-w-[260px] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4" style={{ color: 'var(--ink-4)' }} />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search review queue"
-              className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="sims-input pl-9"
             />
           </label>
         </div>
@@ -115,12 +116,14 @@ export function ComplianceReviewsPage() {
         {documentsQuery.isLoading ? (
           <div className="p-8"><LoadingSpinner /></div>
         ) : queue.length === 0 ? (
-          <div className="p-6 text-sm text-slate-500">No documents match this review view.</div>
+          <div className="p-6">
+            <EmptyState icon={CalendarClock} title="No review items" description="No documents match this review view." />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b text-xs uppercase tracking-wide" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-4)' }}>
                   <th className="px-4 py-3">Document</th>
                   <th className="px-4 py-3">Owner</th>
                   <th className="px-4 py-3">Last Reviewed</th>
@@ -161,12 +164,12 @@ export function ComplianceReviewsPage() {
 function Metric({ icon: Icon, label, value, tone = 'default' }: { icon: React.ElementType; label: string; value: number; tone?: 'default' | 'warning' | 'danger' }) {
   const color = tone === 'danger' ? 'text-red-500' : tone === 'warning' ? 'text-amber-500' : 'text-slate-400'
   return (
-    <div className="rounded border bg-white p-4">
+    <div className="sd-card p-4">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
+        <div className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>{label}</div>
         <Icon className={`h-4 w-4 ${color}`} />
       </div>
-      <div className="mt-2 text-xl font-semibold text-slate-800">{value.toLocaleString()}</div>
+      <div className="mt-2 text-xl font-semibold" style={{ color: 'var(--ink)' }}>{value.toLocaleString()}</div>
     </div>
   )
 }

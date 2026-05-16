@@ -48,21 +48,21 @@ export function ComplianceEvidenceReportPage() {
   if (!document) return <div className="p-6 text-sm text-slate-500">Compliance document not found.</div>
 
   return (
-    <div className="min-h-full bg-slate-100">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-white px-6 py-3 print:hidden">
+    <div className="min-h-full" style={{ background: 'var(--surface-2)' }}>
+      <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3 print:hidden" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
         <button
           type="button"
           onClick={() => navigate(`/compliance-documentation/${document.id}`)}
-          className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="sd-btn outline"
         >
           <ArrowLeft className="h-4 w-4" />
           Document
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => downloadAttestationCsv(document, campaigns)}
-            className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="sd-btn outline"
           >
             <Download className="h-4 w-4" />
             Attestation CSV
@@ -70,7 +70,7 @@ export function ComplianceEvidenceReportPage() {
           <button
             type="button"
             onClick={() => downloadAuditCsv(document, auditLogs)}
-            className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="sd-btn outline"
           >
             <Download className="h-4 w-4" />
             Audit CSV
@@ -78,7 +78,7 @@ export function ComplianceEvidenceReportPage() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            className="sd-btn primary"
           >
             <Printer className="h-4 w-4" />
             Print Report
@@ -86,11 +86,11 @@ export function ComplianceEvidenceReportPage() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-5xl bg-white p-8 shadow-sm print:max-w-none print:p-0 print:shadow-none">
-        <header className="border-b pb-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Compliance Evidence Report</div>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-950">{document.title}</h1>
-          <div className="mt-2 text-sm text-slate-500">Generated {formatDateTime(new Date().toISOString())}</div>
+      <main className="sd-card mx-auto my-6 max-w-5xl p-8 print:my-0 print:max-w-none print:border-0 print:p-0 print:shadow-none">
+        <header className="border-b pb-6" style={{ borderColor: 'var(--line)' }}>
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Compliance Evidence Report</div>
+          <h1 className="mt-2 text-2xl font-semibold" style={{ color: 'var(--ink)' }}>{document.title}</h1>
+          <div className="mt-2 text-sm" style={{ color: 'var(--ink-4)' }}>Generated {formatDateTime(new Date().toISOString())}</div>
         </header>
 
         <section className="grid grid-cols-1 gap-3 py-6 md:grid-cols-4">
@@ -115,7 +115,7 @@ export function ComplianceEvidenceReportPage() {
 
         <ReportSection title="Current Published Version">
           {document.currentPublishedVersion ? (
-            <div className="space-y-2 text-sm text-slate-700">
+            <div className="space-y-2 text-sm" style={{ color: 'var(--ink-2)' }}>
               <div>Version {document.currentPublishedVersion.versionNumber}</div>
               <div>Approved by {document.currentPublishedVersion.approvedByName ?? '-'} on {formatDateTime(document.currentPublishedVersion.approvedAt)}</div>
               {document.currentPublishedVersion.changeSummary && <div>Change summary: {document.currentPublishedVersion.changeSummary}</div>}
@@ -168,8 +168,8 @@ export function ComplianceEvidenceReportPage() {
               </div>
               {campaigns.map((campaign) => (
                 <div key={campaign.id}>
-                  <h3 className="text-sm font-semibold text-slate-900">{campaign.name}</h3>
-                  <div className="mb-2 mt-1 text-xs text-slate-500">Version {campaign.versionNumber} · Due {formatDate(campaign.dueDate)} · {campaign.status}</div>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{campaign.name}</h3>
+                  <div className="mb-2 mt-1 text-xs" style={{ color: 'var(--ink-4)' }}>Version {campaign.versionNumber} / Due {formatDate(campaign.dueDate)} / {campaign.status}</div>
                   <SimpleTable
                     headers={['Recipient', 'Email', 'Status', 'Completed', 'Comment']}
                     rows={campaign.recipients.map((recipient) => [
@@ -209,8 +209,8 @@ export function ComplianceEvidenceReportPage() {
 
 function ReportSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t py-6">
-      <h2 className="mb-3 text-base font-semibold text-slate-950">{title}</h2>
+    <section className="border-t py-6" style={{ borderColor: 'var(--line)' }}>
+      <h2 className="mb-3 text-base font-semibold" style={{ color: 'var(--ink)' }}>{title}</h2>
       {children}
     </section>
   )
@@ -218,9 +218,9 @@ function ReportSection({ title, children }: { title: string; children: React.Rea
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border bg-slate-50 p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-base font-semibold text-slate-900">{value}</div>
+    <div className="rounded-lg p-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+      <div className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>{label}</div>
+      <div className="mt-1 text-base font-semibold" style={{ color: 'var(--ink)' }}>{value}</div>
     </div>
   )
 }
@@ -228,8 +228,8 @@ function Metric({ label, value }: { label: string; value: string }) {
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-1 text-slate-800">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>{label}</dt>
+      <dd className="mt-1" style={{ color: 'var(--ink-2)' }}>{value}</dd>
     </div>
   )
 }
@@ -239,14 +239,14 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] })
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left text-xs">
         <thead>
-          <tr className="border-y bg-slate-50 text-slate-500">
+          <tr className="border-y" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-4)' }}>
             {headers.map((header) => <th key={header} className="px-2 py-2 font-semibold">{header}</th>)}
           </tr>
         </thead>
-        <tbody className="divide-y">
+        <tbody className="divide-y" style={{ borderColor: 'var(--line)' }}>
           {rows.map((row, rowIndex) => (
             <tr key={`${row[0]}-${rowIndex}`} className="align-top">
-              {row.map((cell, cellIndex) => <td key={`${cellIndex}-${cell}`} className="max-w-xs px-2 py-2 text-slate-700">{cell}</td>)}
+              {row.map((cell, cellIndex) => <td key={`${cellIndex}-${cell}`} className="max-w-xs px-2 py-2" style={{ color: 'var(--ink-2)' }}>{cell}</td>)}
             </tr>
           ))}
         </tbody>
@@ -256,7 +256,7 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] })
 }
 
 function EmptyText({ children }: { children: React.ReactNode }) {
-  return <div className="text-sm text-slate-500">{children}</div>
+  return <div className="text-sm" style={{ color: 'var(--ink-4)' }}>{children}</div>
 }
 
 function cleanAction(value: string) {
