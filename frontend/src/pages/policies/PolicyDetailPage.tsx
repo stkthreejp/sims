@@ -11,7 +11,6 @@ import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, Lega
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
-import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { usePermissions } from '@/hooks/usePermissions'
 
 const POLICY_STATUS_PILL: Record<Policy['status'], string> = {
@@ -28,8 +27,6 @@ export function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-
-  const [showGenerateModal, setShowGenerateModal] = useState(false)
 
   const [noteSubject, setNoteSubject] = useState('')
   const [noteBody, setNoteBody] = useState('')
@@ -86,7 +83,7 @@ export function PolicyDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] }),
   })
 
-  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canCreatePolicies, canIssuePolicies, canEndorsePolicies, canCancelPolicies, isAdmin } = usePermissions()
+  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canIssuePolicies, canEndorsePolicies, canCancelPolicies, isAdmin } = usePermissions()
 
   const { data: issuancePacket } = useQuery({
     queryKey: ['policies', id, 'issuance-packet'],
@@ -232,14 +229,6 @@ export function PolicyDetailPage() {
               </button>
             </>
           )}
-          {canCreatePolicies && (
-            <button
-              onClick={() => setShowGenerateModal(true)}
-              className="sd-btn outline"
-            >
-              <FileText className="h-3.5 w-3.5" /> Generate Document
-            </button>
-          )}
           {canVoidTestBind && (
             <button
               onClick={() => {
@@ -277,16 +266,6 @@ export function PolicyDetailPage() {
           )
         })}
       </div>
-
-      {showGenerateModal && (
-        <GenerateDocumentModal
-          entityType="Policy"
-          entityId={id!}
-          attachmentEntityType="Policy"
-          attachmentEntityId={policy.boundQuoteId}
-          onClose={() => setShowGenerateModal(false)}
-        />
-      )}
 
       {actionModal === 'endorse' && (
         <EndorsePolicyModal
