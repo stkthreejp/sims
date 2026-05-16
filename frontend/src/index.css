@@ -374,15 +374,15 @@
   font-family: inherit;
 }
 .sd-btn:hover { background: var(--hover); color: var(--ink); }
-.sd-btn.outline { border: 1px solid var(--line); background: var(--surface); }
-.sd-btn.outline:hover { border-color: var(--accent-light); background: var(--hover); }
+.sd-btn.outline { border: 1px solid var(--line-2); background: var(--surface); color: var(--ink-2); }
+.sd-btn.outline:hover { border-color: var(--line); background: var(--hover); color: var(--ink); }
 .sd-btn.primary { background: var(--accent); color: #fff; border: 0; }
 .sd-btn.primary:hover { background: var(--accent-deep); color: #fff; }
 .sd-btn.success { background: #1b8754; color: #fff; border: 0; }
 .sd-btn.success:hover { background: #15643f; }
 .sd-btn.ghost { padding: 0 8px; color: var(--ink-3); }
 .sd-btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
-.sd-btn.danger { border: 1px solid var(--line); background: var(--surface); color: var(--bad-fg); }
+.sd-btn.danger { border: 1px solid var(--line-2); background: var(--surface); color: var(--bad-fg); }
 .sd-btn.danger:hover { border-color: #e7baad; background: var(--bad-bg); }
 .sd-btn:disabled { opacity: .5; cursor: not-allowed; }
 
