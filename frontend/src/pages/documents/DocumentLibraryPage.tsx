@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent, type MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Upload, FileText, Pencil, Trash2, Search, LayoutTemplate } from 'lucide-react'
@@ -11,13 +11,13 @@ import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
 import type { DocumentTemplateKind, DocumentTemplateListItem } from '@/types/documentTemplate.types'
 import { formatDateTime } from '@/lib/utils'
 
-const ENTITY_TYPE_COLORS: Record<TemplateEntityType, string> = {
-  General:    'bg-slate-100 text-slate-600',
-  Quote:      'bg-cyan-100 text-cyan-700',
-  Policy:     'bg-blue-100 text-blue-700',
-  Submission: 'bg-yellow-100 text-yellow-700',
-  Carrier:    'bg-purple-100 text-purple-700',
-  Agent:      'bg-green-100 text-green-700',
+const ENTITY_TYPE_VARIANTS: Record<TemplateEntityType, string> = {
+  General: 'draft',
+  Quote: 'quoted',
+  Policy: 'bound',
+  Submission: 'inprogress',
+  Carrier: 'submitted',
+  Agent: 'bound',
 }
 
 const ALL_TYPES: (TemplateEntityType | 'All')[] = ['All', 'General', 'Quote', 'Policy', 'Submission', 'Carrier', 'Agent']
@@ -29,11 +29,17 @@ const KIND_LABELS: Record<DocumentTemplateKind, string> = {
   DocumentAndEmail: 'Document + Email',
 }
 
-const KIND_COLORS: Record<DocumentTemplateKind, string> = {
-  Document: 'bg-slate-100 text-slate-600',
-  Email: 'bg-emerald-100 text-emerald-700',
-  DocumentAndEmail: 'bg-indigo-100 text-indigo-700',
+const KIND_VARIANTS: Record<DocumentTemplateKind, string> = {
+  Document: 'draft',
+  Email: 'quoted',
+  DocumentAndEmail: 'bound',
 }
+
+const filterButtonStyle = (active: boolean) => ({
+  borderColor: active ? 'var(--accent)' : 'var(--line)',
+  background: active ? 'var(--accent)' : 'var(--surface)',
+  color: active ? '#fff' : 'var(--ink-3)',
+})
 
 export function DocumentLibraryPage() {
   const navigate = useNavigate()
@@ -67,7 +73,6 @@ export function DocumentLibraryPage() {
     t.description?.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Group by entity type for display
   const grouped = ALL_TYPES.filter((t) => t !== 'All').reduce<Record<string, DocumentTemplateListItem[]>>(
     (acc, type) => {
       const items = displayed.filter((t) => t.entityType === type)
@@ -77,17 +82,15 @@ export function DocumentLibraryPage() {
     {}
   )
 
-  const handleImportDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportDoc = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
 
-    // Dynamic import — only load mammoth when needed
     const mammoth = await import('mammoth/mammoth.browser')
     const arrayBuffer = await file.arrayBuffer()
     const result = await mammoth.convertToHtml({ arrayBuffer })
 
-    // Navigate to editor with pre-filled content
     navigate('/document-library/new', {
       state: {
         importedHtml: result.value,
@@ -103,7 +106,7 @@ export function DocumentLibraryPage() {
         description="Manage document templates for policies, submissions, and more"
         actions={
           <div className="flex gap-2">
-            <label className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 cursor-pointer transition-colors">
+            <label className="sd-btn outline">
               <Upload className="h-4 w-4" />
               Import from Word
               <input
@@ -114,8 +117,9 @@ export function DocumentLibraryPage() {
               />
             </label>
             <button
+              type="button"
               onClick={() => navigate('/document-library/new')}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              className="sd-btn primary"
             >
               <Plus className="h-4 w-4" />
               New Template
@@ -124,96 +128,97 @@ export function DocumentLibraryPage() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        {/* Type filter pills */}
-        <div className="flex gap-1.5 flex-wrap">
-          {ALL_TYPES.map((type) => (
-            <button
-              key={type}
-              onClick={() => setFilter(type)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                filter === type
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
-              }`}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
+      <div className="sd-card mb-5">
+        <div className="sd-card-body">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setFilter(type)}
+                  className="sd-btn sm"
+                  style={filterButtonStyle(filter === type)}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
 
-        <div className="flex gap-1.5 flex-wrap">
-          {ALL_KINDS.map((kind) => (
-            <button
-              key={kind}
-              onClick={() => setKindFilter(kind)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                kindFilter === kind
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-600 border-slate-300 hover:border-slate-500'
-              }`}
-            >
-              {kind === 'All' ? 'All Kinds' : KIND_LABELS[kind]}
-            </button>
-          ))}
-        </div>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_KINDS.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => setKindFilter(kind)}
+                  className="sd-btn sm"
+                  style={filterButtonStyle(kindFilter === kind)}
+                >
+                  {kind === 'All' ? 'All Kinds' : KIND_LABELS[kind]}
+                </button>
+              ))}
+            </div>
 
-        {/* Search */}
-        <div className="relative ml-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search templates…"
-            className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
-          />
-        </div>
+            <div className="relative ml-auto min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: 'var(--ink-4)' }} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search templates..."
+                className="sims-input pl-8"
+              />
+            </div>
 
-        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showInactive}
-            onChange={(e) => setShowInactive(e.target.checked)}
-            className="rounded border-slate-300"
-          />
-          Show inactive
-        </label>
+            <label className="flex cursor-pointer items-center gap-2" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Show inactive
+            </label>
+          </div>
+        </div>
       </div>
 
-      {/* Content */}
       {isLoading ? (
         <LoadingSpinner />
       ) : displayed.length === 0 ? (
         <EmptyState
           icon={LayoutTemplate}
           title="No templates yet"
-          description='Click "New Template" to create one or import from Word.'
+          description="Create a template or import a Word document to start building the library."
+          action={
+            <button type="button" onClick={() => navigate('/document-library/new')} className="sd-btn primary sm">
+              New Template
+            </button>
+          }
         />
       ) : filter !== 'All' ? (
-        // Flat list when filtered to one type
         <TemplateGrid
           templates={displayed}
           onEdit={(id) => navigate(`/document-library/${id}`)}
           onDelete={(id, name) => { if (confirm(`Delete "${name}"?`)) deleteMutation.mutate(id) }}
         />
       ) : (
-        // Grouped by entity type
-        <div className="space-y-8">
+        <div className="space-y-6">
           {Object.entries(grouped).map(([type, items]) => (
-            <div key={type}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${ENTITY_TYPE_COLORS[type as TemplateEntityType]}`}>
+            <section key={type} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className={`sd-pill ${ENTITY_TYPE_VARIANTS[type as TemplateEntityType]}`}>
                   {ENTITY_TYPE_LABELS[type as TemplateEntityType]}
                 </span>
-                <span className="text-sm text-slate-400">{items.length} template{items.length !== 1 ? 's' : ''}</span>
+                <span style={{ color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
+                  {items.length} template{items.length !== 1 ? 's' : ''}
+                </span>
               </div>
               <TemplateGrid
                 templates={items}
                 onEdit={(id) => navigate(`/document-library/${id}`)}
                 onDelete={(id, name) => { if (confirm(`Delete "${name}"?`)) deleteMutation.mutate(id) }}
               />
-            </div>
+            </section>
           ))}
         </div>
       )}
@@ -231,58 +236,67 @@ function TemplateGrid({
   onDelete: (id: string, name: string) => void
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {templates.map((t) => (
-        <div
+        <article
           key={t.id}
-          className="group bg-white border border-slate-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+          className="sd-card cursor-pointer transition-colors"
           onClick={() => onEdit(t.id)}
         >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-sm font-medium text-slate-900 leading-tight">{t.name}</p>
+          <div className="sd-card-body">
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-start gap-2">
+                <FileText className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />
+                <p className="min-w-0 leading-snug" style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>
+                  {t.name}
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-1" onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => onEdit(t.id)}
+                  className="sims-icon-btn"
+                  title="Edit"
+                  aria-label={`Edit ${t.name}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(t.id, t.name)}
+                  className="sims-icon-btn hover:text-red-500"
+                  title="Delete"
+                  aria-label={`Delete ${t.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-              onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => onEdit(t.id)}
-                className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                title="Edit"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => onDelete(t.id, t.name)}
-                className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
-                title="Delete"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
 
-          {t.description && (
-            <p className="text-xs text-slate-500 mb-2 line-clamp-2">{t.description}</p>
-          )}
-
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ENTITY_TYPE_COLORS[t.entityType]}`}>
-                {ENTITY_TYPE_LABELS[t.entityType]}
-              </span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${KIND_COLORS[t.kind]}`}>
-                {KIND_LABELS[t.kind]}
-              </span>
-            </div>
-            {!t.isActive && (
-              <span className="text-xs text-slate-400 italic">Inactive</span>
+            {t.description && (
+              <p className="mb-3 line-clamp-2" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>
+                {t.description}
+              </p>
             )}
+
+            <div className="mt-3 flex items-center justify-between gap-2 border-t pt-3" style={{ borderColor: 'var(--line-2)' }}>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`sd-pill ${ENTITY_TYPE_VARIANTS[t.entityType]}`}>
+                  {ENTITY_TYPE_LABELS[t.entityType]}
+                </span>
+                <span className={`sd-pill ${KIND_VARIANTS[t.kind]}`}>
+                  {KIND_LABELS[t.kind]}
+                </span>
+              </div>
+              {!t.isActive && (
+                <span className="sd-pill draft">Inactive</span>
+              )}
+            </div>
+            <p style={{ margin: '8px 0 0', color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
+              Updated {formatDateTime(t.updatedAt)}
+            </p>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Updated {formatDateTime(t.updatedAt)}
-          </p>
-        </div>
+        </article>
       ))}
     </div>
   )
