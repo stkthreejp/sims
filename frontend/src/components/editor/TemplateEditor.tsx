@@ -1,4 +1,5 @@
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
@@ -10,38 +11,58 @@ import TableHeader from '@tiptap/extension-table-header'
 import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Placeholder from '@tiptap/extension-placeholder'
-import { TagNode } from './TagNode'
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
-  Bold, Italic, Underline as UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
-  AlignJustify, List, ListOrdered, Image as ImageIcon, Table as TableIcon,
-  Undo, Redo, ChevronDown, Tag, Rows3,
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  ChevronDown,
+  Image as ImageIcon,
+  Italic,
+  List,
+  ListOrdered,
+  Redo,
+  Rows3,
+  Table as TableIcon,
+  Tag,
+  Underline as UnderlineIcon,
+  Undo,
+  X,
 } from 'lucide-react'
 import type { TemplateEntityType, TagGroup } from '@/lib/templateTags'
 import { TEMPLATE_TAGS } from '@/lib/templateTags'
 import type { DocumentTag } from '@/types/policyForm.types'
+import { TagNode } from './TagNode'
 
-// ── Toolbar button ─────────────────────────────────────────────────────────────
 function ToolbarBtn({
-  onClick, active, disabled, title, children,
+  onClick,
+  active,
+  disabled,
+  title,
+  children,
 }: {
   onClick: () => void
   active?: boolean
   disabled?: boolean
   title?: string
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <button
       type="button"
-      onMouseDown={(e) => { e.preventDefault(); onClick() }}
+      onMouseDown={(event) => {
+        event.preventDefault()
+        onClick()
+      }}
       disabled={disabled}
       title={title}
-      className={`p-1.5 rounded text-sm transition-colors ${
+      className="sims-icon-btn"
+      style={
         active
-          ? 'bg-blue-100 text-blue-700'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-      } disabled:opacity-30`}
+          ? { background: 'var(--accent-soft)', color: 'var(--accent-ink)', borderColor: 'var(--accent-light)' }
+          : undefined
+      }
     >
       {children}
     </button>
@@ -49,46 +70,43 @@ function ToolbarBtn({
 }
 
 function ToolbarDivider() {
-  return <div className="w-px h-5 bg-slate-200 mx-1" />
+  return <div className="mx-1 h-5 w-px" style={{ background: 'var(--line)' }} />
 }
 
-// ── Tag picker dropdown ────────────────────────────────────────────────────────
-function TagPicker({
-  groups,
-  onInsert,
-}: {
-  groups: TagGroup[]
-  onInsert: (tag: string) => void
-}) {
+function TagPicker({ groups, onInsert }: { groups: TagGroup[]; onInsert: (tag: string) => void }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
-  // Close on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    const handler = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const filtered = groups.map((g) => ({
-    ...g,
-    tags: g.tags.filter(
-      (t) =>
-        search === '' ||
-        t.name.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase())
-    ),
-  })).filter((g) => g.tags.length > 0)
+  const filtered = groups
+    .map((group) => ({
+      ...group,
+      tags: group.tags.filter(
+        (tag) =>
+          search === '' ||
+          tag.name.toLowerCase().includes(search.toLowerCase()) ||
+          tag.description.toLowerCase().includes(search.toLowerCase())
+      ),
+    }))
+    .filter((group) => group.tags.length > 0)
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
-        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o) }}
-        className="flex items-center gap-1 px-2 py-1.5 rounded text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 font-medium"
+        onMouseDown={(event) => {
+          event.preventDefault()
+          setOpen((value) => !value)
+        }}
+        className="sd-btn outline sm"
       >
         <Tag className="h-3.5 w-3.5" />
         Insert Tag
@@ -96,40 +114,47 @@ function TagPicker({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
-          <div className="p-2 border-b border-slate-100">
+        <div
+          className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg"
+          style={{ border: '1px solid var(--line)', background: 'var(--surface)', boxShadow: 'var(--shadow-lg)' }}
+        >
+          <div className="p-2" style={{ borderBottom: '1px solid var(--line-2)' }}>
             <input
               autoFocus
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tags…"
-              className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search tags..."
+              className="sims-input h-8 w-full"
+              onMouseDown={(event) => event.stopPropagation()}
             />
           </div>
           <div className="max-h-72 overflow-y-auto py-1">
             {filtered.length === 0 && (
-              <p className="text-xs text-slate-400 px-3 py-4 text-center">No tags match</p>
+              <p className="px-3 py-4 text-center" style={{ margin: 0, color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
+                No tags match
+              </p>
             )}
             {filtered.map((group) => (
               <div key={group.label}>
-                <p className="px-3 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  {group.label}
-                </p>
-                {group.tags.map((t) => (
+                <p className="sims-field-label px-3 py-1">{group.label}</p>
+                {group.tags.map((tag) => (
                   <button
-                    key={t.name}
+                    key={tag.name}
                     type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      onInsert(t.name)
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      onInsert(tag.name)
                       setOpen(false)
                       setSearch('')
                     }}
-                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-blue-50 text-left"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-[var(--hover)]"
                   >
-                    <span className="text-xs font-mono text-blue-700">{`{{${t.name}}}`}</span>
-                    <span className="text-xs text-slate-400 ml-2 truncate">{t.description}</span>
+                    <span className="truncate font-mono" style={{ color: 'var(--accent-ink)', fontSize: 'var(--fs-sm)' }}>
+                      {`{{${tag.name}}}`}
+                    </span>
+                    <span className="truncate" style={{ color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
+                      {tag.description}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -153,8 +178,8 @@ function RepeatBlockPicker({
   const entries = Object.entries(blocks)
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    const handler = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -166,8 +191,11 @@ function RepeatBlockPicker({
     <div ref={ref} className="relative">
       <button
         type="button"
-        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o) }}
-        className="flex items-center gap-1 px-2 py-1.5 rounded text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 font-medium"
+        onMouseDown={(event) => {
+          event.preventDefault()
+          setOpen((value) => !value)
+        }}
+        className="sd-btn outline sm"
       >
         <Rows3 className="h-3.5 w-3.5" />
         Repeat Block
@@ -175,21 +203,24 @@ function RepeatBlockPicker({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+        <div
+          className="absolute left-0 top-full z-50 mt-1 w-80 overflow-hidden rounded-lg"
+          style={{ border: '1px solid var(--line)', background: 'var(--surface)', boxShadow: 'var(--shadow-lg)' }}
+        >
           <div className="max-h-72 overflow-y-auto py-1">
             {entries.map(([blockName, tags]) => (
               <button
                 key={blockName}
                 type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault()
+                onMouseDown={(event) => {
+                  event.preventDefault()
                   onInsert(blockName, tags)
                   setOpen(false)
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-emerald-50"
+                className="w-full px-3 py-2 text-left hover:bg-[var(--hover)]"
               >
-                <p className="text-xs font-semibold text-slate-700">{blockName}</p>
-                <p className="text-[11px] text-slate-500 truncate">
+                <p style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>{blockName}</p>
+                <p className="truncate" style={{ margin: '2px 0 0', color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>
                   {tags.slice(0, 4).map((tag) => tag.label).join(', ')}
                   {tags.length > 4 ? '...' : ''}
                 </p>
@@ -202,7 +233,6 @@ function RepeatBlockPicker({
   )
 }
 
-// ── Main editor ────────────────────────────────────────────────────────────────
 interface TemplateEditorProps {
   content: string
   onChange: (html: string) => void
@@ -211,6 +241,9 @@ interface TemplateEditorProps {
 }
 
 export function TemplateEditor({ content, onChange, entityType, approvedTags = [] }: TemplateEditorProps) {
+  const [imageModalOpen, setImageModalOpen] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
+
   const tagGroups = useMemo<TagGroup[]>(() => {
     if (approvedTags.length === 0) return TEMPLATE_TAGS[entityType] ?? TEMPLATE_TAGS.General
 
@@ -227,14 +260,17 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
     return [...Object.values(groups), ...(TEMPLATE_TAGS.General ?? [])]
   }, [approvedTags, entityType])
-  const repeatBlocks = useMemo(() => {
-    return approvedTags
-      .filter((tag) => tag.isRepeatable && tag.repeatBlock)
-      .reduce<Record<string, DocumentTag[]>>((acc, tag) => {
-        acc[tag.repeatBlock!] = [...(acc[tag.repeatBlock!] ?? []), tag]
-        return acc
-      }, {})
-  }, [approvedTags])
+
+  const repeatBlocks = useMemo(
+    () =>
+      approvedTags
+        .filter((tag) => tag.isRepeatable && tag.repeatBlock)
+        .reduce<Record<string, DocumentTag[]>>((acc, tag) => {
+          acc[tag.repeatBlock!] = [...(acc[tag.repeatBlock!] ?? []), tag]
+          return acc
+        }, {}),
+    [approvedTags]
+  )
 
   const editor = useEditor({
     extensions: [
@@ -248,39 +284,42 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
       TableRow,
       TableHeader,
       TableCell,
-      Placeholder.configure({ placeholder: 'Start typing your template…' }),
+      Placeholder.configure({ placeholder: 'Start typing your template...' }),
       TagNode,
     ],
     content,
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   })
 
-  // Sync content when it changes externally (e.g. after import)
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content)
     }
   }, [content, editor])
 
-  const insertTag = useCallback((tag: string) => {
-    editor?.chain().focus().insertContent({
-      type: 'templateTag',
-      attrs: { tag },
-    }).run()
-  }, [editor])
+  const insertTag = useCallback(
+    (tag: string) => {
+      editor?.chain().focus().insertContent({ type: 'templateTag', attrs: { tag } }).run()
+    },
+    [editor]
+  )
 
-  const insertRepeatBlock = useCallback((blockName: string, tags: DocumentTag[]) => {
-    const visibleTags = tags.slice(0, 4)
-    const body = visibleTags.map((tag) => `<span data-tag="${tag.tag}">{{${tag.tag}}}</span>`).join(' ')
-    editor?.chain().focus().insertContent(`
-      <p>{{#${blockName}}}</p>
-      <p>${body}</p>
-      <p>{{/${blockName}}}</p>
-    `).run()
-  }, [editor])
-
-  const [imageModalOpen, setImageModalOpen] = useState(false)
-  const [imageUrl, setImageUrl] = useState('')
+  const insertRepeatBlock = useCallback(
+    (blockName: string, tags: DocumentTag[]) => {
+      const visibleTags = tags.slice(0, 4)
+      const body = visibleTags.map((tag) => `<span data-tag="${tag.tag}">{{${tag.tag}}}</span>`).join(' ')
+      editor
+        ?.chain()
+        .focus()
+        .insertContent(`
+          <p>{{#${blockName}}}</p>
+          <p>${body}</p>
+          <p>{{/${blockName}}}</p>
+        `)
+        .run()
+    },
+    [editor]
+  )
 
   const confirmInsertImage = () => {
     if (imageUrl.trim()) {
@@ -293,10 +332,11 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
   if (!editor) return null
 
   return (
-    <div className="border border-slate-300 rounded-lg overflow-hidden flex flex-col">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-slate-200 bg-slate-50">
-        {/* History */}
+    <div className="flex min-h-[620px] flex-col overflow-hidden rounded-lg" style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>
+      <div
+        className="flex flex-wrap items-center gap-1 px-3 py-2"
+        style={{ borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}
+      >
         <ToolbarBtn onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">
           <Undo className="h-4 w-4" />
         </ToolbarBtn>
@@ -306,20 +346,22 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
         <ToolbarDivider />
 
-        {/* Heading */}
         <select
           value={
-            editor.isActive('heading', { level: 1 }) ? '1'
-              : editor.isActive('heading', { level: 2 }) ? '2'
-              : editor.isActive('heading', { level: 3 }) ? '3'
-              : '0'
+            editor.isActive('heading', { level: 1 })
+              ? '1'
+              : editor.isActive('heading', { level: 2 })
+                ? '2'
+                : editor.isActive('heading', { level: 3 })
+                  ? '3'
+                  : '0'
           }
-          onChange={(e) => {
-            const level = parseInt(e.target.value)
+          onChange={(event) => {
+            const level = Number.parseInt(event.target.value)
             if (level === 0) editor.chain().focus().setParagraph().run()
-            else editor.chain().focus().setHeading({ level: level as 1|2|3 }).run()
+            else editor.chain().focus().setHeading({ level: level as 1 | 2 | 3 }).run()
           }}
-          className="text-sm border border-slate-200 rounded px-1.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="sims-select h-8 w-auto"
         >
           <option value="0">Paragraph</option>
           <option value="1">Heading 1</option>
@@ -329,7 +371,6 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
         <ToolbarDivider />
 
-        {/* Formatting */}
         <ToolbarBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold">
           <Bold className="h-4 w-4" />
         </ToolbarBtn>
@@ -342,7 +383,6 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
         <ToolbarDivider />
 
-        {/* Alignment */}
         <ToolbarBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Align left">
           <AlignLeft className="h-4 w-4" />
         </ToolbarBtn>
@@ -358,7 +398,6 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
         <ToolbarDivider />
 
-        {/* Lists */}
         <ToolbarBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bullet list">
           <List className="h-4 w-4" />
         </ToolbarBtn>
@@ -368,69 +407,75 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
 
         <ToolbarDivider />
 
-        {/* Table */}
-        <ToolbarBtn
-          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-          title="Insert table"
-        >
+        <ToolbarBtn onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table">
           <TableIcon className="h-4 w-4" />
         </ToolbarBtn>
-
-        {/* Image */}
         <ToolbarBtn onClick={() => setImageModalOpen(true)} title="Insert image">
           <ImageIcon className="h-4 w-4" />
         </ToolbarBtn>
 
-        {/* Text color */}
-        <div className="flex items-center gap-1 ml-0.5" title="Text color">
-          <span className="text-xs text-slate-500">A</span>
+        <label className="sims-icon-btn" title="Text color">
+          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>A</span>
           <input
             type="color"
-            className="w-5 h-5 cursor-pointer rounded border-0 p-0 bg-transparent"
-            onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()}
+            className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+            onInput={(event) => editor.chain().focus().setColor((event.target as HTMLInputElement).value).run()}
           />
-        </div>
+        </label>
 
         <ToolbarDivider />
 
-        {/* Tag picker */}
         <TagPicker groups={tagGroups} onInsert={insertTag} />
         <RepeatBlockPicker blocks={repeatBlocks} onInsert={insertRepeatBlock} />
       </div>
 
-      {/* Editor area */}
       <EditorContent
         editor={editor}
-        className="flex-1 overflow-y-auto prose prose-sm max-w-none p-6 min-h-[500px] focus-within:outline-none"
+        className="min-h-[500px] flex-1 overflow-y-auto p-7 focus-within:outline-none"
+        style={{ color: 'var(--ink)', fontSize: 'var(--fs-body)', lineHeight: 1.55 }}
       />
 
-      {/* Image URL modal */}
       {imageModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-base font-semibold text-slate-800">Insert Image</h2>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Image URL</label>
+        <div className="sims-modal-backdrop">
+          <div className="sims-modal max-w-sm">
+            <div className="sims-modal-head">
+              <h2 className="sims-modal-title">Insert Image</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setImageUrl('')
+                  setImageModalOpen(false)
+                }}
+                className="sims-icon-btn"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="sims-modal-body">
+              <label className="sims-field-label">Image URL</label>
               <input
                 autoFocus
                 value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') confirmInsertImage() }}
-                placeholder="https://… or blob:…"
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(event) => setImageUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') confirmInsertImage()
+                }}
+                placeholder="https://... or blob:..."
+                className="sims-input mt-1 w-full"
               />
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={confirmInsertImage}
-                disabled={!imageUrl.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-40"
-              >
+            <div className="sims-modal-foot">
+              <button type="button" onClick={confirmInsertImage} disabled={!imageUrl.trim()} className="sd-btn primary sm">
                 Insert
               </button>
               <button
-                onClick={() => { setImageUrl(''); setImageModalOpen(false) }}
-                className="px-4 py-2 border border-slate-300 rounded-md text-sm hover:bg-slate-50"
+                type="button"
+                onClick={() => {
+                  setImageUrl('')
+                  setImageModalOpen(false)
+                }}
+                className="sd-btn outline sm"
               >
                 Cancel
               </button>
@@ -439,14 +484,13 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
         </div>
       )}
 
-      {/* Table context toolbar */}
       {editor.isActive('table') && (
-        <div className="flex gap-2 px-3 py-2 border-t border-slate-200 bg-slate-50 text-xs">
-          <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().addColumnAfter().run() }} className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">+ Col</button>
-          <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().addRowAfter().run() }} className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">+ Row</button>
-          <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().deleteColumn().run() }} className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 text-red-600">- Col</button>
-          <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().deleteRow().run() }} className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 text-red-600">- Row</button>
-          <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().deleteTable().run() }} className="px-2 py-1 rounded bg-white border border-red-200 hover:bg-red-50 text-red-600">Delete Table</button>
+        <div className="flex flex-wrap gap-2 px-3 py-2" style={{ borderTop: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+          <button type="button" onMouseDown={(event) => { event.preventDefault(); editor.chain().focus().addColumnAfter().run() }} className="sd-btn outline sm">Add Col</button>
+          <button type="button" onMouseDown={(event) => { event.preventDefault(); editor.chain().focus().addRowAfter().run() }} className="sd-btn outline sm">Add Row</button>
+          <button type="button" onMouseDown={(event) => { event.preventDefault(); editor.chain().focus().deleteColumn().run() }} className="sd-btn outline sm">Remove Col</button>
+          <button type="button" onMouseDown={(event) => { event.preventDefault(); editor.chain().focus().deleteRow().run() }} className="sd-btn outline sm">Remove Row</button>
+          <button type="button" onMouseDown={(event) => { event.preventDefault(); editor.chain().focus().deleteTable().run() }} className="sd-btn danger sm">Delete Table</button>
         </div>
       )}
     </div>

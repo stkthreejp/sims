@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Upload, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Loader2, Save, ToggleLeft, ToggleRight, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { policyFormsApi } from '@/api/policyForms.api'
-import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
 import type { DocumentTemplateKind } from '@/types/documentTemplate.types'
 
@@ -41,7 +41,6 @@ export function TemplateEditorPage() {
   const [activeBody, setActiveBody] = useState<'document' | 'email'>('document')
   const [isDirty, setIsDirty] = useState(false)
 
-  // Load existing template
   const { data: template, isLoading } = useQuery({
     queryKey: ['document-templates', id],
     queryFn: () => documentTemplatesApi.getById(id!),
@@ -53,7 +52,6 @@ export function TemplateEditorPage() {
     queryFn: policyFormsApi.getTags,
   })
 
-  // Populate form when template loads
   useEffect(() => {
     if (template) {
       setName(template.name)
@@ -68,7 +66,6 @@ export function TemplateEditorPage() {
     }
   }, [template])
 
-  // Pre-fill from Word import (new template)
   useEffect(() => {
     if (isNew && state?.importedHtml) {
       setDocumentContent(state.importedHtml)
@@ -78,15 +75,16 @@ export function TemplateEditorPage() {
   }, [isNew, state])
 
   const createMutation = useMutation({
-    mutationFn: () => documentTemplatesApi.create({
-      name,
-      description: description || undefined,
-      entityType,
-      kind,
-      htmlContent: kind === 'Email' ? '' : documentContent,
-      subjectTemplate: kind === 'Document' ? undefined : subjectTemplate,
-      emailBodyHtml: kind === 'Document' ? undefined : emailBodyHtml,
-    }),
+    mutationFn: () =>
+      documentTemplatesApi.create({
+        name,
+        description: description || undefined,
+        entityType,
+        kind,
+        htmlContent: kind === 'Email' ? '' : documentContent,
+        subjectTemplate: kind === 'Document' ? undefined : subjectTemplate,
+        emailBodyHtml: kind === 'Document' ? undefined : emailBodyHtml,
+      }),
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['document-templates'] })
       toast.success('Template created')
@@ -97,16 +95,17 @@ export function TemplateEditorPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: () => documentTemplatesApi.update(id!, {
-      name,
-      description: description || undefined,
-      entityType,
-      kind,
-      htmlContent: kind === 'Email' ? '' : documentContent,
-      subjectTemplate: kind === 'Document' ? undefined : subjectTemplate,
-      emailBodyHtml: kind === 'Document' ? undefined : emailBodyHtml,
-      isActive,
-    }),
+    mutationFn: () =>
+      documentTemplatesApi.update(id!, {
+        name,
+        description: description || undefined,
+        entityType,
+        kind,
+        htmlContent: kind === 'Email' ? '' : documentContent,
+        subjectTemplate: kind === 'Document' ? undefined : subjectTemplate,
+        emailBodyHtml: kind === 'Document' ? undefined : emailBodyHtml,
+        isActive,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['document-templates'] })
       toast.success('Template saved')
@@ -118,10 +117,22 @@ export function TemplateEditorPage() {
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   const handleSave = () => {
-    if (!name.trim()) { toast.error('Template name is required'); return }
-    if (kind !== 'Email' && (!documentContent || documentContent === '<p></p>')) { toast.error('Document content cannot be empty'); return }
-    if (kind !== 'Document' && !subjectTemplate.trim()) { toast.error('Email subject is required'); return }
-    if (kind !== 'Document' && (!emailBodyHtml || emailBodyHtml === '<p></p>')) { toast.error('Email body cannot be empty'); return }
+    if (!name.trim()) {
+      toast.error('Template name is required')
+      return
+    }
+    if (kind !== 'Email' && (!documentContent || documentContent === '<p></p>')) {
+      toast.error('Document content cannot be empty')
+      return
+    }
+    if (kind !== 'Document' && !subjectTemplate.trim()) {
+      toast.error('Email subject is required')
+      return
+    }
+    if (kind !== 'Document' && (!emailBodyHtml || emailBodyHtml === '<p></p>')) {
+      toast.error('Email body cannot be empty')
+      return
+    }
     isNew ? createMutation.mutate() : updateMutation.mutate()
   }
 
@@ -131,19 +142,16 @@ export function TemplateEditorPage() {
     setIsDirty(true)
   }
 
-  const handleImportDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleImportDoc = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
     if (!file) return
-    e.target.value = ''
+    event.target.value = ''
     try {
       const mammoth = await import('mammoth/mammoth.browser')
       const arrayBuffer = await file.arrayBuffer()
       const result = await mammoth.convertToHtml({ arrayBuffer })
-      if (activeBody === 'email') {
-        setEmailBodyHtml(result.value)
-      } else {
-        setDocumentContent(result.value)
-      }
+      if (activeBody === 'email') setEmailBodyHtml(result.value)
+      else setDocumentContent(result.value)
       if (!name && file.name) setName(file.name.replace(/\.(doc|docx)$/i, ''))
       setIsDirty(true)
       toast.success('Word document imported')
@@ -157,124 +165,122 @@ export function TemplateEditorPage() {
   const editorContent = activeBody === 'email' ? emailBodyHtml : documentContent
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header bar */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-slate-200 bg-white shrink-0">
-        <button
-          onClick={() => navigate('/document-library')}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors"
-        >
+    <div className="flex h-full flex-col" style={{ background: 'var(--bg)' }}>
+      <div
+        className="flex shrink-0 flex-wrap items-center gap-3 px-7 py-4"
+        style={{ borderBottom: '1px solid var(--line)', background: 'var(--surface)' }}
+      >
+        <button type="button" onClick={() => navigate('/document-library')} className="sd-btn outline sm">
           <ArrowLeft className="h-4 w-4" />
           Library
         </button>
 
-        <div className="h-4 w-px bg-slate-200" />
+        <div className="h-6 w-px" style={{ background: 'var(--line)' }} />
 
-        {/* Template name */}
         <input
           value={name}
-          onChange={(e) => { setName(e.target.value); setIsDirty(true) }}
-          placeholder="Template name…"
-          className="flex-1 text-sm font-medium border-0 focus:outline-none focus:ring-0 bg-transparent placeholder:text-slate-400 min-w-0"
+          onChange={(event) => {
+            setName(event.target.value)
+            setIsDirty(true)
+          }}
+          placeholder="Template name..."
+          className="min-w-[220px] flex-1 border-0 bg-transparent px-0 py-1 focus:outline-none"
+          style={{ color: 'var(--ink)', fontSize: 'var(--fs-xl)', fontWeight: 600 }}
         />
 
-        {/* Entity type */}
         <select
           value={entityType}
-          onChange={(e) => { setEntityType(e.target.value as TemplateEntityType); setIsDirty(true) }}
-          className="text-sm border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          onChange={(event) => {
+            setEntityType(event.target.value as TemplateEntityType)
+            setIsDirty(true)
+          }}
+          className="sims-select w-auto"
         >
-          {ENTITY_TYPES.map((t) => (
-            <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>
+          {ENTITY_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {ENTITY_TYPE_LABELS[type]}
+            </option>
           ))}
         </select>
 
-        <select
-          value={kind}
-          onChange={(e) => handleKindChange(e.target.value as DocumentTemplateKind)}
-          className="text-sm border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-        >
-          {TEMPLATE_KINDS.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
+        <select value={kind} onChange={(event) => handleKindChange(event.target.value as DocumentTemplateKind)} className="sims-select w-auto">
+          {TEMPLATE_KINDS.map((templateKind) => (
+            <option key={templateKind.value} value={templateKind.value}>
+              {templateKind.label}
+            </option>
           ))}
         </select>
 
-        {/* Active toggle (edit only) */}
         {!isNew && (
           <button
-            onClick={() => { setIsActive((v) => !v); setIsDirty(true) }}
-            className={`flex items-center gap-1.5 text-sm transition-colors ${isActive ? 'text-green-600' : 'text-slate-400'}`}
+            type="button"
+            onClick={() => {
+              setIsActive((value) => !value)
+              setIsDirty(true)
+            }}
+            className="sd-btn outline sm"
             title={isActive ? 'Active' : 'Inactive'}
           >
-            {isActive
-              ? <ToggleRight className="h-5 w-5" />
-              : <ToggleLeft className="h-5 w-5" />}
-            <span className="hidden sm:inline">{isActive ? 'Active' : 'Inactive'}</span>
+            {isActive ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+            {isActive ? 'Active' : 'Inactive'}
           </button>
         )}
 
-        {/* Import from Word */}
-        <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 cursor-pointer transition-colors text-slate-600">
-          <Upload className="h-3.5 w-3.5" />
+        <label className="sd-btn outline sm cursor-pointer">
+          <Upload className="h-4 w-4" />
           Import Word
           <input type="file" accept=".doc,.docx" className="hidden" onChange={handleImportDoc} />
         </label>
 
-        {/* Save */}
-        <button
-          onClick={handleSave}
-          disabled={isSaving || !isDirty}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-40 transition-colors"
-        >
-          {isSaving
-            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            : <Save className="h-3.5 w-3.5" />}
-          {isSaving ? 'Saving…' : isDirty ? 'Save*' : 'Saved'}
+        <button type="button" onClick={handleSave} disabled={isSaving || !isDirty} className="sd-btn primary sm">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {isSaving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
         </button>
       </div>
 
-      {/* Description bar */}
-      <div className="px-6 py-2 border-b border-slate-100 bg-slate-50 shrink-0">
+      <div className="shrink-0 px-7 py-3" style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
         <input
           value={description}
-          onChange={(e) => { setDescription(e.target.value); setIsDirty(true) }}
-          placeholder="Add a description (optional)…"
-          className="w-full text-xs text-slate-500 border-0 bg-transparent focus:outline-none focus:ring-0 placeholder:text-slate-400"
+          onChange={(event) => {
+            setDescription(event.target.value)
+            setIsDirty(true)
+          }}
+          placeholder="Add a description (optional)..."
+          className="w-full border-0 bg-transparent px-0 py-0 focus:outline-none"
+          style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}
         />
       </div>
 
       {kind !== 'Document' && (
-        <div className="px-6 py-2 border-b border-slate-100 bg-white shrink-0">
+        <div className="shrink-0 px-7 py-3" style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--surface)' }}>
+          <label className="sims-field-label">Email subject</label>
           <input
             value={subjectTemplate}
-            onChange={(e) => { setSubjectTemplate(e.target.value); setIsDirty(true) }}
+            onChange={(event) => {
+              setSubjectTemplate(event.target.value)
+              setIsDirty(true)
+            }}
             placeholder="Email subject..."
-            className="w-full text-sm text-slate-700 border-0 bg-transparent focus:outline-none focus:ring-0 placeholder:text-slate-400"
+            className="mt-1 w-full border-0 bg-transparent px-0 py-0 focus:outline-none"
+            style={{ color: 'var(--ink)', fontSize: 'var(--fs-body)' }}
           />
         </div>
       )}
 
       {kind === 'DocumentAndEmail' && (
-        <div className="px-6 py-2 border-b border-slate-100 bg-white shrink-0">
-          <div className="inline-flex rounded-md border border-slate-200 p-0.5">
-            <button
-              onClick={() => setActiveBody('document')}
-              className={`px-3 py-1.5 text-xs font-medium rounded ${activeBody === 'document' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-            >
+        <div className="shrink-0 px-7 py-3" style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--surface)' }}>
+          <div className="exp-lob-switch">
+            <button type="button" onClick={() => setActiveBody('document')} className={`exp-lob ${activeBody === 'document' ? 'active' : ''}`}>
               Document Body
             </button>
-            <button
-              onClick={() => setActiveBody('email')}
-              className={`px-3 py-1.5 text-xs font-medium rounded ${activeBody === 'email' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-            >
+            <button type="button" onClick={() => setActiveBody('email')} className={`exp-lob ${activeBody === 'email' ? 'active' : ''}`}>
               Email Body
             </button>
           </div>
         </div>
       )}
 
-      {/* Editor */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-7">
         <TemplateEditor
           content={editorContent}
           onChange={(html) => {
