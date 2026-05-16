@@ -165,6 +165,12 @@ function describeTriggerCondition(config: TriggerConfig) {
   return `${field.label} ${operatorLabels[config.operator]} ${value}`
 }
 
+function getApiErrorMessage(e: any, fallback: string) {
+  const data = e?.response?.data
+  if (typeof data === 'string') return data
+  return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
+}
+
 export function PolicyFormsAdminPage() {
   const qc = useQueryClient()
   const [templateForm, setTemplateForm] = useState(emptyTemplate)
@@ -289,13 +295,18 @@ export function PolicyFormsAdminPage() {
   })
 
   const savePackageRows = useMutation({
-    mutationFn: () => policyFormsApi.replacePackageForms(selectedPackageId!, packageRows.map((row, index) => ({
-      ...row,
-      sequenceOrder: Number(row.sequenceOrder) || index + 1,
-      triggerConditionJson: row.formType === 'Conditional'
-        ? buildTriggerCondition(parseTriggerCondition(row.triggerConditionJson))
-        : undefined,
-    }))),
+    mutationFn: () => {
+      if (!selectedPackageId) throw new Error('Select a package before saving forms.')
+      if (packageRows.some((row) => !row.policyFormTemplateId)) throw new Error('Each package form needs a selected form.')
+
+      return policyFormsApi.replacePackageForms(selectedPackageId, packageRows.map((row, index) => ({
+        ...row,
+        sequenceOrder: Number(row.sequenceOrder) || index + 1,
+        triggerConditionJson: row.formType === 'Conditional'
+          ? buildTriggerCondition(parseTriggerCondition(row.triggerConditionJson))
+          : undefined,
+      })))
+    },
     onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ['policy-form-packages'] })
       setPackageRows(saved.forms.map((f) => ({
@@ -307,7 +318,7 @@ export function PolicyFormsAdminPage() {
       })))
       toast.success('Package forms saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? e?.response?.data?.message ?? 'Package forms could not be saved'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, e?.message ?? 'Package forms could not be saved')),
   })
 
   const saveMappings = useMutation({

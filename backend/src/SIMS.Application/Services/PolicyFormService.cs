@@ -25,12 +25,14 @@ public class PolicyFormService : IPolicyFormService
         _blob = blob;
         _fileScan = fileScan;
         _maxFileSize = long.TryParse(config["Storage:MaxFileSizeBytes"], out var parsed) ? parsed : 52_428_800L;
-        _allowedExtensions = [".pdf", ".doc", ".docx"];
+        _allowedExtensions = [".pdf", ".doc", ".docx", ".html", ".htm"];
         _contentTypesByExtension = new(StringComparer.OrdinalIgnoreCase)
         {
             [".pdf"] = "application/pdf",
             [".doc"] = "application/msword",
             [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            [".html"] = "text/html",
+            [".htm"] = "text/html",
         };
     }
 
@@ -109,7 +111,7 @@ public class PolicyFormService : IPolicyFormService
 
         var extension = Path.GetExtension(safeFileName).ToLowerInvariant();
         if (!_allowedExtensions.Contains(extension) || !_contentTypesByExtension.TryGetValue(extension, out var contentType))
-            return Result<PolicyFormTemplateDto>.Failure("UNSUPPORTED_FILE_TYPE", "Only PDF, DOC, and DOCX policy forms are allowed.");
+            return Result<PolicyFormTemplateDto>.Failure("UNSUPPORTED_FILE_TYPE", "Only PDF, DOC, DOCX, and HTML policy forms are allowed.");
 
         var scan = await _fileScan.ScanAsync(file);
         if (!scan.IsAllowed)
@@ -261,10 +263,8 @@ public class PolicyFormService : IPolicyFormService
 
     public async Task<Result<PolicyPackageConfigurationDto>> ReplacePackageFormsAsync(Guid packageId, IReadOnlyList<PolicyPackageFormUpsertDto> forms)
     {
-        var package = await Db.Set<PolicyPackageConfiguration>()
-            .Include(p => p.Forms)
-            .FirstOrDefaultAsync(p => p.Id == packageId);
-        if (package == null)
+        var packageExists = await Db.Set<PolicyPackageConfiguration>().AnyAsync(p => p.Id == packageId);
+        if (!packageExists)
             return Result<PolicyPackageConfigurationDto>.Failure("NOT_FOUND", "Policy package configuration not found.");
 
         if (forms.Any(f => f.PolicyFormTemplateId == Guid.Empty || f.SequenceOrder <= 0))
@@ -281,14 +281,18 @@ public class PolicyFormService : IPolicyFormService
                 return Result<PolicyPackageConfigurationDto>.Failure("VALIDATION", "Conditional form rules must be valid trigger rules.");
         }
 
-        Db.Set<PolicyPackageForm>().RemoveRange(package.Forms);
-        foreach (var form in forms.OrderBy(f => f.SequenceOrder))
+        await using var transaction = await Db.Database.BeginTransactionAsync();
+        await Db.Set<PolicyPackageForm>()
+            .Where(f => f.PolicyPackageConfigurationId == packageId)
+            .ExecuteDeleteAsync();
+
+        var packageForms = forms.OrderBy(f => f.SequenceOrder).Select(form =>
         {
             var triggerConditionJson = form.FormType == PolicyFormType.Conditional && TryNormalizeJson(form.TriggerConditionJson, out var normalized)
                 ? normalized
                 : null;
 
-            package.Forms.Add(new PolicyPackageForm
+            return new PolicyPackageForm
             {
                 PolicyPackageConfigurationId = packageId,
                 PolicyFormTemplateId = form.PolicyFormTemplateId,
@@ -296,10 +300,20 @@ public class PolicyFormService : IPolicyFormService
                 FormType = form.FormType,
                 TriggerConditionJson = triggerConditionJson,
                 Notes = form.Notes?.Trim(),
-            });
+            };
+        }).ToList();
+
+        Db.Set<PolicyPackageForm>().AddRange(packageForms);
+        try
+        {
+            await Db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            return Result<PolicyPackageConfigurationDto>.Failure("SAVE_FAILED", ex.InnerException?.Message ?? ex.Message);
         }
 
-        await Db.SaveChangesAsync();
         return await GetPackageAsync(packageId);
     }
 
