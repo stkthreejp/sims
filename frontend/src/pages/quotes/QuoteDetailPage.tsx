@@ -1064,7 +1064,6 @@ export function QuoteDetailPage() {
   const isGeneralLiability = quote.lineOfBusiness === 'GeneralLiability'
   const isAuto = AUTO_LOBS.has(quote.lineOfBusiness)
   const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted).length
-  const canBind = (quote.status === 'Quoted' || quote.status === 'Submitted') && openBlockers === 0
   const canReduce = quote.status !== 'Bound' && quote.status !== 'Cancelled' && quote.status !== 'Expired' && canCreatePolicies && !quote.commissionOverride
   const canGenerateInlandMarineProposal = quote.lineOfBusiness === 'InlandMarine' && !!ratingSnapshot && ratingSnapshot.grandTotalPremium > 0
   const otherQuotes = siblingQuotes.filter((q) => q.id !== quote.id)
@@ -1085,6 +1084,19 @@ export function QuoteDetailPage() {
   }
 
   const ratedTotalPremium = ratingSnapshot?.grandTotalPremium ?? quote.totalPremium
+  const bindClosedStatus = quote.status === 'Bound' || quote.status === 'Declined' || quote.status === 'Cancelled' || quote.status === 'Expired'
+  const hasBindablePremium = ratedTotalPremium > 0
+  const bindUnavailableReason = !canCreatePolicies
+    ? 'You do not have permission to bind policies.'
+    : bindClosedStatus
+      ? `This quote is ${quote.status.toLowerCase()}.`
+      : !hasBindablePremium
+        ? 'Rate the quote before binding.'
+        : openBlockers > 0
+          ? `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining.`
+          : null
+  const canBind = bindUnavailableReason == null
+  const showBindAction = quote.status !== 'Bound' && quote.status !== 'Declined' && quote.status !== 'Cancelled' && quote.status !== 'Expired'
 
   // Commission: show the rated premium basis when a rating snapshot exists.
   const agentCommRate = quote.commissionOverride?.agentRate ?? quote.agentCommissionRate
@@ -1168,8 +1180,8 @@ export function QuoteDetailPage() {
                 </MenuItem>
               </MenuButton>
             )}
-            {canBind && (
-              <Btn variant="primary" onClick={() => setShowBind(true)}>
+            {showBindAction && (
+              <Btn variant="primary" disabled={!canBind} onClick={() => canBind && setShowBind(true)}>
                 <CheckCircle2 className="h-3.5 w-3.5" /> Bind quote
               </Btn>
             )}
@@ -1740,13 +1752,13 @@ export function QuoteDetailPage() {
             </Card>
 
             {/* Bind CTA */}
-            {(canBind || ((quote.status === 'Quoted' || quote.status === 'Submitted') && openBlockers > 0)) && (
+            {showBindAction && (
               <div className={`rounded-xl p-4 text-white shadow-sm ${canBind ? 'bg-sky-600' : 'bg-amber-500'}`}>
                 <p className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/70">
-                  {canBind ? 'Ready to bind' : `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining`}
+                  {canBind ? 'Ready to bind' : 'Not ready to bind'}
                 </p>
                 <p className="text-2xl font-semibold">{fmt(ratedTotalPremium)}</p>
-                <p className="mb-4 text-xs text-white/70">{formatDate(quote.effectiveDate)} effective</p>
+                <p className="mb-4 text-xs text-white/70">{bindUnavailableReason ?? `${formatDate(quote.effectiveDate)} effective`}</p>
                 <button
                   disabled={!canBind}
                   onClick={() => canBind && setShowBind(true)}
