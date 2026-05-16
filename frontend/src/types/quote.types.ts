@@ -95,6 +95,7 @@ export interface Quote {
   lineOfBusiness: PolicyLineOfBusiness
   status: QuoteStatus
   policyNumber: string | null
+  boundPolicyId: string | null
   boundDate: string | null
   issuedDate: string | null
   cancelledDate: string | null

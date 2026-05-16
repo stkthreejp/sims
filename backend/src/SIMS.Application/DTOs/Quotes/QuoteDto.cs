@@ -15,6 +15,7 @@ public class QuoteDto
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public QuoteStatus Status { get; set; }
     public string? PolicyNumber { get; set; }
+    public Guid? BoundPolicyId { get; set; }
     public DateOnly? BoundDate { get; set; }
     public DateOnly? IssuedDate { get; set; }
     public DateOnly? CancelledDate { get; set; }

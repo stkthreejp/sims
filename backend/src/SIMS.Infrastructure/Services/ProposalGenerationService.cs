@@ -62,6 +62,8 @@ public class ProposalGenerationService : IProposalGenerationService
             return Result<string>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.LineOfBusiness != PolicyLineOfBusiness.InlandMarine)
             return Result<string>.Failure("INVALID_LOB", "This proposal template is only available for Inland Marine quotes.");
+        if (!await HasIncludedPolicyFormsAsync(quoteId))
+            return Result<string>.Failure("POLICY_FORMS_REQUIRED", "Select the policy forms for this quote before generating or sending a proposal.");
 
         var latestSnapshot = await _db.QuoteRatingSnapshots
             .Include(s => s.Lines)
@@ -396,6 +398,10 @@ public class ProposalGenerationService : IProposalGenerationService
             ? configuredForms
             : BuildFallbackFormsData(endorsements);
     }
+
+    private async Task<bool> HasIncludedPolicyFormsAsync(Guid quoteId)
+        => await _db.QuotePolicyFormSelections
+            .AnyAsync(f => f.QuoteId == quoteId && f.IsIncluded && !f.IsDeleted);
 
     private static IReadOnlyList<object> BuildFallbackFormsData(IReadOnlyList<EndorsementProposalRow> endorsements)
     {

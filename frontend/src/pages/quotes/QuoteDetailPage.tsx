@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowLeft, Calculator, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download,
+  ArrowDown, ArrowLeft, ArrowUp, Calculator, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download,
   Edit2, ExternalLink, FileOutput, FileText, MoreHorizontal, Pin, Plus, RefreshCw,
   Save, Send, ShieldCheck, Trash2, TrendingDown, Upload, X,
 } from 'lucide-react'
@@ -389,6 +389,40 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
                     {!form.isIncluded && <span className="rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700">Excluded</span>}
                   </div>
                 </div>
+                {canManage && forms.length > 1 && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={index === 0 || saveMutation.isPending}
+                      onClick={() => {
+                        const next = [...forms]
+                        const previous = next[index - 1]
+                        next[index - 1] = next[index]
+                        next[index] = previous
+                        saveRows(next)
+                      }}
+                      className="sims-icon-btn disabled:opacity-40"
+                      title="Move up"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={index === forms.length - 1 || saveMutation.isPending}
+                      onClick={() => {
+                        const next = [...forms]
+                        const following = next[index + 1]
+                        next[index + 1] = next[index]
+                        next[index] = following
+                        saveRows(next)
+                      }}
+                      className="sims-icon-btn disabled:opacity-40"
+                      title="Move down"
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
                 {canManage && form.formType === 'AdHoc' && (
                   <button
                     type="button"
@@ -543,6 +577,9 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
         toast.info(`Policy ${bound.policyNumber} created`)
       }
       onClose()
+      if (bound.boundPolicyId) {
+        navigate(`/policies/${bound.boundPolicyId}`)
+      }
     },
     onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Bind failed'),
   })
@@ -984,6 +1021,12 @@ export function QuoteDetailPage() {
     enabled: !!quoteId,
   })
 
+  const { data: policyForms = [] } = useQuery({
+    queryKey: ['quote-policy-forms', quoteId],
+    queryFn: () => quotesApi.getPolicyForms(quoteId!),
+    enabled: !!quoteId,
+  })
+
   const commissionOverrideMutation = useMutation({
     mutationFn: (data: CommissionOverrideRequest) => quotesApi.commissionOverride(quoteId!, data),
     onSuccess: () => {
@@ -1064,8 +1107,18 @@ export function QuoteDetailPage() {
   const isGeneralLiability = quote.lineOfBusiness === 'GeneralLiability'
   const isAuto = AUTO_LOBS.has(quote.lineOfBusiness)
   const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted).length
+  const includedPolicyFormCount = policyForms.filter((form) => form.isIncluded).length
+  const hasSelectedPolicyForms = includedPolicyFormCount > 0
   const canReduce = quote.status !== 'Bound' && quote.status !== 'Cancelled' && quote.status !== 'Expired' && canCreatePolicies && !quote.commissionOverride
-  const canGenerateInlandMarineProposal = quote.lineOfBusiness === 'InlandMarine' && !!ratingSnapshot && ratingSnapshot.grandTotalPremium > 0
+  const hasRatedPremium = !!ratingSnapshot && ratingSnapshot.grandTotalPremium > 0
+  const canGenerateInlandMarineProposal = quote.lineOfBusiness === 'InlandMarine' && hasRatedPremium && hasSelectedPolicyForms
+  const proposalUnavailableReason = quote.lineOfBusiness !== 'InlandMarine'
+    ? null
+    : !hasRatedPremium
+      ? 'Rate the quote before generating a proposal.'
+      : !hasSelectedPolicyForms
+        ? 'Select policy forms before generating or sending a proposal.'
+        : null
   const otherQuotes = siblingQuotes.filter((q) => q.id !== quote.id)
   const writeupReadOnly = writeup?.status !== 'Draft'
   const patchWriteupPayload = (patch: Partial<IMWriteupPayload>) =>
@@ -1092,9 +1145,11 @@ export function QuoteDetailPage() {
       ? `This quote is ${quote.status.toLowerCase()}.`
       : !hasBindablePremium
         ? 'Rate the quote before binding.'
-        : openBlockers > 0
-          ? `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining.`
-          : null
+        : !hasSelectedPolicyForms
+          ? 'Select policy forms before binding.'
+          : openBlockers > 0
+            ? `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining.`
+            : null
   const canBind = bindUnavailableReason == null
   const showBindAction = quote.status !== 'Bound' && quote.status !== 'Declined' && quote.status !== 'Cancelled' && quote.status !== 'Expired'
 
@@ -1167,18 +1222,28 @@ export function QuoteDetailPage() {
             <Btn variant={showRating ? 'primary' : 'outline'} onClick={() => setShowRating((v) => !v)}>
               <Calculator className="h-3.5 w-3.5" /> Rate
             </Btn>
-            {canGenerateInlandMarineProposal && (
+            {(canGenerateInlandMarineProposal || proposalUnavailableReason) && (
               <MenuButton label={<><FileText className="h-3.5 w-3.5" /> Proposal</>}>
-                <MenuItem onClick={() => previewInlandMarineProposalMutation.mutate()} disabled={previewInlandMarineProposalMutation.isPending}>
+                <MenuItem onClick={() => previewInlandMarineProposalMutation.mutate()} disabled={!canGenerateInlandMarineProposal || previewInlandMarineProposalMutation.isPending}>
                   <FileText className="h-3.5 w-3.5" /> Preview
                 </MenuItem>
-                <MenuItem onClick={() => saveInlandMarineProposalMutation.mutate()} disabled={saveInlandMarineProposalMutation.isPending}>
+                <MenuItem onClick={() => saveInlandMarineProposalMutation.mutate()} disabled={!canGenerateInlandMarineProposal || saveInlandMarineProposalMutation.isPending}>
                   <Download className="h-3.5 w-3.5" /> Generate & file PDF
                 </MenuItem>
-                <MenuItem onClick={() => sendInlandMarineProposalDraftMutation.mutate()} disabled={sendInlandMarineProposalDraftMutation.isPending}>
+                <MenuItem onClick={() => sendInlandMarineProposalDraftMutation.mutate()} disabled={!canGenerateInlandMarineProposal || sendInlandMarineProposalDraftMutation.isPending}>
                   <FileOutput className="h-3.5 w-3.5" /> Send proposal
                 </MenuItem>
+                {proposalUnavailableReason && (
+                  <div className="max-w-64 px-3 py-2 text-xs font-medium text-amber-700">
+                    {proposalUnavailableReason}
+                  </div>
+                )}
               </MenuButton>
+            )}
+            {quote.boundPolicyId && (
+              <Btn variant="outline" onClick={() => navigate(`/policies/${quote.boundPolicyId}`)}>
+                <ShieldCheck className="h-3.5 w-3.5" /> View policy
+              </Btn>
             )}
             {showBindAction && (
               <Btn variant="primary" disabled={!canBind} onClick={() => canBind && setShowBind(true)}>

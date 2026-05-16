@@ -113,7 +113,7 @@ public class QuoteService : IQuoteService
 
         return quote == null
             ? Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.")
-            : Result<QuoteDto>.Success(MapToDto(quote));
+            : Result<QuoteDto>.Success(await MapToDtoWithPolicyAsync(quote));
     }
 
     public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById)
@@ -270,6 +270,8 @@ public class QuoteService : IQuoteService
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Quote is already bound.");
+        if (!await HasIncludedPolicyFormsAsync(quote.Id))
+            return Result<QuoteDto>.Failure("POLICY_FORMS_REQUIRED", "Select the policy forms for this quote before binding.");
 
         await using var dbTransaction = await Db.Database.BeginTransactionAsync();
 
@@ -388,7 +390,9 @@ public class QuoteService : IQuoteService
             quote.Id,
             BuildQuoteContext(quote));
 
-        return Result<QuoteDto>.Success(MapToDto(quote));
+        var dtoResult = MapToDto(quote);
+        dtoResult.BoundPolicyId = policy.Id;
+        return Result<QuoteDto>.Success(dtoResult);
     }
 
     public async Task<Result<InvoicePreviewDto>> GetInvoicePreviewAsync(Guid id, UserAccessScope access)
@@ -581,6 +585,25 @@ public class QuoteService : IQuoteService
         HasCommissionOverride = qt.HasCommissionOverride,
         CreatedAt = qt.CreatedAt
     };
+
+    private async Task<QuoteDto> MapToDtoWithPolicyAsync(Quote qt)
+    {
+        var dto = MapToDto(qt);
+        if (qt.Status == QuoteStatus.Bound || qt.PolicyNumber != null)
+        {
+            dto.BoundPolicyId = await Db.Set<Policy>()
+                .Where(p => p.BoundQuoteId == qt.Id && !p.IsDeleted)
+                .OrderByDescending(p => p.BoundDate)
+                .Select(p => (Guid?)p.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        return dto;
+    }
+
+    private async Task<bool> HasIncludedPolicyFormsAsync(Guid quoteId)
+        => await Db.Set<QuotePolicyFormSelection>()
+            .AnyAsync(f => f.QuoteId == quoteId && f.IsIncluded && !f.IsDeleted);
 
     private static QuoteDto MapToDto(Quote qt)
     {
