@@ -11,6 +11,7 @@ import type { CarrierContact, CarrierContactInput, CarrierUpdate } from '@/types
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { EmptyState } from '@/components/common/EmptyState'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
 import { formatCurrency } from '@/lib/utils'
@@ -74,16 +75,16 @@ function ContactForm({
     <div className="space-y-3 pt-1">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">First Name *</label>
-          <input value={form.firstName} onChange={set('firstName')} placeholder="First name" className="w-full border rounded px-2 py-1.5 text-sm" autoFocus />
+          <label className="sims-field-label">First Name *</label>
+          <input value={form.firstName} onChange={set('firstName')} placeholder="First name" className="sims-input" autoFocus />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
-          <input value={form.lastName} onChange={set('lastName')} placeholder="Last name" className="w-full border rounded px-2 py-1.5 text-sm" />
+          <label className="sims-field-label">Last Name</label>
+          <input value={form.lastName} onChange={set('lastName')} placeholder="Last name" className="sims-input" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Title / Role</label>
-          <input value={form.title} onChange={set('title')} placeholder="e.g. Underwriter, Rep" className="w-full border rounded px-2 py-1.5 text-sm" />
+          <label className="sims-field-label">Title / Role</label>
+          <input value={form.title} onChange={set('title')} placeholder="e.g. Underwriter, Rep" className="sims-input" />
         </div>
         <div className="flex items-end pb-1">
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
@@ -94,24 +95,26 @@ function ContactForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+          <label className="sims-field-label">Email</label>
           <input
             value={form.email}
             onChange={set('email')}
             type="text"
             placeholder="email@example.com"
-            className={`w-full border rounded px-2 py-1.5 text-sm ${emailError ? 'border-red-400' : ''}`}
+            className="sims-input"
+            aria-invalid={!!emailError}
           />
           {emailError && <p className="text-xs text-red-600 mt-0.5">Enter a valid email address</p>}
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Phone</label>
+          <label className="sims-field-label">Phone</label>
           <input
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: formatPhoneInput(e.target.value) })}
             type="text"
             placeholder="(555) 123-4567"
-            className={`w-full border rounded px-2 py-1.5 text-sm ${phoneError ? 'border-red-400' : ''}`}
+            className="sims-input"
+            aria-invalid={!!phoneError}
           />
           {phoneError && <p className="text-xs text-red-600 mt-0.5">Enter a valid 10-digit number</p>}
         </div>
@@ -120,11 +123,11 @@ function ContactForm({
         <button
           onClick={onSave}
           disabled={isPending || !form.firstName.trim()}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary sm"
         >
           <Check className="h-3.5 w-3.5" /> Save Contact
         </button>
-        <button onClick={onCancel} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50">
+        <button onClick={onCancel} className="sd-btn outline sm">
           <X className="h-3.5 w-3.5" /> Cancel
         </button>
       </div>
@@ -141,7 +144,7 @@ function LobCheckboxes({ selected, onChange }: { selected: PolicyLineOfBusiness[
     <div className="grid grid-cols-2 gap-1.5">
       {ACTIVE_LOBS.map((lob) => (
         <label key={lob} className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={selected.includes(lob)} onChange={() => toggle(lob)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+          <input type="checkbox" checked={selected.includes(lob)} onChange={() => toggle(lob)} className="rounded border-slate-300 text-sky-700 focus:ring-sky-200" />
           {LOB_LABELS[lob]}
         </label>
       ))}
@@ -485,15 +488,15 @@ export function CarrierDetailPage() {
   const zipError = infoForm.zipCode && !isValidZip(infoForm.zipCode)
 
   if (isLoading) return <LoadingSpinner />
-  if (!carrier) return <div className="p-6 text-sm text-slate-500">Carrier not found.</div>
+  if (!carrier) return <EmptyState icon={ShieldCheck} title="Carrier not found" description="The requested carrier record could not be loaded." />
 
   const address = [carrier.addressLine1, carrier.addressLine2, [carrier.city, carrier.state].filter(Boolean).join(', '), carrier.zipCode].filter(Boolean).join(' ')
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-500">
-        <Link to="/carriers" className="hover:text-slate-700 flex items-center gap-1">
+        <Link to="/carriers" className="sd-btn ghost sm">
           <ArrowLeft className="h-4 w-4" /> Carriers
         </Link>
         <span>/</span>
@@ -501,12 +504,12 @@ export function CarrierDetailPage() {
       </div>
 
       {/* Carrier info panel */}
-      <div className="bg-white border rounded-lg p-5">
+      <div className="sd-card p-5">
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-semibold text-slate-900">{carrier.name}</h1>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${carrier.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`sd-pill ${carrier.isActive ? 'bound' : 'draft'}`}>
                 {carrier.isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
@@ -516,7 +519,7 @@ export function CarrierDetailPage() {
             </div>
           </div>
           {!editingInfo && (
-            <button onClick={startEditInfo} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50 text-slate-600">
+            <button onClick={startEditInfo} className="sd-btn outline sm">
               <Pencil className="h-3.5 w-3.5" /> Edit
             </button>
           )}
@@ -527,15 +530,15 @@ export function CarrierDetailPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Carrier Name *</label>
-                <input value={infoForm.name} onChange={infoSet('name')} className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input value={infoForm.name} onChange={infoSet('name')} className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">NAIC #</label>
-                <input value={infoForm.naic} onChange={infoSet('naic')} placeholder="e.g. 14788" className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input value={infoForm.naic} onChange={infoSet('naic')} placeholder="e.g. 14788" className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">AM Best Rating</label>
-                <input value={infoForm.amBestRating} onChange={infoSet('amBestRating')} placeholder="e.g. A+" className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input value={infoForm.amBestRating} onChange={infoSet('amBestRating')} placeholder="e.g. A+" className="sims-input" />
               </div>
             </div>
 
@@ -551,18 +554,18 @@ export function CarrierDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Suite / Unit</label>
-                <input value={infoForm.addressLine2} onChange={infoSet('addressLine2')} placeholder="Apt, Suite, Unit…" className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input value={infoForm.addressLine2} onChange={infoSet('addressLine2')} placeholder="Apt, Suite, Unit…" className="sims-input" />
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-                <input value={infoForm.city} onChange={infoSet('city')} placeholder="City" className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input value={infoForm.city} onChange={infoSet('city')} placeholder="City" className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                <input value={infoForm.state} onChange={infoSet('state')} maxLength={2} placeholder="TX" className="w-full border rounded px-2 py-1.5 text-sm uppercase" />
+                <input value={infoForm.state} onChange={infoSet('state')} maxLength={2} placeholder="TX" className="sims-input uppercase" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">ZIP</label>
@@ -570,7 +573,8 @@ export function CarrierDetailPage() {
                   value={infoForm.zipCode}
                   onChange={infoSet('zipCode')}
                   placeholder="78701"
-                  className={`w-full border rounded px-2 py-1.5 text-sm ${zipError ? 'border-red-400' : ''}`}
+                  className="sims-input"
+                  aria-invalid={!!zipError}
                 />
                 {zipError && <p className="text-xs text-red-600 mt-0.5">Invalid ZIP code</p>}
               </div>
@@ -578,7 +582,7 @@ export function CarrierDetailPage() {
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Website</label>
-              <input value={infoForm.website} onChange={infoSet('website')} placeholder="https://example.com" className="w-full border rounded px-2 py-1.5 text-sm" />
+              <input value={infoForm.website} onChange={infoSet('website')} placeholder="https://example.com" className="sims-input" />
             </div>
 
             <div>
@@ -603,11 +607,11 @@ export function CarrierDetailPage() {
                   updateInfoMutation.mutate()
                 }}
                 disabled={updateInfoMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                className="sd-btn primary sm"
               >
                 <Check className="h-3.5 w-3.5" /> Save
               </button>
-              <button onClick={() => setEditingInfo(false)} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50">
+              <button onClick={() => setEditingInfo(false)} className="sd-btn outline sm">
                 <X className="h-3.5 w-3.5" /> Cancel
               </button>
             </div>
@@ -617,7 +621,7 @@ export function CarrierDetailPage() {
             {/* LOBs */}
             <div className="flex flex-wrap gap-1">
               {carrier.linesOfBusiness.map((lob) => (
-                <span key={lob} className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                <span key={lob} className="sd-lob">
                   {LOB_LABELS[lob]}
                 </span>
               ))}
@@ -638,7 +642,7 @@ export function CarrierDetailPage() {
                     href={carrier.website.startsWith('http') ? carrier.website : `https://${carrier.website}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+                    className="flex items-center gap-1.5 text-sm text-sky-700 hover:underline"
                   >
                     <Globe className="h-3.5 w-3.5 shrink-0" /> {carrier.website}
                   </a>
@@ -650,12 +654,10 @@ export function CarrierDetailPage() {
       </div>
 
       {/* Documents */}
-      <div className="bg-white border rounded-lg p-5">
-        <DocumentsSection entityType="Carrier" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
-      </div>
+      <DocumentsSection entityType="Carrier" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
 
       {/* Commission Schedules */}
-      <div className="bg-white border rounded-lg p-5 space-y-4">
+      <div className="sd-card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
             <Percent className="h-4 w-4 text-slate-400" />
@@ -664,7 +666,7 @@ export function CarrierDetailPage() {
           {!showAddCommission && (
             <button
               onClick={() => setShowAddCommission(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              className="sd-btn primary sm"
             >
               <Plus className="h-3.5 w-3.5" /> Add Rate
             </button>
@@ -673,7 +675,7 @@ export function CarrierDetailPage() {
 
         {/* Add commission form */}
         {showAddCommission && (
-          <div className="bg-slate-50 border rounded-lg p-4 space-y-3">
+          <div className="rounded-lg p-4 space-y-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
             <p className="text-sm font-medium text-slate-700">New Commission Rate</p>
             <div className="grid grid-cols-4 gap-3">
               <div>
@@ -681,7 +683,7 @@ export function CarrierDetailPage() {
                 <select
                   value={commissionForm.lineOfBusiness}
                   onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm bg-white"
+                  className="sims-select"
                 >
                   <option value="">All Lines (default)</option>
                   {carrier.linesOfBusiness.map((lob) => (
@@ -700,7 +702,7 @@ export function CarrierDetailPage() {
                     value={commissionForm.commissionRate}
                     onChange={(e) => setCommissionForm({ ...commissionForm, commissionRate: e.target.value })}
                     placeholder="e.g. 15"
-                    className="w-full border rounded px-2 py-1.5 text-sm pr-6"
+                    className="sims-input pr-6"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
                 </div>
@@ -717,7 +719,7 @@ export function CarrierDetailPage() {
                     value={commissionForm.smmRetentionRate}
                     onChange={(e) => setCommissionForm({ ...commissionForm, smmRetentionRate: e.target.value })}
                     placeholder="e.g. 5"
-                    className="w-full border rounded px-2 py-1.5 text-sm pr-6"
+                    className="sims-input pr-6"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
                 </div>
@@ -729,7 +731,7 @@ export function CarrierDetailPage() {
                   type="date"
                   value={commissionForm.effectiveDate}
                   onChange={(e) => setCommissionForm({ ...commissionForm, effectiveDate: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  className="sims-input"
                 />
               </div>
             </div>
@@ -744,13 +746,13 @@ export function CarrierDetailPage() {
                   addCommissionMutation.mutate()
                 }}
                 disabled={addCommissionMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                className="sd-btn primary sm"
               >
                 <Check className="h-3.5 w-3.5" /> Save
               </button>
               <button
                 onClick={() => setShowAddCommission(false)}
-                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+                className="sd-btn outline sm"
               >
                 <X className="h-3.5 w-3.5" /> Cancel
               </button>
@@ -760,13 +762,11 @@ export function CarrierDetailPage() {
 
         {/* Commission table grouped by LOB */}
         {commissions.length === 0 && !showAddCommission ? (
-          <div className="text-center py-6 border border-dashed rounded-lg">
-            <BanknoteIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No commission rates configured.</p>
-            <button onClick={() => setShowAddCommission(true)} className="mt-2 text-sm text-blue-600 hover:underline">
-              Add the first rate
-            </button>
-          </div>
+          <EmptyState
+            icon={BanknoteIcon}
+            title="No commission rates configured"
+            action={<button onClick={() => setShowAddCommission(true)} className="sd-btn outline sm">Add the first rate</button>}
+          />
         ) : (
           (() => {
             // Group by LOB (null → "All Lines")
@@ -847,7 +847,8 @@ export function CarrierDetailPage() {
                                     {r.isActive && (
                                       <button
                                         onClick={(e) => { e.stopPropagation(); if (confirm('Disable this commission rate?')) disableCommissionMutation.mutate(r.id) }}
-                                        className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                                        className="sims-icon-btn hover:text-red-500"
+                                        title="Disable commission rate"
                                       >
                                         Disable
                                       </button>
@@ -869,7 +870,7 @@ export function CarrierDetailPage() {
       </div>
 
       {/* Rating Plans */}
-      <div className="bg-white border rounded-lg p-5 space-y-4">
+      <div className="sd-card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-slate-400" />
@@ -877,21 +878,19 @@ export function CarrierDetailPage() {
           </h2>
           <button
             onClick={openAddRatingModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            className="sd-btn primary sm"
           >
             <Plus className="h-3.5 w-3.5" /> Assign Rating Plan
           </button>
         </div>
 
         {ratingAssignments.length === 0 ? (
-          <div className="text-center py-6 border border-dashed rounded-lg">
-            <ShieldCheck className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No rating plans assigned.</p>
-            <p className="text-xs text-slate-400 mt-0.5">Quotes for this carrier won't rate until a plan is assigned.</p>
-            <button onClick={openAddRatingModal} className="mt-2 text-sm text-blue-600 hover:underline">
-              Assign the first plan
-            </button>
-          </div>
+          <EmptyState
+            icon={ShieldCheck}
+            title="No rating plans assigned"
+            description="Quotes for this carrier will not rate until a plan is assigned."
+            action={<button onClick={openAddRatingModal} className="sd-btn outline sm">Assign the first plan</button>}
+          />
         ) : (
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
@@ -915,7 +914,7 @@ export function CarrierDetailPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => openEditRatingModal(a)}
-                          className="p-1 text-slate-400 hover:text-blue-600 rounded"
+                          className="sims-icon-btn hover:text-sky-600"
                           title="Edit assignment"
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -925,7 +924,7 @@ export function CarrierDetailPage() {
                             if (confirm(`Remove the ${a.lineOfBusinessLabel} rating plan assignment?`))
                               deleteAssignmentMutation.mutate(a.id)
                           }}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded"
+                          className="sims-icon-btn hover:text-red-500"
                           title="Remove assignment"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -941,7 +940,7 @@ export function CarrierDetailPage() {
       </div>
 
       {/* Additional Interest Rates */}
-      <div className="bg-white border rounded-lg p-5 space-y-4">
+      <div className="sd-card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
             <BanknoteIcon className="h-4 w-4 text-slate-400" />
@@ -953,61 +952,61 @@ export function CarrierDetailPage() {
               setAdditionalInterestRateForm({ ...emptyAdditionalInterestRateForm(), lineOfBusiness: carrier.linesOfBusiness[0] ?? '' })
               setShowAdditionalInterestRateForm(true)
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            className="sd-btn primary sm"
           >
             <Plus className="h-3.5 w-3.5" /> Add Rate
           </button>
         </div>
 
         {showAdditionalInterestRateForm && (
-          <div className="bg-slate-50 rounded-lg p-3 border space-y-3">
+          <div className="rounded-lg p-3 space-y-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business *</label>
-                <select value={additionalInterestRateForm.lineOfBusiness} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="w-full border rounded px-2 py-1.5 text-sm bg-white">
+                <select value={additionalInterestRateForm.lineOfBusiness} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="sims-select">
                   <option value="">Select...</option>
                   {carrier.linesOfBusiness.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Interest Type</label>
-                <select value={additionalInterestRateForm.coverageType} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, coverageType: e.target.value as AdditionalInterestCoverageType }))} className="w-full border rounded px-2 py-1.5 text-sm bg-white">
+                <select value={additionalInterestRateForm.coverageType} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, coverageType: e.target.value as AdditionalInterestCoverageType }))} className="sims-select">
                   {(Object.keys(ADDITIONAL_INTEREST_COVERAGE_LABELS) as AdditionalInterestCoverageType[]).map((k) => <option key={k} value={k}>{ADDITIONAL_INTEREST_COVERAGE_LABELS[k]}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Charge Method</label>
-                <select value={additionalInterestRateForm.chargeMethod} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, chargeMethod: e.target.value as AdditionalInterestChargeMethod }))} className="w-full border rounded px-2 py-1.5 text-sm bg-white">
+                <select value={additionalInterestRateForm.chargeMethod} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, chargeMethod: e.target.value as AdditionalInterestChargeMethod }))} className="sims-select">
                   {(Object.keys(ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS) as AdditionalInterestChargeMethod[]).map((k) => <option key={k} value={k}>{ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS[k]}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                <input value={additionalInterestRateForm.state} maxLength={2} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))} placeholder="Optional" className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input value={additionalInterestRateForm.state} maxLength={2} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))} placeholder="Optional" className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Per Interest Amount</label>
-                <input type="number" value={additionalInterestRateForm.perInterestAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, perInterestAmount: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input type="number" value={additionalInterestRateForm.perInterestAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, perInterestAmount: e.target.value }))} className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Blanket Amount</label>
-                <input type="number" value={additionalInterestRateForm.blanketAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, blanketAmount: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input type="number" value={additionalInterestRateForm.blanketAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, blanketAmount: e.target.value }))} className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Minimum</label>
-                <input type="number" value={additionalInterestRateForm.minimumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, minimumCharge: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input type="number" value={additionalInterestRateForm.minimumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, minimumCharge: e.target.value }))} className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Maximum</label>
-                <input type="number" value={additionalInterestRateForm.maximumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, maximumCharge: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input type="number" value={additionalInterestRateForm.maximumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, maximumCharge: e.target.value }))} className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
-                <input type="date" value={additionalInterestRateForm.effectiveDate} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, effectiveDate: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input type="date" value={additionalInterestRateForm.effectiveDate} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, effectiveDate: e.target.value }))} className="sims-input" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Expiration Date</label>
-                <input type="date" value={additionalInterestRateForm.expirationDate} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, expirationDate: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm" />
+                <input type="date" value={additionalInterestRateForm.expirationDate} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, expirationDate: e.target.value }))} className="sims-input" />
               </div>
               <div className="flex items-end pb-1">
                 <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
@@ -1023,11 +1022,11 @@ export function CarrierDetailPage() {
                   saveAdditionalInterestRateMutation.mutate()
                 }}
                 disabled={saveAdditionalInterestRateMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                className="sd-btn primary sm"
               >
                 <Check className="h-3.5 w-3.5" /> Save Rate
               </button>
-              <button onClick={() => { setShowAdditionalInterestRateForm(false); setEditingAdditionalInterestRateId(null); setAdditionalInterestRateForm(emptyAdditionalInterestRateForm()) }} className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50">
+              <button onClick={() => { setShowAdditionalInterestRateForm(false); setEditingAdditionalInterestRateId(null); setAdditionalInterestRateForm(emptyAdditionalInterestRateForm()) }} className="sd-btn outline sm">
                 <X className="h-3.5 w-3.5" /> Cancel
               </button>
             </div>
@@ -1035,11 +1034,11 @@ export function CarrierDetailPage() {
         )}
 
         {additionalInterestRates.length === 0 ? (
-          <div className="text-center py-6 border border-dashed rounded-lg">
-            <BanknoteIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No additional interest rates configured.</p>
-            <p className="text-xs text-slate-400 mt-0.5">Rating will use these rules after the premium calculation is wired in.</p>
-          </div>
+          <EmptyState
+            icon={BanknoteIcon}
+            title="No additional interest rates configured"
+            description="Rating will use these rules after the premium calculation is wired in."
+          />
         ) : (
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
@@ -1089,14 +1088,14 @@ export function CarrierDetailPage() {
                             })
                             setShowAdditionalInterestRateForm(true)
                           }}
-                          className="p-1 text-slate-400 hover:text-blue-600 rounded"
+                          className="sims-icon-btn hover:text-sky-600"
                           title="Edit rate"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => { if (confirm('Remove this additional interest rate?')) deleteAdditionalInterestRateMutation.mutate(r.id) }}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded"
+                          className="sims-icon-btn hover:text-red-500"
                           title="Remove rate"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -1114,7 +1113,7 @@ export function CarrierDetailPage() {
       {/* Rating plan assign/edit modal */}
       {showRatingModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="sd-card w-full max-w-md p-6 space-y-4">
             <h3 className="text-base font-semibold text-slate-800">
               {editingAssignmentId ? 'Edit Rating Plan' : 'Assign Rating Plan'}
             </h3>
@@ -1130,7 +1129,7 @@ export function CarrierDetailPage() {
                     setRatingPickerLob(lob || null)
                   }}
                   disabled={!!editingAssignmentId}
-                  className="w-full border rounded px-2 py-1.5 text-sm bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                  className="sims-select disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   <option value="">Select a line of business…</option>
                   {carrier.linesOfBusiness.map((lob) => (
@@ -1145,7 +1144,7 @@ export function CarrierDetailPage() {
                   value={ratingForm.ratingPlanVersionId}
                   onChange={(e) => setRatingForm({ ...ratingForm, ratingPlanVersionId: e.target.value })}
                   disabled={!ratingPickerLob}
-                  className="w-full border rounded px-2 py-1.5 text-sm bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                  className="sims-select disabled:bg-slate-50 disabled:text-slate-400"
                 >
                   <option value="">
                     {ratingPickerLob
@@ -1165,13 +1164,13 @@ export function CarrierDetailPage() {
               <button
                 onClick={saveRatingAssignment}
                 disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                className="sd-btn primary sm"
               >
                 <Check className="h-3.5 w-3.5" /> Save
               </button>
               <button
                 onClick={closeRatingModal}
-                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm hover:bg-slate-50"
+                className="sd-btn outline sm"
               >
                 <X className="h-3.5 w-3.5" /> Cancel
               </button>
@@ -1181,7 +1180,7 @@ export function CarrierDetailPage() {
       )}
 
       {/* Contacts section */}
-      <div className="bg-white border rounded-lg p-5 space-y-4">
+      <div className="sd-card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800">
             Contacts
@@ -1192,7 +1191,7 @@ export function CarrierDetailPage() {
           {!showNewContact && (
             <button
               onClick={() => { setShowNewContact(true); setNewContactForm(emptyContactForm()); setEditingContactId(null) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              className="sd-btn primary sm"
             >
               <Plus className="h-3.5 w-3.5" /> Add Contact
             </button>
@@ -1201,7 +1200,7 @@ export function CarrierDetailPage() {
 
         {/* New contact form */}
         {showNewContact && (
-          <div className="bg-slate-50 rounded-lg p-3 border">
+          <div className="rounded-lg p-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
             <ContactForm
               form={newContactForm}
               setForm={setNewContactForm}
@@ -1214,13 +1213,11 @@ export function CarrierDetailPage() {
 
         {/* Contact list */}
         {carrier.contacts.length === 0 && !showNewContact ? (
-          <div className="text-center py-6 border border-dashed rounded-lg">
-            <UserCircle className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No contacts yet.</p>
-            <button onClick={() => setShowNewContact(true)} className="mt-2 text-sm text-blue-600 hover:underline">
-              Add the first contact
-            </button>
-          </div>
+          <EmptyState
+            icon={UserCircle}
+            title="No contacts yet"
+            action={<button onClick={() => setShowNewContact(true)} className="sd-btn outline sm">Add the first contact</button>}
+          />
         ) : (
           <div className="space-y-1">
             {carrier.contacts.map((contact) => {
@@ -1230,7 +1227,7 @@ export function CarrierDetailPage() {
               return (
                 <div key={contact.id}>
                   {isEditingThis ? (
-                    <div className="bg-slate-50 rounded-lg p-3 border">
+                    <div className="rounded-lg p-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
                       <ContactForm
                         form={editContactForm}
                         setForm={setEditContactForm}
@@ -1260,7 +1257,7 @@ export function CarrierDetailPage() {
                               <a
                                 href={`mailto:${contact.email}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                className="text-xs text-sky-700 hover:underline flex items-center gap-1"
                               >
                                 <Mail className="h-3 w-3" /> {contact.email}
                               </a>
@@ -1276,13 +1273,15 @@ export function CarrierDetailPage() {
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => { setEditingContactId(contact.id); setEditContactForm(contactToForm(contact)); setShowNewContact(false) }}
-                          className="p-1 text-slate-400 hover:text-blue-600 rounded"
+                          className="sims-icon-btn hover:text-sky-600"
+                          title="Edit contact"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => { if (confirm(`Delete contact ${fullName}?`)) deleteContactMutation.mutate(contact.id) }}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded"
+                          className="sims-icon-btn hover:text-red-500"
+                          title="Delete contact"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

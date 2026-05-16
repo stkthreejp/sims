@@ -118,7 +118,7 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Agents list | Page | `/agents` | Needs tweaking | Uses shared header but old list, form, and table styling remain. | Medium |
 | Agent detail | Page | `/agents/:id` | Needs tweaking | First pass aligned core forms, cards, documents, empty states, and icon actions; backend wiring appears real for detail, edit, locations, contacts, commissions, and documents. | High |
 | Carriers list | Page | `/carriers` | Needs tweaking | Uses shared header but old cards/list styling remain. | Medium |
-| Carrier detail | Page | `/carriers/:id` | Never updated | Large detail surface with old cards/forms/tables. | High |
+| Carrier detail | Page | `/carriers/:id` | Needs tweaking | First pass aligned core forms, cards, documents, empty states, modals, and icon actions; backend wiring appears real for detail, edit, contacts, commissions, rating plans, additional interest rates, and documents. | High |
 | Users | Page | `/users` | Needs tweaking | Old table, search, status, and page action styling remain. | Medium |
 | User create/edit modal | Modal | `frontend/src/pages/users/UsersPage.tsx` | Good | Modal now uses SIMS modal, field, role chip, and footer button patterns. | Low |
 | Inbox list | Page | `/inbox` | Needs tweaking | Smaller surface but old utility styling remains. | Medium |
@@ -189,3 +189,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-15 | Codex | Submission detail final shell pass | Aligned extraction alert, page action buttons, editor close action, LOB editor trigger, loss-history empty state, and UW notes empty state. Type check passed. |
 | 2026-05-15 | Codex | Audit plan wiring track | Added backend wiring statuses and checklist; existing completed UI rows need wiring back-checks going forward. |
 | 2026-05-15 | Codex | Agent detail first pass | Aligned core agent detail cards, forms, documents, empty states, and icon actions with SIMS patterns; backend wiring appears real for primary workflows. Type check passed. |
+| 2026-05-15 | Codex | Carrier detail first pass | Aligned core carrier detail forms, cards, documents, empty states, modals, and icon actions with SIMS patterns; backend wiring appears real for primary workflows. Type check passed. |
