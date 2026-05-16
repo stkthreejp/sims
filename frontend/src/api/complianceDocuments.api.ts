@@ -8,6 +8,7 @@ import type {
   ComplianceAttestationCampaign,
   ComplianceAuditLog,
   ComplianceEvidence,
+  ComplianceEvidenceAttachment,
   ComplianceVersionCompare,
 } from '@/types/compliance.types'
 
@@ -47,6 +48,21 @@ export const complianceDocumentsApi = {
 
   addEvidence: (id: string, data: { title: string; evidenceType: string; description?: string | null; url?: string | null }) =>
     apiClient.post<ComplianceEvidence>(`/compliance-documents/${id}/evidence`, data).then((r) => r.data),
+
+  uploadEvidenceAttachment: (evidenceId: string, file: File, description?: string | null) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (description) form.append('description', description)
+    return apiClient.post<ComplianceEvidenceAttachment>(`/compliance-documents/evidence/${evidenceId}/attachments`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data)
+  },
+
+  getEvidenceAttachmentDownloadUrl: (attachmentId: string) =>
+    apiClient.get<{ url: string }>(`/compliance-documents/evidence/attachments/${attachmentId}/download-url`).then((r) => r.data.url),
+
+  deleteEvidenceAttachment: (attachmentId: string) =>
+    apiClient.delete(`/compliance-documents/evidence/attachments/${attachmentId}`),
 
   getAttestationCampaigns: (documentId?: string | null) =>
     apiClient.get<ComplianceAttestationCampaign[]>('/compliance-documents/attestations', {

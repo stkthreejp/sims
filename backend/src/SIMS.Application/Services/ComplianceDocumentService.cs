@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Compliance;
 using SIMS.Application.Interfaces.Services;
@@ -11,9 +13,37 @@ namespace SIMS.Application.Services;
 public class ComplianceDocumentService : IComplianceDocumentService
 {
     private readonly IServiceProvider _sp;
-    public ComplianceDocumentService(IServiceProvider sp) => _sp = sp;
+    private readonly long _maxFileSize;
+    private readonly HashSet<string> _allowedExtensions;
+    private readonly Dictionary<string, string> _contentTypesByExtension;
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
+    private IBlobStorageService Blob => (IBlobStorageService)_sp.GetService(typeof(IBlobStorageService))!;
+    private IFileScanService FileScan => (IFileScanService)_sp.GetService(typeof(IFileScanService))!;
+
+    public ComplianceDocumentService(IServiceProvider sp, IConfiguration config)
+    {
+        _sp = sp;
+        _maxFileSize = long.TryParse(config["Storage:MaxFileSizeBytes"], out var parsed) ? parsed : 52_428_800L;
+        _allowedExtensions = (config.GetSection("Storage:AllowedExtensions").Get<string[]>()
+                ?? [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt", ".csv", ".html"])
+            .Select(e => e.StartsWith('.') ? e.ToLowerInvariant() : $".{e.ToLowerInvariant()}")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _contentTypesByExtension = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".pdf"] = "application/pdf",
+            [".doc"] = "application/msword",
+            [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            [".xls"] = "application/vnd.ms-excel",
+            [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            [".png"] = "image/png",
+            [".jpg"] = "image/jpeg",
+            [".jpeg"] = "image/jpeg",
+            [".txt"] = "text/plain",
+            [".csv"] = "text/csv",
+            [".html"] = "text/html",
+        };
+    }
 
     public async Task<ComplianceDocumentSummaryDto> GetSummaryAsync(CancellationToken ct = default)
     {
@@ -316,6 +346,90 @@ public class ComplianceDocumentService : IComplianceDocumentService
         return Result<ComplianceEvidenceDto>.Success(MapEvidence(loaded));
     }
 
+    public async Task<Result<ComplianceEvidenceAttachmentDto>> UploadEvidenceAttachmentAsync(Guid evidenceId, IFormFile file, string? description, Guid userId, CancellationToken ct = default)
+    {
+        var evidence = await Db.Set<ComplianceEvidence>()
+            .Include(e => e.Document)
+            .FirstOrDefaultAsync(e => e.Id == evidenceId, ct);
+
+        if (evidence == null)
+            return Result<ComplianceEvidenceAttachmentDto>.Failure("NOT_FOUND", "Evidence item not found.");
+
+        if (file.Length == 0)
+            return Result<ComplianceEvidenceAttachmentDto>.Failure("EMPTY_FILE", "File is empty.");
+
+        if (file.Length > _maxFileSize)
+            return Result<ComplianceEvidenceAttachmentDto>.Failure("FILE_TOO_LARGE", $"File exceeds the {_maxFileSize / 1024 / 1024}MB limit.");
+
+        var safeFileName = Regex.Replace(Path.GetFileName(file.FileName), @"[^\w.\-() ]", "_");
+        if (string.IsNullOrWhiteSpace(safeFileName))
+            return Result<ComplianceEvidenceAttachmentDto>.Failure("UNSUPPORTED_FILE_TYPE", "File name is required.");
+
+        var extension = Path.GetExtension(safeFileName).ToLowerInvariant();
+        if (!_allowedExtensions.Contains(extension) || !_contentTypesByExtension.TryGetValue(extension, out var contentType))
+            return Result<ComplianceEvidenceAttachmentDto>.Failure("UNSUPPORTED_FILE_TYPE", "This file type is not allowed.");
+
+        if (!await HasExpectedSignatureAsync(file, extension, ct))
+            return Result<ComplianceEvidenceAttachmentDto>.Failure("INVALID_FILE_SIGNATURE", "File contents do not match the file type.");
+
+        var scan = await FileScan.ScanAsync(file, ct);
+        if (!scan.IsAllowed)
+            return Result<ComplianceEvidenceAttachmentDto>.Failure(scan.ErrorCode ?? "FILE_SCAN_FAILED", scan.ErrorMessage ?? "The uploaded file could not be scanned.");
+
+        string blobPath;
+        await using (var stream = file.OpenReadStream())
+            blobPath = await Blob.UploadAsync(stream, safeFileName, contentType);
+
+        var attachment = new ComplianceEvidenceAttachment
+        {
+            EvidenceId = evidence.Id,
+            FileName = safeFileName,
+            BlobPath = blobPath,
+            ContentType = contentType,
+            FileSizeBytes = file.Length,
+            Description = description?.Trim(),
+            UploadedById = userId,
+        };
+
+        Db.Set<ComplianceEvidenceAttachment>().Add(attachment);
+        AddAudit(evidence.DocumentId, null, "EvidenceAttachmentUploaded", null, null, safeFileName, description, userId);
+        await Db.SaveChangesAsync(ct);
+        await Db.Entry(attachment).Reference(a => a.UploadedBy).LoadAsync(ct);
+
+        return Result<ComplianceEvidenceAttachmentDto>.Success(MapEvidenceAttachment(attachment));
+    }
+
+    public async Task<Result<string>> GetEvidenceAttachmentDownloadUrlAsync(Guid attachmentId, Guid userId, CancellationToken ct = default)
+    {
+        var attachment = await Db.Set<ComplianceEvidenceAttachment>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == attachmentId, ct);
+
+        if (attachment == null)
+            return Result<string>.Failure("NOT_FOUND", "Evidence attachment not found.");
+
+        var url = await Blob.GetDownloadUrlAsync(attachment.BlobPath, attachment.FileName);
+        return Result<string>.Success(url);
+    }
+
+    public async Task<Result> DeleteEvidenceAttachmentAsync(Guid attachmentId, Guid userId, CancellationToken ct = default)
+    {
+        var attachment = await Db.Set<ComplianceEvidenceAttachment>()
+            .Include(a => a.Evidence)
+            .FirstOrDefaultAsync(a => a.Id == attachmentId, ct);
+
+        if (attachment == null)
+            return Result.Failure("NOT_FOUND", "Evidence attachment not found.");
+
+        await Blob.DeleteAsync(attachment.BlobPath);
+        attachment.IsDeleted = true;
+        attachment.DeletedAt = DateTime.UtcNow;
+        AddAudit(attachment.Evidence.DocumentId, null, "EvidenceAttachmentDeleted", null, attachment.FileName, null, null, userId);
+
+        await Db.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
     public async Task<Result<ComplianceVersionCompareDto>> CompareVersionsAsync(Guid id, Guid? fromVersionId = null, Guid? toVersionId = null, CancellationToken ct = default)
     {
         var document = await Db.Set<ComplianceDocument>()
@@ -462,7 +576,8 @@ public class ComplianceDocumentService : IComplianceDocumentService
             .Include(d => d.Versions).ThenInclude(v => v.CreatedBy)
             .Include(d => d.Versions).ThenInclude(v => v.ApprovedBy)
             .Include(d => d.Reviews).ThenInclude(r => r.ReviewedBy)
-            .Include(d => d.EvidenceItems).ThenInclude(e => e.CreatedBy);
+            .Include(d => d.EvidenceItems).ThenInclude(e => e.CreatedBy)
+            .Include(d => d.EvidenceItems).ThenInclude(e => e.Attachments).ThenInclude(a => a.UploadedBy);
 
     private IQueryable<ComplianceAttestationCampaign> AttestationCampaignQuery() =>
         Db.Set<ComplianceAttestationCampaign>()
@@ -556,6 +671,20 @@ public class ComplianceDocumentService : IComplianceDocumentService
         Url = e.Url,
         CreatedByName = e.CreatedBy.FullName,
         CreatedAt = e.CreatedAt,
+        Attachments = e.Attachments.OrderByDescending(a => a.CreatedAt).Select(MapEvidenceAttachment).ToList(),
+    };
+
+    private static ComplianceEvidenceAttachmentDto MapEvidenceAttachment(ComplianceEvidenceAttachment a) => new()
+    {
+        Id = a.Id,
+        EvidenceId = a.EvidenceId,
+        FileName = a.FileName,
+        ContentType = a.ContentType,
+        FileSizeBytes = a.FileSizeBytes,
+        Description = a.Description,
+        UploadedById = a.UploadedById,
+        UploadedByName = a.UploadedBy.FullName,
+        CreatedAt = a.CreatedAt,
     };
 
     private static ComplianceAttestationCampaignDto MapCampaign(ComplianceAttestationCampaign c)
@@ -688,6 +817,36 @@ public class ComplianceDocumentService : IComplianceDocumentService
 
     private static string[] Tokenize(string value) =>
         Regex.Matches(value, @"\S+\s*").Select(m => m.Value).ToArray();
+
+    private static async Task<bool> HasExpectedSignatureAsync(IFormFile file, string extension, CancellationToken ct)
+    {
+        await using var stream = file.OpenReadStream();
+        var buffer = new byte[(int)Math.Min(file.Length, 8L)];
+        var read = await stream.ReadAsync(buffer, ct);
+
+        return extension switch
+        {
+            ".pdf" => StartsWith(buffer, read, [0x25, 0x50, 0x44, 0x46]),
+            ".png" => StartsWith(buffer, read, [0x89, 0x50, 0x4E, 0x47]),
+            ".jpg" or ".jpeg" => StartsWith(buffer, read, [0xFF, 0xD8, 0xFF]),
+            ".docx" or ".xlsx" => StartsWith(buffer, read, [0x50, 0x4B, 0x03, 0x04]),
+            _ => true,
+        };
+    }
+
+    private static bool StartsWith(byte[] buffer, int read, byte[] signature)
+    {
+        if (read < signature.Length)
+            return false;
+
+        for (var i = 0; i < signature.Length; i++)
+        {
+            if (buffer[i] != signature[i])
+                return false;
+        }
+
+        return true;
+    }
 
     private static void PushPart(List<ComplianceDiffPartDto> parts, string text, string kind)
     {

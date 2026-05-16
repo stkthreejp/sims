@@ -125,6 +125,28 @@ public class ComplianceDocumentsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("evidence/{evidenceId:guid}/attachments")]
+    [RequestSizeLimit(52_428_800)]
+    public async Task<IActionResult> UploadEvidenceAttachment(Guid evidenceId, IFormFile file, [FromForm] string? description, CancellationToken ct)
+    {
+        var result = await _service.UploadEvidenceAttachmentAsync(evidenceId, file, description, CurrentUserId(), ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpGet("evidence/attachments/{attachmentId:guid}/download-url")]
+    public async Task<IActionResult> GetEvidenceAttachmentDownloadUrl(Guid attachmentId, CancellationToken ct)
+    {
+        var result = await _service.GetEvidenceAttachmentDownloadUrlAsync(attachmentId, CurrentUserId(), ct);
+        return result.IsSuccess ? Ok(new { url = result.Value }) : NotFound(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpDelete("evidence/attachments/{attachmentId:guid}")]
+    public async Task<IActionResult> DeleteEvidenceAttachment(Guid attachmentId, CancellationToken ct)
+    {
+        var result = await _service.DeleteEvidenceAttachmentAsync(attachmentId, CurrentUserId(), ct);
+        return result.IsSuccess ? NoContent() : NotFound(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("{id:guid}/attestations")]
     public async Task<IActionResult> CreateAttestationCampaign(Guid id, [FromBody] ComplianceAttestationCampaignCreateDto dto, CancellationToken ct)
     {

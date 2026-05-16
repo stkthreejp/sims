@@ -76,6 +76,20 @@ public class ComplianceEvidenceDto
     public string? Url { get; set; }
     public string CreatedByName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public IReadOnlyList<ComplianceEvidenceAttachmentDto> Attachments { get; set; } = [];
+}
+
+public class ComplianceEvidenceAttachmentDto
+{
+    public Guid Id { get; set; }
+    public Guid EvidenceId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public long FileSizeBytes { get; set; }
+    public string? Description { get; set; }
+    public Guid UploadedById { get; set; }
+    public string UploadedByName { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
 }
 
 public class ComplianceAttestationCampaignDto

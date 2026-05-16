@@ -68,6 +68,19 @@ export interface ComplianceEvidence {
   url: string | null
   createdByName: string
   createdAt: string
+  attachments: ComplianceEvidenceAttachment[]
+}
+
+export interface ComplianceEvidenceAttachment {
+  id: string
+  evidenceId: string
+  fileName: string
+  contentType: string
+  fileSizeBytes: number
+  description: string | null
+  uploadedById: string
+  uploadedByName: string
+  createdAt: string
 }
 
 export interface ComplianceAttestationCampaign {

@@ -143,13 +143,14 @@ export function ComplianceEvidenceReportPage() {
         <ReportSection title="Evidence Items">
           {document.evidenceItems.length === 0 ? <EmptyText>No evidence items recorded.</EmptyText> : (
             <SimpleTable
-              headers={['Created', 'Type', 'Title', 'Description', 'URL']}
+              headers={['Created', 'Type', 'Title', 'Description', 'URL', 'Attachments']}
               rows={document.evidenceItems.map((evidence) => [
                 formatDateTime(evidence.createdAt),
                 evidence.evidenceType,
                 evidence.title,
                 evidence.description ?? '-',
                 evidence.url ?? '-',
+                evidence.attachments.length === 0 ? '-' : evidence.attachments.map((attachment) => attachment.fileName).join('; '),
               ])}
             />
           )}

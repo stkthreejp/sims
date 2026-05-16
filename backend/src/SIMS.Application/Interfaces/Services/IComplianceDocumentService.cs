@@ -1,5 +1,6 @@
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Compliance;
+using Microsoft.AspNetCore.Http;
 
 namespace SIMS.Application.Interfaces.Services;
 
@@ -20,6 +21,9 @@ public interface IComplianceDocumentService
     Task<Result<ComplianceDocumentDetailDto>> PublishDraftAsync(Guid id, CompliancePublishDto dto, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceDocumentReviewDto>> AddReviewAsync(Guid id, ComplianceReviewCreateDto dto, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceEvidenceDto>> AddEvidenceAsync(Guid id, ComplianceEvidenceCreateDto dto, Guid userId, CancellationToken ct = default);
+    Task<Result<ComplianceEvidenceAttachmentDto>> UploadEvidenceAttachmentAsync(Guid evidenceId, IFormFile file, string? description, Guid userId, CancellationToken ct = default);
+    Task<Result<string>> GetEvidenceAttachmentDownloadUrlAsync(Guid attachmentId, Guid userId, CancellationToken ct = default);
+    Task<Result> DeleteEvidenceAttachmentAsync(Guid attachmentId, Guid userId, CancellationToken ct = default);
     Task<Result<ComplianceVersionCompareDto>> CompareVersionsAsync(Guid id, Guid? fromVersionId = null, Guid? toVersionId = null, CancellationToken ct = default);
     Task<IReadOnlyList<ComplianceAuditLogDto>> GetAuditLogAsync(Guid documentId, CancellationToken ct = default);
     Task<IReadOnlyList<ComplianceAttestationCampaignDto>> GetAttestationCampaignsAsync(Guid? documentId = null, CancellationToken ct = default);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle, Check, FileText, GitCompare, Loader2, Save, Send } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Check, Download, FileText, GitCompare, Loader2, Paperclip, Save, Send, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { usersApi } from '@/api/users.api'
@@ -9,7 +9,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import type { ComplianceAttestationCampaign, ComplianceAttestationRecipient, ComplianceAuditLog } from '@/types/compliance.types'
+import type { ComplianceAttestationCampaign, ComplianceAttestationRecipient, ComplianceAuditLog, ComplianceEvidence, ComplianceEvidenceAttachment } from '@/types/compliance.types'
 import type { User } from '@/types/user.types'
 
 const CATEGORIES = ['IT', 'Security', 'Business Continuity', 'Privacy', 'Operations', 'Vendor Management', 'HR', 'Finance']
@@ -36,6 +36,7 @@ export function ComplianceDocumentDetailPage() {
   const [attestationOpen, setAttestationOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [evidenceUpload, setEvidenceUpload] = useState<ComplianceEvidence | null>(null)
   const [isDirty, setIsDirty] = useState(false)
 
   const documentQuery = useQuery({
@@ -414,9 +415,35 @@ export function ComplianceDocumentDetailPage() {
                   ))}
                   {document.evidenceItems.map((evidence) => (
                     <div key={evidence.id} className="border-b py-3 last:border-0">
-                      <div className="font-medium text-slate-800">{evidence.title}</div>
-                      <div className="mt-1 text-xs text-slate-500">{evidence.evidenceType} · {formatDateTime(evidence.createdAt)}</div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-medium text-slate-800">{evidence.title}</div>
+                          <div className="mt-1 text-xs text-slate-500">{evidence.evidenceType} · {formatDateTime(evidence.createdAt)}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEvidenceUpload(evidence)}
+                          className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          File
+                        </button>
+                      </div>
                       {evidence.description && <div className="mt-2 text-sm text-slate-600">{evidence.description}</div>}
+                      {evidence.attachments.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          {evidence.attachments.map((attachment) => (
+                            <EvidenceAttachmentRow
+                              key={attachment.id}
+                              attachment={attachment}
+                              onChanged={() => {
+                                qc.invalidateQueries({ queryKey: ['compliance-documents', id] })
+                                qc.invalidateQueries({ queryKey: ['compliance-documents', id, 'audit-log'] })
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </>
@@ -482,6 +509,19 @@ export function ComplianceDocumentDetailPage() {
           }}
         />
       )}
+
+      {evidenceUpload && (
+        <EvidenceAttachmentUploadModal
+          evidence={evidenceUpload}
+          onClose={() => setEvidenceUpload(null)}
+          onUploaded={() => {
+            qc.invalidateQueries({ queryKey: ['compliance-documents', id] })
+            qc.invalidateQueries({ queryKey: ['compliance-documents', id, 'audit-log'] })
+            qc.invalidateQueries({ queryKey: ['compliance-documents'] })
+            setEvidenceUpload(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -527,6 +567,56 @@ function HistoryPanel({ title, children }: { title: string; children: React.Reac
       <div className="mb-2 text-sm font-semibold text-slate-800">{title}</div>
       {children}
     </section>
+  )
+}
+
+function EvidenceAttachmentRow({ attachment, onChanged }: { attachment: ComplianceEvidenceAttachment; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const deleteMutation = useMutation({
+    mutationFn: () => complianceDocumentsApi.deleteEvidenceAttachment(attachment.id),
+    onSuccess: () => {
+      toast.success('Evidence file deleted')
+      onChanged()
+    },
+    onError: () => toast.error('Could not delete evidence file'),
+  })
+
+  async function download() {
+    setBusy(true)
+    try {
+      const url = await complianceDocumentsApi.getEvidenceAttachmentDownloadUrl(attachment.id)
+      const link = document.createElement('a')
+      link.href = url
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch {
+      toast.error('Could not get download link')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded border bg-slate-50 px-3 py-2">
+      <div className="min-w-0 flex items-center gap-2">
+        <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium text-slate-700">{attachment.fileName}</div>
+          <div className="text-xs text-slate-500">{formatBytes(attachment.fileSizeBytes)} · {attachment.uploadedByName} · {formatDateTime(attachment.createdAt)}</div>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <button type="button" onClick={download} disabled={busy} className="rounded p-1.5 text-slate-500 hover:bg-white hover:text-blue-700" title="Download">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        </button>
+        <button type="button" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} className="rounded p-1.5 text-slate-500 hover:bg-white hover:text-red-700" title="Delete">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -927,6 +1017,66 @@ function EvidenceModal({
   )
 }
 
+function EvidenceAttachmentUploadModal({
+  evidence,
+  onClose,
+  onUploaded,
+}: {
+  evidence: ComplianceEvidence
+  onClose: () => void
+  onUploaded: () => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [description, setDescription] = useState('')
+  const uploadMutation = useMutation({
+    mutationFn: () => complianceDocumentsApi.uploadEvidenceAttachment(evidence.id, file!, description || null),
+    onSuccess: () => {
+      toast.success('Evidence file uploaded')
+      onUploaded()
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.errorMessage ?? 'Could not upload evidence file'),
+  })
+
+  return (
+    <SimpleModal title="Upload Evidence File" onClose={onClose}>
+      <div className="space-y-4 p-5">
+        <div className="rounded border bg-slate-50 p-3 text-sm text-slate-600">
+          <div className="font-medium text-slate-800">{evidence.title}</div>
+          <div className="mt-1 text-xs text-slate-500">{evidence.evidenceType}</div>
+        </div>
+        <label className="block text-sm font-medium text-slate-700">
+          File
+          <input
+            type="file"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            className="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+          />
+        </label>
+        {file && (
+          <div className="rounded border bg-white p-3 text-sm text-slate-600">
+            {file.name} · {formatBytes(file.size)}
+          </div>
+        )}
+        <label className="block text-sm font-medium text-slate-700">
+          Description
+          <input value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+        </label>
+      </div>
+      <ModalActions onClose={onClose}>
+        <button
+          type="button"
+          onClick={() => uploadMutation.mutate()}
+          disabled={!file || uploadMutation.isPending}
+          className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          Upload
+        </button>
+      </ModalActions>
+    </SimpleModal>
+  )
+}
+
 function SimpleModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
@@ -960,4 +1110,10 @@ function diffClass(kind: 'Same' | 'Added' | 'Removed') {
   if (kind === 'Added') return 'rounded bg-green-100 px-0.5 text-green-900'
   if (kind === 'Removed') return 'rounded bg-red-100 px-0.5 text-red-900 line-through decoration-red-500'
   return ''
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }

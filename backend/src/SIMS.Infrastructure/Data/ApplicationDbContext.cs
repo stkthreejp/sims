@@ -81,6 +81,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<ComplianceDocumentVersion> ComplianceDocumentVersions => Set<ComplianceDocumentVersion>();
     public DbSet<ComplianceDocumentReview> ComplianceDocumentReviews => Set<ComplianceDocumentReview>();
     public DbSet<ComplianceEvidence> ComplianceEvidence => Set<ComplianceEvidence>();
+    public DbSet<ComplianceEvidenceAttachment> ComplianceEvidenceAttachments => Set<ComplianceEvidenceAttachment>();
     public DbSet<ComplianceAttestationCampaign> ComplianceAttestationCampaigns => Set<ComplianceAttestationCampaign>();
     public DbSet<ComplianceAttestationRecipient> ComplianceAttestationRecipients => Set<ComplianceAttestationRecipient>();
     public DbSet<ComplianceAuditLog> ComplianceAuditLogs => Set<ComplianceAuditLog>();
@@ -211,6 +212,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<ComplianceDocumentVersion>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ComplianceDocumentReview>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ComplianceEvidence>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ComplianceEvidenceAttachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ComplianceAttestationCampaign>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ComplianceAttestationRecipient>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ComplianceAuditLog>().HasQueryFilter(e => !e.IsDeleted);
