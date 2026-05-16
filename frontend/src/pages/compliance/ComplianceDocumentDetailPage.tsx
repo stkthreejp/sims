@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle, Check, Download, FileText, GitCompare, Loader2, Paperclip, Save, Send, Trash2, Upload } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Check, Download, FileText, GitCompare, Loader2, Paperclip, Save, Send, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { usersApi } from '@/api/users.api'
@@ -163,27 +163,28 @@ export function ComplianceDocumentDetailPage() {
   const canCompare = !!document.currentPublishedVersion && !!document.currentDraftVersion
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b bg-white px-6 py-3">
+    <div className="flex h-full flex-col" style={{ background: 'var(--surface-2)' }}>
+      <div className="flex flex-wrap items-center gap-3 border-b px-6 py-3" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
         <button
           type="button"
           onClick={() => navigate('/compliance-documentation')}
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900"
+          className="sd-btn ghost sm"
         >
           <ArrowLeft className="h-4 w-4" />
           Compliance
         </button>
-        <div className="h-4 w-px bg-slate-200" />
+        <div className="h-4 w-px" style={{ background: 'var(--line)' }} />
         <input
           value={title}
           onChange={(event) => { setTitle(event.target.value); setIsDirty(true) }}
-          className="min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold text-slate-900 outline-none"
+          className="min-w-[240px] flex-1 border-0 bg-transparent text-sm font-semibold outline-none"
+          style={{ color: 'var(--ink)' }}
         />
         <button
           type="button"
           onClick={() => updateMutation.mutate()}
           disabled={busy || !title.trim()}
-          className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="sd-btn outline sm"
         >
           {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save Details
@@ -192,7 +193,7 @@ export function ComplianceDocumentDetailPage() {
           type="button"
           onClick={() => draftMutation.mutate()}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary sm"
         >
           {draftMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save Draft
@@ -201,7 +202,7 @@ export function ComplianceDocumentDetailPage() {
           type="button"
           onClick={() => publishMutation.mutate()}
           disabled={busy || !document.currentDraftVersion || document.status !== 'Under Review'}
-          className="inline-flex items-center gap-1.5 rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          className="sd-btn success sm"
         >
           {publishMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
           Publish
@@ -209,7 +210,7 @@ export function ComplianceDocumentDetailPage() {
         <button
           type="button"
           onClick={() => navigate(`/compliance-documentation/${document.id}/report`)}
-          className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="sd-btn outline sm"
         >
           <FileText className="h-4 w-4" />
           Report
@@ -217,8 +218,12 @@ export function ComplianceDocumentDetailPage() {
       </div>
 
       <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="overflow-auto border-r bg-slate-50 p-4">
-          <div className="space-y-4">
+        <aside className="overflow-auto border-r p-4" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+          <div className="sd-card">
+            <div className="sd-card-head">
+              <h3>Document Details</h3>
+            </div>
+            <div className="sd-card-body space-y-4">
             <SelectField label="Category" value={category} values={CATEGORIES} onChange={(value) => { setCategory(value); setIsDirty(true) }} />
             <SelectField label="Type" value={documentType} values={TYPES} onChange={(value) => { setDocumentType(value); setIsDirty(true) }} />
             <SelectField label="Status" value={status} values={STATUSES} onChange={(value) => { setStatus(value); setIsDirty(true) }} />
@@ -241,7 +246,7 @@ export function ComplianceDocumentDetailPage() {
                 type="date"
                 value={nextReviewDate}
                 onChange={(event) => { setNextReviewDate(event.target.value); setIsDirty(true) }}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="sims-input mt-1"
               />
             </label>
             <label className="block text-sm font-medium text-slate-700">
@@ -251,7 +256,7 @@ export function ComplianceDocumentDetailPage() {
                 onChange={(event) => { setTagsText(event.target.value); setIsDirty(true) }}
                 rows={3}
                 placeholder="Separate with commas"
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="sims-textarea mt-1"
               />
             </label>
             <label className="block text-sm font-medium text-slate-700">
@@ -261,18 +266,19 @@ export function ComplianceDocumentDetailPage() {
                 onChange={(event) => { setChangeSummary(event.target.value); setIsDirty(true) }}
                 rows={4}
                 placeholder="What changed in this draft?"
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="sims-textarea mt-1"
               />
             </label>
 
-            <div className="rounded border bg-white p-3 text-sm text-slate-600">
-              <div className="font-medium text-slate-800">Review</div>
+            <div className="rounded-lg p-3 text-sm" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
+              <div className="font-medium" style={{ color: 'var(--ink)' }}>Review</div>
               <div className="mt-2">Owner: {document.ownerName ?? '-'}</div>
               <div>Approver: {document.approverName ?? '-'}</div>
               <div className="mt-2">Last reviewed: {formatDate(document.lastReviewedDate)}</div>
               <div>Next review: {formatDate(document.nextReviewDate)}</div>
               <div>Effective: {formatDate(document.effectiveDate)}</div>
-              {isDirty && <div className="mt-2 text-xs text-amber-600">Unsaved changes</div>}
+              {isDirty && <div className="mt-2 text-xs font-medium" style={{ color: 'var(--warn-fg)' }}>Unsaved changes</div>}
+            </div>
             </div>
           </div>
         </aside>
@@ -280,8 +286,8 @@ export function ComplianceDocumentDetailPage() {
         <main className="overflow-auto p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-slate-900">Document Editor</div>
-              <div className="text-xs text-slate-500">
+              <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Document Editor</div>
+              <div className="text-xs" style={{ color: 'var(--ink-4)' }}>
                 Published {document.currentPublishedVersion ? `v${document.currentPublishedVersion.versionNumber}` : 'none'} · Draft {document.currentDraftVersion ? `v${document.currentDraftVersion.versionNumber}` : 'none'}
               </div>
             </div>
@@ -289,25 +295,26 @@ export function ComplianceDocumentDetailPage() {
               type="button"
               onClick={() => setShowCompare((value) => !value)}
               disabled={!canCompare}
-              className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="sd-btn outline"
             >
               <GitCompare className="h-4 w-4" />
               Compare Draft
             </button>
           </div>
 
-          <section className="mb-5 rounded border bg-white p-4">
+          <section className="sd-card mb-5">
+            <div className="sd-card-body">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-900">Review Workflow</div>
-                <div className="mt-1 text-xs text-slate-500">Save a draft, submit it for review, then approve or request changes.</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Review Workflow</div>
+                <div className="mt-1 text-xs" style={{ color: 'var(--ink-4)' }}>Save a draft, submit it for review, then approve or request changes.</div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => submitMutation.mutate()}
                   disabled={busy || !document.currentDraftVersion || document.status === 'Under Review'}
-                  className="inline-flex items-center gap-1.5 rounded border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                  className="sd-btn outline"
                 >
                   <Send className="h-4 w-4" />
                   Submit for Review
@@ -316,27 +323,32 @@ export function ComplianceDocumentDetailPage() {
                   type="button"
                   onClick={() => requireChangesMutation.mutate()}
                   disabled={busy || !document.currentDraftVersion || document.status !== 'Under Review'}
-                  className="inline-flex items-center gap-1.5 rounded border border-amber-200 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                  className="sd-btn outline"
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Require Changes
                 </button>
               </div>
             </div>
+            </div>
           </section>
 
           {showCompare && canCompare && (
-            <section className="mb-5 rounded border bg-white p-4">
-              <div className="mb-3 text-sm font-semibold text-slate-800">Changes from published version</div>
+            <section className="sd-card mb-5">
+              <div className="sd-card-head">
+                <h3>Changes from published version</h3>
+              </div>
+              <div className="sd-card-body">
               {compareQuery.isLoading ? (
                 <LoadingSpinner />
               ) : (
-                <p className="whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                <p className="whitespace-pre-wrap text-sm leading-7" style={{ color: 'var(--ink-2)' }}>
                   {compareQuery.data?.parts.map((part, index) => (
                     <span key={`${part.kind}-${index}`} className={diffClass(part.kind)}>{part.text}</span>
                   ))}
                 </p>
               )}
+              </div>
             </section>
           )}
 
@@ -369,7 +381,7 @@ export function ComplianceDocumentDetailPage() {
                   type="button"
                   onClick={() => setAttestationOpen(true)}
                   disabled={!document.currentPublishedVersion}
-                  className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="sd-btn primary sm"
                 >
                   Launch Campaign
                 </button>
@@ -390,14 +402,14 @@ export function ComplianceDocumentDetailPage() {
                 <button
                   type="button"
                   onClick={() => setReviewOpen(true)}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="sd-btn outline sm"
                 >
                   Mark Reviewed
                 </button>
                 <button
                   type="button"
                   onClick={() => setEvidenceOpen(true)}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="sd-btn outline sm"
                 >
                   Add Evidence
                 </button>
@@ -423,7 +435,7 @@ export function ComplianceDocumentDetailPage() {
                         <button
                           type="button"
                           onClick={() => setEvidenceUpload(evidence)}
-                          className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          className="sd-btn outline sm"
                         >
                           <Upload className="h-3.5 w-3.5" />
                           File
@@ -533,7 +545,7 @@ function SelectField({ label, value, values, onChange }: { label: string; value:
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+        className="sims-select mt-1"
       >
         {values.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -548,7 +560,7 @@ function UserSelectField({ label, value, users, onChange }: { label: string; val
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+        className="sims-select mt-1"
       >
         <option value="">Unassigned</option>
         {users.map((user) => (
@@ -563,9 +575,13 @@ function UserSelectField({ label, value, users, onChange }: { label: string; val
 
 function HistoryPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded border bg-white p-4">
-      <div className="mb-2 text-sm font-semibold text-slate-800">{title}</div>
-      {children}
+    <section className="sd-card">
+      <div className="sd-card-head">
+        <h3>{title}</h3>
+      </div>
+      <div className="sd-card-body">
+        {children}
+      </div>
     </section>
   )
 }
@@ -600,7 +616,7 @@ function EvidenceAttachmentRow({ attachment, onChanged }: { attachment: Complian
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded border bg-slate-50 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
       <div className="min-w-0 flex items-center gap-2">
         <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
         <div className="min-w-0">
@@ -609,10 +625,10 @@ function EvidenceAttachmentRow({ attachment, onChanged }: { attachment: Complian
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button type="button" onClick={download} disabled={busy} className="rounded p-1.5 text-slate-500 hover:bg-white hover:text-blue-700" title="Download">
+        <button type="button" onClick={download} disabled={busy} className="sims-icon-btn" title="Download">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         </button>
-        <button type="button" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} className="rounded p-1.5 text-slate-500 hover:bg-white hover:text-red-700" title="Delete">
+        <button type="button" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} className="sims-icon-btn" title="Delete">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
@@ -738,13 +754,13 @@ function SubmitAttestationModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-      <div className="w-full max-w-lg rounded border bg-white shadow-xl">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">Complete Attestation</h2>
+      <div className="sd-card w-full max-w-lg overflow-hidden">
+        <div className="sims-modal-head px-5 py-4">
+          <h2 className="sims-modal-title">Complete Attestation</h2>
           <p className="mt-1 text-sm text-slate-500">{campaign.documentTitle} v{campaign.versionNumber}</p>
         </div>
         <div className="space-y-4 p-5">
-          <div className="rounded border bg-slate-50 p-3 text-sm leading-6 text-slate-700">{campaign.statement}</div>
+          <div className="rounded-lg p-3 text-sm leading-6" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}>{campaign.statement}</div>
           <div className="text-sm text-slate-600">Recipient: {recipient.userName || recipient.email}</div>
           <label className="block text-sm font-medium text-slate-700">
             Comment
@@ -752,20 +768,20 @@ function SubmitAttestationModal({
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               rows={3}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="sims-textarea mt-1"
               placeholder="Optional"
             />
           </label>
         </div>
-        <div className="flex justify-end gap-2 border-t px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <div className="sims-modal-foot flex justify-end gap-2 px-5 py-4">
+          <button type="button" onClick={onClose} className="sd-btn outline">
             Cancel
           </button>
           <button
             type="button"
             onClick={() => submitMutation.mutate('Declined')}
             disabled={submitMutation.isPending}
-            className="rounded border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            className="sd-btn danger"
           >
             Decline
           </button>
@@ -773,7 +789,7 @@ function SubmitAttestationModal({
             type="button"
             onClick={() => submitMutation.mutate('Attested')}
             disabled={submitMutation.isPending}
-            className="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            className="sd-btn success"
           >
             Attest
           </button>
@@ -832,27 +848,27 @@ function AttestationModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-      <div className="w-full max-w-2xl rounded border bg-white shadow-xl">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">Launch Attestation</h2>
+      <div className="sd-card w-full max-w-2xl overflow-hidden">
+        <div className="sims-modal-head px-5 py-4">
+          <h2 className="sims-modal-title">Launch Attestation</h2>
           <p className="mt-1 text-sm text-slate-500">Recipients attest to the exact published version.</p>
         </div>
         <div className="space-y-4 p-5">
           <label className="block text-sm font-medium text-slate-700">
             Campaign Name
-            <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+            <input value={name} onChange={(event) => setName(event.target.value)} className="sims-input mt-1" />
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Statement
-            <textarea value={statement} onChange={(event) => setStatement(event.target.value)} rows={3} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+            <textarea value={statement} onChange={(event) => setStatement(event.target.value)} rows={3} className="sims-textarea mt-1" />
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Due Date
-            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="sims-input mt-1" />
           </label>
           <div>
             <div className="mb-2 text-sm font-medium text-slate-700">Recipients</div>
-            <div className="max-h-56 overflow-auto rounded border">
+            <div className="max-h-56 overflow-auto rounded-lg" style={{ border: '1px solid var(--line)' }}>
               {usersQuery.isLoading ? (
                 <div className="p-4"><LoadingSpinner /></div>
               ) : users.length === 0 ? (
@@ -877,15 +893,15 @@ function AttestationModal({
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <div className="sims-modal-foot flex justify-end gap-2 px-5 py-4">
+          <button type="button" onClick={onClose} className="sd-btn outline">
             Cancel
           </button>
           <button
             type="button"
             onClick={() => createMutation.mutate()}
             disabled={!canSubmit || createMutation.isPending}
-            className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="sd-btn primary"
           >
             Launch Campaign
           </button>
@@ -937,11 +953,11 @@ function ReviewModal({
         <SelectField label="Review Status" value={status} values={['Completed', 'Needs Update']} onChange={setStatus} />
         <label className="block text-sm font-medium text-slate-700">
           Next Review Date
-          <input type="date" value={nextReviewDate} onChange={(event) => setNextReviewDate(event.target.value)} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+          <input type="date" value={nextReviewDate} onChange={(event) => setNextReviewDate(event.target.value)} className="sims-input mt-1" />
         </label>
         <label className="block text-sm font-medium text-slate-700">
           Notes
-          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} className="sims-textarea mt-1" />
         </label>
       </div>
       <ModalActions onClose={onClose}>
@@ -949,7 +965,7 @@ function ReviewModal({
           type="button"
           onClick={() => reviewMutation.mutate()}
           disabled={reviewMutation.isPending}
-          className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary"
         >
           Save Review
         </button>
@@ -991,16 +1007,16 @@ function EvidenceModal({
       <div className="space-y-4 p-5">
         <label className="block text-sm font-medium text-slate-700">
           Title
-          <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+          <input value={title} onChange={(event) => setTitle(event.target.value)} className="sims-input mt-1" />
         </label>
         <SelectField label="Evidence Type" value={evidenceType} values={['Note', 'Link', 'Test Result', 'Training Record', 'Vendor Review', 'Exercise']} onChange={setEvidenceType} />
         <label className="block text-sm font-medium text-slate-700">
           URL
-          <input value={url} onChange={(event) => setUrl(event.target.value)} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+          <input value={url} onChange={(event) => setUrl(event.target.value)} className="sims-input mt-1" />
         </label>
         <label className="block text-sm font-medium text-slate-700">
           Description
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} className="sims-textarea mt-1" />
         </label>
       </div>
       <ModalActions onClose={onClose}>
@@ -1008,7 +1024,7 @@ function EvidenceModal({
           type="button"
           onClick={() => evidenceMutation.mutate()}
           disabled={!title.trim() || evidenceMutation.isPending}
-          className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary"
         >
           Add Evidence
         </button>
@@ -1040,26 +1056,26 @@ function EvidenceAttachmentUploadModal({
   return (
     <SimpleModal title="Upload Evidence File" onClose={onClose}>
       <div className="space-y-4 p-5">
-        <div className="rounded border bg-slate-50 p-3 text-sm text-slate-600">
-          <div className="font-medium text-slate-800">{evidence.title}</div>
-          <div className="mt-1 text-xs text-slate-500">{evidence.evidenceType}</div>
+        <div className="rounded-lg p-3 text-sm" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
+          <div className="font-medium" style={{ color: 'var(--ink)' }}>{evidence.title}</div>
+          <div className="mt-1 text-xs" style={{ color: 'var(--ink-4)' }}>{evidence.evidenceType}</div>
         </div>
         <label className="block text-sm font-medium text-slate-700">
           File
           <input
             type="file"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+            className="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
           />
         </label>
         {file && (
-          <div className="rounded border bg-white p-3 text-sm text-slate-600">
+          <div className="rounded-lg p-3 text-sm" style={{ border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink-3)' }}>
             {file.name} · {formatBytes(file.size)}
           </div>
         )}
         <label className="block text-sm font-medium text-slate-700">
           Description
-          <input value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+          <input value={description} onChange={(event) => setDescription(event.target.value)} className="sims-input mt-1" />
         </label>
       </div>
       <ModalActions onClose={onClose}>
@@ -1067,7 +1083,7 @@ function EvidenceAttachmentUploadModal({
           type="button"
           onClick={() => uploadMutation.mutate()}
           disabled={!file || uploadMutation.isPending}
-          className="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary"
         >
           {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           Upload
@@ -1080,10 +1096,10 @@ function EvidenceAttachmentUploadModal({
 function SimpleModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-      <div className="w-full max-w-xl rounded border bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button type="button" onClick={onClose} className="text-sm text-slate-500 hover:text-slate-900">Close</button>
+      <div className="sd-card w-full max-w-xl overflow-hidden">
+        <div className="sims-modal-head flex items-center justify-between px-5 py-4">
+          <h2 className="sims-modal-title">{title}</h2>
+          <button type="button" onClick={onClose} className="sims-icon-btn" title="Close"><X className="h-4 w-4" /></button>
         </div>
         {children}
       </div>
@@ -1093,8 +1109,8 @@ function SimpleModal({ title, onClose, children }: { title: string; onClose: () 
 
 function ModalActions({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="flex justify-end gap-2 border-t px-5 py-4">
-      <button type="button" onClick={onClose} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+    <div className="sims-modal-foot flex justify-end gap-2 px-5 py-4">
+      <button type="button" onClick={onClose} className="sd-btn outline">
         Cancel
       </button>
       {children}
