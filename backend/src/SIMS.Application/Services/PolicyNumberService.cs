@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SIMS.Application.Common;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
@@ -28,46 +29,59 @@ public class PolicyNumberService : IPolicyNumberService
         if (assignment == null)
             return await GenerateLegacyNumberAsync();
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var ownsTransaction = _db.Database.CurrentTransaction == null;
+        IDbContextTransaction? transaction = null;
 
-        var sequence = await _db.Set<PolicyNumberSequence>()
-            .FirstOrDefaultAsync(s => s.Id == assignment.PolicyNumberSequenceId && s.IsActive);
-
-        if (sequence == null)
-            return Result<PolicyNumberGenerationResult>.Failure("POLICY_NUMBER_SEQUENCE_NOT_FOUND", "The assigned policy number sequence is inactive or missing.");
-
-        ResetAnnualSequenceIfNeeded(sequence, quote.EffectiveDate.Year);
-
-        var sequenceValue = sequence.NextNumber;
-        var baseNumber = BuildBaseNumber(sequence.Format, sequenceValue, quote, state);
-        var termNumber = 1;
-        var fullNumber = baseNumber + BuildTermSuffix(sequence.TermSuffixFormat, termNumber);
-
-        sequence.NextNumber++;
-
-        _db.Set<PolicyNumberSequenceUsage>().Add(new PolicyNumberSequenceUsage
+        try
         {
-            PolicyNumberSequenceId = sequence.Id,
-            PolicyNumberAssignmentId = assignment.Id,
-            QuoteId = quote.Id,
-            BasePolicyNumber = baseNumber,
-            FullPolicyNumber = fullNumber,
-            SequenceValue = sequenceValue,
-            TermNumber = termNumber,
-            AssignedById = assignedById,
-            AssignedAt = DateTime.UtcNow,
-        });
+            if (ownsTransaction)
+                transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-        await _db.SaveChangesAsync();
-        await transaction.CommitAsync();
+            var sequence = await _db.Set<PolicyNumberSequence>()
+                .FirstOrDefaultAsync(s => s.Id == assignment.PolicyNumberSequenceId && s.IsActive);
 
-        return Result<PolicyNumberGenerationResult>.Success(new PolicyNumberGenerationResult(
-            fullNumber,
-            baseNumber,
-            termNumber,
-            sequence.Id,
-            assignment.Id,
-            sequenceValue));
+            if (sequence == null)
+                return Result<PolicyNumberGenerationResult>.Failure("POLICY_NUMBER_SEQUENCE_NOT_FOUND", "The assigned policy number sequence is inactive or missing.");
+
+            ResetAnnualSequenceIfNeeded(sequence, quote.EffectiveDate.Year);
+
+            var sequenceValue = sequence.NextNumber;
+            var baseNumber = BuildBaseNumber(sequence.Format, sequenceValue, quote, state);
+            var termNumber = 1;
+            var fullNumber = baseNumber + BuildTermSuffix(sequence.TermSuffixFormat, termNumber);
+
+            sequence.NextNumber++;
+
+            _db.Set<PolicyNumberSequenceUsage>().Add(new PolicyNumberSequenceUsage
+            {
+                PolicyNumberSequenceId = sequence.Id,
+                PolicyNumberAssignmentId = assignment.Id,
+                QuoteId = quote.Id,
+                BasePolicyNumber = baseNumber,
+                FullPolicyNumber = fullNumber,
+                SequenceValue = sequenceValue,
+                TermNumber = termNumber,
+                AssignedById = assignedById,
+                AssignedAt = DateTime.UtcNow,
+            });
+
+            await _db.SaveChangesAsync();
+            if (transaction != null)
+                await transaction.CommitAsync();
+
+            return Result<PolicyNumberGenerationResult>.Success(new PolicyNumberGenerationResult(
+                fullNumber,
+                baseNumber,
+                termNumber,
+                sequence.Id,
+                assignment.Id,
+                sequenceValue));
+        }
+        finally
+        {
+            if (transaction != null)
+                await transaction.DisposeAsync();
+        }
     }
 
     private async Task<PolicyNumberAssignment?> FindAssignmentAsync(Guid carrierId, PolicyLineOfBusiness lob, string? state)
