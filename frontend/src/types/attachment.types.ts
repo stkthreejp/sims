@@ -39,6 +39,8 @@ export type DocumentType =
   // Shared
   | 'Correspondence'
   | 'Other'
+  | 'PolicyPacketPreview'
+  | 'IssuedPolicyPacket'
 
 export interface Attachment {
   id: string
@@ -94,6 +96,8 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   // Shared
   Correspondence: 'Correspondence',
   Other: 'Other',
+  PolicyPacketPreview: 'Policy Packet Preview',
+  IssuedPolicyPacket: 'Issued Policy Packet',
 }
 
 export const DOCUMENT_TYPES_BY_ENTITY: Record<DocumentEntityType, DocumentType[]> = {
@@ -103,7 +107,7 @@ export const DOCUMENT_TYPES_BY_ENTITY: Record<DocumentEntityType, DocumentType[]
     'ProposalQuoteLetter', 'Declination', 'UnderwritingMemo', 'Correspondence', 'Other',
   ],
   Policy: [
-    'DeclarationsPage', 'PolicyForm', 'Endorsement', 'Binder', 'CertificateOfInsurance',
+    'IssuedPolicyPacket', 'PolicyPacketPreview', 'DeclarationsPage', 'PolicyForm', 'Endorsement', 'Binder', 'CertificateOfInsurance',
     'Invoice', 'PremiumFinanceAgreement', 'Audit', 'InspectionSurvey',
     'CancellationNonRenewal', 'Correspondence', 'Other',
   ],

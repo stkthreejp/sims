@@ -140,7 +140,8 @@ export function PolicyDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', id] })
       qc.invalidateQueries({ queryKey: ['policies', id, 'issuance-packet'] })
-      toast.success('Policy marked issued')
+      qc.invalidateQueries({ queryKey: ['attachments', 'Policy', policy?.boundQuoteId] })
+      toast.success('Policy issued and final packet filed')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be issued'),
   })
@@ -150,7 +151,7 @@ export function PolicyDetailPage() {
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['attachments', 'Policy', policy?.boundQuoteId] })
       window.open(result.url, '_blank', 'noopener,noreferrer')
-      toast.success('Policy packet preview generated')
+      toast.success('Draft policy packet preview filed')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy packet preview could not be generated'),
   })

@@ -44,6 +44,8 @@ public enum DocumentType
     // ── Shared ────────────────────────────────────────────────────────────────
     Correspondence,
     Other,
+    PolicyPacketPreview,
+    IssuedPolicyPacket,
 }
 
 public enum DocumentEntityType
