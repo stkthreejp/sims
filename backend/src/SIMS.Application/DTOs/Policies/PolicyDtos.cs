@@ -69,14 +69,39 @@ public class PolicyTransactionDto
     public PolicyTransactionStatus Status { get; set; }
     public string TransactionNumber { get; set; } = string.Empty;
     public DateOnly EffectiveDate { get; set; }
+    public DateOnly? ExpirationDate { get; set; }
+    public Guid? SourceQuoteId { get; set; }
+    public Guid? RenewalQuoteId { get; set; }
+    public Guid? PriorPolicyVersionId { get; set; }
+    public Guid? ResultingPolicyVersionId { get; set; }
+    public Guid? RequestedById { get; set; }
+    public DateTime? RequestedAt { get; set; }
+    public Guid? ReviewedById { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public Guid? ApprovedById { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public Guid? IssuedById { get; set; }
+    public DateTime? IssuedAt { get; set; }
+    public Guid? CompletedById { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public string? ReasonCode { get; set; }
+    public string? ReasonText { get; set; }
     public string? EndorsementDescription { get; set; }
     public Guid? PriorPolicyId { get; set; }
     public string? CancellationReason { get; set; }
     public string? CancellationMethod { get; set; }
     public IReadOnlyList<CancellationComplianceChecklistItemDto> CancellationComplianceChecklist { get; set; } = [];
     public string? CancellationLegalRequirementSnapshotJson { get; set; }
+    public decimal? PremiumBefore { get; set; }
     public decimal PremiumChange { get; set; }
     public decimal NewTotalPremium { get; set; }
+    public decimal? PremiumAfter { get; set; }
+    public decimal? TaxesAndFeesDelta { get; set; }
+    public decimal? CommissionDelta { get; set; }
+    public string? BillingModeSnapshot { get; set; }
+    public string? ExternalReference { get; set; }
+    public Guid? VoidsPolicyTransactionId { get; set; }
+    public Guid? ReversesPolicyTransactionId { get; set; }
     public string ProcessedByName { get; set; } = string.Empty;
     public DateTime ProcessedAt { get; set; }
     public string? Notes { get; set; }

@@ -83,6 +83,7 @@ public class PolicyTransactionLifecycleService : IPolicyTransactionLifecycleServ
 
     public async Task<Result> RecordCreatedAsync(PolicyTransaction transaction, Guid userId, string? notes = null)
     {
+        StampStatusMetadata(transaction, transaction.Status, userId);
         await RecordHistoryAndEventAsync(transaction, null, transaction.Status, "policy.transaction.created", userId, notes);
         await RecordHistoryAndEventAsync(transaction, null, transaction.Status, GetEventName(transaction.Status), userId, notes);
         await _db.SaveChangesAsync();
@@ -104,12 +105,44 @@ public class PolicyTransactionLifecycleService : IPolicyTransactionLifecycleServ
 
         transaction.Status = toStatus;
         transaction.UpdatedAt = DateTime.UtcNow;
+        StampStatusMetadata(transaction, toStatus, userId);
         await RecordHistoryAndEventAsync(transaction, fromStatus, toStatus, GetEventName(toStatus), userId, notes);
         await _db.SaveChangesAsync();
         return Result.Success();
     }
 
     private static string GetEventName(PolicyTransactionStatus status) => StatusEvents[status];
+
+    private static void StampStatusMetadata(PolicyTransaction transaction, PolicyTransactionStatus status, Guid userId)
+    {
+        var now = DateTime.UtcNow;
+        transaction.RequestedById ??= userId;
+        transaction.RequestedAt ??= now;
+
+        switch (status)
+        {
+            case PolicyTransactionStatus.InReview:
+            case PolicyTransactionStatus.Referred:
+                transaction.ReviewedById ??= userId;
+                transaction.ReviewedAt ??= now;
+                break;
+            case PolicyTransactionStatus.Approved:
+            case PolicyTransactionStatus.Quoted:
+            case PolicyTransactionStatus.Accepted:
+            case PolicyTransactionStatus.Bound:
+                transaction.ApprovedById ??= userId;
+                transaction.ApprovedAt ??= now;
+                break;
+            case PolicyTransactionStatus.Issued:
+                transaction.IssuedById ??= userId;
+                transaction.IssuedAt ??= now;
+                break;
+            case PolicyTransactionStatus.Completed:
+                transaction.CompletedById ??= userId;
+                transaction.CompletedAt ??= now;
+                break;
+        }
+    }
 
     private async Task RecordHistoryAndEventAsync(
         PolicyTransaction transaction,

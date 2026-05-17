@@ -112,14 +112,39 @@ export interface PolicyTransaction {
   status: PolicyTransactionStatus
   transactionNumber: string
   effectiveDate: string
+  expirationDate: string | null
+  sourceQuoteId: string | null
+  renewalQuoteId: string | null
+  priorPolicyVersionId: string | null
+  resultingPolicyVersionId: string | null
+  requestedById: string | null
+  requestedAt: string | null
+  reviewedById: string | null
+  reviewedAt: string | null
+  approvedById: string | null
+  approvedAt: string | null
+  issuedById: string | null
+  issuedAt: string | null
+  completedById: string | null
+  completedAt: string | null
+  reasonCode: string | null
+  reasonText: string | null
   endorsementDescription: string | null
   priorPolicyId: string | null
   cancellationReason: string | null
   cancellationMethod: string | null
   cancellationComplianceChecklist: CancellationComplianceChecklistItem[]
   cancellationLegalRequirementSnapshotJson: string | null
+  premiumBefore: number | null
   premiumChange: number
   newTotalPremium: number
+  premiumAfter: number | null
+  taxesAndFeesDelta: number | null
+  commissionDelta: number | null
+  billingModeSnapshot: string | null
+  externalReference: string | null
+  voidsPolicyTransactionId: string | null
+  reversesPolicyTransactionId: string | null
   processedByName: string
   processedAt: string
   notes: string | null

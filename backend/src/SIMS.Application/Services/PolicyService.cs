@@ -181,16 +181,24 @@ public class PolicyService : IPolicyService
             policy.BoundQuote.UpdatedAt = DateTime.UtcNow;
         }
 
+        var newBusinessTxn = policy.Transactions
+            .Where(t => t.TransactionType == TransactionType.NewBusiness)
+            .OrderByDescending(t => t.ProcessedAt)
+            .FirstOrDefault();
+
         if (!string.IsNullOrWhiteSpace(dto.Notes))
         {
-            var newBusinessTxn = policy.Transactions
-                .Where(t => t.TransactionType == TransactionType.NewBusiness)
-                .OrderByDescending(t => t.ProcessedAt)
-                .FirstOrDefault();
             if (newBusinessTxn != null)
                 newBusinessTxn.Notes = string.IsNullOrWhiteSpace(newBusinessTxn.Notes)
                     ? dto.Notes.Trim()
                     : $"{newBusinessTxn.Notes}\n{dto.Notes.Trim()}";
+        }
+
+        if (newBusinessTxn != null)
+        {
+            var transitionResult = await _transactionLifecycle.TransitionAsync(newBusinessTxn, PolicyTransactionStatus.Completed, access.UserId, "Policy issued.");
+            if (!transitionResult.IsSuccess)
+                return Result<PolicyDto>.Failure(transitionResult.ErrorCode ?? "STATUS_TRANSITION_FAILED", transitionResult.ErrorMessage ?? "Policy transaction could not be completed.");
         }
 
         await Db.SaveChangesAsync();
@@ -366,9 +374,15 @@ public class PolicyService : IPolicyService
             Status = PolicyTransactionStatus.Submitted,
             TransactionNumber = txnNumber,
             EffectiveDate = dto.EffectiveDate,
+            SourceQuoteId = policy.BoundQuoteId,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            PremiumBefore = policy.TotalPremium,
             PremiumChange = dto.PremiumChange,
             NewTotalPremium = policy.TotalPremium + dto.PremiumChange,
+            PremiumAfter = policy.TotalPremium + dto.PremiumChange,
             EndorsementDescription = dto.EndorsementDescription,
+            ReasonText = dto.EndorsementDescription,
             Notes = dto.Notes,
             ProcessedById = access.UserId,
             ProcessedAt = DateTime.UtcNow,
@@ -407,9 +421,12 @@ public class PolicyService : IPolicyService
         if (dto.EffectiveDate.HasValue) txn.EffectiveDate = dto.EffectiveDate.Value;
         if (dto.PremiumChange.HasValue)
         {
+            txn.PremiumBefore ??= txn.Policy.TotalPremium;
             txn.PremiumChange = dto.PremiumChange.Value;
             txn.NewTotalPremium = txn.Policy.TotalPremium + dto.PremiumChange.Value;
+            txn.PremiumAfter = txn.NewTotalPremium;
         }
+        txn.PremiumAfter ??= txn.NewTotalPremium;
 
         var transitionResult = await _transactionLifecycle.TransitionAsync(txn, PolicyTransactionStatus.Issued, access.UserId, "Endorsement issued.");
         if (!transitionResult.IsSuccess)
@@ -479,7 +496,35 @@ public class PolicyService : IPolicyService
             MedicalPaymentsLimit = source?.MedicalPaymentsLimit,
         };
 
-        return await quoteService.CreateAsync(renewalDto, access.UserId);
+        var renewalResult = await quoteService.CreateAsync(renewalDto, access.UserId);
+        if (!renewalResult.IsSuccess || renewalResult.Value == null)
+            return renewalResult;
+
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            TransactionType = TransactionType.Renewal,
+            Status = PolicyTransactionStatus.Submitted,
+            TransactionNumber = await GenerateTransactionNumberAsync(),
+            EffectiveDate = policy.ExpirationDate,
+            ExpirationDate = policy.ExpirationDate.AddYears(1),
+            PriorPolicyId = policy.Id,
+            SourceQuoteId = policy.BoundQuoteId,
+            RenewalQuoteId = renewalResult.Value.Id,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            PremiumBefore = policy.TotalPremium,
+            PremiumChange = 0m,
+            NewTotalPremium = policy.TotalPremium,
+            PremiumAfter = policy.TotalPremium,
+            ProcessedById = access.UserId,
+            ProcessedAt = DateTime.UtcNow,
+        };
+        Db.Set<PolicyTransaction>().Add(transaction);
+        await Db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Renewal transaction submitted.");
+
+        return renewalResult;
     }
 
     public async Task<Result<PolicyDto>> CancelAsync(Guid policyId, CancelPolicyDto dto, UserAccessScope access)
@@ -523,6 +568,7 @@ public class PolicyService : IPolicyService
             r.LastVerifiedAt
         }).ToList();
 
+        var premiumBefore = policy.TotalPremium;
         policy.Status = PolicyStatus.Cancelled;
         policy.CancelledDate = dto.CancelledDate;
         policy.TotalPremium += dto.PremiumChange;
@@ -531,16 +577,25 @@ public class PolicyService : IPolicyService
         var cancellationTransaction = new PolicyTransaction
         {
             PolicyId = policy.Id,
+            Policy = policy,
             TransactionType = TransactionType.Cancellation,
             Status = PolicyTransactionStatus.Issued,
             TransactionNumber = await GenerateTransactionNumberAsync(),
             EffectiveDate = dto.CancelledDate,
+            SourceQuoteId = policy.BoundQuoteId,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            IssuedById = access.UserId,
+            IssuedAt = DateTime.UtcNow,
+            ReasonText = dto.Reason.Trim(),
             CancellationReason = dto.Reason.Trim(),
             CancellationMethod = string.IsNullOrWhiteSpace(dto.Method) ? "Written Notice" : dto.Method.Trim(),
             CancellationComplianceChecklistJson = JsonSerializer.Serialize(dto.ComplianceChecklist),
             CancellationLegalRequirementSnapshotJson = JsonSerializer.Serialize(legalSnapshot),
+            PremiumBefore = premiumBefore,
             PremiumChange = dto.PremiumChange,
             NewTotalPremium = policy.TotalPremium,
+            PremiumAfter = policy.TotalPremium,
             ProcessedById = access.UserId,
             ProcessedAt = DateTime.UtcNow,
             Notes = dto.Notes
@@ -569,7 +624,31 @@ public class PolicyService : IPolicyService
         policy.Status = PolicyStatus.NonRenewed;
         policy.NonRenewedDate = dto.NonRenewedDate;
         policy.UpdatedAt = DateTime.UtcNow;
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            Policy = policy,
+            TransactionType = TransactionType.NonRenewal,
+            Status = PolicyTransactionStatus.Completed,
+            TransactionNumber = await GenerateTransactionNumberAsync(),
+            EffectiveDate = dto.NonRenewedDate,
+            SourceQuoteId = policy.BoundQuoteId,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            CompletedById = access.UserId,
+            CompletedAt = DateTime.UtcNow,
+            ReasonText = dto.Reason?.Trim(),
+            PremiumBefore = policy.TotalPremium,
+            PremiumChange = 0m,
+            NewTotalPremium = policy.TotalPremium,
+            PremiumAfter = policy.TotalPremium,
+            ProcessedById = access.UserId,
+            ProcessedAt = DateTime.UtcNow,
+            Notes = dto.Reason,
+        };
+        Db.Set<PolicyTransaction>().Add(transaction);
         await Db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Non-renewal transaction completed.");
 
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
@@ -790,14 +869,39 @@ public class PolicyService : IPolicyService
         Status = t.Status,
         TransactionNumber = t.TransactionNumber,
         EffectiveDate = t.EffectiveDate,
+        ExpirationDate = t.ExpirationDate,
+        SourceQuoteId = t.SourceQuoteId,
+        RenewalQuoteId = t.RenewalQuoteId,
+        PriorPolicyVersionId = t.PriorPolicyVersionId,
+        ResultingPolicyVersionId = t.ResultingPolicyVersionId,
+        RequestedById = t.RequestedById,
+        RequestedAt = t.RequestedAt,
+        ReviewedById = t.ReviewedById,
+        ReviewedAt = t.ReviewedAt,
+        ApprovedById = t.ApprovedById,
+        ApprovedAt = t.ApprovedAt,
+        IssuedById = t.IssuedById,
+        IssuedAt = t.IssuedAt,
+        CompletedById = t.CompletedById,
+        CompletedAt = t.CompletedAt,
+        ReasonCode = t.ReasonCode,
+        ReasonText = t.ReasonText,
         EndorsementDescription = t.EndorsementDescription,
         PriorPolicyId = t.PriorPolicyId,
         CancellationReason = t.CancellationReason,
         CancellationMethod = t.CancellationMethod,
         CancellationComplianceChecklist = DeserializeChecklist(t.CancellationComplianceChecklistJson),
         CancellationLegalRequirementSnapshotJson = t.CancellationLegalRequirementSnapshotJson,
+        PremiumBefore = t.PremiumBefore,
         PremiumChange = t.PremiumChange,
         NewTotalPremium = t.NewTotalPremium,
+        PremiumAfter = t.PremiumAfter,
+        TaxesAndFeesDelta = t.TaxesAndFeesDelta,
+        CommissionDelta = t.CommissionDelta,
+        BillingModeSnapshot = t.BillingModeSnapshot,
+        ExternalReference = t.ExternalReference,
+        VoidsPolicyTransactionId = t.VoidsPolicyTransactionId,
+        ReversesPolicyTransactionId = t.ReversesPolicyTransactionId,
         ProcessedByName = t.ProcessedBy != null
             ? $"{t.ProcessedBy.FirstName} {t.ProcessedBy.LastName}".Trim()
             : "",

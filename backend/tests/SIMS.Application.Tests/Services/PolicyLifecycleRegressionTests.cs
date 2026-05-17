@@ -132,6 +132,45 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task IssuePolicy_CompletesNewBusinessTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        await SeedReadyPolicyFormsAsync(db, fixture.Quote);
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.NewBusiness,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = "TXN-ISSUE-1",
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            PremiumChange = fixture.Policy.TotalPremium,
+            NewTotalPremium = fixture.Policy.TotalPremium,
+            ProcessedById = fixture.UserId,
+        };
+        db.Add(transaction);
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.IssueAsync(fixture.Policy.Id, new IssuePolicyDto
+        {
+            IssuedDate = new DateOnly(2026, 1, 5),
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(new DateOnly(2026, 1, 5), fixture.Policy.IssuedDate);
+        Assert.Equal(PolicyTransactionStatus.Completed, transaction.Status);
+        Assert.Equal(fixture.UserId, transaction.CompletedById);
+        Assert.NotNull(transaction.CompletedAt);
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal("policy.transaction.completed", Assert.Single(history).EventName);
+    }
+
+    [Fact]
     public async Task Endorsement_CanBeCreatedAndIssued()
     {
         await using var db = CreateDb();
@@ -246,6 +285,21 @@ public class PolicyLifecycleRegressionTests
         Assert.True(result.IsSuccess);
         Assert.Equal(PolicyStatus.NonRenewed, fixture.Policy.Status);
         Assert.Equal(nonRenewedDate, fixture.Policy.NonRenewedDate);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
+        Assert.Equal(PolicyTransactionStatus.Completed, transaction.Status);
+        Assert.Equal(nonRenewedDate, transaction.EffectiveDate);
+        Assert.Equal("Carrier appetite change", transaction.ReasonText);
+        Assert.Equal(fixture.Policy.BoundQuoteId, transaction.SourceQuoteId);
+        Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumBefore);
+        Assert.Equal(fixture.Policy.TotalPremium, transaction.NewTotalPremium);
+        Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumAfter);
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.completed" },
+            history.Select(h => h.EventName).ToArray());
     }
 
     [Fact]
@@ -265,6 +319,22 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(fixture.Policy.ExpirationDate, request.EffectiveDate);
         Assert.Equal(fixture.Policy.ExpirationDate.AddYears(1), request.ExpirationDate);
         Assert.Equal(fixture.Policy.PremiumAmount, request.PremiumAmount);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.Renewal);
+        Assert.Equal(PolicyTransactionStatus.Submitted, transaction.Status);
+        Assert.Equal(fixture.Policy.ExpirationDate, transaction.EffectiveDate);
+        Assert.Equal(fixture.Policy.Id, transaction.PriorPolicyId);
+        Assert.Equal(fixture.Policy.BoundQuoteId, transaction.SourceQuoteId);
+        Assert.Equal(result.Value!.Id, transaction.RenewalQuoteId);
+        Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumBefore);
+        Assert.Equal(0m, transaction.PremiumChange);
+        Assert.Equal(fixture.Policy.TotalPremium, transaction.NewTotalPremium);
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.submitted" },
+            history.Select(h => h.EventName).ToArray());
     }
 
     [Fact]
@@ -410,6 +480,31 @@ public class PolicyLifecycleRegressionTests
         db.AddRange(quoteFixture.User, quoteFixture.Carrier, quoteFixture.Insured, quoteFixture.Submission, quoteFixture.Quote, policy);
         await db.SaveChangesAsync();
         return new PolicyFixture(quoteFixture.UserId, quoteFixture.Insured, quoteFixture.Submission, quoteFixture.Quote, policy);
+    }
+
+    private static async Task SeedReadyPolicyFormsAsync(ApplicationDbContext db, Quote quote)
+    {
+        var template = new PolicyFormTemplate
+        {
+            Id = Guid.NewGuid(),
+            FormNumber = "PF-ISSUE",
+            Name = "Issuance Form",
+            FileName = "issuance.pdf",
+            StoragePath = "forms/issuance.pdf",
+        };
+        var selection = new QuotePolicyFormSelection
+        {
+            Id = Guid.NewGuid(),
+            QuoteId = quote.Id,
+            Quote = quote,
+            PolicyFormTemplateId = template.Id,
+            PolicyFormTemplate = template,
+            IsIncluded = true,
+            SequenceOrder = 1,
+        };
+
+        db.AddRange(template, selection);
+        await db.SaveChangesAsync();
     }
 
     private static QuoteFixture CreateQuoteFixture(string insuredName)
