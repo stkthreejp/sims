@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using Ganss.Xss;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -16,20 +17,35 @@ public class ComplianceDocumentService : IComplianceDocumentService
 {
     private const string ReviewTaskTypeName = "Review Compliance Document";
 
-    private readonly IServiceProvider _sp;
+    private readonly DbContext _db;
+    private readonly IBlobStorageService _blob;
+    private readonly IFileScanService _fileScan;
+    private readonly IHtmlToPdfService _htmlToPdf;
     private readonly long _maxFileSize;
+    private readonly int _reviewTaskLeadDays;
     private readonly HashSet<string> _allowedExtensions;
     private readonly Dictionary<string, string> _contentTypesByExtension;
+    private static readonly HtmlSanitizer _sanitizer = BuildSanitizer();
 
-    private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
-    private IBlobStorageService Blob => (IBlobStorageService)_sp.GetService(typeof(IBlobStorageService))!;
-    private IFileScanService FileScan => (IFileScanService)_sp.GetService(typeof(IFileScanService))!;
-    private IHtmlToPdfService HtmlToPdf => (IHtmlToPdfService)_sp.GetService(typeof(IHtmlToPdfService))!;
+    // Keep shorthand aliases so the rest of the file doesn't need to change
+    private DbContext Db => _db;
+    private IBlobStorageService Blob => _blob;
+    private IFileScanService FileScan => _fileScan;
+    private IHtmlToPdfService HtmlToPdf => _htmlToPdf;
 
-    public ComplianceDocumentService(IServiceProvider sp, IConfiguration config)
+    public ComplianceDocumentService(
+        DbContext db,
+        IBlobStorageService blob,
+        IFileScanService fileScan,
+        IHtmlToPdfService htmlToPdf,
+        IConfiguration config)
     {
-        _sp = sp;
+        _db = db;
+        _blob = blob;
+        _fileScan = fileScan;
+        _htmlToPdf = htmlToPdf;
         _maxFileSize = long.TryParse(config["Storage:MaxFileSizeBytes"], out var parsed) ? parsed : 52_428_800L;
+        _reviewTaskLeadDays = int.TryParse(config["Compliance:ReviewTaskLeadDays"], out var leadDays) ? leadDays : 7;
         _allowedExtensions = (config.GetSection("Storage:AllowedExtensions").Get<string[]>()
                 ?? [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt", ".csv", ".html"])
             .Select(e => e.StartsWith('.') ? e.ToLowerInvariant() : $".{e.ToLowerInvariant()}")
@@ -48,6 +64,25 @@ public class ComplianceDocumentService : IComplianceDocumentService
             [".csv"] = "text/csv",
             [".html"] = "text/html",
         };
+    }
+
+    private static HtmlSanitizer BuildSanitizer()
+    {
+        var s = new HtmlSanitizer();
+        // Allow the full set of tags TipTap can produce
+        s.AllowedTags.UnionWith([
+            "h1", "h2", "h3", "h4", "h5", "h6",
+            "p", "br", "hr", "blockquote", "pre", "code",
+            "ul", "ol", "li",
+            "table", "thead", "tbody", "tr", "th", "td",
+            "strong", "em", "u", "s", "mark", "sub", "sup",
+            "a", "img",
+            "div", "span",
+        ]);
+        s.AllowedAttributes.UnionWith(["href", "src", "alt", "title", "class", "style", "colspan", "rowspan"]);
+        s.AllowedSchemes.Add("https");
+        s.AllowedSchemes.Add("http");
+        return s;
     }
 
     public async Task<ComplianceDocumentSummaryDto> GetSummaryAsync(CancellationToken ct = default)
@@ -129,13 +164,14 @@ public class ComplianceDocumentService : IComplianceDocumentService
             Status = "Draft",
         };
 
+        var safeHtml = SanitizeHtml(dto.HtmlContent);
         var version = new ComplianceDocumentVersion
         {
             Document = document,
             VersionNumber = 1,
             Status = "Draft",
-            HtmlContent = string.IsNullOrWhiteSpace(dto.HtmlContent) ? "<p></p>" : dto.HtmlContent,
-            PlainText = ToPlainText(dto.HtmlContent),
+            HtmlContent = safeHtml,
+            PlainText = ToPlainText(safeHtml),
             CreatedById = userId,
             EffectiveDate = dto.EffectiveDate,
         };
@@ -205,8 +241,9 @@ public class ComplianceDocumentService : IComplianceDocumentService
             document.CurrentDraftVersion = draft;
         }
 
-        draft.HtmlContent = string.IsNullOrWhiteSpace(dto.HtmlContent) ? "<p></p>" : dto.HtmlContent;
-        draft.PlainText = ToPlainText(dto.HtmlContent);
+        var safeHtml = SanitizeHtml(dto.HtmlContent);
+        draft.HtmlContent = safeHtml;
+        draft.PlainText = ToPlainText(safeHtml);
         draft.ChangeSummary = dto.ChangeSummary?.Trim();
         document.Status = "Draft";
         AddAudit(document.Id, draft.Id, "DraftSaved", null, null, draft.ChangeSummary, null, userId);
@@ -303,6 +340,10 @@ public class ComplianceDocumentService : IComplianceDocumentService
             return Result<ComplianceDocumentReviewDto>.Failure("NOT_FOUND", "Compliance document not found.");
 
         var reviewedAt = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (dto.NextReviewDate.HasValue && dto.NextReviewDate.Value <= reviewedAt)
+            return Result<ComplianceDocumentReviewDto>.Failure("VALIDATION", "Next review date must be in the future.");
+
         var nextReviewDate = dto.NextReviewDate ?? CalculateNextReviewDate(reviewedAt, document.ReviewCadence);
         var review = new ComplianceDocumentReview
         {
@@ -822,7 +863,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
             AssignedUserId = document.ApproverId.Value,
             Status = TaskInstanceStatus.Open,
             Priority = taskType.DefaultPriority,
-            DueDate = DateTime.UtcNow.AddDays(7),
+            DueDate = DateTime.UtcNow.AddDays(_reviewTaskLeadDays),
             ReferenceUrl = $"/compliance-documentation/{document.Id}",
         };
 
@@ -1019,4 +1060,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
 
         parts.Add(new ComplianceDiffPartDto { Text = text, Kind = kind });
     }
+
+    private static string SanitizeHtml(string? html) =>
+        string.IsNullOrWhiteSpace(html) ? "<p></p>" : _sanitizer.Sanitize(html);
 }

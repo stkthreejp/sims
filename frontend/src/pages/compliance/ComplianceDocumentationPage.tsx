@@ -7,6 +7,7 @@ import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { EmptyState } from '@/components/common/EmptyState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { useDebounce } from '@/hooks/useDebounce'
 import { formatDate } from '@/lib/utils'
 
 const ALL = 'All'
@@ -21,6 +22,7 @@ export function ComplianceDocumentationPage() {
   const [category, setCategory] = useState(ALL)
   const [search, setSearch] = useState('')
   const [metricFilter, setMetricFilter] = useState<MetricFilter>('All')
+  const debouncedSearch = useDebounce(search, 300)
 
   const summaryQuery = useQuery({
     queryKey: ['compliance-documents', 'summary'],
@@ -28,11 +30,11 @@ export function ComplianceDocumentationPage() {
   })
 
   const documentsQuery = useQuery({
-    queryKey: ['compliance-documents', { status, category, search }],
+    queryKey: ['compliance-documents', { status, category, search: debouncedSearch }],
     queryFn: () => complianceDocumentsApi.getAll({
       status: status === ALL ? undefined : status,
       category: category === ALL ? undefined : category,
-      search: search.trim() || undefined,
+      search: debouncedSearch.trim() || undefined,
     }),
   })
 
