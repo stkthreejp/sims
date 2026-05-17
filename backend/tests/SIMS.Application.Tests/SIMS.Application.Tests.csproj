@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\SIMS.Application\SIMS.Application.csproj" />
+    <ProjectReference Include="..\..\src\SIMS.Infrastructure\SIMS.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
