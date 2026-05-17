@@ -256,6 +256,7 @@ public class PolicyNumberServiceTests
             modelBuilder.Entity<Policy>().Ignore(p => p.BoundQuote);
             modelBuilder.Entity<Policy>().Ignore(p => p.Carrier);
             modelBuilder.Entity<Policy>().Ignore(p => p.Transactions);
+            modelBuilder.Entity<Policy>().Ignore(p => p.Versions);
             modelBuilder.Entity<PolicyNumberSequenceUsage>().Ignore(u => u.Quote);
             modelBuilder.Entity<PolicyNumberSequenceUsage>().Ignore(u => u.Policy);
             modelBuilder.Entity<PolicyNumberSequenceUsage>().Ignore(u => u.AssignedBy);

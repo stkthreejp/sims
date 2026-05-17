@@ -64,6 +64,34 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteBind_CreatesInitialPolicyVersionAndLinksTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess);
+        var policy = await db.Set<Policy>().SingleAsync();
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync();
+        var version = await db.Set<PolicyVersion>().SingleAsync();
+        Assert.Equal(policy.Id, version.PolicyId);
+        Assert.Equal(1, version.VersionNumber);
+        Assert.Null(version.PriorPolicyVersionId);
+        Assert.Equal(transaction.Id, version.CreatedByPolicyTransactionId);
+        Assert.Equal(version.Id, transaction.ResultingPolicyVersionId);
+        Assert.Null(transaction.PriorPolicyVersionId);
+        Assert.Equal(policy.EffectiveDate, version.EffectiveDate);
+        Assert.Equal(policy.ExpirationDate, version.ExpirationDate);
+        Assert.Equal(PolicyStatus.Active, version.Status);
+        Assert.Equal(policy.PremiumAmount, version.PremiumAmount);
+        Assert.Equal(policy.TaxesAndFees, version.TaxesAndFees);
+        Assert.Equal(policy.TotalPremium, version.TotalPremium);
+        Assert.Contains("IncludedFormCount", version.ExposureSnapshotJson);
+    }
+
+    [Fact]
     public async Task QuoteBind_LocksLatestRatingSnapshot()
     {
         await using var db = CreateDb();
@@ -202,6 +230,16 @@ public class PolicyLifecycleRegressionTests
         var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.Id == createResult.Value.Id);
         Assert.Equal(PolicyTransactionStatus.Issued, transaction.Status);
         Assert.Equal(1125m, transaction.Policy.TotalPremium);
+        var versions = await db.Set<PolicyVersion>()
+            .Where(v => v.PolicyId == fixture.Policy.Id)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(1000m, versions[0].TotalPremium);
+        Assert.Equal(1125m, versions[1].TotalPremium);
+        Assert.Equal(versions[0].Id, versions[1].PriorPolicyVersionId);
+        Assert.Equal(versions[0].Id, transaction.PriorPolicyVersionId);
+        Assert.Equal(versions[1].Id, transaction.ResultingPolicyVersionId);
         var history = await db.Set<PolicyTransactionStatusHistory>()
             .Where(h => h.PolicyTransactionId == transaction.Id)
             .OrderBy(h => h.ChangedAt)
@@ -258,6 +296,16 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(PolicyTransactionStatus.Issued, transaction.Status);
         Assert.Contains("notice", transaction.CancellationComplianceChecklistJson);
         Assert.Contains("Send written notice before cancellation.", transaction.CancellationLegalRequirementSnapshotJson);
+        var versions = await db.Set<PolicyVersion>()
+            .Where(v => v.PolicyId == fixture.Policy.Id)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(PolicyStatus.Active, versions[0].Status);
+        Assert.Equal(PolicyStatus.Cancelled, versions[1].Status);
+        Assert.Equal(versions[0].Id, versions[1].PriorPolicyVersionId);
+        Assert.Equal(versions[0].Id, transaction.PriorPolicyVersionId);
+        Assert.Equal(versions[1].Id, transaction.ResultingPolicyVersionId);
         var history = await db.Set<PolicyTransactionStatusHistory>()
             .Where(h => h.PolicyTransactionId == transaction.Id)
             .OrderBy(h => h.ChangedAt)
@@ -293,6 +341,16 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumBefore);
         Assert.Equal(fixture.Policy.TotalPremium, transaction.NewTotalPremium);
         Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumAfter);
+        var versions = await db.Set<PolicyVersion>()
+            .Where(v => v.PolicyId == fixture.Policy.Id)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(PolicyStatus.Active, versions[0].Status);
+        Assert.Equal(PolicyStatus.NonRenewed, versions[1].Status);
+        Assert.Equal(versions[0].Id, versions[1].PriorPolicyVersionId);
+        Assert.Equal(versions[0].Id, transaction.PriorPolicyVersionId);
+        Assert.Equal(versions[1].Id, transaction.ResultingPolicyVersionId);
         var history = await db.Set<PolicyTransactionStatusHistory>()
             .Where(h => h.PolicyTransactionId == transaction.Id)
             .OrderBy(h => h.ChangedAt)
@@ -395,7 +453,8 @@ public class PolicyLifecycleRegressionTests
             new NoOpAgentCommissionService(),
             new NoOpQuoteChecklistService(),
             new StubPolicyNumberService(),
-            new PolicyTransactionLifecycleService(db, workflow));
+            new PolicyTransactionLifecycleService(db, workflow),
+            new PolicyVersionService(db));
     }
 
     private static PolicyService CreatePolicyService(
@@ -415,7 +474,7 @@ public class PolicyLifecycleRegressionTests
             .AddSingleton(quoteService)
             .BuildServiceProvider();
 
-        return new PolicyService(services, invoicing, new RecordingVoidService(), new PolicyTransactionLifecycleService(db, workflow));
+        return new PolicyService(services, invoicing, new RecordingVoidService(), new PolicyTransactionLifecycleService(db, workflow), new PolicyVersionService(db));
     }
 
     private static QuoteBindDto BindRequest() => new()

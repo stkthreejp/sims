@@ -30,4 +30,5 @@ public class Policy : BaseEntity
     public Quote BoundQuote { get; set; } = null!;
     public Carrier Carrier { get; set; } = null!;
     public ICollection<PolicyTransaction> Transactions { get; set; } = new List<PolicyTransaction>();
+    public ICollection<PolicyVersion> Versions { get; set; } = new List<PolicyVersion>();
 }

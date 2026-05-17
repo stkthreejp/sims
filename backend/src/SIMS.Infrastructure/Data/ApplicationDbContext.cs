@@ -29,6 +29,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<Policy> Policies => Set<Policy>();
+    public DbSet<PolicyVersion> PolicyVersions => Set<PolicyVersion>();
     public DbSet<PolicyNumberSequence> PolicyNumberSequences => Set<PolicyNumberSequence>();
     public DbSet<PolicyNumberAssignment> PolicyNumberAssignments => Set<PolicyNumberAssignment>();
     public DbSet<PolicyNumberSequenceUsage> PolicyNumberSequenceUsages => Set<PolicyNumberSequenceUsage>();
@@ -164,6 +165,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Submission>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Quote>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Policy>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyVersion>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyNumberSequence>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyNumberAssignment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyNumberSequenceUsage>().HasQueryFilter(e => !e.IsDeleted);

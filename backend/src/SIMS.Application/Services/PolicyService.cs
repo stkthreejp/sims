@@ -19,6 +19,7 @@ public class PolicyService : IPolicyService
     private readonly IInvoicingService _invoicing;
     private readonly IVoidService _voids;
     private readonly IPolicyTransactionLifecycleService _transactionLifecycle;
+    private readonly IPolicyVersionService _policyVersions;
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
@@ -26,12 +27,14 @@ public class PolicyService : IPolicyService
         IServiceProvider sp,
         IInvoicingService invoicing,
         IVoidService voids,
-        IPolicyTransactionLifecycleService transactionLifecycle)
+        IPolicyTransactionLifecycleService transactionLifecycle,
+        IPolicyVersionService policyVersions)
     {
         _sp = sp;
         _invoicing = invoicing;
         _voids = voids;
         _transactionLifecycle = transactionLifecycle;
+        _policyVersions = policyVersions;
     }
 
     public async Task<PagedResult<PolicyListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -428,11 +431,13 @@ public class PolicyService : IPolicyService
         }
         txn.PremiumAfter ??= txn.NewTotalPremium;
 
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(txn.Policy, access.UserId);
         var transitionResult = await _transactionLifecycle.TransitionAsync(txn, PolicyTransactionStatus.Issued, access.UserId, "Endorsement issued.");
         if (!transitionResult.IsSuccess)
             return Result<PolicyTransactionDto>.Failure(transitionResult.ErrorCode ?? "STATUS_TRANSITION_FAILED", transitionResult.ErrorMessage ?? "Endorsement status could not be updated.");
 
         txn.Policy.TotalPremium = txn.NewTotalPremium;
+        await _policyVersions.CreateVersionAsync(txn.Policy, txn, priorVersion, access.UserId);
         await Db.SaveChangesAsync();
 
         // Auto-create invoice
@@ -569,6 +574,7 @@ public class PolicyService : IPolicyService
         }).ToList();
 
         var premiumBefore = policy.TotalPremium;
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
         policy.Status = PolicyStatus.Cancelled;
         policy.CancelledDate = dto.CancelledDate;
         policy.TotalPremium += dto.PremiumChange;
@@ -603,6 +609,7 @@ public class PolicyService : IPolicyService
         Db.Set<PolicyTransaction>().Add(cancellationTransaction);
 
         await Db.SaveChangesAsync();
+        await _policyVersions.CreateVersionAsync(policy, cancellationTransaction, priorVersion, access.UserId);
         await _transactionLifecycle.RecordCreatedAsync(cancellationTransaction, access.UserId, "Cancellation transaction issued.");
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
@@ -621,6 +628,7 @@ public class PolicyService : IPolicyService
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can be non-renewed.");
 
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
         policy.Status = PolicyStatus.NonRenewed;
         policy.NonRenewedDate = dto.NonRenewedDate;
         policy.UpdatedAt = DateTime.UtcNow;
@@ -648,6 +656,7 @@ public class PolicyService : IPolicyService
         };
         Db.Set<PolicyTransaction>().Add(transaction);
         await Db.SaveChangesAsync();
+        await _policyVersions.CreateVersionAsync(policy, transaction, priorVersion, access.UserId);
         await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Non-renewal transaction completed.");
 
         return Result<PolicyDto>.Success(MapToDto(policy));
