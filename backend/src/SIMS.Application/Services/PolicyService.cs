@@ -18,14 +18,20 @@ public class PolicyService : IPolicyService
     private readonly IServiceProvider _sp;
     private readonly IInvoicingService _invoicing;
     private readonly IVoidService _voids;
+    private readonly IPolicyTransactionLifecycleService _transactionLifecycle;
 
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
 
-    public PolicyService(IServiceProvider sp, IInvoicingService invoicing, IVoidService voids)
+    public PolicyService(
+        IServiceProvider sp,
+        IInvoicingService invoicing,
+        IVoidService voids,
+        IPolicyTransactionLifecycleService transactionLifecycle)
     {
         _sp = sp;
         _invoicing = invoicing;
         _voids = voids;
+        _transactionLifecycle = transactionLifecycle;
     }
 
     public async Task<PagedResult<PolicyListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -370,6 +376,7 @@ public class PolicyService : IPolicyService
 
         Db.Set<PolicyTransaction>().Add(txn);
         await Db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(txn, access.UserId, "Endorsement transaction submitted.");
         await Db.Entry(txn).Reference(t => t.ProcessedBy).LoadAsync();
 
         return Result<PolicyTransactionDto>.Success(MapToTransactionDto(txn));
@@ -396,8 +403,6 @@ public class PolicyService : IPolicyService
         if (txn == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Endorsement not found.");
         if (txn.TransactionType != TransactionType.Endorsement)
             return Result<PolicyTransactionDto>.Failure("INVALID_TYPE", "Transaction is not an endorsement.");
-        if (txn.Status != PolicyTransactionStatus.Submitted)
-            return Result<PolicyTransactionDto>.Failure("ALREADY_ISSUED", "Endorsement is already issued.");
 
         if (dto.EffectiveDate.HasValue) txn.EffectiveDate = dto.EffectiveDate.Value;
         if (dto.PremiumChange.HasValue)
@@ -406,7 +411,10 @@ public class PolicyService : IPolicyService
             txn.NewTotalPremium = txn.Policy.TotalPremium + dto.PremiumChange.Value;
         }
 
-        txn.Status = PolicyTransactionStatus.Issued;
+        var transitionResult = await _transactionLifecycle.TransitionAsync(txn, PolicyTransactionStatus.Issued, access.UserId, "Endorsement issued.");
+        if (!transitionResult.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(transitionResult.ErrorCode ?? "STATUS_TRANSITION_FAILED", transitionResult.ErrorMessage ?? "Endorsement status could not be updated.");
+
         txn.Policy.TotalPremium = txn.NewTotalPremium;
         await Db.SaveChangesAsync();
 
@@ -520,7 +528,7 @@ public class PolicyService : IPolicyService
         policy.TotalPremium += dto.PremiumChange;
         policy.UpdatedAt = DateTime.UtcNow;
 
-        Db.Set<PolicyTransaction>().Add(new PolicyTransaction
+        var cancellationTransaction = new PolicyTransaction
         {
             PolicyId = policy.Id,
             TransactionType = TransactionType.Cancellation,
@@ -536,9 +544,11 @@ public class PolicyService : IPolicyService
             ProcessedById = access.UserId,
             ProcessedAt = DateTime.UtcNow,
             Notes = dto.Notes
-        });
+        };
+        Db.Set<PolicyTransaction>().Add(cancellationTransaction);
 
         await Db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(cancellationTransaction, access.UserId, "Cancellation transaction issued.");
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
 

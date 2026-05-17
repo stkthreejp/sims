@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
-import { POLICY_STATUS_LABELS } from '@/types/policy.types'
+import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
 import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
@@ -710,8 +710,8 @@ function TransactionRows({ transaction: t }: { transaction: PolicyTransaction })
         <td className="id">{t.transactionNumber}</td>
         <td>{t.transactionType}</td>
         <td>
-          <span className={`sd-pill ${t.status === 'Issued' ? 'bound' : 'inprogress'}`}>
-            {t.status}
+          <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[t.status]}`}>
+            {POLICY_TRANSACTION_STATUS_LABELS[t.status]}
           </span>
         </td>
         <td>{formatDate(t.effectiveDate)}</td>

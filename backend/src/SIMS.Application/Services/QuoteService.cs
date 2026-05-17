@@ -18,6 +18,7 @@ public class QuoteService : IQuoteService
     private readonly IAgentCommissionService _agentCommissions;
     private readonly IQuoteChecklistService _checklist;
     private readonly IPolicyNumberService _policyNumbers;
+    private readonly IPolicyTransactionLifecycleService _transactionLifecycle;
 
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
@@ -28,7 +29,8 @@ public class QuoteService : IQuoteService
         ICarrierCommissionService carrierCommissions,
         IAgentCommissionService agentCommissions,
         IQuoteChecklistService checklist,
-        IPolicyNumberService policyNumbers)
+        IPolicyNumberService policyNumbers,
+        IPolicyTransactionLifecycleService transactionLifecycle)
     {
         _sp = sp;
         _workflowEngine = workflowEngine;
@@ -36,6 +38,7 @@ public class QuoteService : IQuoteService
         _agentCommissions = agentCommissions;
         _checklist = checklist;
         _policyNumbers = policyNumbers;
+        _transactionLifecycle = transactionLifecycle;
     }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -359,6 +362,7 @@ public class QuoteService : IQuoteService
         };
         Db.Set<PolicyTransaction>().Add(transaction);
         await Db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "New business transaction created during quote bind.");
 
         // Auto-create invoice
         var invoicing = (IInvoicingService)_sp.GetService(typeof(IInvoicingService))!;

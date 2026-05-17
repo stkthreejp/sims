@@ -54,6 +54,13 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(PolicyTransactionStatus.Issued, transaction.Status);
         Assert.Equal(fixture.Quote.TotalPremium, transaction.PremiumChange);
         Assert.Equal(fixture.Quote.TotalPremium, transaction.NewTotalPremium);
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.issued" },
+            history.Select(h => h.EventName).ToArray());
     }
 
     [Fact]
@@ -156,6 +163,13 @@ public class PolicyLifecycleRegressionTests
         var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.Id == createResult.Value.Id);
         Assert.Equal(PolicyTransactionStatus.Issued, transaction.Status);
         Assert.Equal(1125m, transaction.Policy.TotalPremium);
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.submitted", "policy.transaction.issued" },
+            history.Select(h => h.EventName).ToArray());
         var invoiceRequest = Assert.Single(invoicing.BindRequests);
         Assert.True(invoiceRequest.IsEndorsement);
         Assert.Equal(transaction.Id, invoiceRequest.PolicyTransactionId);
@@ -205,6 +219,13 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(PolicyTransactionStatus.Issued, transaction.Status);
         Assert.Contains("notice", transaction.CancellationComplianceChecklistJson);
         Assert.Contains("Send written notice before cancellation.", transaction.CancellationLegalRequirementSnapshotJson);
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.issued" },
+            history.Select(h => h.EventName).ToArray());
         Assert.Equal(PolicyStatus.Cancelled, fixture.Policy.Status);
     }
 
@@ -286,8 +307,12 @@ public class PolicyLifecycleRegressionTests
         return new ApplicationDbContext(options);
     }
 
-    private static QuoteService CreateQuoteService(ApplicationDbContext db, RecordingInvoicingService invoicing)
+    private static QuoteService CreateQuoteService(
+        ApplicationDbContext db,
+        RecordingInvoicingService invoicing,
+        RecordingWorkflowEngineService? workflow = null)
     {
+        workflow ??= new RecordingWorkflowEngineService();
         var services = new ServiceCollection()
             .AddSingleton<DbContext>(db)
             .AddSingleton<IInvoicingService>(invoicing)
@@ -295,21 +320,24 @@ public class PolicyLifecycleRegressionTests
 
         return new QuoteService(
             services,
-            new NoOpWorkflowEngineService(),
+            workflow,
             new NoOpCarrierCommissionService(),
             new NoOpAgentCommissionService(),
             new NoOpQuoteChecklistService(),
-            new StubPolicyNumberService());
+            new StubPolicyNumberService(),
+            new PolicyTransactionLifecycleService(db, workflow));
     }
 
     private static PolicyService CreatePolicyService(
         ApplicationDbContext db,
         RecordingInvoicingService invoicing,
         RecordingPolicyAssemblyService? assembly = null,
-        IQuoteService? quoteService = null)
+        IQuoteService? quoteService = null,
+        RecordingWorkflowEngineService? workflow = null)
     {
         assembly ??= new RecordingPolicyAssemblyService();
         quoteService ??= new RecordingQuoteService(db);
+        workflow ??= new RecordingWorkflowEngineService();
         var services = new ServiceCollection()
             .AddSingleton<DbContext>(db)
             .AddSingleton<IQuotePolicyFormSelectionService>(new NoOpQuotePolicyFormSelectionService())
@@ -317,7 +345,7 @@ public class PolicyLifecycleRegressionTests
             .AddSingleton(quoteService)
             .BuildServiceProvider();
 
-        return new PolicyService(services, invoicing, new RecordingVoidService());
+        return new PolicyService(services, invoicing, new RecordingVoidService(), new PolicyTransactionLifecycleService(db, workflow));
     }
 
     private static QuoteBindDto BindRequest() => new()
@@ -578,10 +606,15 @@ public class PolicyLifecycleRegressionTests
             => throw new NotSupportedException();
     }
 
-    private sealed class NoOpWorkflowEngineService : IWorkflowEngineService
+    private sealed class RecordingWorkflowEngineService : IWorkflowEngineService
     {
+        public List<(string EventName, Guid EntityId)> Events { get; } = [];
+
         public Task FireEventAsync(string eventName, TaskEntityType entityType, Guid entityId, Dictionary<string, object> context)
-            => Task.CompletedTask;
+        {
+            Events.Add((eventName, entityId));
+            return Task.CompletedTask;
+        }
 
         public Task FireStepCompletedAsync(Guid completedStepId, TaskEntityType entityType, Guid entityId, Dictionary<string, object> context)
             => Task.CompletedTask;

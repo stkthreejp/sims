@@ -33,6 +33,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<PolicyNumberAssignment> PolicyNumberAssignments => Set<PolicyNumberAssignment>();
     public DbSet<PolicyNumberSequenceUsage> PolicyNumberSequenceUsages => Set<PolicyNumberSequenceUsage>();
     public DbSet<PolicyTransaction> PolicyTransactions => Set<PolicyTransaction>();
+    public DbSet<PolicyTransactionStatusHistory> PolicyTransactionStatusHistory => Set<PolicyTransactionStatusHistory>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<QuoteUWWriteup> QuoteUWWriteups => Set<QuoteUWWriteup>();
@@ -167,6 +168,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<PolicyNumberAssignment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyNumberSequenceUsage>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransaction>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyTransactionStatusHistory>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Note>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<DocumentTemplate>().HasQueryFilter(e => !e.IsDeleted);

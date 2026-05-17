@@ -36,6 +36,60 @@ export const POLICY_STATUS_COLORS: Record<PolicyStatus, string> = {
   Cancelled: 'bg-red-100 text-red-700',
 }
 
+export const POLICY_TRANSACTION_STATUS_LABELS: Record<PolicyTransactionStatus, string> = {
+  Submitted: 'Submitted',
+  Issued: 'Issued',
+  InReview: 'In Review',
+  Referred: 'Referred',
+  Approved: 'Approved',
+  Quoted: 'Quoted',
+  Accepted: 'Accepted',
+  Bound: 'Bound',
+  NoticePending: 'Notice Pending',
+  NoticeSent: 'Notice Sent',
+  PendingEffectiveDate: 'Pending Effective Date',
+  Completed: 'Completed',
+  Declined: 'Declined',
+  Withdrawn: 'Withdrawn',
+  Voided: 'Voided',
+}
+
+export const POLICY_TRANSACTION_STATUS_PILL: Record<PolicyTransactionStatus, string> = {
+  Submitted: 'inprogress',
+  Issued: 'bound',
+  InReview: 'inprogress',
+  Referred: 'warning',
+  Approved: 'quoted',
+  Quoted: 'quoted',
+  Accepted: 'quoted',
+  Bound: 'bound',
+  NoticePending: 'warning',
+  NoticeSent: 'warning',
+  PendingEffectiveDate: 'inprogress',
+  Completed: 'bound',
+  Declined: 'danger',
+  Withdrawn: 'draft',
+  Voided: 'danger',
+}
+
+export const POLICY_TRANSACTION_STATUS_META: Record<PolicyTransactionStatus, { owner: string; meaning: string; isTerminal: boolean }> = {
+  Submitted: { owner: 'Underwriting', meaning: 'Entered and awaiting review or processing.', isTerminal: false },
+  Issued: { owner: 'Operations', meaning: 'Issued and ready for financial processing.', isTerminal: false },
+  InReview: { owner: 'Underwriting', meaning: 'Actively being reviewed.', isTerminal: false },
+  Referred: { owner: 'Senior Underwriting', meaning: 'Outside straight-through authority and awaiting referral approval.', isTerminal: false },
+  Approved: { owner: 'Underwriting Authority', meaning: 'Approved to proceed.', isTerminal: false },
+  Quoted: { owner: 'Underwriting', meaning: 'Financial impact calculated and presented.', isTerminal: false },
+  Accepted: { owner: 'Insured or Producer', meaning: 'Terms accepted but not fully bound or issued.', isTerminal: false },
+  Bound: { owner: 'Underwriting', meaning: 'Coverage bound and ready for issuance/accounting.', isTerminal: false },
+  NoticePending: { owner: 'Compliance', meaning: 'Required legal notice identified but not sent.', isTerminal: false },
+  NoticeSent: { owner: 'Compliance', meaning: 'Required notice sent; awaiting effective date or final action.', isTerminal: false },
+  PendingEffectiveDate: { owner: 'Operations', meaning: 'Waiting for effective date.', isTerminal: false },
+  Completed: { owner: 'Operations', meaning: 'Fully complete with no further action expected.', isTerminal: true },
+  Declined: { owner: 'Underwriting', meaning: 'Declined and cannot proceed.', isTerminal: true },
+  Withdrawn: { owner: 'Producer or Insured', meaning: 'Withdrawn before completion.', isTerminal: true },
+  Voided: { owner: 'Operations', meaning: 'Voided and not active business.', isTerminal: true },
+}
+
 export interface PolicyListItem {
   id: string
   policyNumber: string
