@@ -3,11 +3,17 @@ using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace SIMS.Application.Services;
 
 public class PolicyVersionService : IPolicyVersionService
 {
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
+
     private readonly DbContext _db;
 
     public PolicyVersionService(DbContext db)
@@ -106,23 +112,156 @@ public class PolicyVersionService : IPolicyVersionService
             CarrierCommissionRate = quote?.EffectiveCarrierRate,
             SMMRetentionRate = quote?.EffectiveSMMRate,
             AgentCommissionRate = quote?.EffectiveAgentRate,
-        });
+        }, SnapshotJsonOptions);
     }
 
     private async Task<string> BuildExposureSnapshotJsonAsync(Policy policy, CancellationToken ct)
     {
         var submissionId = policy.SubmissionId;
-        var includedFormCount = await _db.Set<QuotePolicyFormSelection>()
-            .CountAsync(f => f.QuoteId == policy.BoundQuoteId && f.IsIncluded && !f.IsDeleted, ct);
+        var locations = await _db.Set<SubmissionLocation>()
+            .Where(l => l.SubmissionId == submissionId && !l.IsDeleted)
+            .OrderBy(l => l.LocationNumber)
+            .Select(l => new
+            {
+                l.Id,
+                l.LocationNumber,
+                l.Address,
+                l.ZipCode,
+            })
+            .ToListAsync(ct);
+
+        var drivers = await _db.Set<SubmissionDriver>()
+            .Where(d => d.SubmissionId == submissionId && !d.IsDeleted)
+            .OrderBy(d => d.DriverNumber)
+            .Select(d => new
+            {
+                d.Id,
+                d.DriverNumber,
+                d.Name,
+                d.DateOfBirth,
+                d.LicenseNumber,
+                d.LicenseState,
+                d.DateHired,
+            })
+            .ToListAsync(ct);
+
+        var vehicles = await _db.Set<SubmissionVehicle>()
+            .Where(v => v.SubmissionId == submissionId && !v.IsDeleted)
+            .OrderBy(v => v.UnitNumber)
+            .Select(v => new
+            {
+                v.Id,
+                v.UnitNumber,
+                v.Year,
+                v.Make,
+                v.Model,
+                v.Vin,
+                v.Gvw,
+                v.VehicleClass,
+                v.GaragingZip,
+                v.Radius,
+                v.ApdVehicleClass,
+                v.ApdRoadType,
+                v.ApdAnnualMiles,
+                v.ApdOperationCode,
+                v.ApdState,
+                v.ApdStatedValue,
+                v.ApdCompDeductible,
+                v.ApdCollDeductible,
+            })
+            .ToListAsync(ct);
+
+        var equipment = await _db.Set<SubmissionEquipment>()
+            .Where(e => e.SubmissionId == submissionId && !e.IsDeleted)
+            .OrderBy(e => e.ItemNumber)
+            .Select(e => new
+            {
+                e.Id,
+                e.ItemNumber,
+                e.Year,
+                e.Make,
+                e.Model,
+                e.Description,
+                e.SerialNumber,
+                e.Value,
+                e.EquipmentTypeId,
+                e.TerritoryCode,
+                e.Deductible,
+                e.SettlementBasis,
+            })
+            .ToListAsync(ct);
+
+        var additionalInterests = await _db.Set<SubmissionAdditionalInterest>()
+            .Where(i => i.SubmissionId == submissionId && !i.IsDeleted)
+            .OrderBy(i => i.Name)
+            .Select(i => new
+            {
+                i.Id,
+                i.LineOfBusiness,
+                i.Name,
+                i.AddressLine1,
+                i.AddressLine2,
+                i.City,
+                i.State,
+                i.ZipCode,
+                i.Email,
+                i.Phone,
+                i.AppliesToType,
+                i.ScheduledItemNumbers,
+                i.AdditionalInsured,
+                i.LossPayee,
+                i.WaiverOfSubrogation,
+                i.PrimaryNonContributory,
+                i.Notes,
+            })
+            .ToListAsync(ct);
+
+        var blanketAdditionalInterests = await _db.Set<SubmissionAdditionalInterestBlanket>()
+            .Where(i => i.SubmissionId == submissionId && !i.IsDeleted)
+            .OrderBy(i => i.LineOfBusiness)
+            .Select(i => new
+            {
+                i.Id,
+                i.LineOfBusiness,
+                i.AdditionalInsured,
+                i.WaiverOfSubrogation,
+                i.PrimaryNonContributory,
+            })
+            .ToListAsync(ct);
+
+        var policyForms = await _db.Set<QuotePolicyFormSelection>()
+            .Where(f => f.QuoteId == policy.BoundQuoteId && f.IsIncluded && !f.IsDeleted)
+            .OrderBy(f => f.SequenceOrder)
+            .Select(f => new
+            {
+                f.Id,
+                f.SequenceOrder,
+                f.FormType,
+                f.IsSystemGenerated,
+                f.PolicyFormTemplate.FormNumber,
+                FormName = f.PolicyFormTemplate.Name,
+                f.PolicyFormTemplate.EditionDate,
+                f.PolicyFormTemplate.DocumentType,
+                f.PolicyFormTemplate.FileName,
+            })
+            .ToListAsync(ct);
 
         return JsonSerializer.Serialize(new
         {
-            LocationCount = await _db.Set<SubmissionLocation>().CountAsync(l => l.SubmissionId == submissionId && !l.IsDeleted, ct),
-            DriverCount = await _db.Set<SubmissionDriver>().CountAsync(d => d.SubmissionId == submissionId && !d.IsDeleted, ct),
-            VehicleCount = await _db.Set<SubmissionVehicle>().CountAsync(v => v.SubmissionId == submissionId && !v.IsDeleted, ct),
-            EquipmentCount = await _db.Set<SubmissionEquipment>().CountAsync(e => e.SubmissionId == submissionId && !e.IsDeleted, ct),
-            AdditionalInterestCount = await _db.Set<SubmissionAdditionalInterest>().CountAsync(i => i.SubmissionId == submissionId && !i.IsDeleted, ct),
-            IncludedFormCount = includedFormCount,
-        });
+            LocationCount = locations.Count,
+            DriverCount = drivers.Count,
+            VehicleCount = vehicles.Count,
+            EquipmentCount = equipment.Count,
+            AdditionalInterestCount = additionalInterests.Count,
+            BlanketAdditionalInterestCount = blanketAdditionalInterests.Count,
+            IncludedFormCount = policyForms.Count,
+            Locations = locations,
+            Drivers = drivers,
+            Vehicles = vehicles,
+            Equipment = equipment,
+            AdditionalInterests = additionalInterests,
+            BlanketAdditionalInterests = blanketAdditionalInterests,
+            PolicyForms = policyForms,
+        }, SnapshotJsonOptions);
     }
 }

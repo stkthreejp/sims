@@ -15,6 +15,7 @@ using SIMS.Domain.Entities.Accounting;
 using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 using SIMS.Infrastructure.Data;
+using System.Text.Json;
 using Xunit;
 
 namespace SIMS.Application.Tests.Services;
@@ -68,6 +69,7 @@ public class PolicyLifecycleRegressionTests
     {
         await using var db = CreateDb();
         var fixture = await SeedBindableQuoteAsync(db);
+        await SeedSnapshotExposureDataAsync(db, fixture);
         var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
 
         var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
@@ -88,7 +90,26 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(policy.PremiumAmount, version.PremiumAmount);
         Assert.Equal(policy.TaxesAndFees, version.TaxesAndFees);
         Assert.Equal(policy.TotalPremium, version.TotalPremium);
-        Assert.Contains("IncludedFormCount", version.ExposureSnapshotJson);
+
+        using var coverageJson = JsonDocument.Parse(version.CoverageSnapshotJson);
+        var coverage = coverageJson.RootElement;
+        Assert.Equal("Scheduled inland marine", coverage.GetProperty("CoverageDescription").GetString());
+        Assert.Equal("InlandMarine", coverage.GetProperty("LineOfBusiness").GetString());
+        Assert.Equal(2500m, coverage.GetProperty("Deductible").GetDecimal());
+        Assert.Equal(100000m, coverage.GetProperty("Limit").GetDecimal());
+
+        using var exposureJson = JsonDocument.Parse(version.ExposureSnapshotJson);
+        var exposure = exposureJson.RootElement;
+        Assert.Equal(1, exposure.GetProperty("LocationCount").GetInt32());
+        Assert.Equal("100 Main St", exposure.GetProperty("Locations")[0].GetProperty("Address").GetString());
+        Assert.Equal("Jane Driver", exposure.GetProperty("Drivers")[0].GetProperty("Name").GetString());
+        Assert.Equal("VIN123", exposure.GetProperty("Vehicles")[0].GetProperty("Vin").GetString());
+        Assert.Equal("Truck", exposure.GetProperty("Vehicles")[0].GetProperty("VehicleClass").GetString());
+        Assert.Equal("Excavator", exposure.GetProperty("Equipment")[0].GetProperty("Description").GetString());
+        Assert.Equal(50000m, exposure.GetProperty("Equipment")[0].GetProperty("Value").GetDecimal());
+        Assert.Equal("Bank of Testing", exposure.GetProperty("AdditionalInterests")[0].GetProperty("Name").GetString());
+        Assert.True(exposure.GetProperty("BlanketAdditionalInterests")[0].GetProperty("AdditionalInsured").GetBoolean());
+        Assert.Equal("PF-1", exposure.GetProperty("PolicyForms")[0].GetProperty("FormNumber").GetString());
     }
 
     [Fact]
@@ -508,6 +529,75 @@ public class PolicyLifecycleRegressionTests
         db.AddRange(fixture.User, fixture.Carrier, fixture.Insured, fixture.Submission, fixture.Quote, template, selection);
         await db.SaveChangesAsync();
         return fixture;
+    }
+
+    private static async Task SeedSnapshotExposureDataAsync(ApplicationDbContext db, QuoteFixture fixture)
+    {
+        fixture.Quote.CoverageDescription = "Scheduled inland marine";
+        fixture.Quote.Deductible = 2500m;
+        fixture.Quote.Limit = 100000m;
+        db.AddRange(
+            new SubmissionLocation
+            {
+                SubmissionId = fixture.Submission.Id,
+                LocationNumber = 1,
+                Address = "100 Main St",
+                ZipCode = "27601",
+            },
+            new SubmissionDriver
+            {
+                SubmissionId = fixture.Submission.Id,
+                DriverNumber = 1,
+                Name = "Jane Driver",
+                LicenseNumber = "D123",
+                LicenseState = "NC",
+            },
+            new SubmissionVehicle
+            {
+                SubmissionId = fixture.Submission.Id,
+                UnitNumber = 1,
+                Year = 2024,
+                Make = "Peterbilt",
+                Model = "579",
+                Vin = "VIN123",
+                VehicleClass = VehicleClass.Truck,
+                GaragingZip = "27601",
+                Radius = OperatingRadius.Local,
+            },
+            new SubmissionEquipment
+            {
+                SubmissionId = fixture.Submission.Id,
+                ItemNumber = 1,
+                Year = 2023,
+                Make = "CAT",
+                Model = "320",
+                Description = "Excavator",
+                SerialNumber = "EQ123",
+                Value = 50000m,
+                TerritoryCode = "NC-01",
+                Deductible = 2500m,
+            },
+            new SubmissionAdditionalInterest
+            {
+                SubmissionId = fixture.Submission.Id,
+                LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+                Name = "Bank of Testing",
+                City = "Raleigh",
+                State = "NC",
+                ZipCode = "27601",
+                AppliesToType = AdditionalInterestAppliesToType.ScheduledItems,
+                ScheduledItemNumbers = "1",
+                LossPayee = true,
+            },
+            new SubmissionAdditionalInterestBlanket
+            {
+                SubmissionId = fixture.Submission.Id,
+                LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+                AdditionalInsured = true,
+                WaiverOfSubrogation = true,
+            });
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task<PolicyFixture> SeedBoundPolicyAsync(ApplicationDbContext db, string insuredName = "Test Logistics")
