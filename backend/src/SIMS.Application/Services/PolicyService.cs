@@ -357,7 +357,7 @@ public class PolicyService : IPolicyService
         {
             PolicyId = policyId,
             TransactionType = TransactionType.Endorsement,
-            Status = PolicyTransactionStatus.Pending,
+            Status = PolicyTransactionStatus.Submitted,
             TransactionNumber = txnNumber,
             EffectiveDate = dto.EffectiveDate,
             PremiumChange = dto.PremiumChange,
@@ -396,7 +396,7 @@ public class PolicyService : IPolicyService
         if (txn == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Endorsement not found.");
         if (txn.TransactionType != TransactionType.Endorsement)
             return Result<PolicyTransactionDto>.Failure("INVALID_TYPE", "Transaction is not an endorsement.");
-        if (txn.Status != PolicyTransactionStatus.Pending)
+        if (txn.Status != PolicyTransactionStatus.Submitted)
             return Result<PolicyTransactionDto>.Failure("ALREADY_ISSUED", "Endorsement is already issued.");
 
         if (dto.EffectiveDate.HasValue) txn.EffectiveDate = dto.EffectiveDate.Value;

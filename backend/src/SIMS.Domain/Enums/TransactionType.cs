@@ -7,5 +7,7 @@ public enum TransactionType
     Renewal = 3,
     Cancellation = 4,
     Reinstatement = 5,
-    Audit = 6
+    Audit = 6,
+    NonRenewal = 7,
+    Rewrite = 8
 }

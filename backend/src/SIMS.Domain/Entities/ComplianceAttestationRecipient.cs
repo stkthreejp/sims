@@ -1,3 +1,5 @@
+using SIMS.Domain.Constants;
+
 namespace SIMS.Domain.Entities;
 
 public class ComplianceAttestationRecipient : BaseEntity
@@ -6,7 +8,7 @@ public class ComplianceAttestationRecipient : BaseEntity
     public ComplianceAttestationCampaign Campaign { get; set; } = null!;
     public Guid UserId { get; set; }
     public User User { get; set; } = null!;
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = ComplianceAttestationStatus.Pending;
     public DateTime? AttestedAt { get; set; }
     public string? Comment { get; set; }
 }

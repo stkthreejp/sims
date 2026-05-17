@@ -812,10 +812,10 @@ function EndorsePolicyModal({
           <input type="number" step="0.01" value={premiumChange} onChange={(e) => setPremiumChange(e.target.value)} className={inputClass} />
         </Field>
         <Field label="Description">
-          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} />
+          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className={textareaClass} />
         </Field>
         <Field label="Notes">
-          <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
+          <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
         </Field>
         <ModalActions saving={saving} onClose={onClose} submitLabel="Add Endorsement" />
       </form>
@@ -876,10 +876,10 @@ function CancelPolicyModal({
             <input type="date" required value={cancelledDate} onChange={(e) => setCancelledDate(e.target.value)} className={inputClass} />
           </Field>
           <Field label="Reason">
-            <textarea rows={4} required value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} />
+            <textarea rows={4} required value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
           </Field>
           <Field label="Notice Method">
-            <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass}>
+            <select value={method} onChange={(e) => setMethod(e.target.value)} className={selectClass}>
               <option>Written Notice</option>
               <option>Certified Mail</option>
               <option>First-Class Mail</option>
@@ -891,7 +891,7 @@ function CancelPolicyModal({
             <input type="number" step="0.01" value={premiumChange} onChange={(e) => setPremiumChange(e.target.value)} className={inputClass} />
           </Field>
           <Field label="Notes">
-            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
+            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
           </Field>
           <ComplianceChecklist items={checklist} onChange={setChecklist} />
           <ModalActions saving={saving} disabled={!allChecklistComplete} onClose={onClose} submitLabel="Cancel Policy" danger />
@@ -934,7 +934,7 @@ function NonRenewPolicyModal({
             <input type="date" required value={nonRenewedDate} onChange={(e) => setNonRenewedDate(e.target.value)} className={inputClass} />
           </Field>
           <Field label="Reason">
-            <textarea rows={5} value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} />
+            <textarea rows={5} value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
           </Field>
           <ModalActions saving={saving} onClose={onClose} submitLabel="Mark Non-Renewed" />
         </div>
@@ -955,22 +955,22 @@ function LegalGuidancePanel({ guidance, mode }: { guidance?: LegalComplianceGuid
   ].filter((group) => group.rows.length > 0) : []
 
   return (
-    <aside className="rounded border bg-slate-50 p-4">
+    <aside className="rounded-lg border p-4" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
       <div className="flex items-start gap-2">
-        <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />
+        <AlertTriangle className="mt-0.5 h-4 w-4" style={{ color: 'var(--warn-fg)' }} />
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Legal Guidance</h3>
-          <p className="mt-1 text-xs text-slate-500">
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Legal Guidance</h3>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>
             {guidance ? `${mode}: ${guidance.state} ${guidance.lineOfBusiness}` : 'No matching guidance loaded.'}
           </p>
         </div>
       </div>
       <div className="mt-4 max-h-[520px] space-y-3 overflow-auto pr-1">
         {groups.length === 0 ? (
-          <p className="text-sm text-slate-500">No cancellation requirements were found for this policy state.</p>
+          <p className="text-sm" style={{ color: 'var(--ink-3)' }}>No cancellation requirements were found for this policy state.</p>
         ) : groups.map((group) => (
-          <section key={group.label} className="rounded border bg-white p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</div>
+          <section key={group.label} className="rounded-lg border p-3" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>{group.label}</div>
             <div className="mt-2 space-y-3">
               {group.rows.map((row) => (
                 <LegalRequirementSummary key={row.id} row={row} />
@@ -986,12 +986,12 @@ function LegalGuidancePanel({ guidance, mode }: { guidance?: LegalComplianceGuid
 function LegalRequirementSummary({ row }: { row: LegalComplianceRequirement }) {
   return (
     <div>
-      <div className="text-sm font-semibold text-slate-800">{row.topic}</div>
-      <p className="mt-1 text-sm leading-6 text-slate-700">{truncateText(row.requirementText, 520)}</p>
+      <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{row.topic}</div>
+      <p className="mt-1 text-sm leading-6" style={{ color: 'var(--ink-2)' }}>{truncateText(row.requirementText, 520)}</p>
       {row.citations.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {row.citations.map((citation) => (
-            <span key={citation} className="rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{citation}</span>
+            <span key={citation} className="rounded px-2 py-0.5 text-[11px]" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>{citation}</span>
           ))}
         </div>
       )}
@@ -1007,11 +1007,11 @@ function ComplianceChecklist({
   onChange: (items: CancellationComplianceChecklistItem[]) => void
 }) {
   return (
-    <section className="rounded border bg-slate-50 p-4">
-      <h3 className="text-sm font-semibold text-slate-900">Compliance Review</h3>
+    <section className="rounded-lg border p-4" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+      <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Compliance Review</h3>
       <div className="mt-3 space-y-2">
         {items.map((item) => (
-          <label key={item.key} className="flex items-start gap-2 text-sm text-slate-700">
+          <label key={item.key} className="flex items-start gap-2 text-sm" style={{ color: 'var(--ink-2)' }}>
             <input
               type="checkbox"
               checked={item.isCompleted}
@@ -1024,22 +1024,22 @@ function ComplianceChecklist({
           </label>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-500">These selections are saved with the cancellation transaction.</p>
+      <p className="mt-3 text-xs" style={{ color: 'var(--ink-3)' }}>These selections are saved with the cancellation transaction.</p>
     </section>
   )
 }
 
 function ActionModal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-      <div className={`max-h-[92vh] w-full overflow-auto rounded border bg-white shadow-xl ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded p-2 text-slate-500 hover:bg-slate-100" aria-label="Close">
-            <X className="h-5 w-5" />
+    <div className="sims-modal-backdrop">
+      <div className={`sims-modal max-h-[92vh] overflow-auto ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>
+        <div className="sims-modal-head">
+          <h2 className="sims-modal-title">{title}</h2>
+          <button type="button" onClick={onClose} className="sims-icon-btn" aria-label="Close">
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="sims-modal-body">{children}</div>
       </div>
     </div>
   )
@@ -1047,7 +1047,7 @@ function ActionModal({ title, onClose, children, wide = false }: { title: string
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="sims-field-label">
       {label}
       <div className="mt-1">{children}</div>
     </label>
@@ -1056,14 +1056,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ModalActions({ saving, disabled = false, onClose, submitLabel, danger = false }: { saving: boolean; disabled?: boolean; onClose: () => void; submitLabel: string; danger?: boolean }) {
   return (
-    <div className="flex justify-end gap-2 border-t pt-4">
-      <button type="button" onClick={onClose} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+    <div className="sims-modal-foot -mx-5 -mb-5 mt-4">
+      <button type="button" onClick={onClose} className="sd-btn outline">
         Close
       </button>
       <button
         type="submit"
         disabled={saving || disabled}
-        className={`rounded px-3 py-2 text-sm font-medium text-white disabled:opacity-50 ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+        className={`sd-btn ${danger ? 'danger' : 'primary'}`}
       >
         {saving ? 'Saving...' : submitLabel}
       </button>
@@ -1071,7 +1071,9 @@ function ModalActions({ saving, disabled = false, onClose, submitLabel, danger =
   )
 }
 
-const inputClass = 'w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+const inputClass = 'sims-input'
+const selectClass = 'sims-select'
+const textareaClass = 'sims-textarea'
 
 function toDateInput(value: string) {
   return value.slice(0, 10)

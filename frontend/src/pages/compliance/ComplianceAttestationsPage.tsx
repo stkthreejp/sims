@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, Clock, FileCheck2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
+import { ATTESTATION_STATUS } from '@/constants/compliance'
 import { EmptyState } from '@/components/common/EmptyState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -34,11 +35,11 @@ export function ComplianceAttestationsPage() {
 
   const visible = assigned.filter(({ recipient }) => {
     if (filter === 'All') return true
-    if (filter === 'Pending') return recipient.status === 'Pending'
+    if (filter === 'Pending') return recipient.status === ATTESTATION_STATUS.PENDING
     return recipient.status !== 'Pending'
   })
 
-  const pendingCount = assigned.filter((item) => item.recipient.status === 'Pending').length
+  const pendingCount = assigned.filter((item) => item.recipient.status === ATTESTATION_STATUS.PENDING).length
   const completedCount = assigned.length - pendingCount
 
   return (
@@ -112,10 +113,10 @@ function AttestationRow({
 }) {
   const qc = useQueryClient()
   const [comment, setComment] = useState('')
-  const [expanded, setExpanded] = useState(recipient.status === 'Pending')
+  const [expanded, setExpanded] = useState(recipient.status === ATTESTATION_STATUS.PENDING)
 
   const submitMutation = useMutation({
-    mutationFn: (status: 'Attested' | 'Declined') => complianceDocumentsApi.submitAttestation(campaign.id, {
+    mutationFn: (status: typeof ATTESTATION_STATUS.ATTESTED | typeof ATTESTATION_STATUS.DECLINED) => complianceDocumentsApi.submitAttestation(campaign.id, {
       status,
       comment: comment || null,
     }),
@@ -128,7 +129,7 @@ function AttestationRow({
     onError: () => toast.error('Could not record attestation'),
   })
 
-  const pending = recipient.status === 'Pending'
+  const pending = recipient.status === ATTESTATION_STATUS.PENDING
 
   return (
     <article className="p-4">
@@ -181,7 +182,7 @@ function AttestationRow({
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => submitMutation.mutate('Declined')}
+                  onClick={() => submitMutation.mutate(ATTESTATION_STATUS.DECLINED)}
                   disabled={submitMutation.isPending}
                   className="sd-btn danger"
                 >
@@ -190,7 +191,7 @@ function AttestationRow({
                 </button>
                 <button
                   type="button"
-                  onClick={() => submitMutation.mutate('Attested')}
+                  onClick={() => submitMutation.mutate(ATTESTATION_STATUS.ATTESTED)}
                   disabled={submitMutation.isPending}
                   className="sd-btn success"
                 >
@@ -222,9 +223,9 @@ function Metric({ icon: Icon, label, value, tone = 'default' }: { icon: React.El
 }
 
 function StatusPill({ status }: { status: string }) {
-  const styles = status === 'Attested'
+  const styles = status === ATTESTATION_STATUS.ATTESTED
     ? 'border-green-200 bg-green-50 text-green-700'
-    : status === 'Declined'
+    : status === ATTESTATION_STATUS.DECLINED
       ? 'border-red-200 bg-red-50 text-red-700'
       : 'border-amber-200 bg-amber-50 text-amber-700'
 

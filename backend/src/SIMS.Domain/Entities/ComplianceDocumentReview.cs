@@ -1,3 +1,5 @@
+using SIMS.Domain.Constants;
+
 namespace SIMS.Domain.Entities;
 
 public class ComplianceDocumentReview : BaseEntity
@@ -6,7 +8,7 @@ public class ComplianceDocumentReview : BaseEntity
     public ComplianceDocument Document { get; set; } = null!;
     public Guid? VersionId { get; set; }
     public ComplianceDocumentVersion? Version { get; set; }
-    public string Status { get; set; } = "Completed";
+    public string Status { get; set; } = ComplianceReviewStatus.Completed;
     public string? Notes { get; set; }
     public Guid ReviewedById { get; set; }
     public User ReviewedBy { get; set; } = null!;

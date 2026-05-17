@@ -7,12 +7,13 @@ import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { EmptyState } from '@/components/common/EmptyState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { DOCUMENT_CATEGORIES, DOCUMENT_STATUS, DOCUMENT_STATUS_LIST } from '@/constants/compliance'
 import { useDebounce } from '@/hooks/useDebounce'
 import { formatDate } from '@/lib/utils'
 
 const ALL = 'All'
-const STATUSES = [ALL, 'Draft', 'Active', 'Under Review', 'Needs Update', 'Retired']
-const CATEGORIES = [ALL, 'IT', 'Security', 'Business Continuity', 'Privacy', 'Operations', 'Vendor Management', 'HR', 'Finance']
+const STATUSES = [ALL, ...DOCUMENT_STATUS_LIST]
+const CATEGORIES = [ALL, ...DOCUMENT_CATEGORIES]
 type MetricFilter = 'All' | 'Active' | 'DraftReview' | 'Overdue'
 
 export function ComplianceDocumentationPage() {
@@ -58,8 +59,8 @@ export function ComplianceDocumentationPage() {
   const documents = documentsQuery.data ?? []
   const categories = useMemo(() => Array.from(new Set([...CATEGORIES, ...documents.map((d) => d.category)])), [documents])
   const filteredDocuments = useMemo(() => {
-    if (metricFilter === 'Active') return documents.filter((document) => document.status === 'Active')
-    if (metricFilter === 'DraftReview') return documents.filter((document) => document.status === 'Draft' || document.status === 'Under Review')
+    if (metricFilter === 'Active') return documents.filter((document) => document.status === DOCUMENT_STATUS.ACTIVE)
+    if (metricFilter === 'DraftReview') return documents.filter((document) => document.status === DOCUMENT_STATUS.DRAFT || document.status === DOCUMENT_STATUS.UNDER_REVIEW)
     if (metricFilter === 'Overdue') {
       const today = startOfToday()
       return documents.filter((document) => {

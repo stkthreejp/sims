@@ -1,7 +1,9 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using SIMS.Application.DTOs.Compliance;
+using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Services;
 using SIMS.Domain.Entities;
 using Xunit;
@@ -160,14 +162,12 @@ public class ComplianceDocumentServiceTests
     }
 
     private static ComplianceDocumentService CreateService(ComplianceTestDbContext db)
-    {
-        var services = new Dictionary<Type, object>
-        {
-            [typeof(DbContext)] = db
-        };
-
-        return new ComplianceDocumentService(new TestServiceProvider(services), new ConfigurationBuilder().Build());
-    }
+        => new(
+            db,
+            new FakeBlobStorageService(),
+            new NoOpFileScanService(),
+            new FakeHtmlToPdfService(),
+            new ConfigurationBuilder().Build());
 
     private static ComplianceTestDbContext CreateDb()
     {
@@ -188,10 +188,25 @@ public class ComplianceDocumentServiceTests
         Email = email ?? $"{firstName}.{lastName}@example.com",
     };
 
-    private sealed class TestServiceProvider(IReadOnlyDictionary<Type, object> services) : IServiceProvider
+    private sealed class FakeBlobStorageService : IBlobStorageService
     {
-        public object? GetService(Type serviceType) =>
-            services.TryGetValue(serviceType, out var service) ? service : null;
+        public Task<string> UploadAsync(Stream content, string fileName, string contentType) =>
+            Task.FromResult($"test/{fileName}");
+
+        public Task<string> GetDownloadUrlAsync(string blobPath, string fileName, TimeSpan? expiry = null) =>
+            Task.FromResult($"https://example.test/{blobPath}");
+
+        public Task<byte[]> DownloadAsync(string blobPath) =>
+            Task.FromResult(Array.Empty<byte>());
+
+        public Task DeleteAsync(string blobPath) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class FakeHtmlToPdfService : IHtmlToPdfService
+    {
+        public Task<byte[]> ConvertAsync(string html, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Encoding.UTF8.GetBytes(html));
     }
 
     private sealed class ComplianceTestDbContext : DbContext

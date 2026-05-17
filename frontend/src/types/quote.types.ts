@@ -13,7 +13,7 @@ export type PolicyLineOfBusiness =
   | 'ExcessLiability'
   | 'Other'
 export type QuoteStatus = 'Draft' | 'Submitted' | 'Quoted' | 'Bound' | 'Declined' | 'Cancelled' | 'Expired'
-export type TransactionType = 'NewBusiness' | 'Endorsement' | 'Renewal' | 'Cancellation' | 'Reinstatement' | 'Audit'
+export type TransactionType = 'NewBusiness' | 'Endorsement' | 'Renewal' | 'Cancellation' | 'Reinstatement' | 'Audit' | 'NonRenewal' | 'Rewrite'
 
 export const LOB_LABELS: Record<PolicyLineOfBusiness, string> = {
   GeneralLiability: 'General Liability',

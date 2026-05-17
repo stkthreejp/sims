@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle, CalendarClock, CheckCircle2, Search } from 'lucide-react'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
+import { DOCUMENT_STATUS } from '@/constants/compliance'
 import { EmptyState } from '@/components/common/EmptyState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -27,7 +28,7 @@ export function ComplianceReviewsPage() {
     const term = search.trim().toLowerCase()
 
     return (documentsQuery.data ?? [])
-      .filter((document) => document.status !== 'Retired')
+      .filter((document) => document.status !== DOCUMENT_STATUS.RETIRED)
       .filter((document) => {
         if (!term) return true
         return (
@@ -51,7 +52,7 @@ export function ComplianceReviewsPage() {
   const counts = useMemo(() => {
     const today = startOfToday()
     const soon = addDays(today, 30)
-    const docs = (documentsQuery.data ?? []).filter((document) => document.status !== 'Retired')
+    const docs = (documentsQuery.data ?? []).filter((document) => document.status !== DOCUMENT_STATUS.RETIRED)
     return {
       overdue: docs.filter((document) => {
         const due = parseDate(document.nextReviewDate)

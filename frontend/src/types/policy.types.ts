@@ -2,8 +2,23 @@ import type { PolicyLineOfBusiness } from './quote.types'
 import type { PolicyFormType } from './policyForm.types'
 
 export type PolicyStatus = 'Active' | 'Renewed' | 'NonRenewed' | 'Expired' | 'Cancelled'
-export type PolicyTransactionStatus = 'Pending' | 'Issued'
-export type TransactionType = 'NewBusiness' | 'Endorsement' | 'Renewal' | 'Cancellation' | 'Reinstatement' | 'Audit'
+export type PolicyTransactionStatus =
+  | 'Submitted'
+  | 'Issued'
+  | 'InReview'
+  | 'Referred'
+  | 'Approved'
+  | 'Quoted'
+  | 'Accepted'
+  | 'Bound'
+  | 'NoticePending'
+  | 'NoticeSent'
+  | 'PendingEffectiveDate'
+  | 'Completed'
+  | 'Declined'
+  | 'Withdrawn'
+  | 'Voided'
+export type TransactionType = 'NewBusiness' | 'Endorsement' | 'Renewal' | 'Cancellation' | 'Reinstatement' | 'Audit' | 'NonRenewal' | 'Rewrite'
 
 export const POLICY_STATUS_LABELS: Record<PolicyStatus, string> = {
   Active: 'Active',

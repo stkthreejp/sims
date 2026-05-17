@@ -1,3 +1,5 @@
+using SIMS.Domain.Constants;
+
 namespace SIMS.Domain.Entities;
 
 public class ComplianceDocument : BaseEntity
@@ -5,7 +7,7 @@ public class ComplianceDocument : BaseEntity
     public string Title { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
     public string DocumentType { get; set; } = string.Empty;
-    public string Status { get; set; } = "Draft";
+    public string Status { get; set; } = ComplianceDocumentStatus.Draft;
     public Guid? OwnerId { get; set; }
     public User? Owner { get; set; }
     public Guid? ApproverId { get; set; }

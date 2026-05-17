@@ -6,7 +6,7 @@ public class PolicyTransaction : BaseEntity
 {
     public Guid PolicyId { get; set; }
     public TransactionType TransactionType { get; set; }
-    public PolicyTransactionStatus Status { get; set; } = PolicyTransactionStatus.Issued;
+    public PolicyTransactionStatus Status { get; set; } = PolicyTransactionStatus.Submitted;
     public string TransactionNumber { get; set; } = string.Empty;
     public DateOnly EffectiveDate { get; set; }
 

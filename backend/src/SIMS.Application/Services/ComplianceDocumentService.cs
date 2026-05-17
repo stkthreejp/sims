@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Compliance;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Constants;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 
@@ -93,12 +94,12 @@ public class ComplianceDocumentService : IComplianceDocumentService
         return new ComplianceDocumentSummaryDto
         {
             TotalDocuments = await Db.Set<ComplianceDocument>().CountAsync(ct),
-            ActiveDocuments = await Db.Set<ComplianceDocument>().CountAsync(d => d.Status == "Active", ct),
-            DraftDocuments = await Db.Set<ComplianceDocument>().CountAsync(d => d.Status == "Draft" || d.Status == "Under Review", ct),
+            ActiveDocuments = await Db.Set<ComplianceDocument>().CountAsync(d => d.Status == ComplianceDocumentStatus.Active, ct),
+            DraftDocuments = await Db.Set<ComplianceDocument>().CountAsync(d => d.Status == ComplianceDocumentStatus.Draft || d.Status == ComplianceDocumentStatus.UnderReview, ct),
             DueSoon = await Db.Set<ComplianceDocument>().CountAsync(d => d.NextReviewDate != null && d.NextReviewDate >= today && d.NextReviewDate <= dueSoon, ct),
             Overdue = await Db.Set<ComplianceDocument>().CountAsync(d => d.NextReviewDate != null && d.NextReviewDate < today, ct),
-            ActiveAttestationCampaigns = await Db.Set<ComplianceAttestationCampaign>().CountAsync(c => c.Status == "Active", ct),
-            PendingAttestations = await Db.Set<ComplianceAttestationRecipient>().CountAsync(r => r.Status == "Pending", ct),
+            ActiveAttestationCampaigns = await Db.Set<ComplianceAttestationCampaign>().CountAsync(c => c.Status == ComplianceCampaignStatus.Active, ct),
+            PendingAttestations = await Db.Set<ComplianceAttestationRecipient>().CountAsync(r => r.Status == ComplianceAttestationStatus.Pending, ct),
         };
     }
 
@@ -161,7 +162,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
             NextReviewDate = dto.NextReviewDate,
             ReviewCadence = Clean(dto.ReviewCadence, "Annual"),
             Tags = CleanTags(dto.Tags),
-            Status = "Draft",
+            Status = ComplianceDocumentStatus.Draft,
         };
 
         var safeHtml = SanitizeHtml(dto.HtmlContent);
@@ -169,7 +170,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
         {
             Document = document,
             VersionNumber = 1,
-            Status = "Draft",
+            Status = ComplianceVersionStatus.Draft,
             HtmlContent = safeHtml,
             PlainText = ToPlainText(safeHtml),
             CreatedById = userId,
@@ -227,14 +228,14 @@ public class ComplianceDocumentService : IComplianceDocumentService
             return Result<ComplianceDocumentDetailDto>.Failure("NOT_FOUND", "Compliance document not found.");
 
         var draft = document.CurrentDraftVersion;
-        if (draft == null || draft.Status != "Draft")
+        if (draft == null || draft.Status != ComplianceVersionStatus.Draft)
         {
             var nextVersionNumber = document.Versions.Count == 0 ? 1 : document.Versions.Max(v => v.VersionNumber) + 1;
             draft = new ComplianceDocumentVersion
             {
                 DocumentId = document.Id,
                 VersionNumber = nextVersionNumber,
-                Status = "Draft",
+                Status = ComplianceVersionStatus.Draft,
                 CreatedById = userId,
             };
             Db.Set<ComplianceDocumentVersion>().Add(draft);
@@ -245,7 +246,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
         draft.HtmlContent = safeHtml;
         draft.PlainText = ToPlainText(safeHtml);
         draft.ChangeSummary = dto.ChangeSummary?.Trim();
-        document.Status = "Draft";
+        document.Status = ComplianceDocumentStatus.Draft;
         AddAudit(document.Id, draft.Id, "DraftSaved", null, null, draft.ChangeSummary, null, userId);
 
         await Db.SaveChangesAsync(ct);
@@ -265,7 +266,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
             return Result<ComplianceDocumentDetailDto>.Failure("VALIDATION", "A draft is required before submitting for review.");
 
         var oldStatus = document.Status;
-        document.Status = "Under Review";
+        document.Status = ComplianceDocumentStatus.UnderReview;
         AddAudit(document.Id, document.CurrentDraftVersion.Id, "SubmittedForReview", "Status", oldStatus, document.Status, dto.Notes, userId);
         await AddReviewTaskAsync(document, userId, ct);
 
@@ -286,7 +287,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
             return Result<ComplianceDocumentDetailDto>.Failure("VALIDATION", "A draft is required before requesting changes.");
 
         var oldStatus = document.Status;
-        document.Status = "Needs Update";
+        document.Status = ComplianceDocumentStatus.NeedsUpdate;
         AddAudit(document.Id, document.CurrentDraftVersion.Id, "ChangesRequested", "Status", oldStatus, document.Status, dto.Notes, userId);
 
         await Db.SaveChangesAsync(ct);
@@ -302,18 +303,18 @@ public class ComplianceDocumentService : IComplianceDocumentService
         if (document?.CurrentDraftVersion == null)
             return Result<ComplianceDocumentDetailDto>.Failure("NOT_FOUND", "Draft not found.");
 
-        if (document.Status != "Under Review")
+        if (document.Status != ComplianceDocumentStatus.UnderReview)
             return Result<ComplianceDocumentDetailDto>.Failure("VALIDATION", "Draft must be submitted for review before publishing.");
 
         var draft = document.CurrentDraftVersion;
-        draft.Status = "Published";
+        draft.Status = ComplianceVersionStatus.Published;
         draft.ApprovedById = userId;
         draft.ApprovedAt = DateTime.UtcNow;
         draft.EffectiveDate = dto.EffectiveDate ?? document.EffectiveDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
 
         document.CurrentPublishedVersionId = draft.Id;
         document.CurrentDraftVersionId = null;
-        document.Status = "Active";
+        document.Status = ComplianceDocumentStatus.Active;
         document.EffectiveDate = draft.EffectiveDate;
         document.LastReviewedDate = DateOnly.FromDateTime(DateTime.UtcNow);
         document.NextReviewDate = CalculateNextReviewDate(document.LastReviewedDate.Value, document.ReviewCadence);
@@ -349,7 +350,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
         {
             DocumentId = id,
             VersionId = document.CurrentPublishedVersionId,
-            Status = Clean(dto.Status, "Completed"),
+            Status = Clean(dto.Status, ComplianceReviewStatus.Completed),
             Notes = dto.Notes?.Trim(),
             ReviewedById = userId,
             NextReviewDate = nextReviewDate,
@@ -357,8 +358,8 @@ public class ComplianceDocumentService : IComplianceDocumentService
 
         document.LastReviewedDate = reviewedAt;
         document.NextReviewDate = nextReviewDate;
-        if (document.Status == "Needs Update" && review.Status == "Completed")
-            document.Status = "Active";
+        if (document.Status == ComplianceDocumentStatus.NeedsUpdate && review.Status == ComplianceReviewStatus.Completed)
+            document.Status = ComplianceDocumentStatus.Active;
 
         Db.Set<ComplianceDocumentReview>().Add(review);
         AddAudit(document.Id, review.VersionId, "Reviewed", "ReviewStatus", null, review.Status, review.Notes, userId);
@@ -492,7 +493,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
 
         var html = BuildDocumentPdfHtml(document, version);
         var bytes = await HtmlToPdf.ConvertAsync(html, ct);
-        var suffix = version.Status == "Published" ? $"v{version.VersionNumber}" : $"draft-v{version.VersionNumber}";
+        var suffix = version.Status == ComplianceVersionStatus.Published ? $"v{version.VersionNumber}" : $"draft-v{version.VersionNumber}";
 
         AddAudit(document.Id, version.Id, "PdfExported", null, null, suffix, null, userId);
         await Db.SaveChangesAsync(ct);
@@ -573,7 +574,7 @@ public class ComplianceDocumentService : IComplianceDocumentService
             return Result<ComplianceAttestationCampaignDto>.Failure("NOT_FOUND", "Compliance document not found.");
 
         var version = document.Versions.FirstOrDefault(v => v.Id == dto.VersionId);
-        if (version == null || version.Status != "Published")
+        if (version == null || version.Status != ComplianceVersionStatus.Published)
             return Result<ComplianceAttestationCampaignDto>.Failure("VALIDATION", "Attestations can only be launched for a published version.");
 
         var recipientIds = dto.UserIds.Distinct().ToArray();
@@ -592,12 +593,12 @@ public class ComplianceDocumentService : IComplianceDocumentService
             Name = Clean(dto.Name, $"{document.Title} v{version.VersionNumber} Attestation"),
             Statement = Clean(dto.Statement, "I acknowledge that I have reviewed and understand this document version."),
             DueDate = dto.DueDate,
-            Status = "Active",
+            Status = ComplianceCampaignStatus.Active,
             CreatedById = userId,
             Recipients = activeUserIds.Select(id => new ComplianceAttestationRecipient
             {
                 UserId = id,
-                Status = "Pending",
+                Status = ComplianceAttestationStatus.Pending,
             }).ToList()
         };
 
@@ -627,11 +628,13 @@ public class ComplianceDocumentService : IComplianceDocumentService
         if (recipient == null)
             return Result<ComplianceAttestationRecipientDto>.Failure("NOT_FOUND", "You are not assigned to this attestation campaign.");
 
-        if (recipient.Campaign.Status != "Active")
+        if (recipient.Campaign.Status != ComplianceCampaignStatus.Active)
             return Result<ComplianceAttestationRecipientDto>.Failure("VALIDATION", "This attestation campaign is not active.");
 
         var oldStatus = recipient.Status;
-        recipient.Status = dto.Status == "Declined" ? "Declined" : "Attested";
+        recipient.Status = dto.Status == ComplianceAttestationStatus.Declined
+            ? ComplianceAttestationStatus.Declined
+            : ComplianceAttestationStatus.Attested;
         recipient.Comment = dto.Comment?.Trim();
         recipient.AttestedAt = DateTime.UtcNow;
         AddAudit(recipient.Campaign.DocumentId, recipient.Campaign.VersionId, "AttestationSubmitted", "Status", oldStatus, recipient.Status, recipient.Comment, userId);
@@ -778,9 +781,9 @@ public class ComplianceDocumentService : IComplianceDocumentService
             CreatedByName = c.CreatedBy.FullName,
             CreatedAt = c.CreatedAt,
             RecipientCount = recipients.Count,
-            PendingCount = recipients.Count(r => r.Status == "Pending"),
-            AttestedCount = recipients.Count(r => r.Status == "Attested"),
-            DeclinedCount = recipients.Count(r => r.Status == "Declined"),
+            PendingCount = recipients.Count(r => r.Status == ComplianceAttestationStatus.Pending),
+            AttestedCount = recipients.Count(r => r.Status == ComplianceAttestationStatus.Attested),
+            DeclinedCount = recipients.Count(r => r.Status == ComplianceAttestationStatus.Declined),
             Recipients = recipients,
         };
     }
