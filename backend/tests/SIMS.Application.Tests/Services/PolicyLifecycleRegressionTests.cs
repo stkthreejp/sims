@@ -271,6 +271,19 @@ public class PolicyLifecycleRegressionTests
         var invoiceRequest = Assert.Single(invoicing.BindRequests);
         Assert.True(invoiceRequest.IsEndorsement);
         Assert.Equal(transaction.Id, invoiceRequest.PolicyTransactionId);
+
+        var detailResult = await policyService.GetByIdAsync(fixture.Policy.Id, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(detailResult.IsSuccess);
+        var transactionDto = Assert.Single(detailResult.Value!.Transactions, t => t.Id == transaction.Id);
+        Assert.NotNull(transactionDto.PriorVersion);
+        Assert.NotNull(transactionDto.ResultingVersion);
+        Assert.Equal(1, transactionDto.PriorVersion.VersionNumber);
+        Assert.Equal(2, transactionDto.ResultingVersion.VersionNumber);
+        Assert.Equal(PolicyStatus.Active, transactionDto.PriorVersion.Status);
+        Assert.Equal(PolicyStatus.Active, transactionDto.ResultingVersion.Status);
+        Assert.Equal(1000m, transactionDto.PriorVersion.TotalPremium);
+        Assert.Equal(1125m, transactionDto.ResultingVersion.TotalPremium);
     }
 
     [Fact]

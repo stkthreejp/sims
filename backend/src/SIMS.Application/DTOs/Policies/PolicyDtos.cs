@@ -74,6 +74,8 @@ public class PolicyTransactionDto
     public Guid? RenewalQuoteId { get; set; }
     public Guid? PriorPolicyVersionId { get; set; }
     public Guid? ResultingPolicyVersionId { get; set; }
+    public PolicyVersionSummaryDto? PriorVersion { get; set; }
+    public PolicyVersionSummaryDto? ResultingVersion { get; set; }
     public Guid? RequestedById { get; set; }
     public DateTime? RequestedAt { get; set; }
     public Guid? ReviewedById { get; set; }
@@ -105,6 +107,20 @@ public class PolicyTransactionDto
     public string ProcessedByName { get; set; } = string.Empty;
     public DateTime ProcessedAt { get; set; }
     public string? Notes { get; set; }
+}
+
+public class PolicyVersionSummaryDto
+{
+    public Guid Id { get; set; }
+    public int VersionNumber { get; set; }
+    public DateOnly EffectiveDate { get; set; }
+    public DateOnly ExpirationDate { get; set; }
+    public PolicyStatus Status { get; set; }
+    public decimal PremiumAmount { get; set; }
+    public decimal TaxesAndFees { get; set; }
+    public decimal TotalPremium { get; set; }
+    public Guid? RatingSnapshotId { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class CreateEndorsementDto

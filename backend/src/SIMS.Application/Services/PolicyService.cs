@@ -95,6 +95,7 @@ public class PolicyService : IPolicyService
             .Include(p => p.Carrier)
             .Include(p => p.BoundQuote)
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Versions)
             .Where(p => p.Id == id && !p.IsDeleted)
             .ForAccessScope(access)
             .FirstOrDefaultAsync();
@@ -831,10 +832,7 @@ public class PolicyService : IPolicyService
             Limit = quote?.Limit,
             UninsuredMotoristLimit = quote?.UninsuredMotoristLimit,
             MedicalPaymentsLimit = quote?.MedicalPaymentsLimit,
-            Transactions = p.Transactions
-                .OrderBy(t => t.ProcessedAt)
-                .Select(MapToTransactionDto)
-                .ToList(),
+            Transactions = MapTransactionDtos(p),
             CreatedAt = p.CreatedAt,
         };
     }
@@ -870,7 +868,19 @@ public class PolicyService : IPolicyService
         return needles.Any(n => value.Contains(n, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static PolicyTransactionDto MapToTransactionDto(PolicyTransaction t) => new()
+    private static List<PolicyTransactionDto> MapTransactionDtos(Policy policy)
+    {
+        var versions = policy.Versions.ToDictionary(v => v.Id);
+        return policy.Transactions
+            .OrderBy(t => t.ProcessedAt)
+            .Select(t => MapToTransactionDto(t, versions))
+            .ToList();
+    }
+
+    private static PolicyTransactionDto MapToTransactionDto(PolicyTransaction t)
+        => MapToTransactionDto(t, new Dictionary<Guid, PolicyVersion>());
+
+    private static PolicyTransactionDto MapToTransactionDto(PolicyTransaction t, IReadOnlyDictionary<Guid, PolicyVersion> versions) => new()
     {
         Id = t.Id,
         PolicyId = t.PolicyId,
@@ -883,6 +893,12 @@ public class PolicyService : IPolicyService
         RenewalQuoteId = t.RenewalQuoteId,
         PriorPolicyVersionId = t.PriorPolicyVersionId,
         ResultingPolicyVersionId = t.ResultingPolicyVersionId,
+        PriorVersion = t.PriorPolicyVersionId.HasValue && versions.TryGetValue(t.PriorPolicyVersionId.Value, out var priorVersion)
+            ? MapToVersionSummaryDto(priorVersion)
+            : null,
+        ResultingVersion = t.ResultingPolicyVersionId.HasValue && versions.TryGetValue(t.ResultingPolicyVersionId.Value, out var resultingVersion)
+            ? MapToVersionSummaryDto(resultingVersion)
+            : null,
         RequestedById = t.RequestedById,
         RequestedAt = t.RequestedAt,
         ReviewedById = t.ReviewedById,
@@ -916,6 +932,20 @@ public class PolicyService : IPolicyService
             : "",
         ProcessedAt = t.ProcessedAt,
         Notes = t.Notes,
+    };
+
+    private static PolicyVersionSummaryDto MapToVersionSummaryDto(PolicyVersion version) => new()
+    {
+        Id = version.Id,
+        VersionNumber = version.VersionNumber,
+        EffectiveDate = version.EffectiveDate,
+        ExpirationDate = version.ExpirationDate,
+        Status = version.Status,
+        PremiumAmount = version.PremiumAmount,
+        TaxesAndFees = version.TaxesAndFees,
+        TotalPremium = version.TotalPremium,
+        RatingSnapshotId = version.RatingSnapshotId,
+        CreatedAt = version.CreatedAt,
     };
 
     private static IReadOnlyList<CancellationComplianceChecklistItemDto> DeserializeChecklist(string? json)

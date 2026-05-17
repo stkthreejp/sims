@@ -726,7 +726,62 @@ function TransactionRows({ transaction: t }: { transaction: PolicyTransaction })
       {t.transactionType === 'Cancellation' && (
         <CancellationTransactionDetails transaction={t} />
       )}
+      {(t.priorVersion || t.resultingVersion) && (
+        <VersionChangeDetails transaction={t} />
+      )}
     </>
+  )
+}
+
+function VersionChangeDetails({ transaction }: { transaction: PolicyTransaction }) {
+  const prior = transaction.priorVersion
+  const resulting = transaction.resultingVersion
+
+  return (
+    <tr>
+      <td colSpan={7} className="px-5 pb-4">
+        <div className="grid gap-3 rounded border bg-slate-50/70 p-3 text-sm sm:grid-cols-[1fr_auto_1fr]">
+          <VersionSummary label="Before" version={prior} />
+          <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+          <VersionSummary label="After" version={resulting} />
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function VersionSummary({ label, version }: { label: string; version: PolicyTransaction['priorVersion'] }) {
+  if (!version) {
+    return (
+      <div>
+        <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
+        <div className="mt-1 text-slate-500">No version snapshot</div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase text-slate-500">{label}</span>
+        <span className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-700">v{version.versionNumber}</span>
+        <span className={`sd-pill ${POLICY_STATUS_PILL[version.status]}`}>{POLICY_STATUS_LABELS[version.status]}</span>
+      </div>
+      <div className="mt-2 grid gap-2 text-slate-700 sm:grid-cols-3">
+        <div>
+          <div className="text-xs text-slate-500">Term</div>
+          <div>{formatDate(version.effectiveDate)} - {formatDate(version.expirationDate)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-slate-500">Premium</div>
+          <div>{formatCurrency(version.premiumAmount)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-slate-500">Total</div>
+          <div className="font-medium">{formatCurrency(version.totalPremium)}</div>
+        </div>
+      </div>
+    </div>
   )
 }
 

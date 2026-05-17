@@ -117,6 +117,8 @@ export interface PolicyTransaction {
   renewalQuoteId: string | null
   priorPolicyVersionId: string | null
   resultingPolicyVersionId: string | null
+  priorVersion: PolicyVersionSummary | null
+  resultingVersion: PolicyVersionSummary | null
   requestedById: string | null
   requestedAt: string | null
   reviewedById: string | null
@@ -148,6 +150,19 @@ export interface PolicyTransaction {
   processedByName: string
   processedAt: string
   notes: string | null
+}
+
+export interface PolicyVersionSummary {
+  id: string
+  versionNumber: number
+  effectiveDate: string
+  expirationDate: string
+  status: PolicyStatus
+  premiumAmount: number
+  taxesAndFees: number
+  totalPremium: number
+  ratingSnapshotId: string | null
+  createdAt: string
 }
 
 export interface Policy {
