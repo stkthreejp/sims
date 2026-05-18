@@ -46,6 +46,7 @@ public enum DocumentType
     Other,
     PolicyPacketPreview,
     IssuedPolicyPacket,
+    ProofOfNotice,
 }
 
 public enum DocumentEntityType

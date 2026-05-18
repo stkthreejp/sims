@@ -623,6 +623,37 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task PolicyTransactionArtifacts_ReturnsNoticeAndProofDocumentsForTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.Cancellation,
+            Status = PolicyTransactionStatus.NoticeSent,
+            TransactionNumber = "TXN-NOTICE-1",
+            EffectiveDate = fixture.Policy.EffectiveDate.AddMonths(1),
+            ProcessedById = fixture.UserId,
+        };
+        var notice = AttachmentFor(fixture, transaction.Id, DocumentType.CancellationNonRenewal, "notice.pdf");
+        var proof = AttachmentFor(fixture, transaction.Id, DocumentType.ProofOfNotice, "proof.pdf");
+        var unrelatedProof = AttachmentFor(fixture, null, DocumentType.ProofOfNotice, "unlinked-proof.pdf");
+        db.AddRange(transaction, notice, proof, unrelatedProof);
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        var documents = result.Value!.Documents.OrderBy(d => d.FileName).ToList();
+        Assert.Equal(new[] { "notice.pdf", "proof.pdf" }, documents.Select(d => d.FileName).ToArray());
+        Assert.Contains(documents, d => d.DocumentType == DocumentType.CancellationNonRenewal && d.PolicyTransactionId == transaction.Id);
+        Assert.Contains(documents, d => d.DocumentType == DocumentType.ProofOfNotice && d.PolicyTransactionId == transaction.Id);
+    }
+
+    [Fact]
     public async Task PolicyTransactionArtifacts_ReturnsLinkedRatingSnapshot()
     {
         await using var db = CreateDb();
@@ -1212,6 +1243,20 @@ public class PolicyLifecycleRegressionTests
         Status = OutboundCommunicationStatus.Sent,
         CreatedById = fixture.UserId,
         CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
+    };
+
+    private static Attachment AttachmentFor(PolicyFixture fixture, Guid? policyTransactionId, DocumentType documentType, string fileName) => new()
+    {
+        QuoteId = fixture.Policy.BoundQuoteId,
+        EntityType = DocumentEntityType.Policy,
+        DocumentType = documentType,
+        PolicyTransactionId = policyTransactionId,
+        FileName = fileName,
+        BlobPath = fileName,
+        ContentType = "application/pdf",
+        FileSizeBytes = 123,
+        UploadedById = fixture.UserId,
+        UploadedBy = fixture.Policy.BoundQuote.CreatedBy,
     };
 
     private static Invoice InvoiceFor(string invoiceNumber, Guid policyTransactionId, decimal totalAmount, PolicyFixture fixture) => new()

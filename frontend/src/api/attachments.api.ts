@@ -23,11 +23,13 @@ export const attachmentsApi = {
     file: File,
     documentType: DocumentType,
     description?: string,
+    policyTransactionId?: string,
   ) => {
     const form = new FormData()
     form.append('file', file)
     form.append('documentType', documentType)
     if (description) form.append('description', description)
+    if (policyTransactionId) form.append('policyTransactionId', policyTransactionId)
     return apiClient
       .post<Attachment>(`/${entityPath(entityType)}/${entityId}/attachments`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },

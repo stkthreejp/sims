@@ -77,7 +77,8 @@ public class AttachmentService : IAttachmentService
     public async Task<Result<AttachmentDto>> UploadAsync(
         DocumentEntityType entityType, Guid entityId,
         IFormFile file, DocumentType documentType,
-        string? description, Guid userId)
+        string? description, Guid userId,
+        Guid? policyTransactionId = null)
     {
         if (!await CanAccessEntityAsync(entityType, entityId, userId))
             return Result<AttachmentDto>.Failure("ATTACHMENT_ACCESS_DENIED", "You do not have access to this attachment target.");
@@ -120,6 +121,7 @@ public class AttachmentService : IAttachmentService
             ContentType = contentType,
             FileSizeBytes = file.Length,
             Description = description,
+            PolicyTransactionId = policyTransactionId,
             UploadedById = userId,
         };
 

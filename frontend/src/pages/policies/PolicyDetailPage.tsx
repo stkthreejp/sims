@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Ban, FileSignature, FileX2, Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
+import { attachmentsApi } from '@/api/attachments.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
@@ -423,7 +424,12 @@ export function PolicyDetailPage() {
             </thead>
             <tbody>
               {policy.transactions.map((t) => (
-                <TransactionRows key={t.id} transaction={t} />
+                <TransactionRows
+                  key={t.id}
+                  transaction={t}
+                  policyDocumentEntityId={policy.boundQuoteId}
+                  canUploadProof={canUploadAttachments}
+                />
               ))}
             </tbody>
           </table>
@@ -704,11 +710,20 @@ function ReadinessIcon({ status }: { status: 'Ready' | 'Warning' | 'Blocked' }) 
   )
 }
 
-function TransactionRows({ transaction: t }: { transaction: PolicyTransaction }) {
+function TransactionRows({
+  transaction: t,
+  policyDocumentEntityId,
+  canUploadProof,
+}: {
+  transaction: PolicyTransaction
+  policyDocumentEntityId: string
+  canUploadProof: boolean
+}) {
   const { data: artifacts } = useQuery({
     queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'],
     queryFn: () => policiesApi.getTransactionArtifacts(t.policyId, t.id),
   })
+  const proofUploadApplies = t.transactionType === 'Cancellation' || t.transactionType === 'NonRenewal'
 
   return (
     <>
@@ -740,21 +755,63 @@ function TransactionRows({ transaction: t }: { transaction: PolicyTransaction })
         artifacts.ratingSnapshots.length > 0 ||
         artifacts.invoices.length > 0 ||
         artifacts.communications.length > 0 ||
-        artifacts.complianceChecklists.length > 0
+        artifacts.complianceChecklists.length > 0 ||
+        (canUploadProof && proofUploadApplies)
       ) && (
-        <TransactionArtifactDetails artifacts={artifacts} />
+        <TransactionArtifactDetails
+          artifacts={artifacts}
+          policyDocumentEntityId={policyDocumentEntityId}
+          canUploadProof={canUploadProof && proofUploadApplies}
+        />
       )}
     </>
   )
 }
 
-function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnType<typeof policiesApi.getTransactionArtifacts>> }) {
+function TransactionArtifactDetails({
+  artifacts,
+  policyDocumentEntityId,
+  canUploadProof,
+}: {
+  artifacts: Awaited<ReturnType<typeof policiesApi.getTransactionArtifacts>>
+  policyDocumentEntityId: string
+  canUploadProof: boolean
+}) {
+  const qc = useQueryClient()
+  const proofUpload = useMutation({
+    mutationFn: (file: File) =>
+      attachmentsApi.upload('Policy', policyDocumentEntityId, file, 'ProofOfNotice', 'Proof of notice', artifacts.transaction.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', artifacts.transaction.policyId, 'transactions', artifacts.transaction.id, 'artifacts'] })
+      toast.success('Proof of notice uploaded')
+    },
+    onError: () => toast.error('Proof upload failed'),
+  })
+
   return (
     <tr>
       <td colSpan={7} className="px-5 pb-4">
         <div className="grid gap-3 rounded border bg-white p-3 text-sm lg:grid-cols-5">
           <div>
-            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Documents</div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase text-slate-500">Documents</div>
+              {canUploadProof && (
+                <label className="sd-btn outline xs cursor-pointer">
+                  Upload proof
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                    disabled={proofUpload.isPending}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.currentTarget.value = ''
+                      if (file) proofUpload.mutate(file)
+                    }}
+                  />
+                </label>
+              )}
+            </div>
             {artifacts.documents.length === 0 ? (
               <div className="text-slate-500">No linked documents</div>
             ) : (
