@@ -46,6 +46,8 @@ export interface Attachment {
   id: string
   entityType: DocumentEntityType
   documentType: DocumentType
+  policyVersionId: string | null
+  policyVersionNumber: number | null
   fileName: string
   contentType: string
   fileSizeBytes: number

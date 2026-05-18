@@ -172,8 +172,13 @@ public class PolicyService : IPolicyService
         if (!packet.Value.IsReady)
             return Result<PolicyDto>.Failure("PACKET_NOT_READY", string.Join(" ", packet.Value.ReadinessMessages));
 
+        var newBusinessTxn = policy.Transactions
+            .Where(t => t.TransactionType == TransactionType.NewBusiness)
+            .OrderByDescending(t => t.ProcessedAt)
+            .FirstOrDefault();
+
         var assembly = (IPolicyAssemblyService)_sp.GetService(typeof(IPolicyAssemblyService))!;
-        var assemblyResult = await assembly.AssembleAndFileAsync(policyId, access.UserId);
+        var assemblyResult = await assembly.AssembleAndFileAsync(policyId, access.UserId, policyVersionId: newBusinessTxn?.ResultingPolicyVersionId);
         if (!assemblyResult.IsSuccess)
             return Result<PolicyDto>.Failure(assemblyResult.ErrorCode ?? "POLICY_PACKET_FAILED", assemblyResult.ErrorMessage ?? "Policy packet could not be assembled.");
 
@@ -184,11 +189,6 @@ public class PolicyService : IPolicyService
             policy.BoundQuote.IssuedDate = dto.IssuedDate;
             policy.BoundQuote.UpdatedAt = DateTime.UtcNow;
         }
-
-        var newBusinessTxn = policy.Transactions
-            .Where(t => t.TransactionType == TransactionType.NewBusiness)
-            .OrderByDescending(t => t.ProcessedAt)
-            .FirstOrDefault();
 
         if (!string.IsNullOrWhiteSpace(dto.Notes))
         {

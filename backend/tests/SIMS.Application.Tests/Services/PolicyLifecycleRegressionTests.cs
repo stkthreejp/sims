@@ -186,6 +186,19 @@ public class PolicyLifecycleRegressionTests
         await using var db = CreateDb();
         var fixture = await SeedBoundPolicyAsync(db);
         await SeedReadyPolicyFormsAsync(db, fixture.Quote);
+        var version = new PolicyVersion
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            VersionNumber = 1,
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ExpirationDate = fixture.Policy.ExpirationDate,
+            Status = fixture.Policy.Status,
+            PremiumAmount = fixture.Policy.PremiumAmount,
+            TaxesAndFees = fixture.Policy.TaxesAndFees,
+            TotalPremium = fixture.Policy.TotalPremium,
+            CreatedById = fixture.UserId,
+        };
         var transaction = new PolicyTransaction
         {
             PolicyId = fixture.Policy.Id,
@@ -194,13 +207,15 @@ public class PolicyLifecycleRegressionTests
             Status = PolicyTransactionStatus.Issued,
             TransactionNumber = "TXN-ISSUE-1",
             EffectiveDate = fixture.Policy.EffectiveDate,
+            ResultingPolicyVersionId = version.Id,
             PremiumChange = fixture.Policy.TotalPremium,
             NewTotalPremium = fixture.Policy.TotalPremium,
             ProcessedById = fixture.UserId,
         };
-        db.Add(transaction);
+        db.AddRange(version, transaction);
         await db.SaveChangesAsync();
-        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var assembly = new RecordingPolicyAssemblyService();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), assembly: assembly);
 
         var result = await policyService.IssueAsync(fixture.Policy.Id, new IssuePolicyDto
         {
@@ -212,6 +227,7 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(PolicyTransactionStatus.Completed, transaction.Status);
         Assert.Equal(fixture.UserId, transaction.CompletedById);
         Assert.NotNull(transaction.CompletedAt);
+        Assert.Equal(transaction.ResultingPolicyVersionId, assembly.AssembledPolicyVersionId);
         var history = await db.Set<PolicyTransactionStatusHistory>()
             .Where(h => h.PolicyTransactionId == transaction.Id)
             .OrderBy(h => h.ChangedAt)
@@ -771,10 +787,12 @@ public class PolicyLifecycleRegressionTests
     private sealed class RecordingPolicyAssemblyService : IPolicyAssemblyService
     {
         public bool WasCalled { get; private set; }
+        public Guid? AssembledPolicyVersionId { get; private set; }
 
-        public Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false)
+        public Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false, Guid? policyVersionId = null)
         {
             WasCalled = true;
+            AssembledPolicyVersionId = policyVersionId;
             return Task.FromResult(Result<GeneratedDocumentDto>.Success(DocumentResult()));
         }
 

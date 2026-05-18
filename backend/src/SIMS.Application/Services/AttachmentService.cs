@@ -57,6 +57,7 @@ public class AttachmentService : IAttachmentService
         var q = _db.Set<Attachment>()
             .AsNoTracking()
             .Include(a => a.UploadedBy)
+            .Include(a => a.PolicyVersion)
             .Where(a => a.EntityType == entityType);
 
         q = entityType switch
@@ -148,7 +149,8 @@ public class AttachmentService : IAttachmentService
         long fileSizeBytes,
         DocumentType documentType,
         string? description,
-        Guid userId)
+        Guid userId,
+        Guid? policyVersionId = null)
     {
         if (!await CanAccessEntityAsync(entityType, entityId, userId))
             return Result<AttachmentDto>.Failure("ATTACHMENT_ACCESS_DENIED", "You do not have access to this attachment target.");
@@ -185,6 +187,7 @@ public class AttachmentService : IAttachmentService
             ContentType = contentType,
             FileSizeBytes = fileSizeBytes,
             Description = description,
+            PolicyVersionId = policyVersionId,
             UploadedById = userId,
         };
 
@@ -200,6 +203,8 @@ public class AttachmentService : IAttachmentService
         _db.Set<Attachment>().Add(attachment);
         await _db.SaveChangesAsync();
         await _db.Entry(attachment).Reference(a => a.UploadedBy).LoadAsync();
+        if (attachment.PolicyVersionId.HasValue)
+            await _db.Entry(attachment).Reference(a => a.PolicyVersion).LoadAsync();
 
         return Result<AttachmentDto>.Success(MapToDto(attachment));
     }
@@ -240,6 +245,8 @@ public class AttachmentService : IAttachmentService
         Id = a.Id,
         EntityType = a.EntityType,
         DocumentType = a.DocumentType,
+        PolicyVersionId = a.PolicyVersionId,
+        PolicyVersionNumber = a.PolicyVersion?.VersionNumber,
         FileName = a.FileName,
         ContentType = a.ContentType,
         FileSizeBytes = a.FileSizeBytes,

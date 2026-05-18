@@ -200,6 +200,11 @@ function DocumentRow({
             {attachment.description && (
               <span className="text-xs text-slate-400 truncate">- {attachment.description}</span>
             )}
+            {attachment.policyVersionNumber != null && (
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+                v{attachment.policyVersionNumber}
+              </span>
+            )}
             <span className="text-xs text-slate-400">
               - {attachment.uploadedByName} - {new Date(attachment.createdAt).toLocaleDateString()}
             </span>
