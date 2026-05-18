@@ -7,6 +7,8 @@ export interface InvoiceSummary {
   totalFees: number
   totalAmount: number
   status: string
+  policyTransactionId: string | null
+  policyVersionId: string | null
 }
 
 export interface InvoiceLineItem {
@@ -48,5 +50,6 @@ export interface CreateInvoiceRequest {
   licenseType?: string
   locationCount: number
   vehicleCount: number
-  policyTransactionId?: number
+  policyTransactionId?: string
+  policyVersionId?: string
 }

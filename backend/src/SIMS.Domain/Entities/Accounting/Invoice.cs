@@ -1,3 +1,5 @@
+using SIMS.Domain.Entities;
+
 namespace SIMS.Domain.Entities.Accounting;
 
 public class Invoice
@@ -6,6 +8,7 @@ public class Invoice
     public int TenantId { get; set; } = 1;
     public string InvoiceNumber { get; set; } = string.Empty;
     public Guid? PolicyTransactionId { get; set; }
+    public Guid? PolicyVersionId { get; set; }
     public DateOnly EffectiveDate { get; set; }
     public DateOnly InvoiceDate { get; set; }
     public decimal GrossPremium { get; set; }
@@ -20,4 +23,5 @@ public class Invoice
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
+    public PolicyVersion? PolicyVersion { get; set; }
 }

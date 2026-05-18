@@ -160,6 +160,69 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(fixture.Quote.PremiumAmount, invoiceRequest.GrossPremium);
         Assert.Equal(fixture.Quote.CarrierId, invoiceRequest.CarrierId);
         Assert.NotNull(invoiceRequest.PolicyTransactionId);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync();
+        Assert.Equal(transaction.ResultingPolicyVersionId, invoiceRequest.PolicyVersionId);
+    }
+
+    [Fact]
+    public async Task Invoice_CanReconcileToResultingPolicyVersion()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        await SeedLedgerAccountsAsync(db);
+        var version = new PolicyVersion
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            VersionNumber = 1,
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ExpirationDate = fixture.Policy.ExpirationDate,
+            Status = fixture.Policy.Status,
+            PremiumAmount = fixture.Policy.PremiumAmount,
+            TaxesAndFees = fixture.Policy.TaxesAndFees,
+            TotalPremium = fixture.Policy.TotalPremium,
+            CreatedById = fixture.UserId,
+        };
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.NewBusiness,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = "TXN-INVOICE-1",
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ResultingPolicyVersionId = version.Id,
+            PremiumChange = fixture.Policy.TotalPremium,
+            NewTotalPremium = fixture.Policy.TotalPremium,
+            ProcessedById = fixture.UserId,
+        };
+        db.AddRange(version, transaction);
+        await db.SaveChangesAsync();
+        var services = new ServiceCollection()
+            .AddSingleton<DbContext>(db)
+            .BuildServiceProvider();
+        var invoicing = new InvoicingService(services, new EmptyFeeCalculationService(), new RecordingLedgerService());
+
+        var result = await invoicing.BindAsync(new CreateInvoiceRequest(
+            EffectiveDate: fixture.Policy.EffectiveDate,
+            GrossPremium: fixture.Policy.PremiumAmount,
+            StateCode: fixture.Insured.State,
+            IsEndorsement: false,
+            IsFilingState: false,
+            CarrierId: fixture.Policy.CarrierId,
+            CompanyId: fixture.Quote.CompanyId,
+            ProducerId: fixture.Quote.ProducerId,
+            LineOfBusiness: fixture.Policy.LineOfBusiness.ToString(),
+            City: null,
+            LicenseType: null,
+            PolicyTransactionId: transaction.Id), fixture.UserId);
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(transaction.Id, result.Value!.PolicyTransactionId);
+        Assert.Equal(version.Id, result.Value.PolicyVersionId);
+        var invoice = await db.Set<Invoice>().SingleAsync();
+        Assert.Equal(transaction.Id, invoice.PolicyTransactionId);
+        Assert.Equal(version.Id, invoice.PolicyVersionId);
     }
 
     [Fact]
@@ -287,6 +350,7 @@ public class PolicyLifecycleRegressionTests
         var invoiceRequest = Assert.Single(invoicing.BindRequests);
         Assert.True(invoiceRequest.IsEndorsement);
         Assert.Equal(transaction.Id, invoiceRequest.PolicyTransactionId);
+        Assert.Equal(transaction.ResultingPolicyVersionId, invoiceRequest.PolicyVersionId);
 
         var detailResult = await policyService.GetByIdAsync(fixture.Policy.Id, UserAccessScope.All(fixture.UserId));
 
@@ -685,6 +749,16 @@ public class PolicyLifecycleRegressionTests
         await db.SaveChangesAsync();
     }
 
+    private static async Task SeedLedgerAccountsAsync(ApplicationDbContext db)
+    {
+        db.AddRange(
+            new LedgerAccount { InternalCode = "1200", ExternalLabel = "Accounts Receivable", AccountType = "Asset" },
+            new LedgerAccount { InternalCode = "2100", ExternalLabel = "Carrier Payable", AccountType = "Liability" },
+            new LedgerAccount { InternalCode = "4100", ExternalLabel = "Commission Revenue", AccountType = "Revenue" },
+            new LedgerAccount { InternalCode = "5100", ExternalLabel = "Commission Expense", AccountType = "Expense" });
+        await db.SaveChangesAsync();
+    }
+
     private static QuoteFixture CreateQuoteFixture(string insuredName)
     {
         var userId = Guid.NewGuid();
@@ -772,6 +846,8 @@ public class PolicyLifecycleRegressionTests
                 0m,
                 req.GrossPremium,
                 "Posted",
+                req.PolicyTransactionId,
+                req.PolicyVersionId,
                 Guid.NewGuid(),
                 [],
                 [])));
@@ -782,6 +858,33 @@ public class PolicyLifecycleRegressionTests
 
         public Task<Result<InvoiceDetailDto>> GetInvoiceAsync(long id, CancellationToken ct = default)
             => Task.FromResult(Result<InvoiceDetailDto>.Failure("NOT_FOUND", "Invoice not found."));
+    }
+
+    private sealed class EmptyFeeCalculationService : IFeeCalculationService
+    {
+        public Task<FeeCalculationResult> CalculateAsync(PolicyContext ctx, CancellationToken ct = default)
+            => Task.FromResult(new FeeCalculationResult([]));
+    }
+
+    private sealed class RecordingLedgerService : ILedgerService
+    {
+        public Task<Guid> PostInvoiceAsync(Invoice invoice, int arAccountId, int carrierApAccountId, int commissionAccountId, int agentCommissionExpenseAccountId, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(Guid.NewGuid());
+
+        public Task<Guid> PostReceiptAsync(Receipt receipt, int trustAccountId, int unappliedCashAccountId, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(Guid.NewGuid());
+
+        public Task<Guid> PostCashApplicationAsync(Receipt receipt, Invoice invoice, decimal grossApplied, decimal commissionAmount, int unappliedCashAccountId, int commissionExpenseAccountId, int arAccountId, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(Guid.NewGuid());
+
+        public Task<Guid> PostDisbursementAsync(Disbursement disbursementWithLines, int trustAccountId, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(Guid.NewGuid());
+
+        public Task<Guid> PostDistributionSweepAsync(CashMovementInstruction instruction, int trustAccountId, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(Guid.NewGuid());
+
+        public Task<Guid> ReverseTransactionGroupAsync(Guid transactionId, string voidReason, Guid userId, DateOnly effectiveDate, CancellationToken ct = default)
+            => Task.FromResult(Guid.NewGuid());
     }
 
     private sealed class RecordingPolicyAssemblyService : IPolicyAssemblyService

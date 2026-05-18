@@ -23,8 +23,15 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .HasForeignKey(l => l.InvoiceId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(e => e.PolicyVersion)
+            .WithMany()
+            .HasForeignKey(e => e.PolicyVersionId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasIndex(e => e.InvoiceNumber).IsUnique();
         builder.HasIndex(e => e.LedgerTransactionId);
+        builder.HasIndex(e => e.PolicyVersionId);
         builder.HasIndex(e => new { e.TenantId, e.InvoiceDate });
     }
 }

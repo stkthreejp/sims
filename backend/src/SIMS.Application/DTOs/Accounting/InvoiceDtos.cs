@@ -14,7 +14,8 @@ public record CreateInvoiceRequest(
     string? LicenseType,
     int LocationCount = 1,
     int VehicleCount = 1,
-    Guid? PolicyTransactionId = null
+    Guid? PolicyTransactionId = null,
+    Guid? PolicyVersionId = null
 );
 
 public record InvoiceSummaryDto(
@@ -25,7 +26,9 @@ public record InvoiceSummaryDto(
     decimal GrossPremium,
     decimal TotalFees,
     decimal TotalAmount,
-    string Status
+    string Status,
+    Guid? PolicyTransactionId,
+    Guid? PolicyVersionId
 );
 
 public record InvoiceLineDto(
@@ -57,6 +60,8 @@ public record InvoiceDetailDto(
     decimal TotalFees,
     decimal TotalAmount,
     string Status,
+    Guid? PolicyTransactionId,
+    Guid? PolicyVersionId,
     Guid LedgerTransactionId,
     IReadOnlyList<InvoiceLineDto> Lines,
     IReadOnlyList<LedgerEntryDto> LedgerEntries

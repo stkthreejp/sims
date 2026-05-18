@@ -374,7 +374,7 @@ public class QuoteService : IQuoteService
         };
         Db.Set<PolicyTransaction>().Add(transaction);
         await Db.SaveChangesAsync();
-        await _policyVersions.CreateVersionAsync(policy, transaction, null, access.UserId);
+        var policyVersion = await _policyVersions.CreateVersionAsync(policy, transaction, null, access.UserId);
         await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "New business transaction created during quote bind.");
 
         // Auto-create invoice
@@ -393,7 +393,8 @@ public class QuoteService : IQuoteService
             LicenseType: null,
             LocationCount: quote.Submission?.Locations?.Count(l => !l.IsDeleted) ?? 1,
             VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
-            PolicyTransactionId: transaction.Id
+            PolicyTransactionId: transaction.Id,
+            PolicyVersionId: policyVersion.Id
         );
         var invoiceResult = await invoicing.BindAsync(invoiceReq, access.UserId);
         if (!invoiceResult.IsSuccess)

@@ -438,7 +438,7 @@ public class PolicyService : IPolicyService
             return Result<PolicyTransactionDto>.Failure(transitionResult.ErrorCode ?? "STATUS_TRANSITION_FAILED", transitionResult.ErrorMessage ?? "Endorsement status could not be updated.");
 
         txn.Policy.TotalPremium = txn.NewTotalPremium;
-        await _policyVersions.CreateVersionAsync(txn.Policy, txn, priorVersion, access.UserId);
+        var policyVersion = await _policyVersions.CreateVersionAsync(txn.Policy, txn, priorVersion, access.UserId);
         await Db.SaveChangesAsync();
 
         // Auto-create invoice
@@ -460,7 +460,8 @@ public class PolicyService : IPolicyService
                 LicenseType: null,
                 LocationCount: submission.Locations?.Count(l => !l.IsDeleted) ?? 1,
                 VehicleCount: submission.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
-                PolicyTransactionId: txn.Id
+                PolicyTransactionId: txn.Id,
+                PolicyVersionId: policyVersion.Id
             );
             await _invoicing.BindAsync(req, access.UserId);
         }

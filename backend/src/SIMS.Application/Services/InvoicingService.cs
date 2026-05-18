@@ -56,6 +56,7 @@ public class InvoicingService : IInvoicingService
 
         // Load quote for commission rates (rates are stamped at quote creation; override rates take precedence)
         Quote? quote = null;
+        var policyVersionId = req.PolicyVersionId;
         if (req.PolicyTransactionId.HasValue)
         {
             var txn = await db.Set<PolicyTransaction>()
@@ -65,6 +66,7 @@ public class InvoicingService : IInvoicingService
 
             if (txn != null)
             {
+                policyVersionId ??= txn.ResultingPolicyVersionId;
                 quote = txn.Policy?.BoundQuote;
                 carrierId = txn.Policy?.CarrierId;
                 if (carrierId.HasValue)
@@ -106,6 +108,7 @@ public class InvoicingService : IInvoicingService
         {
             InvoiceNumber = invoiceNumber,
             PolicyTransactionId = req.PolicyTransactionId,
+            PolicyVersionId = policyVersionId,
             EffectiveDate = req.EffectiveDate,
             InvoiceDate = invoiceDate,
             GrossPremium = req.GrossPremium,
@@ -226,7 +229,8 @@ public class InvoicingService : IInvoicingService
             .ThenByDescending(i => i.Id)
             .Select(i => new InvoiceSummaryDto(
                 i.Id, i.InvoiceNumber, i.InvoiceDate, i.EffectiveDate,
-                i.GrossPremium, i.TotalFees, i.TotalAmount, i.Status))
+                i.GrossPremium, i.TotalFees, i.TotalAmount, i.Status,
+                i.PolicyTransactionId, i.PolicyVersionId))
             .ToListAsync(ct);
     }
 
@@ -263,6 +267,8 @@ public class InvoicingService : IInvoicingService
             invoice.TotalFees,
             invoice.TotalAmount,
             invoice.Status,
+            invoice.PolicyTransactionId,
+            invoice.PolicyVersionId,
             invoice.LedgerTransactionId,
             invoice.Lines
                 .OrderBy(l => l.Id)
