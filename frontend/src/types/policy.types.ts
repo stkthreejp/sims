@@ -2,6 +2,7 @@ import type { PolicyLineOfBusiness } from './quote.types'
 import type { PolicyFormType } from './policyForm.types'
 import type { Attachment } from './attachment.types'
 import type { InvoiceSummary } from './invoice.types'
+import type { OutboundCommunicationListItem } from './outboundCommunication.types'
 
 export type PolicyStatus = 'Active' | 'Renewed' | 'NonRenewed' | 'Expired' | 'Cancelled'
 export type PolicyTransactionStatus =
@@ -171,6 +172,7 @@ export interface PolicyTransactionArtifacts {
   transaction: PolicyTransaction
   documents: Attachment[]
   invoices: InvoiceSummary[]
+  communications: OutboundCommunicationListItem[]
 }
 
 export interface Policy {

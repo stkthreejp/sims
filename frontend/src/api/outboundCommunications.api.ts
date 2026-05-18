@@ -9,9 +9,9 @@ import type {
 } from '@/types/outboundCommunication.types'
 
 export const outboundCommunicationsApi = {
-  getForEntity: (entityType: OutboundCommunicationEntityType, entityId: string) =>
+  getForEntity: (entityType: OutboundCommunicationEntityType, entityId: string, policyTransactionId?: string) =>
     apiClient
-      .get<OutboundCommunicationListItem[]>('/outbound-communications', { params: { entityType, entityId } })
+      .get<OutboundCommunicationListItem[]>('/outbound-communications', { params: { entityType, entityId, policyTransactionId } })
       .then((r) => r.data),
 
   getById: (id: string) =>

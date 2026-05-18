@@ -6,6 +6,9 @@ public class OutboundCommunication : BaseEntity
 {
     public OutboundCommunicationEntityType EntityType { get; set; }
     public Guid EntityId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
+    public PolicyTransaction? PolicyTransaction { get; set; }
+    public OutboundCommunicationPurpose Purpose { get; set; } = OutboundCommunicationPurpose.Other;
     public Guid? TemplateId { get; set; }
     public DocumentTemplate? Template { get; set; }
 

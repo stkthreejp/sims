@@ -735,7 +735,7 @@ function TransactionRows({ transaction: t }: { transaction: PolicyTransaction })
       {(t.priorVersion || t.resultingVersion) && (
         <VersionChangeDetails transaction={t} />
       )}
-      {artifacts && (artifacts.documents.length > 0 || artifacts.invoices.length > 0) && (
+      {artifacts && (artifacts.documents.length > 0 || artifacts.invoices.length > 0 || artifacts.communications.length > 0) && (
         <TransactionArtifactDetails artifacts={artifacts} />
       )}
     </>
@@ -746,7 +746,7 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
   return (
     <tr>
       <td colSpan={7} className="px-5 pb-4">
-        <div className="grid gap-3 rounded border bg-white p-3 text-sm md:grid-cols-2">
+        <div className="grid gap-3 rounded border bg-white p-3 text-sm lg:grid-cols-3">
           <div>
             <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Documents</div>
             {artifacts.documents.length === 0 ? (
@@ -758,7 +758,7 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
                     <div className="min-w-0">
                       <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
                       <div className="text-xs text-slate-500">
-                        {DOCUMENT_TYPE_LABELS[doc.documentType]}{doc.policyVersionNumber != null ? ` · v${doc.policyVersionNumber}` : ''}
+                        {DOCUMENT_TYPE_LABELS[doc.documentType]}{doc.policyVersionNumber != null ? ` - v${doc.policyVersionNumber}` : ''}
                       </div>
                     </div>
                     <span className="shrink-0 text-xs text-slate-400">{formatDate(doc.createdAt)}</span>
@@ -777,9 +777,42 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
                   <div key={invoice.id} className="flex items-center justify-between gap-3">
                     <div>
                       <div className="font-medium text-slate-800">{invoice.invoiceNumber}</div>
-                      <div className="text-xs text-slate-500">{invoice.status} · {formatDate(invoice.invoiceDate)}</div>
+                      <div className="text-xs text-slate-500">{invoice.status} - {formatDate(invoice.invoiceDate)}</div>
                     </div>
                     <span className="font-mono text-slate-700">{formatCurrency(invoice.totalAmount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Communications</div>
+            {artifacts.communications.length === 0 ? (
+              <div className="text-slate-500">No linked communications</div>
+            ) : (
+              <div className="space-y-2">
+                {artifacts.communications.map((communication) => (
+                  <div key={communication.id} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-800">{communication.subject}</div>
+                      <div className="text-xs text-slate-500">
+                        {formatCommunicationPurpose(communication.purpose)} - {communication.status}
+                      </div>
+                    </div>
+                    {communication.graphMessageWebLink ? (
+                      <a
+                        href={communication.graphMessageWebLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-700"
+                      >
+                        Open
+                      </a>
+                    ) : (
+                      <span className="shrink-0 text-xs text-slate-400">
+                        {communication.sentAt ? formatDate(communication.sentAt) : formatDate(communication.createdAt)}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -789,6 +822,10 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
       </td>
     </tr>
   )
+}
+
+function formatCommunicationPurpose(purpose: string) {
+  return purpose.replace(/([a-z])([A-Z])/g, '$1 $2')
 }
 
 function VersionChangeDetails({ transaction }: { transaction: PolicyTransaction }) {

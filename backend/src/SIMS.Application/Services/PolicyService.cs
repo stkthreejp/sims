@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Attachments;
+using SIMS.Application.DTOs.OutboundCommunications;
 using SIMS.Application.DTOs.Policies;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
@@ -166,12 +167,43 @@ public class PolicyService : IPolicyService
                 i.PolicyVersionId))
             .ToListAsync();
 
+        var communicationRows = await Db.Set<OutboundCommunication>()
+            .AsNoTracking()
+            .Include(c => c.CreatedBy)
+            .Include(c => c.Attachments.Where(a => !a.IsDeleted))
+            .Where(c => c.PolicyTransactionId == transactionId && !c.IsDeleted)
+            .OrderByDescending(c => c.SentAt ?? c.CreatedAt)
+            .ThenByDescending(c => c.CreatedAt)
+            .ToListAsync();
+
+        var communications = communicationRows.Select(c => new OutboundCommunicationListItemDto
+            {
+                Id = c.Id,
+                EntityType = c.EntityType,
+                EntityId = c.EntityId,
+                PolicyTransactionId = c.PolicyTransactionId,
+                Purpose = c.Purpose,
+                ToAddress = c.ToAddress,
+                ToName = c.ToName,
+                FromAddress = c.FromAddress,
+                Subject = c.Subject,
+                Status = c.Status,
+                GraphMessageId = c.GraphMessageId,
+                GraphMessageWebLink = c.GraphMessageWebLink,
+                SentAt = c.SentAt,
+                CreatedByName = c.CreatedBy?.FullName ?? "",
+                AttachmentCount = c.Attachments?.Count ?? 0,
+                CreatedAt = c.CreatedAt,
+            })
+            .ToList();
+
         var versions = policy.Versions.ToDictionary(v => v.Id);
         return Result<PolicyTransactionArtifactsDto>.Success(new PolicyTransactionArtifactsDto
         {
             Transaction = MapToTransactionDto(transaction, versions),
             Documents = documents,
             Invoices = invoices,
+            Communications = communications,
         });
     }
 

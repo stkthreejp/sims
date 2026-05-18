@@ -7,11 +7,14 @@ public class OutboundCommunicationListItemDto
     public Guid Id { get; set; }
     public OutboundCommunicationEntityType EntityType { get; set; }
     public Guid EntityId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
+    public OutboundCommunicationPurpose Purpose { get; set; }
     public string ToAddress { get; set; } = string.Empty;
     public string? ToName { get; set; }
     public string FromAddress { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public OutboundCommunicationStatus Status { get; set; }
+    public string? GraphMessageId { get; set; }
     public string? GraphMessageWebLink { get; set; }
     public DateTime? SentAt { get; set; }
     public string CreatedByName { get; set; } = string.Empty;
@@ -24,6 +27,8 @@ public class OutboundCommunicationDto
     public Guid Id { get; set; }
     public OutboundCommunicationEntityType EntityType { get; set; }
     public Guid EntityId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
+    public OutboundCommunicationPurpose Purpose { get; set; }
     public Guid? TemplateId { get; set; }
     public string ToAddress { get; set; } = string.Empty;
     public string? ToName { get; set; }
@@ -56,6 +61,8 @@ public class OutboundCommunicationCreateDto
 {
     public OutboundCommunicationEntityType EntityType { get; set; }
     public Guid EntityId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
+    public OutboundCommunicationPurpose Purpose { get; set; } = OutboundCommunicationPurpose.Other;
     public Guid? TemplateId { get; set; }
     public string ToAddress { get; set; } = string.Empty;
     public string? ToName { get; set; }
@@ -71,6 +78,8 @@ public class OutboundCommunicationCreateDto
 
 public class OutboundCommunicationUpdateDto
 {
+    public Guid? PolicyTransactionId { get; set; }
+    public OutboundCommunicationPurpose Purpose { get; set; } = OutboundCommunicationPurpose.Other;
     public string ToAddress { get; set; } = string.Empty;
     public string? ToName { get; set; }
     public string? CcAddresses { get; set; }

@@ -22,12 +22,18 @@ public class OutboundCommunicationService : IOutboundCommunicationService
 
     public async Task<IEnumerable<OutboundCommunicationListItemDto>> GetForEntityAsync(
         OutboundCommunicationEntityType entityType,
-        Guid entityId)
+        Guid entityId,
+        Guid? policyTransactionId = null)
     {
-        var communications = await _db.Set<OutboundCommunication>()
+        var query = _db.Set<OutboundCommunication>()
             .Include(c => c.CreatedBy)
             .Include(c => c.Attachments.Where(a => !a.IsDeleted))
-            .Where(c => c.EntityType == entityType && c.EntityId == entityId && !c.IsDeleted)
+            .Where(c => c.EntityType == entityType && c.EntityId == entityId && !c.IsDeleted);
+
+        if (policyTransactionId.HasValue)
+            query = query.Where(c => c.PolicyTransactionId == policyTransactionId.Value);
+
+        var communications = await query
             .OrderByDescending(c => c.CreatedAt)
             .ToListAsync();
 
@@ -62,6 +68,8 @@ public class OutboundCommunicationService : IOutboundCommunicationService
         {
             EntityType = dto.EntityType,
             EntityId = dto.EntityId,
+            PolicyTransactionId = dto.PolicyTransactionId,
+            Purpose = dto.Purpose,
             TemplateId = dto.TemplateId,
             ToAddress = dto.ToAddress.Trim(),
             ToName = dto.ToName?.Trim(),
@@ -101,6 +109,8 @@ public class OutboundCommunicationService : IOutboundCommunicationService
             return Result<OutboundCommunicationDto>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
 
         communication.ToAddress = dto.ToAddress.Trim();
+        communication.PolicyTransactionId = dto.PolicyTransactionId;
+        communication.Purpose = dto.Purpose;
         communication.ToName = dto.ToName?.Trim();
         communication.CcAddresses = dto.CcAddresses?.Trim();
         communication.BccAddresses = dto.BccAddresses?.Trim();
@@ -524,11 +534,14 @@ public class OutboundCommunicationService : IOutboundCommunicationService
         Id = c.Id,
         EntityType = c.EntityType,
         EntityId = c.EntityId,
+        PolicyTransactionId = c.PolicyTransactionId,
+        Purpose = c.Purpose,
         ToAddress = c.ToAddress,
         ToName = c.ToName,
         FromAddress = c.FromAddress,
         Subject = c.Subject,
         Status = c.Status,
+        GraphMessageId = c.GraphMessageId,
         GraphMessageWebLink = c.GraphMessageWebLink,
         SentAt = c.SentAt,
         CreatedByName = c.CreatedBy?.FullName ?? string.Empty,
@@ -541,6 +554,8 @@ public class OutboundCommunicationService : IOutboundCommunicationService
         Id = c.Id,
         EntityType = c.EntityType,
         EntityId = c.EntityId,
+        PolicyTransactionId = c.PolicyTransactionId,
+        Purpose = c.Purpose,
         TemplateId = c.TemplateId,
         ToAddress = c.ToAddress,
         ToName = c.ToName,

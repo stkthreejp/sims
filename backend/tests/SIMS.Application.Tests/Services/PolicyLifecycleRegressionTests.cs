@@ -368,7 +368,7 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
-    public async Task PolicyTransactionArtifacts_ReturnsDocumentsAndInvoices()
+    public async Task PolicyTransactionArtifacts_ReturnsDocumentsInvoicesAndCommunications()
     {
         await using var db = CreateDb();
         var fixture = await SeedBoundPolicyAsync(db);
@@ -437,7 +437,41 @@ public class PolicyLifecycleRegressionTests
             LedgerTransactionId = Guid.NewGuid(),
             CreatedBy = fixture.UserId,
         };
-        db.AddRange(version, transaction, attachment, unrelatedAttachment, invoice);
+        var communication = new OutboundCommunication
+        {
+            EntityType = OutboundCommunicationEntityType.Policy,
+            EntityId = fixture.Policy.Id,
+            PolicyTransactionId = transaction.Id,
+            Purpose = OutboundCommunicationPurpose.PolicyIssue,
+            ToAddress = "agent@example.com",
+            FromAddress = "uw@example.com",
+            SenderType = OutboundCommunicationSenderType.CurrentUser,
+            Subject = "Issued policy",
+            BodyHtml = "<p>Issued policy attached.</p>",
+            Status = OutboundCommunicationStatus.Sent,
+            GraphMessageId = "graph-message-1",
+            GraphMessageWebLink = "https://graph.example/messages/1",
+            CreatedById = fixture.UserId,
+            CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
+            SentById = fixture.UserId,
+            SentBy = fixture.Policy.BoundQuote.CreatedBy,
+            SentAt = DateTime.UtcNow,
+        };
+        var unrelatedCommunication = new OutboundCommunication
+        {
+            EntityType = OutboundCommunicationEntityType.Policy,
+            EntityId = fixture.Policy.Id,
+            Purpose = OutboundCommunicationPurpose.Other,
+            ToAddress = "agent@example.com",
+            FromAddress = "uw@example.com",
+            SenderType = OutboundCommunicationSenderType.CurrentUser,
+            Subject = "Unlinked note",
+            BodyHtml = "<p>Not tied to the transaction.</p>",
+            Status = OutboundCommunicationStatus.Sent,
+            CreatedById = fixture.UserId,
+            CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
+        };
+        db.AddRange(version, transaction, attachment, unrelatedAttachment, invoice, communication, unrelatedCommunication);
         await db.SaveChangesAsync();
         var policyService = CreatePolicyService(db, new RecordingInvoicingService());
 
@@ -453,6 +487,55 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(invoice.Id, invoiceDto.Id);
         Assert.Equal(transaction.Id, invoiceDto.PolicyTransactionId);
         Assert.Equal(version.Id, invoiceDto.PolicyVersionId);
+        var communicationDto = Assert.Single(result.Value.Communications);
+        Assert.Equal(communication.Id, communicationDto.Id);
+        Assert.Equal(transaction.Id, communicationDto.PolicyTransactionId);
+        Assert.Equal(OutboundCommunicationPurpose.PolicyIssue, communicationDto.Purpose);
+        Assert.Equal("graph-message-1", communicationDto.GraphMessageId);
+        Assert.Equal("https://graph.example/messages/1", communicationDto.GraphMessageWebLink);
+    }
+
+    [Fact]
+    public async Task OutboundCommunications_CanBeFilteredByPolicyTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var firstTransaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.NewBusiness,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = "TXN-COMM-1",
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ProcessedById = fixture.UserId,
+        };
+        var secondTransaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.Cancellation,
+            Status = PolicyTransactionStatus.Submitted,
+            TransactionNumber = "TXN-COMM-2",
+            EffectiveDate = fixture.Policy.EffectiveDate.AddMonths(1),
+            ProcessedById = fixture.UserId,
+        };
+        db.AddRange(
+            firstTransaction,
+            secondTransaction,
+            CommunicationFor(fixture, firstTransaction.Id, OutboundCommunicationPurpose.PolicyIssue, "Policy issue notice"),
+            CommunicationFor(fixture, secondTransaction.Id, OutboundCommunicationPurpose.CancellationNotice, "Cancellation notice"));
+        await db.SaveChangesAsync();
+        var service = new OutboundCommunicationService(db, new DocumentMergeService(), new RecordingOutboundEmailSender());
+
+        var allPolicyCommunications = (await service.GetForEntityAsync(OutboundCommunicationEntityType.Policy, fixture.Policy.Id)).ToList();
+        var filteredCommunications = (await service.GetForEntityAsync(OutboundCommunicationEntityType.Policy, fixture.Policy.Id, secondTransaction.Id)).ToList();
+
+        Assert.Equal(2, allPolicyCommunications.Count);
+        var filtered = Assert.Single(filteredCommunications);
+        Assert.Equal(secondTransaction.Id, filtered.PolicyTransactionId);
+        Assert.Equal(OutboundCommunicationPurpose.CancellationNotice, filtered.Purpose);
+        Assert.Equal("Cancellation notice", filtered.Subject);
     }
 
     [Fact]
@@ -904,6 +987,22 @@ public class PolicyLifecycleRegressionTests
         return new QuoteFixture(userId, user, carrier, insured, submission, quote);
     }
 
+    private static OutboundCommunication CommunicationFor(PolicyFixture fixture, Guid policyTransactionId, OutboundCommunicationPurpose purpose, string subject) => new()
+    {
+        EntityType = OutboundCommunicationEntityType.Policy,
+        EntityId = fixture.Policy.Id,
+        PolicyTransactionId = policyTransactionId,
+        Purpose = purpose,
+        ToAddress = "agent@example.com",
+        FromAddress = "uw@example.com",
+        SenderType = OutboundCommunicationSenderType.CurrentUser,
+        Subject = subject,
+        BodyHtml = $"<p>{subject}</p>",
+        Status = OutboundCommunicationStatus.Sent,
+        CreatedById = fixture.UserId,
+        CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
+    };
+
     private sealed record QuoteFixture(Guid UserId, User User, Carrier Carrier, Insured Insured, Submission Submission, Quote Quote);
     private sealed record PolicyFixture(Guid UserId, Insured Insured, Submission Submission, Quote Quote, Policy Policy);
 
@@ -1004,6 +1103,12 @@ public class PolicyLifecycleRegressionTests
                 ContentType = "application/pdf",
                 CreatedAt = DateTime.UtcNow,
             });
+    }
+
+    private sealed class RecordingOutboundEmailSender : IOutboundEmailSenderService
+    {
+        public Task<Result<OutboundEmailSendResult>> SendAsync(OutboundCommunication communication, CancellationToken cancellationToken = default)
+            => Task.FromResult(Result<OutboundEmailSendResult>.Success(new OutboundEmailSendResult("message-id", "https://graph.example/messages/message-id")));
     }
 
     private sealed class RecordingQuoteService(ApplicationDbContext db) : IQuoteService

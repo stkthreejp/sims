@@ -19,6 +19,20 @@ public enum OutboundCommunicationStatus
     Cancelled = 4,
 }
 
+public enum OutboundCommunicationPurpose
+{
+    Proposal = 0,
+    Binder = 1,
+    PolicyIssue = 2,
+    Endorsement = 3,
+    CancellationNotice = 4,
+    NonRenewalNotice = 5,
+    RenewalInvitation = 6,
+    InternalReferral = 7,
+    CarrierReporting = 8,
+    Other = 9,
+}
+
 public enum OutboundCommunicationSenderType
 {
     CurrentUser = 0,

@@ -18,15 +18,30 @@ export type OutboundCommunicationSenderType =
   | 'SharedMailbox'
   | 'System'
 
+export type OutboundCommunicationPurpose =
+  | 'Proposal'
+  | 'Binder'
+  | 'PolicyIssue'
+  | 'Endorsement'
+  | 'CancellationNotice'
+  | 'NonRenewalNotice'
+  | 'RenewalInvitation'
+  | 'InternalReferral'
+  | 'CarrierReporting'
+  | 'Other'
+
 export interface OutboundCommunicationListItem {
   id: string
   entityType: OutboundCommunicationEntityType
   entityId: string
+  policyTransactionId: string | null
+  purpose: OutboundCommunicationPurpose
   toAddress: string
   toName: string | null
   fromAddress: string
   subject: string
   status: OutboundCommunicationStatus
+  graphMessageId: string | null
   graphMessageWebLink: string | null
   sentAt: string | null
   createdByName: string
@@ -43,6 +58,8 @@ export interface OutboundCommunication {
   id: string
   entityType: OutboundCommunicationEntityType
   entityId: string
+  policyTransactionId: string | null
+  purpose: OutboundCommunicationPurpose
   templateId: string | null
   toAddress: string
   toName: string | null
@@ -68,6 +85,8 @@ export interface OutboundCommunication {
 export interface OutboundCommunicationCreate {
   entityType: OutboundCommunicationEntityType
   entityId: string
+  policyTransactionId?: string
+  purpose?: OutboundCommunicationPurpose
   templateId?: string
   toAddress: string
   toName?: string
@@ -82,6 +101,8 @@ export interface OutboundCommunicationCreate {
 }
 
 export interface OutboundCommunicationUpdate {
+  policyTransactionId?: string
+  purpose?: OutboundCommunicationPurpose
   toAddress: string
   toName?: string
   ccAddresses?: string

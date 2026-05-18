@@ -22,8 +22,9 @@ public class OutboundCommunicationsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetForEntity(
         [FromQuery] OutboundCommunicationEntityType entityType,
-        [FromQuery] Guid entityId)
-        => Ok(await _service.GetForEntityAsync(entityType, entityId));
+        [FromQuery] Guid entityId,
+        [FromQuery] Guid? policyTransactionId)
+        => Ok(await _service.GetForEntityAsync(entityType, entityId, policyTransactionId));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)

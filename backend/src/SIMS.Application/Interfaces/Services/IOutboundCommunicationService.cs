@@ -6,7 +6,7 @@ namespace SIMS.Application.Interfaces.Services;
 
 public interface IOutboundCommunicationService
 {
-    Task<IEnumerable<OutboundCommunicationListItemDto>> GetForEntityAsync(OutboundCommunicationEntityType entityType, Guid entityId);
+    Task<IEnumerable<OutboundCommunicationListItemDto>> GetForEntityAsync(OutboundCommunicationEntityType entityType, Guid entityId, Guid? policyTransactionId = null);
     Task<Result<OutboundCommunicationDto>> GetByIdAsync(Guid id);
     Task<Result<OutboundCommunicationDto>> CreateDraftAsync(OutboundCommunicationCreateDto dto, Guid createdById);
     Task<Result<OutboundCommunicationDto>> UpdateDraftAsync(Guid id, OutboundCommunicationUpdateDto dto);
