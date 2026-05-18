@@ -945,13 +945,19 @@ function TransactionArtifactDetails({
             <CancellationSummary
               transaction={transaction}
               documents={artifacts.documents.filter((doc) => doc.documentType === 'CancellationNonRenewal' || doc.documentType === 'ProofOfNotice')}
+              canUploadProof={canUploadProof}
+              proofUploading={proofUpload.isPending}
+              onUploadProof={(file) => proofUpload.mutate(file)}
             />
           )}
 
           {activeSection === 'Compliance' && (
             <div className="space-y-3">
               {transaction.transactionType === 'Cancellation' && (
-                <CancellationSummary transaction={transaction} />
+                <CancellationSummary
+                  transaction={transaction}
+                  documents={artifacts.documents.filter((doc) => doc.documentType === 'CancellationNonRenewal' || doc.documentType === 'ProofOfNotice')}
+                />
               )}
               {artifacts.complianceChecklists.length === 0 ? (
                 <EmptyState text="No linked compliance checklist." />
@@ -1009,9 +1015,24 @@ function CompactRow({ title, meta, value, sub }: { title: string; meta?: string;
   )
 }
 
-function CancellationSummary({ transaction, documents = [] }: { transaction: PolicyTransaction; documents?: Attachment[] }) {
+function CancellationSummary({
+  transaction,
+  documents = [],
+  canUploadProof = false,
+  proofUploading = false,
+  onUploadProof,
+}: {
+  transaction: PolicyTransaction
+  documents?: Attachment[]
+  canUploadProof?: boolean
+  proofUploading?: boolean
+  onUploadProof?: (file: File) => void
+}) {
   const detail = transaction.cancellationDetail
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const noticeDocuments = documents.filter((doc) => doc.documentType === 'CancellationNonRenewal')
+  const proofDocuments = documents.filter((doc) => doc.documentType === 'ProofOfNotice')
+  const hasProof = proofDocuments.length > 0
 
   const downloadDocument = async (attachment: Attachment) => {
     setDownloadingId(attachment.id)
@@ -1034,7 +1055,12 @@ function CancellationSummary({ transaction, documents = [] }: { transaction: Pol
 
   return (
     <div className="rounded border border-red-100 bg-red-50/40 px-3 py-2 text-slate-700">
-      <div className="font-semibold text-slate-900">Cancellation Notice Detail</div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-semibold text-slate-900">Cancellation Notice Detail</div>
+        <span className={`sd-pill ${hasProof ? 'bound' : 'warning'}`}>
+          {hasProof ? 'Proof Filed' : 'Proof Not Filed'}
+        </span>
+      </div>
       <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
         <div><span className="text-slate-500">Reason:</span> {detail?.reasonLabel || transaction.cancellationReason || 'Not recorded'}</div>
         <div><span className="text-slate-500">Code:</span> {detail?.reasonCode || transaction.reasonCode || '-'}</div>
@@ -1044,14 +1070,36 @@ function CancellationSummary({ transaction, documents = [] }: { transaction: Pol
         <div><span className="text-slate-500">Cancellation Date:</span> {formatDate(detail?.cancellationEffectiveDate ?? transaction.effectiveDate)}</div>
         <div><span className="text-slate-500">Method:</span> {detail?.method || transaction.cancellationMethod || 'Not recorded'}</div>
         <div><span className="text-slate-500">Template:</span> {detail?.noticeTemplateName || (detail?.noticeTemplateId ? 'Selected template' : 'Default or not recorded')}</div>
+        <div><span className="text-slate-500">Proof:</span> {hasProof ? `${proofDocuments.length} document${proofDocuments.length === 1 ? '' : 's'} filed` : 'Not filed'}</div>
       </div>
       {detail?.resolvedReasonLanguage && (
         <p className="mt-2 text-xs text-slate-700">{detail.resolvedReasonLanguage}</p>
       )}
+      {!hasProof && (
+        <p className="mt-2 text-xs text-slate-500">Proof of notice is tracked here when applicable, but it is not required to complete every cancellation.</p>
+      )}
+      {canUploadProof && onUploadProof && (
+        <div className="mt-3">
+          <label className="sd-btn outline xs cursor-pointer">
+            {proofUploading ? 'Uploading...' : 'Upload proof'}
+            <input
+              type="file"
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+              disabled={proofUploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.currentTarget.value = ''
+                if (file) onUploadProof(file)
+              }}
+            />
+          </label>
+        </div>
+      )}
       {documents.length > 0 && (
         <div className="mt-3 space-y-1">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notice Documents</div>
-          {documents.map((doc) => (
+          {[...noticeDocuments, ...proofDocuments].map((doc) => (
             <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-red-100 bg-white/80 px-2.5 py-2 text-xs">
               <div className="min-w-0">
                 <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
