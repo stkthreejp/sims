@@ -231,6 +231,39 @@ public class ReportService : IReportService
             periods.Sum(p => p.CashReceived));
     }
 
+    public async Task<InvoiceTotalsByPolicyTransactionDto> GetInvoiceTotalsByPolicyTransactionAsync(CancellationToken ct = default)
+    {
+        var rows = await (
+            from invoice in Db.Set<Invoice>()
+            where invoice.TenantId == 1 && invoice.Status != "Voided"
+            join txn in Db.Set<PolicyTransaction>() on invoice.PolicyTransactionId equals txn.Id into txnGroup
+            from txn in txnGroup.DefaultIfEmpty()
+            join version in Db.Set<PolicyVersion>() on invoice.PolicyVersionId equals version.Id into versionGroup
+            from version in versionGroup.DefaultIfEmpty()
+            group new { invoice, txn, version } by new
+            {
+                invoice.PolicyTransactionId,
+                TransactionNumber = txn != null ? txn.TransactionNumber : null,
+                TransactionType = txn != null ? (Domain.Enums.TransactionType?)txn.TransactionType : null,
+                invoice.PolicyVersionId,
+                PolicyVersionNumber = version != null ? (int?)version.VersionNumber : null,
+            }
+            into g
+            select new InvoiceTotalsByPolicyTransactionRowDto(
+                g.Key.PolicyTransactionId,
+                g.Key.TransactionNumber ?? "Unlinked",
+                g.Key.TransactionType,
+                g.Key.PolicyVersionId,
+                g.Key.PolicyVersionNumber,
+                g.Count(),
+                g.Sum(x => x.invoice.GrossPremium),
+                g.Sum(x => x.invoice.TotalFees),
+                g.Sum(x => x.invoice.TotalAmount))
+        ).ToListAsync(ct);
+
+        return new InvoiceTotalsByPolicyTransactionDto(rows.OrderByDescending(r => r.TotalAmount).ToList());
+    }
+
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)
     {
         decimal Bucket(OpenPayableDto p, int from, int to)

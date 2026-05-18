@@ -177,6 +177,19 @@ function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
               <p className="font-medium text-gray-900">{event.sourceDescription}</p>
             </div>
           )}
+          {event.sourcePolicyTransactionNumber && (
+            <div>
+              <span className="text-gray-500">Policy transaction</span>
+              <p className="font-mono text-xs font-medium text-gray-900">{event.sourcePolicyTransactionNumber}</p>
+              {event.sourcePolicyTransactionType && <p className="text-xs text-gray-500">{event.sourcePolicyTransactionType}</p>}
+            </div>
+          )}
+          {event.sourcePolicyVersionNumber != null && (
+            <div>
+              <span className="text-gray-500">Policy version</span>
+              <p className="font-medium text-gray-900">v{event.sourcePolicyVersionNumber}</p>
+            </div>
+          )}
           {event.postingStatus === 'Voided' && event.voidReason && (
             <div className="col-span-2">
               <span className="text-gray-500">Void reason</span>
@@ -399,7 +412,7 @@ export function ActivityPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">
-                    {evt.sourceDescription ?? '—'}
+                    {evt.sourcePolicyTransactionNumber ?? evt.sourceDescription ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-gray-900">
                     {fmt.format(evt.totalDebits)}

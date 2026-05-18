@@ -224,14 +224,19 @@ public class InvoicingService : IInvoicingService
 
     public async Task<IReadOnlyList<InvoiceSummaryDto>> GetInvoicesAsync(CancellationToken ct = default)
     {
-        return await Db.Set<Invoice>()
-            .OrderByDescending(i => i.InvoiceDate)
-            .ThenByDescending(i => i.Id)
-            .Select(i => new InvoiceSummaryDto(
-                i.Id, i.InvoiceNumber, i.InvoiceDate, i.EffectiveDate,
-                i.GrossPremium, i.TotalFees, i.TotalAmount, i.Status,
-                i.PolicyTransactionId, i.PolicyVersionId))
-            .ToListAsync(ct);
+        var rows = await (
+            from invoice in Db.Set<Invoice>()
+            join txn in Db.Set<PolicyTransaction>() on invoice.PolicyTransactionId equals txn.Id into txnGroup
+            from txn in txnGroup.DefaultIfEmpty()
+            join version in Db.Set<PolicyVersion>() on invoice.PolicyVersionId equals version.Id into versionGroup
+            from version in versionGroup.DefaultIfEmpty()
+            orderby invoice.InvoiceDate descending, invoice.Id descending
+            select new { invoice, txn, version }
+        ).ToListAsync(ct);
+
+        return rows
+            .Select(row => MapSummary(row.invoice, row.txn, row.version))
+            .ToList();
     }
 
     public async Task<Result<InvoiceDetailDto>> GetInvoiceAsync(long id, CancellationToken ct = default)
@@ -252,6 +257,13 @@ public class InvoicingService : IInvoicingService
                 .ThenInclude(l => l.LedgerAccount)
             .FirstAsync(i => i.Id == id, ct);
 
+        var transaction = invoice.PolicyTransactionId.HasValue
+            ? await db.Set<PolicyTransaction>().FirstOrDefaultAsync(t => t.Id == invoice.PolicyTransactionId.Value, ct)
+            : null;
+        var version = invoice.PolicyVersionId.HasValue
+            ? await db.Set<PolicyVersion>().FirstOrDefaultAsync(v => v.Id == invoice.PolicyVersionId.Value, ct)
+            : null;
+
         var ledgerRows = await db.Set<LedgerTransaction>()
             .Include(t => t.Account)
             .Where(t => t.TransactionId == invoice.LedgerTransactionId)
@@ -268,7 +280,10 @@ public class InvoicingService : IInvoicingService
             invoice.TotalAmount,
             invoice.Status,
             invoice.PolicyTransactionId,
+            transaction?.TransactionNumber,
+            transaction?.TransactionType,
             invoice.PolicyVersionId,
+            version?.VersionNumber,
             invoice.LedgerTransactionId,
             invoice.Lines
                 .OrderBy(l => l.Id)
@@ -292,4 +307,19 @@ public class InvoicingService : IInvoicingService
                 .ToList()
         );
     }
+
+    private static InvoiceSummaryDto MapSummary(Invoice invoice, PolicyTransaction? transaction, PolicyVersion? version) => new(
+        invoice.Id,
+        invoice.InvoiceNumber,
+        invoice.InvoiceDate,
+        invoice.EffectiveDate,
+        invoice.GrossPremium,
+        invoice.TotalFees,
+        invoice.TotalAmount,
+        invoice.Status,
+        invoice.PolicyTransactionId,
+        transaction?.TransactionNumber,
+        transaction?.TransactionType,
+        invoice.PolicyVersionId,
+        version?.VersionNumber);
 }

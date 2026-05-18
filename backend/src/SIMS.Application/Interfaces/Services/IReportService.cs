@@ -10,4 +10,5 @@ public interface IReportService
     Task<PayableAgingDto> GetSlTaxAgingAsync(CancellationToken ct = default);
     Task<BrokerArAgingDto> GetBrokerArAgingAsync(CancellationToken ct = default);
     Task<CommissionSummaryDto> GetCommissionSummaryAsync(int months = 12, CancellationToken ct = default);
+    Task<InvoiceTotalsByPolicyTransactionDto> GetInvoiceTotalsByPolicyTransactionAsync(CancellationToken ct = default);
 }

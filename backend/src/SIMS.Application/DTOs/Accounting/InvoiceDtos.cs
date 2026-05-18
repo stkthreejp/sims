@@ -1,3 +1,5 @@
+using SIMS.Domain.Enums;
+
 namespace SIMS.Application.DTOs.Accounting;
 
 public record CreateInvoiceRequest(
@@ -28,7 +30,10 @@ public record InvoiceSummaryDto(
     decimal TotalAmount,
     string Status,
     Guid? PolicyTransactionId,
-    Guid? PolicyVersionId
+    string? PolicyTransactionNumber,
+    TransactionType? PolicyTransactionType,
+    Guid? PolicyVersionId,
+    int? PolicyVersionNumber
 );
 
 public record InvoiceLineDto(
@@ -61,7 +66,10 @@ public record InvoiceDetailDto(
     decimal TotalAmount,
     string Status,
     Guid? PolicyTransactionId,
+    string? PolicyTransactionNumber,
+    TransactionType? PolicyTransactionType,
     Guid? PolicyVersionId,
+    int? PolicyVersionNumber,
     Guid LedgerTransactionId,
     IReadOnlyList<InvoiceLineDto> Lines,
     IReadOnlyList<LedgerEntryDto> LedgerEntries

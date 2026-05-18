@@ -6,12 +6,14 @@ import {
   getSlTaxAging,
   getBrokerArAging,
   getCommissionSummary,
+  getInvoiceTotalsByPolicyTransaction,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
   PayableAging,
   BrokerArAging,
   CommissionSummary,
+  InvoiceTotalsByPolicyTransaction,
   AgingBucket,
   AgingRow,
   BrokerArRow,
@@ -296,6 +298,58 @@ function CommissionSummaryReport() {
 
 // ── Report: Coming Soon ─────────────────────────────────────────────────────
 
+function InvoiceTotalsByPolicyTransactionReport() {
+  const { data, isLoading, error } = useQuery<InvoiceTotalsByPolicyTransaction>({
+    queryKey: ['report', 'invoice-totals-by-policy-transaction'],
+    queryFn: getInvoiceTotalsByPolicyTransaction,
+  })
+
+  const totalAmount = data?.rows.reduce((sum, row) => sum + row.totalAmount, 0) ?? 0
+  const totalInvoices = data?.rows.reduce((sum, row) => sum + row.invoiceCount, 0) ?? 0
+
+  return (
+    <ReportShell title="Invoice Totals by Policy Transaction" isLoading={isLoading} error={error as Error}>
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Transactions" value={data.rows.length.toLocaleString()} />
+            <KpiCard label="Invoices" value={totalInvoices.toLocaleString()} />
+            <KpiCard label="Total Amount" value={fmt(totalAmount)} />
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Transaction', 'Type', 'Version', 'Invoices', 'Gross Premium', 'Fees', 'Total'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: ['Transaction', 'Type', 'Version'].includes(h) ? 'left' : 'right' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map(row => (
+                  <tr key={row.policyTransactionId ?? 'unlinked'} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={tdStyle}>{row.policyTransactionNumber}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{row.policyTransactionType ?? '-'}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{row.policyVersionNumber ? `v${row.policyVersionNumber}` : '-'}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{row.invoiceCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.totalFees)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(row.totalAmount)}</td>
+                  </tr>
+                ))}
+                {data.rows.length === 0 && (
+                  <tr><td colSpan={7} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No invoice data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 function ComingSoon({ title }: { title: string }) {
   return (
     <ReportShell title={title}>
@@ -317,6 +371,7 @@ const REPORT_CATEGORIES = [
       { id: 'sl-tax-aging', label: 'SL Tax Payable Aging' },
       { id: 'broker-ar-aging', label: 'Broker AR Aging' },
       { id: 'commission-summary', label: 'Commission Summary' },
+      { id: 'invoice-totals-by-transaction', label: 'Invoice Totals by Transaction' },
       { id: 'qb-sync-health', label: 'QB Sync Health', external: '/billing/sync-health' },
     ],
   },
@@ -348,6 +403,7 @@ function renderReport(id: string) {
     case 'sl-tax-aging':           return <SlTaxAgingReport />
     case 'broker-ar-aging':        return <BrokerArAgingReport />
     case 'commission-summary':     return <CommissionSummaryReport />
+    case 'invoice-totals-by-transaction': return <InvoiceTotalsByPolicyTransactionReport />
     default:                       return null
   }
 }

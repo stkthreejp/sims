@@ -68,3 +68,19 @@ export interface CommissionSummary {
   totalNetRetained: number
   totalCashReceived: number
 }
+
+export interface InvoiceTotalsByPolicyTransactionRow {
+  policyTransactionId: string | null
+  policyTransactionNumber: string
+  policyTransactionType: string | null
+  policyVersionId: string | null
+  policyVersionNumber: number | null
+  invoiceCount: number
+  grossPremium: number
+  totalFees: number
+  totalAmount: number
+}
+
+export interface InvoiceTotalsByPolicyTransaction {
+  rows: InvoiceTotalsByPolicyTransactionRow[]
+}

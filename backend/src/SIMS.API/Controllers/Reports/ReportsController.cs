@@ -33,4 +33,8 @@ public class ReportsController : ControllerBase
     public async Task<IActionResult> GetCommissionSummary(
         [FromQuery] int months = 12, CancellationToken ct = default)
         => Ok(await _svc.GetCommissionSummaryAsync(months, ct));
+
+    [HttpGet("accounting/invoice-totals-by-policy-transaction")]
+    public async Task<IActionResult> GetInvoiceTotalsByPolicyTransaction(CancellationToken ct)
+        => Ok(await _svc.GetInvoiceTotalsByPolicyTransactionAsync(ct));
 }

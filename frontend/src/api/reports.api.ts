@@ -4,6 +4,7 @@ import type {
   PayableAging,
   BrokerArAging,
   CommissionSummary,
+  InvoiceTotalsByPolicyTransaction,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -22,3 +23,6 @@ export const getBrokerArAging = (): Promise<BrokerArAging> =>
 
 export const getCommissionSummary = (months = 12): Promise<CommissionSummary> =>
   apiClient.get(`${BASE}/accounting/commission-summary`, { params: { months } }).then(r => r.data)
+
+export const getInvoiceTotalsByPolicyTransaction = (): Promise<InvoiceTotalsByPolicyTransaction> =>
+  apiClient.get(`${BASE}/accounting/invoice-totals-by-policy-transaction`).then(r => r.data)

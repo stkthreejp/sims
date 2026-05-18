@@ -187,6 +187,27 @@ function InvoiceDetailView({ id, onBack }: { id: number; onBack: () => void }) {
         ))}
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <p className="text-xs text-gray-500">Policy Transaction</p>
+          <p className="mt-1 text-sm font-semibold text-gray-900">
+            {inv.policyTransactionNumber ?? 'Unlinked'}
+          </p>
+          {inv.policyTransactionType && (
+            <p className="mt-1 text-xs text-gray-500">{inv.policyTransactionType}</p>
+          )}
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <p className="text-xs text-gray-500">Policy Version</p>
+          <p className="mt-1 text-sm font-semibold text-gray-900">
+            {inv.policyVersionNumber != null ? `v${inv.policyVersionNumber}` : 'Unlinked'}
+          </p>
+          {inv.policyVersionId && (
+            <p className="mt-1 truncate font-mono text-xs text-gray-400">{inv.policyVersionId}</p>
+          )}
+        </div>
+      </div>
+
       {/* Fee Lines */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Fee Lines</h3>
@@ -354,6 +375,7 @@ export function InvoicesPage() {
             <thead className="bg-gray-50 text-left border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 font-medium text-gray-600">Invoice #</th>
+                <th className="px-4 py-3 font-medium text-gray-600">Transaction</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Invoice Date</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Effective Date</th>
                 <th className="px-4 py-3 font-medium text-gray-600 text-right">Gross Premium</th>
@@ -371,6 +393,10 @@ export function InvoicesPage() {
                   onClick={() => setSelectedId(inv.id)}
                 >
                   <td className="px-4 py-3 font-mono font-medium text-blue-700">{inv.invoiceNumber}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <div className="font-mono text-xs text-gray-800">{inv.policyTransactionNumber ?? 'Unlinked'}</div>
+                    {inv.policyVersionNumber != null && <div className="text-xs text-gray-400">v{inv.policyVersionNumber}</div>}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{fmtDate(inv.invoiceDate)}</td>
                   <td className="px-4 py-3 text-gray-600">{fmtDate(inv.effectiveDate)}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmt.format(inv.grossPremium)}</td>

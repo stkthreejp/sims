@@ -8,7 +8,10 @@ export interface InvoiceSummary {
   totalAmount: number
   status: string
   policyTransactionId: string | null
+  policyTransactionNumber: string | null
+  policyTransactionType: string | null
   policyVersionId: string | null
+  policyVersionNumber: number | null
 }
 
 export interface InvoiceLineItem {

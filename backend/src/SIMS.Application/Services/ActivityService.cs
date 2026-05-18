@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
 
 namespace SIMS.Application.Services;
@@ -43,8 +44,7 @@ public class ActivityService : IActivityService
         foreach (var group in groups)
         {
             var first = group.First();
-            var (sourceNumber, sourceDescription) = await ResolveSourceAsync(
-                first.SourceType, first.SourceId, ct);
+            var source = await ResolveSourceAsync(first.SourceType, first.SourceId, ct);
 
             var postingStatus = DetermineGroupStatus(group.ToList());
             var voidedRow = group.FirstOrDefault(t => t.VoidedByTransactionId != null);
@@ -57,8 +57,13 @@ public class ActivityService : IActivityService
                 TransactionId: group.Key,
                 SourceType: first.SourceType,
                 SourceId: first.SourceId,
-                SourceNumber: sourceNumber,
-                SourceDescription: sourceDescription,
+                SourceNumber: source.Number,
+                SourceDescription: source.Description,
+                SourcePolicyTransactionId: source.PolicyTransactionId,
+                SourcePolicyTransactionNumber: source.PolicyTransactionNumber,
+                SourcePolicyTransactionType: source.PolicyTransactionType,
+                SourcePolicyVersionId: source.PolicyVersionId,
+                SourcePolicyVersionNumber: source.PolicyVersionNumber,
                 EffectiveDate: first.EffectiveDate,
                 PostedAt: first.PostedAt,
                 TotalDebits: group.Where(t => t.PostingStatus != "Reversal").Sum(t => t.Debit),
@@ -112,25 +117,20 @@ public class ActivityService : IActivityService
         return "Posted";
     }
 
-    private async Task<(string number, string? description)> ResolveSourceAsync(
+    private async Task<ActivitySourceContext> ResolveSourceAsync(
         string sourceType, long sourceId, CancellationToken ct)
     {
         var db = Db;
         return sourceType switch
         {
-            "Invoice" => await db.Set<Invoice>()
-                .Where(i => i.Id == sourceId)
-                .Select(i => new { i.InvoiceNumber, Desc = (string?)null })
-                .FirstOrDefaultAsync(ct) is { } inv
-                    ? (inv.InvoiceNumber, inv.Desc)
-                    : ($"INV-{sourceId}", null),
+            "Invoice" => await ResolveInvoiceSourceAsync(sourceId, ct),
 
             "Receipt" => await db.Set<Receipt>()
                 .Where(r => r.Id == sourceId)
                 .Select(r => new { r.ReceiptNumber, Desc = r.PayerName })
                 .FirstOrDefaultAsync(ct) is { } rct
-                    ? (rct.ReceiptNumber, rct.Desc)
-                    : ($"RCT-{sourceId}", null),
+                    ? new ActivitySourceContext(rct.ReceiptNumber, rct.Desc, null, null, null, null, null)
+                    : new ActivitySourceContext($"RCT-{sourceId}", null, null, null, null, null, null),
 
             "CashApplication" => await db.Set<CashApplication>()
                 .Include(a => a.Receipt)
@@ -138,20 +138,42 @@ public class ActivityService : IActivityService
                 .Where(a => a.ReceiptId == sourceId)
                 .Select(a => new { Num = a.Receipt.ReceiptNumber + " → " + a.Invoice.InvoiceNumber, Desc = (string?)null })
                 .FirstOrDefaultAsync(ct) is { } ca
-                    ? (ca.Num, ca.Desc)
-                    : ($"APPLY-{sourceId}", null),
+                    ? new ActivitySourceContext(ca.Num, ca.Desc, null, null, null, null, null)
+                    : new ActivitySourceContext($"APPLY-{sourceId}", null, null, null, null, null, null),
 
             "Disbursement" => await db.Set<Disbursement>()
                 .Where(d => d.Id == sourceId)
                 .Select(d => new { d.DisbursementNumber, Desc = d.PayeeName })
                 .FirstOrDefaultAsync(ct) is { } disb
-                    ? (disb.DisbursementNumber, disb.Desc)
-                    : ($"DISB-{sourceId}", null),
+                    ? new ActivitySourceContext(disb.DisbursementNumber, disb.Desc, null, null, null, null, null)
+                    : new ActivitySourceContext($"DISB-{sourceId}", null, null, null, null, null, null),
 
-            "Distribution" => ($"DIST-{sourceId}", null),
+            "Distribution" => new ActivitySourceContext($"DIST-{sourceId}", null, null, null, null, null, null),
 
-            _ => ($"{sourceType}-{sourceId}", null)
+            _ => new ActivitySourceContext($"{sourceType}-{sourceId}", null, null, null, null, null, null)
         };
+    }
+
+    private async Task<ActivitySourceContext> ResolveInvoiceSourceAsync(long sourceId, CancellationToken ct)
+    {
+        var invoice = await Db.Set<Invoice>()
+            .Include(i => i.PolicyVersion)
+            .FirstOrDefaultAsync(i => i.Id == sourceId, ct);
+        if (invoice == null)
+            return new ActivitySourceContext($"INV-{sourceId}", null, null, null, null, null, null);
+
+        var transaction = invoice.PolicyTransactionId.HasValue
+            ? await Db.Set<PolicyTransaction>().FirstOrDefaultAsync(t => t.Id == invoice.PolicyTransactionId.Value, ct)
+            : null;
+
+        return new ActivitySourceContext(
+            invoice.InvoiceNumber,
+            null,
+            invoice.PolicyTransactionId,
+            transaction?.TransactionNumber,
+            transaction?.TransactionType,
+            invoice.PolicyVersionId,
+            invoice.PolicyVersion?.VersionNumber);
     }
 
     private async Task<string?> CheckVoidBlockAsync(string sourceType, long sourceId, CancellationToken ct)
@@ -191,4 +213,13 @@ public class ActivityService : IActivityService
         }
         return null;
     }
+
+    private sealed record ActivitySourceContext(
+        string Number,
+        string? Description,
+        Guid? PolicyTransactionId,
+        string? PolicyTransactionNumber,
+        Domain.Enums.TransactionType? PolicyTransactionType,
+        Guid? PolicyVersionId,
+        int? PolicyVersionNumber);
 }

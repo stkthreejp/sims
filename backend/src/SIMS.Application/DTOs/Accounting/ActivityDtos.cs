@@ -1,3 +1,5 @@
+using SIMS.Domain.Enums;
+
 namespace SIMS.Application.DTOs.Accounting;
 
 public record ActivityEventDto(
@@ -6,6 +8,11 @@ public record ActivityEventDto(
     long SourceId,
     string SourceNumber,        // INV-2026-00001, RCT-..., etc.
     string? SourceDescription,  // payerName, payeeName, etc.
+    Guid? SourcePolicyTransactionId,
+    string? SourcePolicyTransactionNumber,
+    TransactionType? SourcePolicyTransactionType,
+    Guid? SourcePolicyVersionId,
+    int? SourcePolicyVersionNumber,
     DateOnly EffectiveDate,
     DateTime PostedAt,
     decimal TotalDebits,

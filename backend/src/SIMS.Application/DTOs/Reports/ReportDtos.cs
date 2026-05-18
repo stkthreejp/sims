@@ -1,4 +1,5 @@
 using SIMS.Application.DTOs.Accounting;
+using SIMS.Domain.Enums;
 
 namespace SIMS.Application.DTOs.Reports;
 
@@ -67,4 +68,20 @@ public record CommissionSummaryDto(
     decimal TotalAgentPaid,
     decimal TotalNetRetained,
     decimal TotalCashReceived
+);
+
+public record InvoiceTotalsByPolicyTransactionDto(
+    IReadOnlyList<InvoiceTotalsByPolicyTransactionRowDto> Rows
+);
+
+public record InvoiceTotalsByPolicyTransactionRowDto(
+    Guid? PolicyTransactionId,
+    string PolicyTransactionNumber,
+    TransactionType? PolicyTransactionType,
+    Guid? PolicyVersionId,
+    int? PolicyVersionNumber,
+    int InvoiceCount,
+    decimal GrossPremium,
+    decimal TotalFees,
+    decimal TotalAmount
 );

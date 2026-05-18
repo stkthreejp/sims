@@ -220,10 +220,136 @@ public class PolicyLifecycleRegressionTests
 
         Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
         Assert.Equal(transaction.Id, result.Value!.PolicyTransactionId);
+        Assert.Equal("TXN-INVOICE-1", result.Value.PolicyTransactionNumber);
+        Assert.Equal(TransactionType.NewBusiness, result.Value.PolicyTransactionType);
         Assert.Equal(version.Id, result.Value.PolicyVersionId);
+        Assert.Equal(1, result.Value.PolicyVersionNumber);
         var invoice = await db.Set<Invoice>().SingleAsync();
         Assert.Equal(transaction.Id, invoice.PolicyTransactionId);
         Assert.Equal(version.Id, invoice.PolicyVersionId);
+    }
+
+    [Fact]
+    public async Task Activity_ExplainsInvoicePolicyTransactionSource()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        await SeedLedgerAccountsAsync(db);
+        var account = await db.Set<LedgerAccount>().SingleAsync(a => a.InternalCode == "1200");
+        var version = new PolicyVersion
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            VersionNumber = 1,
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ExpirationDate = fixture.Policy.ExpirationDate,
+            Status = fixture.Policy.Status,
+            PremiumAmount = fixture.Policy.PremiumAmount,
+            TaxesAndFees = fixture.Policy.TaxesAndFees,
+            TotalPremium = fixture.Policy.TotalPremium,
+            CreatedById = fixture.UserId,
+        };
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.NewBusiness,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = "TXN-ACTIVITY-1",
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ResultingPolicyVersionId = version.Id,
+            ProcessedById = fixture.UserId,
+        };
+        var ledgerTransactionId = Guid.NewGuid();
+        var invoice = new Invoice
+        {
+            InvoiceNumber = "INV-ACTIVITY-1",
+            PolicyTransactionId = transaction.Id,
+            PolicyVersionId = version.Id,
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            InvoiceDate = fixture.Policy.EffectiveDate,
+            GrossPremium = 1000m,
+            TotalAmount = 1000m,
+            Status = "Posted",
+            LedgerTransactionId = ledgerTransactionId,
+            CreatedBy = fixture.UserId,
+        };
+        db.AddRange(version, transaction, invoice);
+        await db.SaveChangesAsync();
+        db.Add(new LedgerTransaction
+        {
+            TransactionId = ledgerTransactionId,
+            EffectiveDate = invoice.EffectiveDate,
+            AccountId = account.Id,
+            Debit = invoice.TotalAmount,
+            SourceType = "Invoice",
+            SourceId = invoice.Id,
+            Memo = "Invoice posting",
+            CreatedBy = fixture.UserId,
+        });
+        await db.SaveChangesAsync();
+        var services = new ServiceCollection()
+            .AddSingleton<DbContext>(db)
+            .BuildServiceProvider();
+        var activity = new ActivityService(services);
+
+        var events = await activity.GetActivityAsync(new ActivityFilterRequest(null, null, null, null), isAdmin: true);
+
+        var evt = Assert.Single(events);
+        Assert.Equal(transaction.Id, evt.SourcePolicyTransactionId);
+        Assert.Equal("TXN-ACTIVITY-1", evt.SourcePolicyTransactionNumber);
+        Assert.Equal(TransactionType.NewBusiness, evt.SourcePolicyTransactionType);
+        Assert.Equal(version.Id, evt.SourcePolicyVersionId);
+        Assert.Equal(1, evt.SourcePolicyVersionNumber);
+    }
+
+    [Fact]
+    public async Task Reports_GroupInvoiceTotalsByPolicyTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var firstTransaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.NewBusiness,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = "TXN-REPORT-1",
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ProcessedById = fixture.UserId,
+        };
+        var secondTransaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.Endorsement,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = "TXN-REPORT-2",
+            EffectiveDate = fixture.Policy.EffectiveDate.AddMonths(1),
+            ProcessedById = fixture.UserId,
+        };
+        db.AddRange(
+            firstTransaction,
+            secondTransaction,
+            InvoiceFor("INV-REPORT-1", firstTransaction.Id, 1000m, fixture),
+            InvoiceFor("INV-REPORT-2", firstTransaction.Id, 250m, fixture),
+            InvoiceFor("INV-REPORT-3", secondTransaction.Id, 125m, fixture));
+        await db.SaveChangesAsync();
+        var services = new ServiceCollection()
+            .AddSingleton<DbContext>(db)
+            .BuildServiceProvider();
+        var reports = new ReportService(services);
+
+        var result = await reports.GetInvoiceTotalsByPolicyTransactionAsync();
+
+        Assert.Equal(2, result.Rows.Count);
+        var first = Assert.Single(result.Rows, r => r.PolicyTransactionId == firstTransaction.Id);
+        Assert.Equal("TXN-REPORT-1", first.PolicyTransactionNumber);
+        Assert.Equal(TransactionType.NewBusiness, first.PolicyTransactionType);
+        Assert.Equal(1250m, first.TotalAmount);
+        Assert.Equal(2, first.InvoiceCount);
+        var second = Assert.Single(result.Rows, r => r.PolicyTransactionId == secondTransaction.Id);
+        Assert.Equal(125m, second.TotalAmount);
     }
 
     [Fact]
@@ -1064,6 +1190,19 @@ public class PolicyLifecycleRegressionTests
         CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
     };
 
+    private static Invoice InvoiceFor(string invoiceNumber, Guid policyTransactionId, decimal totalAmount, PolicyFixture fixture) => new()
+    {
+        InvoiceNumber = invoiceNumber,
+        PolicyTransactionId = policyTransactionId,
+        EffectiveDate = fixture.Policy.EffectiveDate,
+        InvoiceDate = fixture.Policy.EffectiveDate,
+        GrossPremium = totalAmount,
+        TotalAmount = totalAmount,
+        Status = "Posted",
+        LedgerTransactionId = Guid.NewGuid(),
+        CreatedBy = fixture.UserId,
+    };
+
     private sealed record QuoteFixture(Guid UserId, User User, Carrier Carrier, Insured Insured, Submission Submission, Quote Quote);
     private sealed record PolicyFixture(Guid UserId, Insured Insured, Submission Submission, Quote Quote, Policy Policy);
 
@@ -1096,7 +1235,10 @@ public class PolicyLifecycleRegressionTests
                 req.GrossPremium,
                 "Posted",
                 req.PolicyTransactionId,
+                null,
+                null,
                 req.PolicyVersionId,
+                null,
                 Guid.NewGuid(),
                 [],
                 [])));

@@ -205,7 +205,10 @@ public class PolicyService : IPolicyService
                 i.TotalAmount,
                 i.Status,
                 i.PolicyTransactionId,
-                i.PolicyVersionId))
+                null,
+                null,
+                i.PolicyVersionId,
+                null))
             .ToListAsync();
 
         var communicationRows = await Db.Set<OutboundCommunication>()

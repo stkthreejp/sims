@@ -14,6 +14,11 @@ export interface ActivityEvent {
   sourceId: number
   sourceNumber: string
   sourceDescription: string | null
+  sourcePolicyTransactionId: string | null
+  sourcePolicyTransactionNumber: string | null
+  sourcePolicyTransactionType: string | null
+  sourcePolicyVersionId: string | null
+  sourcePolicyVersionNumber: number | null
   effectiveDate: string
   postedAt: string
   totalDebits: number
