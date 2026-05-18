@@ -445,6 +445,7 @@ export function PolicyDetailPage() {
                   transaction={t}
                   policyDocumentEntityId={policy.boundQuoteId}
                   canUploadProof={canUploadAttachments}
+                  canCompleteCancellation={canCancelPolicies}
                 />
               ))}
             </tbody>
@@ -730,17 +731,34 @@ function TransactionRows({
   transaction: t,
   policyDocumentEntityId,
   canUploadProof,
+  canCompleteCancellation,
 }: {
   transaction: PolicyTransaction
   policyDocumentEntityId: string
   canUploadProof: boolean
+  canCompleteCancellation: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const qc = useQueryClient()
   const { data: artifacts } = useQuery({
     queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'],
     queryFn: () => policiesApi.getTransactionArtifacts(t.policyId, t.id),
   })
   const proofUploadApplies = t.transactionType === 'Cancellation' || t.transactionType === 'NonRenewal'
+  const canComplete = canCompleteCancellation &&
+    t.transactionType === 'Cancellation' &&
+    (t.status === 'NoticeSent' || t.status === 'PendingEffectiveDate' || t.status === 'Issued')
+  const completeCancellation = useMutation({
+    mutationFn: () => policiesApi.completeCancellation(t.policyId, t.id, {
+      completedDate: new Date().toISOString().slice(0, 10),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'] })
+      toast.success('Cancellation completed')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Cancellation could not be completed'),
+  })
 
   return (
     <>
@@ -759,7 +777,25 @@ function TransactionRows({
           </span>
         </td>
         <td className="num font-medium">{formatCurrency(t.newTotalPremium)}</td>
-        <td>{t.processedByName}</td>
+        <td>
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{t.processedByName}</span>
+            {canComplete && (
+              <button
+                type="button"
+                className="sd-btn outline sm"
+                disabled={completeCancellation.isPending}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  completeCancellation.mutate()
+                }}
+                title="Complete the cancellation once the effective date has passed"
+              >
+                <Check className="h-3.5 w-3.5" /> Complete
+              </button>
+            )}
+          </div>
+        </td>
       </tr>
       {expanded && artifacts && (
         <TransactionArtifactDetails

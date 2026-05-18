@@ -1041,6 +1041,81 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task CompleteCancellation_BeforeEffectiveDateFails()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var notice = await policyService.IssueCancellationNoticeAsync(fixture.Policy.Id, new IssueCancellationNoticeDto
+        {
+            ReasonCode = "NP-01",
+            ReasonInputs = new Dictionary<string, string>
+            {
+                ["AMOUNT_DUE"] = "500.00",
+            },
+            NoticeMailingDate = new DateOnly(2026, 6, 1),
+            NoticeRequirementDays = 10,
+            MailingDays = 0,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(notice.IsSuccess);
+
+        var result = await policyService.CompleteCancellationAsync(
+            fixture.Policy.Id,
+            notice.Value!.Id,
+            new CompleteCancellationDto { CompletedDate = new DateOnly(2026, 6, 10) },
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("CANCELLATION_NOT_EFFECTIVE", result.ErrorCode);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+    }
+
+    [Fact]
+    public async Task CompleteCancellation_OnEffectiveDateCancelsPolicyAndCreatesVersion()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var notice = await policyService.IssueCancellationNoticeAsync(fixture.Policy.Id, new IssueCancellationNoticeDto
+        {
+            ReasonCode = "NP-01",
+            ReasonInputs = new Dictionary<string, string>
+            {
+                ["AMOUNT_DUE"] = "500.00",
+            },
+            NoticeMailingDate = new DateOnly(2026, 6, 1),
+            NoticeRequirementDays = 10,
+            MailingDays = 0,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(notice.IsSuccess);
+
+        var result = await policyService.CompleteCancellationAsync(
+            fixture.Policy.Id,
+            notice.Value!.Id,
+            new CompleteCancellationDto { CompletedDate = new DateOnly(2026, 6, 11) },
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(PolicyStatus.Cancelled, fixture.Policy.Status);
+        Assert.Equal(new DateOnly(2026, 6, 11), fixture.Policy.CancelledDate);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.Id == notice.Value.Id);
+        Assert.Equal(PolicyTransactionStatus.Completed, transaction.Status);
+        Assert.NotNull(transaction.PriorPolicyVersionId);
+        Assert.NotNull(transaction.ResultingPolicyVersionId);
+        var versions = await db.Set<PolicyVersion>()
+            .Where(v => v.PolicyId == fixture.Policy.Id)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(PolicyStatus.Active, versions[0].Status);
+        Assert.Equal(PolicyStatus.Cancelled, versions[1].Status);
+        Assert.Equal(versions[0].Id, transaction.PriorPolicyVersionId);
+        Assert.Equal(versions[1].Id, transaction.ResultingPolicyVersionId);
+    }
+
+    [Fact]
     public async Task NonRenewal_UpdatesPolicyStatus()
     {
         await using var db = CreateDb();

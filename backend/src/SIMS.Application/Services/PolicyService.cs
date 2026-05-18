@@ -954,6 +954,60 @@ public class PolicyService : IPolicyService
         return Result<PolicyTransactionDto>.Success(MapToTransactionDto(transaction));
     }
 
+    public async Task<Result<PolicyDto>> CompleteCancellationAsync(Guid policyId, Guid transactionId, CompleteCancellationDto dto, UserAccessScope access)
+    {
+        var db = Db;
+        var policy = await db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Transactions).ThenInclude(t => t.CancellationDetail)
+            .Include(p => p.Versions)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can complete a cancellation.");
+
+        var transaction = policy.Transactions.FirstOrDefault(t => t.Id == transactionId && !t.IsDeleted);
+        if (transaction == null)
+            return Result<PolicyDto>.Failure("TRANSACTION_NOT_FOUND", "Cancellation transaction not found.");
+        if (transaction.TransactionType != TransactionType.Cancellation)
+            return Result<PolicyDto>.Failure("INVALID_TRANSACTION_TYPE", "Only cancellation transactions can be completed here.");
+        if (transaction.Status is not (PolicyTransactionStatus.NoticeSent or PolicyTransactionStatus.PendingEffectiveDate or PolicyTransactionStatus.Issued))
+            return Result<PolicyDto>.Failure("INVALID_TRANSACTION_STATUS", "Only noticed cancellation transactions can be completed.");
+        if (transaction.CancellationDetail == null)
+            return Result<PolicyDto>.Failure("CANCELLATION_DETAIL_REQUIRED", "Cancellation notice detail is required before completing cancellation.");
+        if (dto.CompletedDate < transaction.CancellationDetail.CancellationEffectiveDate)
+            return Result<PolicyDto>.Failure("CANCELLATION_NOT_EFFECTIVE", "Cancellation cannot be completed before the effective cancellation date.");
+
+        await using var dbTransaction = await db.Database.BeginTransactionAsync();
+
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
+        policy.Status = PolicyStatus.Cancelled;
+        policy.CancelledDate = transaction.CancellationDetail.CancellationEffectiveDate;
+        policy.UpdatedAt = DateTime.UtcNow;
+        transaction.EffectiveDate = transaction.CancellationDetail.CancellationEffectiveDate;
+        transaction.Notes = string.IsNullOrWhiteSpace(dto.Notes) ? transaction.Notes : dto.Notes.Trim();
+        transaction.ProcessedById = access.UserId;
+        transaction.ProcessedAt = DateTime.UtcNow;
+
+        var transition = await _transactionLifecycle.TransitionAsync(
+            transaction,
+            PolicyTransactionStatus.Completed,
+            access.UserId,
+            string.IsNullOrWhiteSpace(dto.Notes) ? "Cancellation completed." : dto.Notes.Trim());
+        if (!transition.IsSuccess)
+            return Result<PolicyDto>.Failure(transition.ErrorCode ?? "CANCELLATION_COMPLETION_FAILED", transition.ErrorMessage ?? "Cancellation could not be completed.");
+
+        await _policyVersions.CreateVersionAsync(policy, transaction, priorVersion, access.UserId);
+        await dbTransaction.CommitAsync();
+
+        return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
     public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()

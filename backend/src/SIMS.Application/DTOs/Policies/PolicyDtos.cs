@@ -268,6 +268,12 @@ public class IssueCancellationNoticeDto
     public string? Notes { get; set; }
 }
 
+public class CompleteCancellationDto
+{
+    public DateOnly CompletedDate { get; set; }
+    public string? Notes { get; set; }
+}
+
 public class LegalComplianceGuidanceDto
 {
     public string State { get; set; } = string.Empty;

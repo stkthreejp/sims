@@ -330,6 +330,11 @@ export interface IssueCancellationNotice {
   notes?: string
 }
 
+export interface CompleteCancellation {
+  completedDate: string
+  notes?: string
+}
+
 export interface LegalComplianceGuidance {
   state: string
   lineOfBusiness: string
