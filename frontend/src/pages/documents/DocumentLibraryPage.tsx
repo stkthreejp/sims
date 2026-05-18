@@ -37,7 +37,7 @@ const KIND_VARIANTS: Record<DocumentTemplateKind, string> = {
 }
 
 const filterButtonStyle = (active: boolean) => ({
-  borderColor: active ? 'var(--accent)' : 'var(--line)',
+  borderColor: active ? 'var(--accent)' : 'var(--line-2)',
   background: active ? 'var(--accent)' : 'var(--surface)',
   color: active ? '#fff' : 'var(--ink-3)',
 })
@@ -105,7 +105,7 @@ export function DocumentLibraryPage() {
         description="Manage document templates for policies, submissions, and more"
         actions={
           <div className="flex gap-2">
-            <label className="sd-btn outline">
+            <label className="sd-btn">
               <Upload className="h-4 w-4" />
               Import from Word
               <input
