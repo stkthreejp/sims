@@ -654,6 +654,102 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task Task_CanPointToPolicyTransactionAndExposeTransactionContext()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.Cancellation,
+            Status = PolicyTransactionStatus.InReview,
+            TransactionNumber = "TXN-TASK-1",
+            EffectiveDate = fixture.Policy.EffectiveDate.AddMonths(1),
+            ProcessedById = fixture.UserId,
+        };
+        var taskType = new TaskType { Name = "Review transaction", DefaultPriority = TaskPriority.High };
+        var task = new TaskInstance
+        {
+            TaskType = taskType,
+            TaskTypeId = taskType.Id,
+            WorkflowStepId = Guid.NewGuid(),
+            EntityType = TaskEntityType.PolicyTransaction,
+            EntityId = transaction.Id,
+            AssignedUserId = fixture.UserId,
+            Status = TaskInstanceStatus.Open,
+            Priority = TaskPriority.High,
+            DueDate = DateTime.UtcNow.AddDays(1),
+        };
+        db.AddRange(transaction, taskType, task);
+        await db.SaveChangesAsync();
+        var workflow = new RecordingWorkflowEngineService();
+        var services = new ServiceCollection()
+            .AddSingleton<DbContext>(db)
+            .BuildServiceProvider();
+        var tasks = new TaskInstanceService(services, workflow);
+
+        var listItem = Assert.Single(await tasks.GetByEntityAsync(TaskEntityType.PolicyTransaction, transaction.Id));
+        Assert.Equal(TaskEntityType.PolicyTransaction, listItem.EntityType);
+        Assert.Equal("TXN-TASK-1", listItem.PolicyTransactionNumber);
+        Assert.Equal(TransactionType.Cancellation, listItem.PolicyTransactionType);
+        Assert.Equal(PolicyTransactionStatus.InReview, listItem.PolicyTransactionStatus);
+
+        var detail = await tasks.UpdateStatusAsync(task.Id, TaskInstanceStatus.Closed, fixture.UserId, "Approved to continue.");
+
+        Assert.True(detail.IsSuccess, $"{detail.ErrorCode}: {detail.ErrorMessage}");
+        Assert.Equal("TXN-TASK-1", detail.Value!.PolicyTransactionNumber);
+        var workflowCall = Assert.Single(workflow.StepCompleted);
+        Assert.Equal(TaskEntityType.PolicyTransaction, workflowCall.EntityType);
+        Assert.Equal(transaction.Id, workflowCall.EntityId);
+        Assert.Equal("TXN-TASK-1", workflowCall.Context["PolicyTransactionNumber"]);
+        Assert.Equal("Cancellation", workflowCall.Context["PolicyTransactionType"]);
+        Assert.Equal("InReview", workflowCall.Context["PolicyTransactionStatus"]);
+    }
+
+    [Fact]
+    public async Task PolicyTransactionArtifacts_ReturnsApprovalHistory()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.Endorsement,
+            Status = PolicyTransactionStatus.Approved,
+            TransactionNumber = "TXN-APPROVAL-1",
+            EffectiveDate = fixture.Policy.EffectiveDate.AddMonths(1),
+            ProcessedById = fixture.UserId,
+        };
+        var approval = new PolicyTransactionApproval
+        {
+            PolicyTransactionId = transaction.Id,
+            PolicyTransaction = transaction,
+            ApprovalType = "LargePremiumEndorsement",
+            RequestedById = fixture.UserId,
+            RequestedAt = DateTime.UtcNow.AddHours(-2),
+            DecisionById = fixture.UserId,
+            DecisionAt = DateTime.UtcNow.AddHours(-1),
+            Decision = "Approved",
+            Notes = "Within program appetite.",
+        };
+        db.AddRange(transaction, approval);
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        var approvalDto = Assert.Single(result.Value!.Approvals);
+        Assert.Equal("LargePremiumEndorsement", approvalDto.ApprovalType);
+        Assert.Equal("Approved", approvalDto.Decision);
+        Assert.Equal(fixture.UserId, approvalDto.RequestedById);
+        Assert.Equal(fixture.UserId, approvalDto.DecisionById);
+        Assert.Equal("Within program appetite.", approvalDto.Notes);
+    }
+
+    [Fact]
     public async Task PolicyTransactionArtifacts_ReturnsLinkedRatingSnapshot()
     {
         await using var db = CreateDb();
@@ -1455,6 +1551,7 @@ public class PolicyLifecycleRegressionTests
     private sealed class RecordingWorkflowEngineService : IWorkflowEngineService
     {
         public List<(string EventName, Guid EntityId)> Events { get; } = [];
+        public List<(Guid StepId, TaskEntityType EntityType, Guid EntityId, Dictionary<string, object> Context)> StepCompleted { get; } = [];
 
         public Task FireEventAsync(string eventName, TaskEntityType entityType, Guid entityId, Dictionary<string, object> context)
         {
@@ -1463,7 +1560,10 @@ public class PolicyLifecycleRegressionTests
         }
 
         public Task FireStepCompletedAsync(Guid completedStepId, TaskEntityType entityType, Guid entityId, Dictionary<string, object> context)
-            => Task.CompletedTask;
+        {
+            StepCompleted.Add((completedStepId, entityType, entityId, context));
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NoOpCarrierCommissionService : ICarrierCommissionService

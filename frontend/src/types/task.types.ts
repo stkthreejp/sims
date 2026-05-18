@@ -1,4 +1,6 @@
-export type TaskEntityType = 'Account' | 'Submission' | 'Policy' | 'ComplianceDocument'
+import type { PolicyTransactionStatus, TransactionType } from './policy.types'
+
+export type TaskEntityType = 'Account' | 'Submission' | 'Policy' | 'PolicyTransaction' | 'ComplianceDocument'
 export type TaskInstanceStatus = 'Open' | 'InProgress' | 'Blocked' | 'Closed' | 'Cancelled'
 export type TaskPriority = 'Low' | 'Medium' | 'High'
 export type TaskAuditAction =
@@ -29,6 +31,9 @@ export interface TaskInstanceListItem {
   dueDate: string
   isOverdue: boolean
   escalationLevel: number
+  policyTransactionNumber?: string
+  policyTransactionType?: TransactionType
+  policyTransactionStatus?: PolicyTransactionStatus
   createdAt: string
 }
 

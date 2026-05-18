@@ -46,7 +46,9 @@ public class TaskInstanceService : ITaskInstanceService
             .ThenBy(t => t.DueDate)
             .ToListAsync();
 
-        return tasks.Select(t => MapToListItem(t, now));
+        var dtos = tasks.Select(t => MapToListItem(t, now)).ToList();
+        await AddPolicyTransactionContextAsync(dtos);
+        return dtos;
     }
 
     public async Task<IEnumerable<TaskInstanceListItemDto>> GetByEntityAsync(TaskEntityType type, Guid entityId)
@@ -60,7 +62,9 @@ public class TaskInstanceService : ITaskInstanceService
             .ThenBy(t => t.DueDate)
             .ToListAsync();
 
-        return tasks.Select(t => MapToListItem(t, now));
+        var dtos = tasks.Select(t => MapToListItem(t, now)).ToList();
+        await AddPolicyTransactionContextAsync(dtos);
+        return dtos;
     }
 
     public async Task<Result<TaskInstanceDto>> GetByIdAsync(Guid id)
@@ -258,6 +262,19 @@ public class TaskInstanceService : ITaskInstanceService
                 if (s.ExpirationDate.HasValue) ctx["ExpirationDate"] = s.ExpirationDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
             }
         }
+        else if (type == TaskEntityType.PolicyTransaction)
+        {
+            var transaction = await Db.Set<PolicyTransaction>()
+                .FirstOrDefaultAsync(t => t.Id == entityId);
+            if (transaction != null)
+            {
+                ctx["PolicyId"] = transaction.PolicyId;
+                ctx["PolicyTransactionNumber"] = transaction.TransactionNumber;
+                ctx["PolicyTransactionType"] = transaction.TransactionType.ToString();
+                ctx["PolicyTransactionStatus"] = transaction.Status.ToString();
+                ctx["EffectiveDate"] = transaction.EffectiveDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            }
+        }
 
         return ctx;
     }
@@ -282,6 +299,35 @@ public class TaskInstanceService : ITaskInstanceService
         };
     }
 
+    private async Task AddPolicyTransactionContextAsync(List<TaskInstanceListItemDto> tasks)
+    {
+        var transactionIds = tasks
+            .Where(t => t.EntityType == TaskEntityType.PolicyTransaction)
+            .Select(t => t.EntityId)
+            .Distinct()
+            .ToList();
+        if (transactionIds.Count == 0) return;
+
+        var transactions = await Db.Set<PolicyTransaction>()
+            .Where(t => transactionIds.Contains(t.Id))
+            .Select(t => new
+            {
+                t.Id,
+                t.TransactionNumber,
+                t.TransactionType,
+                t.Status,
+            })
+            .ToDictionaryAsync(t => t.Id);
+
+        foreach (var task in tasks.Where(t => t.EntityType == TaskEntityType.PolicyTransaction))
+        {
+            if (!transactions.TryGetValue(task.EntityId, out var transaction)) continue;
+            task.PolicyTransactionNumber = transaction.TransactionNumber;
+            task.PolicyTransactionType = transaction.TransactionType;
+            task.PolicyTransactionStatus = transaction.Status;
+        }
+    }
+
     private async Task<TaskInstanceDto> MapToDtoAsync(TaskInstance t)
     {
         var now = DateTime.UtcNow;
@@ -302,7 +348,7 @@ public class TaskInstanceService : ITaskInstanceService
                 .ToDictionaryAsync(u => u.Id, u => u.FullName)
             : new Dictionary<Guid, string>();
 
-        return new TaskInstanceDto
+        var dto = new TaskInstanceDto
         {
             Id                     = t.Id,
             TaskTypeId             = t.TaskTypeId,
@@ -338,5 +384,7 @@ public class TaskInstanceService : ITaskInstanceService
                 })
                 .ToList(),
         };
+        await AddPolicyTransactionContextAsync([dto]);
+        return dto;
     }
 }

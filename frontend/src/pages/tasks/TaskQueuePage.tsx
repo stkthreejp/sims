@@ -94,6 +94,13 @@ function entityUrl(task: TaskInstanceListItem) {
   return `${base}/${task.entityId}`
 }
 
+function taskEntityLabel(task: TaskInstanceListItem) {
+  if (task.entityType === 'PolicyTransaction' && task.policyTransactionNumber) {
+    return `${task.policyTransactionNumber} ${task.policyTransactionType ?? ''}`.trim()
+  }
+  return task.entityType
+}
+
 function taskAccent(task: TaskInstanceListItem) {
   if (task.status === 'Blocked') return STATUS_TONE.Blocked.border
   if (task.isOverdue) return 'rgba(155, 45, 31, 0.45)'
@@ -133,7 +140,7 @@ export function TaskQueuePage() {
     if (filterPriority && t.priority !== filterPriority) return false
     if (search) {
       const query = search.toLowerCase()
-      const target = `${t.taskTypeName} ${t.entityType} ${t.assignedUserName ?? ''}`.toLowerCase()
+      const target = `${t.taskTypeName} ${t.entityType} ${t.policyTransactionNumber ?? ''} ${t.policyTransactionType ?? ''} ${t.policyTransactionStatus ?? ''} ${t.assignedUserName ?? ''}`.toLowerCase()
       if (!target.includes(query)) return false
     }
     return true
@@ -247,15 +254,18 @@ export function TaskQueuePage() {
                     </div>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    {isSampleTask(task) ? (
-                      <span className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>{task.entityType}</span>
+                    {isSampleTask(task) || task.entityType === 'PolicyTransaction' ? (
+                      <span className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>
+                        {taskEntityLabel(task)}
+                        {task.policyTransactionStatus && <span className="ml-1 text-slate-400">{task.policyTransactionStatus}</span>}
+                      </span>
                     ) : (
                       <Link
                         to={entityUrl(task)}
                         className="flex items-center gap-1 text-xs font-medium"
                         style={{ color: 'var(--accent)' }}
                       >
-                        {task.entityType} <ExternalLink className="h-3 w-3" />
+                        {taskEntityLabel(task)} <ExternalLink className="h-3 w-3" />
                       </Link>
                     )}
                   </td>

@@ -756,6 +756,7 @@ function TransactionRows({
         artifacts.invoices.length > 0 ||
         artifacts.communications.length > 0 ||
         artifacts.complianceChecklists.length > 0 ||
+        artifacts.approvals.length > 0 ||
         (canUploadProof && proofUploadApplies)
       ) && (
         <TransactionArtifactDetails
@@ -905,10 +906,10 @@ function TransactionArtifactDetails({
           </div>
           <div>
             <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Compliance</div>
-            {artifacts.complianceChecklists.length === 0 ? (
-              <div className="text-slate-500">No linked checklist</div>
+            {artifacts.complianceChecklists.length === 0 && artifacts.approvals.length === 0 ? (
+              <div className="text-slate-500">No linked checklist or approvals</div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {artifacts.complianceChecklists.flatMap((checklist) =>
                   checklist.items.map((item) => (
                     <div key={item.id} className="flex items-start gap-2 text-slate-700">
@@ -924,6 +925,15 @@ function TransactionArtifactDetails({
                     </div>
                   ))
                 )}
+                {artifacts.approvals.map((approval) => (
+                  <div key={approval.id} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+                    <div className="font-medium text-slate-800">{approval.approvalType}</div>
+                    <div className="text-xs text-slate-500">
+                      {approval.decision ?? 'Pending'}{approval.decisionAt ? ` - ${formatDate(approval.decisionAt)}` : ''}
+                    </div>
+                    {approval.notes && <div className="mt-1 text-xs text-slate-600">{approval.notes}</div>}
+                  </div>
+                ))}
               </div>
             )}
           </div>

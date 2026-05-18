@@ -175,6 +175,21 @@ export interface PolicyTransactionArtifacts {
   invoices: InvoiceSummary[]
   communications: OutboundCommunicationListItem[]
   complianceChecklists: PolicyTransactionComplianceChecklist[]
+  approvals: PolicyTransactionApproval[]
+}
+
+export interface PolicyTransactionApproval {
+  id: string
+  policyTransactionId: string
+  approvalType: string
+  requestedById: string
+  requestedByName: string
+  requestedAt: string
+  decisionById: string | null
+  decisionByName: string | null
+  decisionAt: string | null
+  decision: string | null
+  notes: string | null
 }
 
 export interface PolicyTransactionComplianceChecklist {

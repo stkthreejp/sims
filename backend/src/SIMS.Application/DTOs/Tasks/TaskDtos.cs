@@ -52,6 +52,9 @@ public class TaskInstanceListItemDto
     public DateTime DueDate { get; set; }
     public bool IsOverdue { get; set; }
     public int EscalationLevel { get; set; }
+    public string? PolicyTransactionNumber { get; set; }
+    public TransactionType? PolicyTransactionType { get; set; }
+    public PolicyTransactionStatus? PolicyTransactionStatus { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

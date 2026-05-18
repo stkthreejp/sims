@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { WorkflowTemplate, WorkflowStep, TaskEntityType } from '@/types/task.types'
 
-const ENTITY_TYPES: TaskEntityType[] = ['Submission', 'Policy', 'Account']
+const ENTITY_TYPES: TaskEntityType[] = ['Submission', 'Policy', 'PolicyTransaction', 'Account']
 
 export function WorkflowsAdminPage() {
   const qc = useQueryClient()

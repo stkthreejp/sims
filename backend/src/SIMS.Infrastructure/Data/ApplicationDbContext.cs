@@ -37,6 +37,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<PolicyTransactionStatusHistory> PolicyTransactionStatusHistory => Set<PolicyTransactionStatusHistory>();
     public DbSet<PolicyTransactionComplianceChecklist> PolicyTransactionComplianceChecklists => Set<PolicyTransactionComplianceChecklist>();
     public DbSet<PolicyTransactionComplianceChecklistItem> PolicyTransactionComplianceChecklistItems => Set<PolicyTransactionComplianceChecklistItem>();
+    public DbSet<PolicyTransactionApproval> PolicyTransactionApprovals => Set<PolicyTransactionApproval>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<QuoteUWWriteup> QuoteUWWriteups => Set<QuoteUWWriteup>();
@@ -175,6 +176,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<PolicyTransactionStatusHistory>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransactionComplianceChecklist>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransactionComplianceChecklistItem>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyTransactionApproval>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Note>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<DocumentTemplate>().HasQueryFilter(e => !e.IsDeleted);

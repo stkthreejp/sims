@@ -5,5 +5,6 @@ public enum TaskEntityType
     Account = 1,
     Submission = 2,
     Policy = 3,
-    ComplianceDocument = 4
+    ComplianceDocument = 4,
+    PolicyTransaction = 5
 }

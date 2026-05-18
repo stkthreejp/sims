@@ -105,6 +105,12 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
             {task.entityType && (
               <MetaRow icon={<></>} label="Entity" value={`${task.entityType}`} />
             )}
+            {task.policyTransactionNumber && (
+              <MetaRow icon={<FileText className="h-3.5 w-3.5" />} label="Transaction" value={`${task.policyTransactionNumber} ${task.policyTransactionType ?? ''}`.trim()} />
+            )}
+            {task.policyTransactionStatus && (
+              <MetaRow icon={<CheckCircle className="h-3.5 w-3.5" />} label="Txn status" value={task.policyTransactionStatus} />
+            )}
           </div>
 
           {/* Status update */}

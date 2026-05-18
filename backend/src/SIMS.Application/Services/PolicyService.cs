@@ -270,6 +270,28 @@ public class PolicyService : IPolicyService
             })
             .ToListAsync();
 
+        var approvals = await Db.Set<PolicyTransactionApproval>()
+            .AsNoTracking()
+            .Include(a => a.RequestedBy)
+            .Include(a => a.DecisionBy)
+            .Where(a => a.PolicyTransactionId == transactionId && !a.IsDeleted)
+            .OrderByDescending(a => a.RequestedAt)
+            .Select(a => new PolicyTransactionApprovalDto
+            {
+                Id = a.Id,
+                PolicyTransactionId = a.PolicyTransactionId,
+                ApprovalType = a.ApprovalType,
+                RequestedById = a.RequestedById,
+                RequestedByName = a.RequestedBy.FullName,
+                RequestedAt = a.RequestedAt,
+                DecisionById = a.DecisionById,
+                DecisionByName = a.DecisionBy != null ? a.DecisionBy.FullName : null,
+                DecisionAt = a.DecisionAt,
+                Decision = a.Decision,
+                Notes = a.Notes,
+            })
+            .ToListAsync();
+
         var versions = policy.Versions.ToDictionary(v => v.Id);
         return Result<PolicyTransactionArtifactsDto>.Success(new PolicyTransactionArtifactsDto
         {
@@ -279,6 +301,7 @@ public class PolicyService : IPolicyService
             Invoices = invoices,
             Communications = communications,
             ComplianceChecklists = complianceChecklists,
+            Approvals = approvals,
         });
     }
 

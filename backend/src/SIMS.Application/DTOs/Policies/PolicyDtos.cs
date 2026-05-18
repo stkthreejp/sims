@@ -121,6 +121,22 @@ public class PolicyTransactionArtifactsDto
     public IReadOnlyList<InvoiceSummaryDto> Invoices { get; set; } = [];
     public IReadOnlyList<OutboundCommunicationListItemDto> Communications { get; set; } = [];
     public IReadOnlyList<PolicyTransactionComplianceChecklistDto> ComplianceChecklists { get; set; } = [];
+    public IReadOnlyList<PolicyTransactionApprovalDto> Approvals { get; set; } = [];
+}
+
+public class PolicyTransactionApprovalDto
+{
+    public Guid Id { get; set; }
+    public Guid PolicyTransactionId { get; set; }
+    public string ApprovalType { get; set; } = string.Empty;
+    public Guid RequestedById { get; set; }
+    public string RequestedByName { get; set; } = string.Empty;
+    public DateTime RequestedAt { get; set; }
+    public Guid? DecisionById { get; set; }
+    public string? DecisionByName { get; set; }
+    public DateTime? DecisionAt { get; set; }
+    public string? Decision { get; set; }
+    public string? Notes { get; set; }
 }
 
 public class PolicyTransactionComplianceChecklistDto
