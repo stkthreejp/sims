@@ -997,6 +997,50 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task CancellationNotice_GeneratesNoticeDocumentForPolicyTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var template = new DocumentTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Commercial Cancellation Notice - Sample",
+            EntityType = TemplateEntityType.Policy,
+            Kind = DocumentTemplateKind.Document,
+            HtmlContent = "<p>{{cancellation.reasonLanguageResolved}}</p>",
+            CreatedById = fixture.UserId,
+            CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
+            IsActive = true,
+        };
+        db.Add(template);
+        await db.SaveChangesAsync();
+        var documents = new RecordingDocumentGenerationService(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), documentGeneration: documents);
+
+        var result = await policyService.IssueCancellationNoticeAsync(fixture.Policy.Id, new IssueCancellationNoticeDto
+        {
+            ReasonCode = "UW-02",
+            ReasonInputs = new Dictionary<string, string>
+            {
+                ["DESCRIBE_CONDITIONS"] = "unacceptable housekeeping",
+            },
+            NoticeMailingDate = new DateOnly(2026, 6, 1),
+            NoticeRequirementDays = 20,
+            MailingDays = 2,
+            Method = "First-Class Mail",
+            NoticeTemplateId = template.Id,
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.Cancellation);
+        Assert.Equal(template.Id, documents.GeneratedTemplateId);
+        Assert.Equal(fixture.Policy.Id, documents.GeneratedPolicyId);
+        Assert.Equal(transaction.Id, documents.GeneratedPolicyTransactionId);
+        var notice = await db.Set<Attachment>().SingleAsync(a => a.PolicyTransactionId == transaction.Id);
+        Assert.Equal(DocumentType.CancellationNonRenewal, notice.DocumentType);
+    }
+
+    [Fact]
     public async Task NonRenewal_UpdatesPolicyStatus()
     {
         await using var db = CreateDb();
@@ -1142,7 +1186,8 @@ public class PolicyLifecycleRegressionTests
         RecordingInvoicingService invoicing,
         RecordingPolicyAssemblyService? assembly = null,
         IQuoteService? quoteService = null,
-        RecordingWorkflowEngineService? workflow = null)
+        RecordingWorkflowEngineService? workflow = null,
+        IDocumentGenerationService? documentGeneration = null)
     {
         assembly ??= new RecordingPolicyAssemblyService();
         quoteService ??= new RecordingQuoteService(db);
@@ -1151,6 +1196,7 @@ public class PolicyLifecycleRegressionTests
             .AddSingleton<DbContext>(db)
             .AddSingleton<IQuotePolicyFormSelectionService>(new NoOpQuotePolicyFormSelectionService())
             .AddSingleton<IPolicyAssemblyService>(assembly)
+            .AddSingleton<IDocumentGenerationService>(documentGeneration ?? new RecordingDocumentGenerationService(db))
             .AddSingleton(quoteService)
             .BuildServiceProvider();
 
@@ -1527,6 +1573,57 @@ public class PolicyLifecycleRegressionTests
                 ContentType = "application/pdf",
                 CreatedAt = DateTime.UtcNow,
             });
+    }
+
+    private sealed class RecordingDocumentGenerationService(ApplicationDbContext db) : IDocumentGenerationService
+    {
+        public Guid? GeneratedTemplateId { get; private set; }
+        public Guid? GeneratedPolicyId { get; private set; }
+        public Guid? GeneratedPolicyTransactionId { get; private set; }
+
+        public Task<Result<GeneratedDocumentDto>> GenerateAsync(Guid templateId, TemplateEntityType entityType, Guid entityId, DocumentType? documentType, Guid userId)
+            => Task.FromResult(Result<GeneratedDocumentDto>.Failure("NOT_USED", "Use transaction-aware generation."));
+
+        public async Task<Result<GeneratedDocumentDto>> GenerateForPolicyTransactionAsync(
+            Guid templateId,
+            Guid policyId,
+            Guid policyTransactionId,
+            DocumentType documentType,
+            Guid userId)
+        {
+            GeneratedTemplateId = templateId;
+            GeneratedPolicyId = policyId;
+            GeneratedPolicyTransactionId = policyTransactionId;
+            var policy = await db.Set<Policy>().SingleAsync(p => p.Id == policyId);
+            var attachment = new Attachment
+            {
+                EntityType = DocumentEntityType.Policy,
+                QuoteId = policy.BoundQuoteId,
+                DocumentType = documentType,
+                PolicyTransactionId = policyTransactionId,
+                FileName = "cancellation-notice.pdf",
+                BlobPath = "cancellation-notice.pdf",
+                ContentType = "application/pdf",
+                FileSizeBytes = 100,
+                UploadedById = userId,
+            };
+            db.Add(attachment);
+            await db.SaveChangesAsync();
+
+            return Result<GeneratedDocumentDto>.Success(new GeneratedDocumentDto(
+                "/documents/cancellation-notice.pdf",
+                new AttachmentDto
+                {
+                    Id = attachment.Id,
+                    EntityType = attachment.EntityType,
+                    DocumentType = attachment.DocumentType,
+                    PolicyTransactionId = attachment.PolicyTransactionId,
+                    FileName = attachment.FileName,
+                    ContentType = attachment.ContentType,
+                    FileSizeBytes = attachment.FileSizeBytes,
+                    CreatedAt = attachment.CreatedAt,
+                }));
+        }
     }
 
     private sealed class RecordingOutboundEmailSender : IOutboundEmailSenderService

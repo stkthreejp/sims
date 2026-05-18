@@ -100,6 +100,71 @@ public class DocumentGenerationService : IDocumentGenerationService
 
     // ── Tag replacement ───────────────────────────────────────────────────────
 
+    public async Task<Result<GeneratedDocumentDto>> GenerateForPolicyTransactionAsync(
+        Guid templateId,
+        Guid policyId,
+        Guid policyTransactionId,
+        DocumentType documentType,
+        Guid userId)
+    {
+        var template = await Db.Set<DocumentTemplate>().FindAsync(templateId);
+        if (template == null)
+            return Result<GeneratedDocumentDto>.Failure("NOT_FOUND", "Template not found.");
+        if (template.Kind == DocumentTemplateKind.Email)
+            return Result<GeneratedDocumentDto>.Failure("INVALID_TEMPLATE_KIND", "Email-only templates cannot be generated as documents.");
+
+        DocumentMergeData data;
+        try
+        {
+            data = await BuildDataDictionaryAsync(TemplateEntityType.Policy, policyId);
+            await AddPolicyTransactionDataAsync(data, policyTransactionId);
+        }
+        catch (Exception ex)
+        {
+            return Result<GeneratedDocumentDto>.Failure("DATA_ERROR", $"Could not load policy transaction data: {ex.Message}");
+        }
+
+        var filledHtml = _merge.MergeHtml(template.HtmlContent, data);
+        var fullHtml = BuildFullHtml(filledHtml, template.Name);
+
+        byte[] pdfBytes;
+        try
+        {
+            pdfBytes = ConvertHtmlToPdf(fullHtml);
+        }
+        catch (Exception ex)
+        {
+            return Result<GeneratedDocumentDto>.Failure("CONVERSION_ERROR", $"PDF conversion failed: {ex.Message}");
+        }
+
+        var target = await ResolvePolicyAttachmentTargetAsync(policyId);
+        if (target == null)
+            return Result<GeneratedDocumentDto>.Failure("POLICY_NOT_FOUND", "Policy not found.");
+
+        var fileName = $"{SanitizeFileName(template.Name)}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
+        using var stream = new MemoryStream(pdfBytes);
+        var attachmentResult = await _attachments.CreateGeneratedAsync(
+            target.Value.EntityType,
+            target.Value.EntityId,
+            stream,
+            fileName,
+            "application/pdf",
+            pdfBytes.LongLength,
+            documentType,
+            $"Generated from template \"{template.Name}\" on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC.",
+            userId,
+            policyTransactionId: policyTransactionId);
+
+        if (!attachmentResult.IsSuccess || attachmentResult.Value == null)
+            return Result<GeneratedDocumentDto>.Failure(attachmentResult.ErrorCode ?? "ATTACHMENT_SAVE_FAILED", attachmentResult.ErrorMessage ?? "Generated document could not be stored.");
+
+        var urlResult = await _attachments.GetDownloadUrlAsync(attachmentResult.Value.Id, userId);
+        if (!urlResult.IsSuccess || string.IsNullOrWhiteSpace(urlResult.Value))
+            return Result<GeneratedDocumentDto>.Failure(urlResult.ErrorCode ?? "DOWNLOAD_URL_FAILED", urlResult.ErrorMessage ?? "Generated document was stored, but a download URL could not be created.");
+
+        return Result<GeneratedDocumentDto>.Success(new GeneratedDocumentDto(urlResult.Value, attachmentResult.Value));
+    }
+
     private static string BuildFullHtml(string bodyHtml, string title)
     {
         return $$"""
@@ -410,6 +475,42 @@ public class DocumentGenerationService : IDocumentGenerationService
         await AddPolicyFormRepeatingValuesAsync(data, policy.BoundQuoteId);
 
         await AddLegalCancellationDataAsync(d, insured.State, cancellation?.CancellationLegalRequirementSnapshotJson);
+    }
+
+    private async Task AddPolicyTransactionDataAsync(DocumentMergeData data, Guid policyTransactionId)
+    {
+        var d = data.Values;
+        var transaction = await Db.Set<PolicyTransaction>()
+            .Include(t => t.CancellationDetail)
+            .FirstOrDefaultAsync(t => t.Id == policyTransactionId && !t.IsDeleted)
+            ?? throw new Exception("Policy transaction not found.");
+
+        d["TransactionNumber"] = transaction.TransactionNumber;
+        d["TransactionType"] = transaction.TransactionType.ToString();
+        d["TransactionStatus"] = transaction.Status.ToString();
+        d["TransactionEffectiveDate"] = transaction.EffectiveDate;
+
+        if (transaction.CancellationDetail is { } cancellation)
+        {
+            d["CancellationReasonCode"] = cancellation.ReasonCode;
+            d["CancellationReasonLabel"] = cancellation.ReasonLabel;
+            d["CancellationReasonLanguageResolved"] = cancellation.ResolvedReasonLanguage;
+            d["CancellationNoticeMailingDate"] = cancellation.NoticeMailingDate;
+            d["CancellationNoticeRequirementDays"] = cancellation.NoticeRequirementDays;
+            d["CancellationMailingDays"] = cancellation.MailingDays;
+            d["CancellationEffectiveDate"] = cancellation.CancellationEffectiveDate;
+            d["CancellationMethod"] = cancellation.Method;
+
+            d["cancellation.reasonCode"] = cancellation.ReasonCode;
+            d["cancellation.reasonLabel"] = cancellation.ReasonLabel;
+            d["cancellation.reasonLanguageResolved"] = cancellation.ResolvedReasonLanguage;
+            d["cancellation.noticeMailingDate"] = cancellation.NoticeMailingDate;
+            d["cancellation.noticeRequirementDays"] = cancellation.NoticeRequirementDays;
+            d["cancellation.mailingDays"] = cancellation.MailingDays;
+            d["cancellation.cancellationEffectiveDate"] = cancellation.CancellationEffectiveDate;
+            d["cancellation.returnPremiumAmount"] = transaction.PremiumChange < 0 ? Math.Abs(transaction.PremiumChange) : 0m;
+            d["cancellation.returnPremiumMethod"] = string.Empty;
+        }
     }
 
     private async Task AddLegalCancellationDataAsync(Dictionary<string, object?> d, string state, string? snapshotJson)

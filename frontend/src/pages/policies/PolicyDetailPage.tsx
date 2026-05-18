@@ -5,6 +5,7 @@ import { AlertTriangle, Ban, FileSignature, FileX2, Pin, PinOff, Pencil, Trash2,
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
 import { attachmentsApi } from '@/api/attachments.api'
+import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
@@ -12,6 +13,7 @@ import type { CancellationComplianceChecklistItem, CancellationReason, IssueCanc
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
+import type { DocumentTemplateListItem } from '@/types/documentTemplate.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -102,6 +104,12 @@ export function PolicyDetailPage() {
   const { data: cancellationReasons = [] } = useQuery({
     queryKey: ['policies', 'cancellation-reasons'],
     queryFn: policiesApi.getCancellationReasons,
+    enabled: canCancelPolicies,
+  })
+
+  const { data: policyDocumentTemplates = [] } = useQuery({
+    queryKey: ['document-templates', 'Policy', 'Document'],
+    queryFn: () => documentTemplatesApi.getAll('Policy', false, 'Document'),
     enabled: canCancelPolicies,
   })
 
@@ -290,6 +298,7 @@ export function PolicyDetailPage() {
           policy={policy}
           guidance={cancellationGuidance}
           reasons={cancellationReasons}
+          templates={policyDocumentTemplates}
           saving={issueCancellationNoticeMutation.isPending}
           onClose={() => setActionModal(null)}
           onSave={(data) => issueCancellationNoticeMutation.mutate(data)}
@@ -1121,6 +1130,7 @@ function CancelPolicyModal({
   policy,
   guidance,
   reasons,
+  templates,
   saving,
   onClose,
   onSave,
@@ -1128,6 +1138,7 @@ function CancelPolicyModal({
   policy: Policy
   guidance?: LegalComplianceGuidance
   reasons: CancellationReason[]
+  templates: DocumentTemplateListItem[]
   saving: boolean
   onClose: () => void
   onSave: (data: IssueCancellationNotice) => void
@@ -1138,6 +1149,8 @@ function CancelPolicyModal({
   const [noticeRequirementDays, setNoticeRequirementDays] = useState('10')
   const [mailingDays, setMailingDays] = useState('0')
   const [method, setMethod] = useState('Written Notice')
+  const cancellationTemplates = templates.filter((template) => /cancel/i.test(template.name))
+  const [noticeTemplateId, setNoticeTemplateId] = useState('')
   const [notes, setNotes] = useState('')
   const selectedReason = reasons.find((reason) => reason.code === reasonCode)
   const calculatedCancellationDate = addDaysToDateInput(
@@ -1168,6 +1181,7 @@ function CancelPolicyModal({
       noticeRequirementDays: Number(noticeRequirementDays),
       mailingDays: Number(mailingDays || 0),
       method,
+      noticeTemplateId: noticeTemplateId || undefined,
       notes: notes.trim() || undefined,
     })
   }
@@ -1233,6 +1247,14 @@ function CancelPolicyModal({
               <option>Carrier Issued</option>
             </select>
           </Field>
+          <Field label="Notice Template">
+            <select value={noticeTemplateId} onChange={(e) => setNoticeTemplateId(e.target.value)} className={selectClass}>
+              <option value="">Use default cancellation template</option>
+              {cancellationTemplates.map((template) => (
+                <option key={template.id} value={template.id}>{template.name}</option>
+              ))}
+            </select>
+          </Field>
           <Field label="Notes">
             <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
           </Field>
@@ -1243,6 +1265,7 @@ function CancelPolicyModal({
               <div><span className="font-medium">Mailing date:</span> {formatDate(noticeMailingDate)}</div>
               <div><span className="font-medium">Notice days:</span> {noticeRequirementDays || '0'} + {mailingDays || '0'} mailing days</div>
               <div><span className="font-medium">Cancellation date:</span> {formatDate(calculatedCancellationDate)}</div>
+              <div><span className="font-medium">Template:</span> {cancellationTemplates.find((template) => template.id === noticeTemplateId)?.name ?? 'Default cancellation template'}</div>
             </div>
             {selectedReason?.requiresSpecialHandling && (
               <p className="mt-2 text-xs font-medium text-amber-700">This reason requires special procedural review before use.</p>

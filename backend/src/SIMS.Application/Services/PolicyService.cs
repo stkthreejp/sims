@@ -931,6 +931,24 @@ public class PolicyService : IPolicyService
         Db.Set<PolicyCancellationDetail>().Add(detail);
         await Db.SaveChangesAsync();
         await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Cancellation notice issued.");
+
+        var noticeTemplateId = dto.NoticeTemplateId ?? await ResolveDefaultCancellationNoticeTemplateIdAsync();
+        if (noticeTemplateId.HasValue)
+        {
+            var documents = (IDocumentGenerationService?)_sp.GetService(typeof(IDocumentGenerationService));
+            if (documents != null)
+            {
+                var documentResult = await documents.GenerateForPolicyTransactionAsync(
+                    noticeTemplateId.Value,
+                    policy.Id,
+                    transaction.Id,
+                    DocumentType.CancellationNonRenewal,
+                    access.UserId);
+                if (!documentResult.IsSuccess)
+                    return Result<PolicyTransactionDto>.Failure(documentResult.ErrorCode ?? "NOTICE_GENERATION_FAILED", documentResult.ErrorMessage ?? "Cancellation notice could not be generated.");
+            }
+        }
+
         await Db.Entry(transaction).Reference(t => t.ProcessedBy).LoadAsync();
 
         return Result<PolicyTransactionDto>.Success(MapToTransactionDto(transaction));
@@ -1061,6 +1079,19 @@ public class PolicyService : IPolicyService
             .IgnoreQueryFilters()
             .CountAsync(t => t.TransactionNumber.StartsWith(prefix));
         return $"{prefix}{(count + 1):D5}";
+    }
+
+    private async Task<Guid?> ResolveDefaultCancellationNoticeTemplateIdAsync()
+    {
+        return await Db.Set<DocumentTemplate>()
+            .Where(t => !t.IsDeleted
+                && t.IsActive
+                && t.EntityType == TemplateEntityType.Policy
+                && t.Kind != DocumentTemplateKind.Email
+                && (EF.Functions.Like(t.Name, "%Cancellation%") || EF.Functions.Like(t.Name, "%Cancel%")))
+            .OrderBy(t => t.Name)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync();
     }
 
     private async Task RecalculateSubmissionStatusAsync(Guid submissionId)
