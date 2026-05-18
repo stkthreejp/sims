@@ -238,7 +238,7 @@ export function ReviewModal({
   onClose: () => void
   onSaved: () => void
 }) {
-  const [status, setStatus] = useState(REVIEW_STATUS.COMPLETED)
+  const [status, setStatus] = useState<string>(REVIEW_STATUS.COMPLETED)
   const [notes, setNotes] = useState('')
   const [nextReviewDate, setNextReviewDate] = useState(() => {
     const date = new Date()

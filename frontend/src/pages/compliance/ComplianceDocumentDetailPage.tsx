@@ -24,7 +24,7 @@ export function ComplianceDocumentDetailPage() {
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('IT')
   const [documentType, setDocumentType] = useState('Policy')
-  const [status, setStatus] = useState(DOCUMENT_STATUS.DRAFT)
+  const [status, setStatus] = useState<string>(DOCUMENT_STATUS.DRAFT)
   const [ownerId, setOwnerId] = useState('')
   const [approverId, setApproverId] = useState('')
   const [reviewCadence, setReviewCadence] = useState('Annual')
