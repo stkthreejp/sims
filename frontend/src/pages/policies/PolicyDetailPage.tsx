@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Ban, FileSignature, FileX2, Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
+import { AlertTriangle, Ban, Download, FileSignature, FileX2, Loader2, Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
 import { attachmentsApi } from '@/api/attachments.api'
@@ -11,6 +11,7 @@ import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
 import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
+import type { Attachment } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import type { DocumentTemplateListItem } from '@/types/documentTemplate.types'
@@ -941,7 +942,10 @@ function TransactionArtifactDetails({
           )}
 
           {activeSection === 'Cancellation' && (
-            <CancellationSummary transaction={transaction} />
+            <CancellationSummary
+              transaction={transaction}
+              documents={artifacts.documents.filter((doc) => doc.documentType === 'CancellationNonRenewal' || doc.documentType === 'ProofOfNotice')}
+            />
           )}
 
           {activeSection === 'Compliance' && (
@@ -1005,8 +1009,28 @@ function CompactRow({ title, meta, value, sub }: { title: string; meta?: string;
   )
 }
 
-function CancellationSummary({ transaction }: { transaction: PolicyTransaction }) {
+function CancellationSummary({ transaction, documents = [] }: { transaction: PolicyTransaction; documents?: Attachment[] }) {
   const detail = transaction.cancellationDetail
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const downloadDocument = async (attachment: Attachment) => {
+    setDownloadingId(attachment.id)
+    try {
+      const url = await attachmentsApi.getDownloadUrl(attachment.id)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = attachment.fileName
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch {
+      toast.error('Failed to get download link')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   return (
     <div className="rounded border border-red-100 bg-red-50/40 px-3 py-2 text-slate-700">
@@ -1019,9 +1043,32 @@ function CancellationSummary({ transaction }: { transaction: PolicyTransaction }
         <div><span className="text-slate-500">Notice Days:</span> {detail ? `${detail.noticeRequirementDays} + ${detail.mailingDays} mailing` : '-'}</div>
         <div><span className="text-slate-500">Cancellation Date:</span> {formatDate(detail?.cancellationEffectiveDate ?? transaction.effectiveDate)}</div>
         <div><span className="text-slate-500">Method:</span> {detail?.method || transaction.cancellationMethod || 'Not recorded'}</div>
+        <div><span className="text-slate-500">Template:</span> {detail?.noticeTemplateName || (detail?.noticeTemplateId ? 'Selected template' : 'Default or not recorded')}</div>
       </div>
       {detail?.resolvedReasonLanguage && (
         <p className="mt-2 text-xs text-slate-700">{detail.resolvedReasonLanguage}</p>
+      )}
+      {documents.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notice Documents</div>
+          {documents.map((doc) => (
+            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-red-100 bg-white/80 px-2.5 py-2 text-xs">
+              <div className="min-w-0">
+                <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
+                <div className="text-slate-500">{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
+              </div>
+              <button
+                type="button"
+                className="sims-icon-btn shrink-0"
+                disabled={downloadingId === doc.id}
+                onClick={() => downloadDocument(doc)}
+                title="Download"
+              >
+                {downloadingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          ))}
+        </div>
       )}
       {transaction.notes && <p className="mt-2 text-xs text-slate-600">{transaction.notes}</p>}
     </div>

@@ -183,6 +183,7 @@ export interface PolicyCancellationDetail {
   cancellationEffectiveDate: string
   method: string
   noticeTemplateId: string | null
+  noticeTemplateName: string | null
 }
 
 export interface PolicyTransactionArtifacts {

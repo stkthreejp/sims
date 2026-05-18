@@ -129,6 +129,7 @@ public class PolicyCancellationDetailDto
     public DateOnly CancellationEffectiveDate { get; set; }
     public string Method { get; set; } = string.Empty;
     public Guid? NoticeTemplateId { get; set; }
+    public string? NoticeTemplateName { get; set; }
 }
 
 public class PolicyTransactionArtifactsDto

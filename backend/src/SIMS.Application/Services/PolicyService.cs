@@ -100,6 +100,7 @@ public class PolicyService : IPolicyService
             .Include(p => p.BoundQuote)
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
             .Include(p => p.Transactions).ThenInclude(t => t.CancellationDetail)
+                .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Versions)
             .Where(p => p.Id == id && !p.IsDeleted)
             .ForAccessScope(access)
@@ -115,6 +116,7 @@ public class PolicyService : IPolicyService
         var policy = await Db.Set<Policy>()
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
             .Include(p => p.Transactions).ThenInclude(t => t.CancellationDetail)
+                .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Versions)
             .Where(p => p.Id == policyId && !p.IsDeleted)
             .ForAccessScope(access)
@@ -1338,6 +1340,7 @@ public class PolicyService : IPolicyService
             CancellationEffectiveDate = t.CancellationDetail.CancellationEffectiveDate,
             Method = t.CancellationDetail.Method,
             NoticeTemplateId = t.CancellationDetail.NoticeTemplateId,
+            NoticeTemplateName = t.CancellationDetail.NoticeTemplate?.Name,
         },
         CancellationComplianceChecklist = DeserializeChecklist(t.CancellationComplianceChecklistJson),
         CancellationLegalRequirementSnapshotJson = t.CancellationLegalRequirementSnapshotJson,

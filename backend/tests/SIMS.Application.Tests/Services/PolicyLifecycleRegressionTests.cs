@@ -1001,6 +1001,19 @@ public class PolicyLifecycleRegressionTests
     {
         await using var db = CreateDb();
         var fixture = await SeedBoundPolicyAsync(db);
+        var template = new DocumentTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Commercial Cancellation Notice - Sample",
+            EntityType = TemplateEntityType.Policy,
+            Kind = DocumentTemplateKind.Document,
+            HtmlContent = "<p>{{cancellation.reasonLanguageResolved}}</p>",
+            CreatedById = fixture.UserId,
+            CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
+            IsActive = true,
+        };
+        db.Add(template);
+        await db.SaveChangesAsync();
         var policyService = CreatePolicyService(db, new RecordingInvoicingService());
 
         var result = await policyService.IssueCancellationNoticeAsync(fixture.Policy.Id, new IssueCancellationNoticeDto
@@ -1014,6 +1027,7 @@ public class PolicyLifecycleRegressionTests
             NoticeRequirementDays = 10,
             MailingDays = 3,
             Method = "Certified Mail",
+            NoticeTemplateId = template.Id,
         }, UserAccessScope.All(fixture.UserId));
         Assert.True(result.IsSuccess);
 
@@ -1030,6 +1044,8 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(3, transaction.CancellationDetail.MailingDays);
         Assert.Equal(new DateOnly(2026, 6, 14), transaction.CancellationDetail.CancellationEffectiveDate);
         Assert.Equal("Certified Mail", transaction.CancellationDetail.Method);
+        Assert.Equal(template.Id, transaction.CancellationDetail.NoticeTemplateId);
+        Assert.Equal("Commercial Cancellation Notice - Sample", transaction.CancellationDetail.NoticeTemplateName);
     }
 
     [Fact]
