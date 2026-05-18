@@ -23,6 +23,7 @@ public interface IPolicyService
     Task<Result<QuoteDto>> CreateRenewalQuoteAsync(Guid policyId, UserAccessScope access);
 
     Task<Result<PolicyDto>> CancelAsync(Guid policyId, CancelPolicyDto dto, UserAccessScope access);
+    Task<Result<PolicyTransactionDto>> IssueCancellationNoticeAsync(Guid policyId, IssueCancellationNoticeDto dto, UserAccessScope access);
     Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access);
     Task<Result<LegalComplianceGuidanceDto>> GetCancellationGuidanceAsync(Guid policyId, UserAccessScope access);
     Task<Result<LegalComplianceGuidanceDto>> GetNonRenewalGuidanceAsync(Guid policyId, UserAccessScope access);

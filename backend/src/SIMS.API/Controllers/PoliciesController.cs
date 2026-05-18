@@ -3,6 +3,7 @@ using SIMS.Application.DTOs.Notes;
 using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.Policies;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Policies;
 using SIMS.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -37,6 +38,21 @@ public class PoliciesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] QueryParameters query)
         => Ok(await _policies.GetAllAsync(query, CurrentAccess));
+
+    [HttpGet("cancellation-reasons")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public IActionResult GetCancellationReasons()
+        => Ok(CancellationReasonLibrary.All.Select(r => new
+        {
+            r.Code,
+            r.Category,
+            r.Label,
+            r.DefaultNoticeRequirementDays,
+            r.NoticeRequirementLabel,
+            r.LanguageTemplate,
+            r.RequiredInputTokens,
+            r.RequiresSpecialHandling,
+        }));
 
     [HttpGet("by-insured/{insuredId:guid}")]
     public async Task<IActionResult> GetByInsured(Guid insuredId)
@@ -144,6 +160,14 @@ public class PoliciesController : ControllerBase
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelPolicyDto dto)
     {
         var result = await _policies.CancelAsync(id, dto, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/cancellation-notice")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public async Task<IActionResult> IssueCancellationNotice(Guid id, [FromBody] IssueCancellationNoticeDto dto)
+    {
+        var result = await _policies.IssueCancellationNoticeAsync(id, dto, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

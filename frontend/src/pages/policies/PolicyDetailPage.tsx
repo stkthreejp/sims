@@ -8,7 +8,7 @@ import { attachmentsApi } from '@/api/attachments.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
-import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
+import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
@@ -99,6 +99,12 @@ export function PolicyDetailPage() {
     enabled: !!id && canCancelPolicies,
   })
 
+  const { data: cancellationReasons = [] } = useQuery({
+    queryKey: ['policies', 'cancellation-reasons'],
+    queryFn: policiesApi.getCancellationReasons,
+    enabled: canCancelPolicies,
+  })
+
   const { data: nonRenewalGuidance } = useQuery({
     queryKey: ['policies', id, 'non-renewal-guidance'],
     queryFn: () => policiesApi.getNonRenewalGuidance(id!),
@@ -116,15 +122,15 @@ export function PolicyDetailPage() {
     onError: () => toast.error('Endorsement could not be added'),
   })
 
-  const cancelPolicyMutation = useMutation({
-    mutationFn: (data: { cancelledDate: string; reason: string; method: string; premiumChange: number; complianceChecklist: CancellationComplianceChecklistItem[]; legalRequirementSectionIds: string[]; notes?: string }) =>
-      policiesApi.cancel(id!, data),
+  const issueCancellationNoticeMutation = useMutation({
+    mutationFn: (data: IssueCancellationNotice) =>
+      policiesApi.issueCancellationNotice(id!, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', id] })
       setActionModal(null)
-      toast.success('Policy cancelled')
+      toast.success('Cancellation notice issued')
     },
-    onError: () => toast.error('Policy could not be cancelled'),
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Cancellation notice could not be issued'),
   })
 
   const nonRenewMutation = useMutation({
@@ -283,9 +289,10 @@ export function PolicyDetailPage() {
         <CancelPolicyModal
           policy={policy}
           guidance={cancellationGuidance}
-          saving={cancelPolicyMutation.isPending}
+          reasons={cancellationReasons}
+          saving={issueCancellationNoticeMutation.isPending}
           onClose={() => setActionModal(null)}
-          onSave={(data) => cancelPolicyMutation.mutate(data)}
+          onSave={(data) => issueCancellationNoticeMutation.mutate(data)}
         />
       )}
 
@@ -1113,57 +1120,109 @@ function EndorsePolicyModal({
 function CancelPolicyModal({
   policy,
   guidance,
+  reasons,
   saving,
   onClose,
   onSave,
 }: {
   policy: Policy
   guidance?: LegalComplianceGuidance
+  reasons: CancellationReason[]
   saving: boolean
   onClose: () => void
-  onSave: (data: { cancelledDate: string; reason: string; method: string; premiumChange: number; complianceChecklist: CancellationComplianceChecklistItem[]; legalRequirementSectionIds: string[]; notes?: string }) => void
+  onSave: (data: IssueCancellationNotice) => void
 }) {
-  const [cancelledDate, setCancelledDate] = useState(toDateInput(policy.effectiveDate))
-  const [reason, setReason] = useState('')
+  const [reasonCode, setReasonCode] = useState('')
+  const [reasonInputs, setReasonInputs] = useState<Record<string, string>>({})
+  const [noticeMailingDate, setNoticeMailingDate] = useState(toDateInput(new Date().toISOString()))
+  const [noticeRequirementDays, setNoticeRequirementDays] = useState('10')
+  const [mailingDays, setMailingDays] = useState('0')
   const [method, setMethod] = useState('Written Notice')
-  const [premiumChange, setPremiumChange] = useState('0')
   const [notes, setNotes] = useState('')
-  const [checklist, setChecklist] = useState<CancellationComplianceChecklistItem[]>(() => buildCancellationChecklist(guidance))
-  const allChecklistComplete = checklist.length > 0 && checklist.every((item) => item.isCompleted)
+  const selectedReason = reasons.find((reason) => reason.code === reasonCode)
+  const calculatedCancellationDate = addDaysToDateInput(
+    noticeMailingDate,
+    Number(noticeRequirementDays || 0) + Number(mailingDays || 0)
+  )
+  const resolvedReason = selectedReason ? resolveReasonPreview(selectedReason, reasonInputs) : ''
+  const requiredInputsComplete = selectedReason
+    ? selectedReason.requiredInputTokens.every((token) => reasonInputs[token]?.trim())
+    : false
 
   useEffect(() => {
-    setChecklist((current) => {
-      const next = buildCancellationChecklist(guidance)
-      if (current.length === 0) return next
-      return next.map((item) => ({
-        ...item,
-        isCompleted: current.find((existing) => existing.key === item.key)?.isCompleted ?? false,
-      }))
-    })
-  }, [guidance])
+    if (reasons.length > 0 && !reasonCode) {
+      const first = reasons[0]
+      setReasonCode(first.code)
+      setNoticeRequirementDays(String(first.defaultNoticeRequirementDays))
+      setReasonInputs({})
+    }
+  }, [reasonCode, reasons])
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
+    if (!selectedReason) return
     onSave({
-      cancelledDate,
-      reason: reason.trim(),
+      reasonCode: selectedReason.code,
+      reasonInputs,
+      noticeMailingDate,
+      noticeRequirementDays: Number(noticeRequirementDays),
+      mailingDays: Number(mailingDays || 0),
       method,
-      premiumChange: Number(premiumChange || 0),
-      complianceChecklist: checklist,
-      legalRequirementSectionIds: uniqueIds(checklist.flatMap((item) => item.requirementSectionIds)),
       notes: notes.trim() || undefined,
     })
   }
 
   return (
-    <ActionModal title="Cancel Policy" onClose={onClose} wide>
+    <ActionModal title="Issue Cancellation Notice" onClose={onClose} wide>
       <form onSubmit={submit} className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
         <div className="space-y-4">
-          <Field label="Cancellation Date">
-            <input type="date" required value={cancelledDate} onChange={(e) => setCancelledDate(e.target.value)} className={inputClass} />
-          </Field>
           <Field label="Reason">
-            <textarea rows={4} required value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
+            <select
+              value={reasonCode}
+              onChange={(e) => {
+                const nextReason = reasons.find((reason) => reason.code === e.target.value)
+                setReasonCode(e.target.value)
+                setReasonInputs({})
+                if (nextReason) setNoticeRequirementDays(String(nextReason.defaultNoticeRequirementDays))
+              }}
+              className={selectClass}
+              required
+            >
+              {groupCancellationReasons(reasons).map((group) => (
+                <optgroup key={group.category} label={group.category}>
+                  {group.reasons.map((reason) => (
+                    <option key={reason.code} value={reason.code}>
+                      {reason.code} - {reason.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </Field>
+          {selectedReason?.requiredInputTokens.map((token) => (
+            <Field key={token} label={formatReasonTokenLabel(token)}>
+              <textarea
+                rows={token.startsWith('DESCRIBE_') ? 3 : 1}
+                required
+                value={reasonInputs[token] ?? ''}
+                onChange={(e) => setReasonInputs((current) => ({ ...current, [token]: e.target.value }))}
+                className={textareaClass}
+              />
+            </Field>
+          ))}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Field label="Notice Mailing Date">
+              <input type="date" required value={noticeMailingDate} onChange={(e) => setNoticeMailingDate(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Notice Days">
+              <input type="number" min={1} required value={noticeRequirementDays} onChange={(e) => setNoticeRequirementDays(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Mailing Days">
+              <input type="number" min={0} required value={mailingDays} onChange={(e) => setMailingDays(e.target.value)} className={inputClass} />
+            </Field>
+          </div>
+          <Field label="Calculated Cancellation Date">
+            <input type="date" readOnly value={calculatedCancellationDate} className={inputClass} />
           </Field>
           <Field label="Notice Method">
             <select value={method} onChange={(e) => setMethod(e.target.value)} className={selectClass}>
@@ -1174,14 +1233,23 @@ function CancelPolicyModal({
               <option>Carrier Issued</option>
             </select>
           </Field>
-          <Field label="Premium Change">
-            <input type="number" step="0.01" value={premiumChange} onChange={(e) => setPremiumChange(e.target.value)} className={inputClass} />
-          </Field>
           <Field label="Notes">
             <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
           </Field>
-          <ComplianceChecklist items={checklist} onChange={setChecklist} />
-          <ModalActions saving={saving} disabled={!allChecklistComplete} onClose={onClose} submitLabel="Cancel Policy" danger />
+          <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+            <div className="font-semibold text-slate-900">Notice Preview</div>
+            <div className="mt-2 grid gap-1 text-xs text-slate-600">
+              <div><span className="font-medium">Reason:</span> {selectedReason ? `${selectedReason.code} - ${selectedReason.label}` : '-'}</div>
+              <div><span className="font-medium">Mailing date:</span> {formatDate(noticeMailingDate)}</div>
+              <div><span className="font-medium">Notice days:</span> {noticeRequirementDays || '0'} + {mailingDays || '0'} mailing days</div>
+              <div><span className="font-medium">Cancellation date:</span> {formatDate(calculatedCancellationDate)}</div>
+            </div>
+            {selectedReason?.requiresSpecialHandling && (
+              <p className="mt-2 text-xs font-medium text-amber-700">This reason requires special procedural review before use.</p>
+            )}
+            {resolvedReason && <p className="mt-3 text-xs text-slate-700">{resolvedReason}</p>}
+          </div>
+          <ModalActions saving={saving} disabled={!selectedReason || !requiredInputsComplete} onClose={onClose} submitLabel="Issue Notice" danger />
         </div>
         <LegalGuidancePanel guidance={guidance} mode="Cancellation" />
       </form>
@@ -1364,6 +1432,37 @@ const textareaClass = 'sims-textarea'
 
 function toDateInput(value: string) {
   return value.slice(0, 10)
+}
+
+function addDaysToDateInput(value: string, days: number) {
+  if (!value) return ''
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return ''
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function groupCancellationReasons(reasons: CancellationReason[]) {
+  const groups = new Map<string, CancellationReason[]>()
+  for (const reason of reasons) {
+    groups.set(reason.category, [...(groups.get(reason.category) ?? []), reason])
+  }
+  return Array.from(groups.entries()).map(([category, groupReasons]) => ({ category, reasons: groupReasons }))
+}
+
+function formatReasonTokenLabel(token: string) {
+  return token
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function resolveReasonPreview(reason: CancellationReason, inputs: Record<string, string>) {
+  return reason.languageTemplate.replace(/\[([A-Z0-9_]+)\]/g, (match, token: string) => {
+    const value = inputs[token]?.trim()
+    return value || match
+  })
 }
 
 function truncateText(value: string, maxLength: number) {

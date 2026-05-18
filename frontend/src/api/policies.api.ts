@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Policy, PolicyListItem, PolicyTransaction, PolicyTransactionArtifacts, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance } from '@/types/policy.types'
+import type { Policy, PolicyListItem, PolicyTransaction, PolicyTransactionArtifacts, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance, CancellationReason, IssueCancellationNotice } from '@/types/policy.types'
 import type { Quote } from '@/types/quote.types'
 import type { Note } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
@@ -14,6 +14,9 @@ export const policiesApi = {
 
   getById: (id: string) =>
     apiClient.get<Policy>(`/policies/${id}`).then((r) => r.data),
+
+  getCancellationReasons: () =>
+    apiClient.get<CancellationReason[]>('/policies/cancellation-reasons').then((r) => r.data),
 
   getTransactionArtifacts: (id: string, txnId: string) =>
     apiClient.get<PolicyTransactionArtifacts>(`/policies/${id}/transactions/${txnId}/artifacts`).then((r) => r.data),
@@ -47,6 +50,9 @@ export const policiesApi = {
 
   cancel: (id: string, data: CancelPolicy) =>
     apiClient.post<Policy>(`/policies/${id}/cancel`, data).then((r) => r.data),
+
+  issueCancellationNotice: (id: string, data: IssueCancellationNotice) =>
+    apiClient.post<PolicyTransaction>(`/policies/${id}/cancellation-notice`, data).then((r) => r.data),
 
   nonRenew: (id: string, data: NonRenewPolicy) =>
     apiClient.post<Policy>(`/policies/${id}/non-renew`, data).then((r) => r.data),

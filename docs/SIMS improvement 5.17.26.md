@@ -102,6 +102,10 @@ Purpose: add clearance, appetite, authority, referral, and approval as auditable
 
 Purpose: create the program-level source of truth for carrier, LOB, rating, forms, fees, commissions, authority, appetite, documents, and bordereaux setup.
 
+### Phase 7A: Rating Model Deepening
+
+Purpose: keep rating formulas in tested code while making rating inputs, factor tables, eligibility rules, fees, endorsements, versioning, and snapshots more configurable and auditable.
+
 ### Phase 8: Bordereaux and Carrier Reporting
 
 Purpose: support MGA carrier obligations with configurable exports and reconciliation.
@@ -563,7 +567,15 @@ Acceptance:
 Move from immediate cancellation to notice-driven workflow:
 
 - Create cancellation transaction.
+- Create cancellation detail record.
 - Select reason and cancellation method.
+- Select reason code from cancellation reason library.
+- Capture required reason-specific fields from bracketed placeholders.
+- Capture notice mailing date.
+- Capture cancellation day notice requirement.
+- Capture mailing days.
+- Calculate cancellation effective date from notice mailing date plus notice requirement days plus mailing days.
+- Select cancellation notice template.
 - Pull legal guidance.
 - Generate compliance checklist.
 - Generate cancellation notice.
@@ -576,12 +588,15 @@ Move from immediate cancellation to notice-driven workflow:
 Acceptance:
 - Cancellation is not final until the workflow reaches completion.
 - Notice date, effective date, proof, legal snapshot, and return premium are all traceable.
+- User can see the selected reason and calculated cancellation date before the notice is issued.
+- Generated cancellation notice is attached to the cancellation transaction.
 
 ### Workstream 5D: Reinstatement
 
 Add reinstatement skeleton and workflow:
 
 - Create reinstatement transaction from cancelled policy.
+- Create reinstatement detail record.
 - Capture reinstatement reason.
 - Capture payment or approval requirement.
 - Generate reinstatement notice/document if needed.
@@ -598,6 +613,7 @@ Acceptance:
 Upgrade current renewal quote creation:
 
 - Create renewal transaction before or alongside renewal quote.
+- Create renewal detail record.
 - Generate renewal quote from prior policy version.
 - Re-rate using renewal effective date rules.
 - Generate renewal invitation/proposal.
@@ -614,6 +630,7 @@ Acceptance:
 Upgrade current non-renewal:
 
 - Create non-renewal transaction.
+- Create non-renewal detail record.
 - Pull legal guidance.
 - Generate non-renewal notice.
 - Store proof of notice.
@@ -629,6 +646,7 @@ Acceptance:
 Add rewrite skeleton:
 
 - Create rewrite transaction.
+- Create rewrite detail record.
 - Link original policy and replacement quote/policy.
 - Record rewrite reason.
 - Handle cancellation or supersession of original policy.
@@ -642,6 +660,7 @@ Acceptance:
 Add audit transaction skeleton:
 
 - Capture audit basis.
+- Create audit detail record.
 - Capture audited exposure values.
 - Calculate additional/return premium.
 - Generate audit invoice/credit.
@@ -776,6 +795,131 @@ Carrier + LOB is not enough. MGA work is program-driven. Program should connect 
 - New quote setup is program-based.
 - Forms/rating/fees/commissions can be derived from program.
 - Existing records remain readable.
+
+## Phase 7A: Rating Model Deepening
+
+### Why This Comes After Program Configuration
+
+SIMS already has a rating engine foundation: rating plans, versions, factor tables, eligibility rules, carrier assignments, rating snapshots, impact previews, shadow rating, and fixture tests. The next improvement should not be a free-form JSON formula engine. That would add a fragile mini-programming language before the business needs it.
+
+Instead, keep the actual premium formulas in C# and deepen the configurable, versioned rating data around them. This gives SIMS most of the operational benefit of a rating engine while preserving auditability, testability, and predictable premium calculations.
+
+### Existing Pieces To Reuse
+
+- `RatingPlan`
+- `RatingPlanVersion`
+- `FactorTable`
+- `FactorRow`
+- `EligibilityRule`
+- `CarrierRatingAssignment`
+- `QuoteRatingSnapshot`
+- `QuoteRatingLine`
+- rating fixture tests
+- shadow rating results
+- impact preview framework
+- quote rating panel
+- carrier rating assignment UI
+
+### Planned Changes
+
+1. Inventory hardcoded and configurable rating values.
+
+   Document where each rating value currently lives:
+   - base rates
+   - deductible factors
+   - territory modifiers
+   - schedule modifier min/max
+   - minimum premium
+   - endorsement fees
+   - TRIA percentage
+   - additional interest charges
+   - eligibility rules
+   - carrier/program/LOB assignments
+
+2. Strengthen rating plan versions as the source of truth.
+
+   Each rating version should own:
+   - effective date
+   - expiration date
+   - status
+   - schedule min/max
+   - minimum premium
+   - factor tables
+   - eligibility rules
+   - endorsement and fee tables
+   - notes/change reason
+   - created by, edited by, promoted by
+   - impact preview status
+
+3. Move endorsements and rating fees into versioned tables.
+
+   Add a configurable charge table per rating version with:
+   - code
+   - label
+   - charge type: flat, percent, per unit, calculated
+   - amount
+   - default selected
+   - required flag
+   - calculation base: manual premium, subtotal, or grand total
+   - LOB/program applicability
+
+   The calculation logic should stay in code, but the changeable charge values should come from the active rating version.
+
+4. Expand structured eligibility rules.
+
+   Keep eligibility rules typed and explicit instead of free-form expressions at first:
+   - equipment type accepted/rejected
+   - deductible allowed by equipment type
+   - state allowed/rejected
+   - minimum and maximum equipment value
+   - required coverage fields
+   - carrier/program restrictions
+
+   Ineligible combinations should fail before rating with readable messages.
+
+5. Improve rating snapshots and explanations.
+
+   Snapshots should preserve:
+   - rating plan version id
+   - manual premium
+   - final premium
+   - schedule modifier and reason
+   - selected endorsements
+   - fees/charges applied
+   - line-level inputs
+   - factors used per line
+   - eligibility warnings or errors
+   - rated by and rated at
+
+6. Strengthen version testing and impact preview.
+
+   Before activation, a draft version should be testable against:
+   - fixture quotes
+   - open quotes
+   - renewal candidates
+   - selected historical examples
+
+   The preview should show premium movement, top movers, outliers, and validation errors.
+
+7. Improve rating admin UI after the backend model is solid.
+
+   Useful admin screens:
+   - rating plans list
+   - version detail
+   - factor table editor/import
+   - eligibility editor
+   - endorsement/fee editor
+   - carrier/program assignment page
+   - impact preview page
+   - promote/retire actions
+
+### Acceptance Criteria
+
+- Routine rate, factor, fee, endorsement, minimum premium, and eligibility changes can be made through versioned rating data rather than code.
+- Rating formulas remain in tested C# implementations.
+- Every rated quote can explain which version, factors, fees, endorsements, and eligibility decisions produced the premium.
+- A draft rating version can be previewed before activation.
+- Bound quote snapshots remain immutable and reproducible.
 
 ## Phase 8: Bordereaux and Carrier Reporting
 
@@ -1326,16 +1470,24 @@ Scope:
 
 ## Recommended Third Work Package
 
-### Work Package 3: Cancellation, Non-Renewal, and Reinstatement Workflow
+### Work Package 3: Full Lifecycle Workflow Completion
 
 Scope:
 
+- Add required policy transaction detail tables.
 - Convert cancellation to notice-driven transaction lifecycle.
+- Add manual cancellation notice issue flow with reason code, reason fields, notice days, mailing days, calculated cancellation date, and template selection.
 - Convert non-renewal to transaction lifecycle.
 - Add reinstatement workflow.
+- Complete renewal traceability when renewal binds.
+- Add rewrite skeleton.
+- Add audit skeleton.
 - Generate and store notice documents.
 - Track proof of notice.
 - Add return premium accounting hooks.
+- Fix DOCX table import enough for notice templates.
+
+Detailed execution plan: `docs/phase-5-lifecycle-workflows-plan.md`.
 
 ## Recommended Fourth Work Package
 
@@ -1358,6 +1510,26 @@ Scope:
 - Add program entity.
 - Link program to carrier, LOB, rating, forms, fees, commissions, authority, appetite, and policy number setup.
 - Require program on new quotes after migration.
+
+## Recommended Fifth-A Work Package
+
+### Work Package 5A: Rating Model Deepening
+
+Scope:
+
+- Inventory hardcoded versus configurable rating values.
+- Move version-sensitive endorsements, fees, TRIA percentages, minimum premiums, and schedule bounds into rating plan version data where they are not already there.
+- Expand structured eligibility rules without introducing a free-form formula language.
+- Improve rating snapshots so they preserve factors, charges, selected endorsements, warnings, and calculation explanations.
+- Strengthen draft-version impact preview and promotion gates.
+- Keep premium formulas in C#.
+
+Do not include in this work package:
+
+- A generic JSON formula interpreter.
+- Broker self-service rating.
+- Replacing all existing rating formulas.
+- New LOB rating formulas unless needed to validate the model.
 
 ## Recommended Sixth Work Package
 

@@ -7,6 +7,7 @@ using SIMS.Application.DTOs.Policies;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.DTOs.Tasks;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Policies;
 using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
@@ -848,6 +849,91 @@ public class PolicyService : IPolicyService
         await _policyVersions.CreateVersionAsync(policy, cancellationTransaction, priorVersion, access.UserId);
         await _transactionLifecycle.RecordCreatedAsync(cancellationTransaction, access.UserId, "Cancellation transaction issued.");
         return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
+    public async Task<Result<PolicyTransactionDto>> IssueCancellationNoticeAsync(Guid policyId, IssueCancellationNoticeDto dto, UserAccessScope access)
+    {
+        var policy = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyTransactionDto>.Failure("INVALID_STATUS", "Only active policies can be cancelled.");
+
+        var reason = CancellationReasonLibrary.GetByCode(dto.ReasonCode);
+        if (reason == null)
+            return Result<PolicyTransactionDto>.Failure("INVALID_CANCELLATION_REASON", "Cancellation reason code was not found.");
+        if (dto.NoticeRequirementDays <= 0)
+            return Result<PolicyTransactionDto>.Failure("INVALID_NOTICE_DAYS", "Notice requirement days must be greater than zero.");
+        if (dto.MailingDays < 0)
+            return Result<PolicyTransactionDto>.Failure("INVALID_MAILING_DAYS", "Mailing days cannot be negative.");
+
+        string resolvedReason;
+        try
+        {
+            resolvedReason = reason.Resolve(dto.ReasonInputs);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<PolicyTransactionDto>.Failure("REASON_INPUT_REQUIRED", ex.Message);
+        }
+
+        var cancellationEffectiveDate = dto.NoticeMailingDate.AddDays(dto.NoticeRequirementDays + dto.MailingDays);
+        if (cancellationEffectiveDate < policy.EffectiveDate || cancellationEffectiveDate > policy.ExpirationDate)
+            return Result<PolicyTransactionDto>.Failure("INVALID_DATE", "Cancellation date must be within the policy term.");
+
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            Policy = policy,
+            TransactionType = TransactionType.Cancellation,
+            Status = PolicyTransactionStatus.NoticeSent,
+            TransactionNumber = await GenerateTransactionNumberAsync(),
+            EffectiveDate = cancellationEffectiveDate,
+            SourceQuoteId = policy.BoundQuoteId,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            ReasonCode = reason.Code,
+            ReasonText = resolvedReason,
+            CancellationReason = reason.Label,
+            CancellationMethod = string.IsNullOrWhiteSpace(dto.Method) ? "Written Notice" : dto.Method.Trim(),
+            PremiumBefore = policy.TotalPremium,
+            PremiumChange = 0m,
+            NewTotalPremium = policy.TotalPremium,
+            PremiumAfter = policy.TotalPremium,
+            ProcessedById = access.UserId,
+            ProcessedAt = DateTime.UtcNow,
+            Notes = dto.Notes,
+        };
+
+        var detail = new PolicyCancellationDetail
+        {
+            PolicyTransaction = transaction,
+            ReasonCode = reason.Code,
+            ReasonLabel = reason.Label,
+            ReasonCategory = reason.Category,
+            ReasonLanguageTemplate = reason.LanguageTemplate,
+            ReasonInputsJson = JsonSerializer.Serialize(dto.ReasonInputs),
+            ResolvedReasonLanguage = resolvedReason,
+            NoticeMailingDate = dto.NoticeMailingDate,
+            NoticeRequirementDays = dto.NoticeRequirementDays,
+            MailingDays = dto.MailingDays,
+            CancellationEffectiveDate = cancellationEffectiveDate,
+            Method = string.IsNullOrWhiteSpace(dto.Method) ? "Written Notice" : dto.Method.Trim(),
+            NoticeTemplateId = dto.NoticeTemplateId,
+        };
+
+        Db.Set<PolicyTransaction>().Add(transaction);
+        Db.Set<PolicyCancellationDetail>().Add(detail);
+        await Db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Cancellation notice issued.");
+        await Db.Entry(transaction).Reference(t => t.ProcessedBy).LoadAsync();
+
+        return Result<PolicyTransactionDto>.Success(MapToTransactionDto(transaction));
     }
 
     public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)

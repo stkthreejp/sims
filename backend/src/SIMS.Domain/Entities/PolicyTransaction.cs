@@ -60,6 +60,7 @@ public class PolicyTransaction : BaseEntity
     public Policy Policy { get; set; } = null!;
     public User ProcessedBy { get; set; } = null!;
     public Policy? PriorPolicy { get; set; }
+    public PolicyCancellationDetail? CancellationDetail { get; set; }
     public ICollection<PolicyTransactionStatusHistory> StatusHistory { get; set; } = new List<PolicyTransactionStatusHistory>();
     public ICollection<PolicyTransactionComplianceChecklist> ComplianceChecklists { get; set; } = new List<PolicyTransactionComplianceChecklist>();
     public ICollection<PolicyTransactionApproval> Approvals { get; set; } = new List<PolicyTransactionApproval>();

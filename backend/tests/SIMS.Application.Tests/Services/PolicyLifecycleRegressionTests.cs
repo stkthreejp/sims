@@ -957,6 +957,46 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task CancellationNotice_CreatesPendingTransactionDetailWithoutCancellingPolicy()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.IssueCancellationNoticeAsync(fixture.Policy.Id, new IssueCancellationNoticeDto
+        {
+            ReasonCode = "NP-01",
+            ReasonInputs = new Dictionary<string, string>
+            {
+                ["AMOUNT_DUE"] = "1,250.00",
+            },
+            NoticeMailingDate = new DateOnly(2026, 6, 1),
+            NoticeRequirementDays = 10,
+            MailingDays = 5,
+            Method = "Certified Mail",
+            Notes = "Manual notice test",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.Cancellation);
+        Assert.Equal(PolicyTransactionStatus.NoticeSent, transaction.Status);
+        Assert.Equal(new DateOnly(2026, 6, 16), transaction.EffectiveDate);
+
+        var detail = await db.Set<PolicyCancellationDetail>().SingleAsync(d => d.PolicyTransactionId == transaction.Id);
+        Assert.Equal("NP-01", detail.ReasonCode);
+        Assert.Equal("Non-Payment - Standard", detail.ReasonLabel);
+        Assert.Equal(new DateOnly(2026, 6, 1), detail.NoticeMailingDate);
+        Assert.Equal(10, detail.NoticeRequirementDays);
+        Assert.Equal(5, detail.MailingDays);
+        Assert.Equal(new DateOnly(2026, 6, 16), detail.CancellationEffectiveDate);
+        Assert.Equal("Certified Mail", detail.Method);
+        Assert.Contains("$1,250.00", detail.ResolvedReasonLanguage);
+        Assert.Contains("AMOUNT_DUE", detail.ReasonInputsJson);
+        Assert.Null(fixture.Policy.CancelledDate);
+    }
+
+    [Fact]
     public async Task NonRenewal_UpdatesPolicyStatus()
     {
         await using var db = CreateDb();

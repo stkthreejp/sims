@@ -308,6 +308,28 @@ export interface CancelPolicy {
   notes?: string
 }
 
+export interface CancellationReason {
+  code: string
+  category: string
+  label: string
+  defaultNoticeRequirementDays: number
+  noticeRequirementLabel: string
+  languageTemplate: string
+  requiredInputTokens: string[]
+  requiresSpecialHandling: boolean
+}
+
+export interface IssueCancellationNotice {
+  reasonCode: string
+  reasonInputs: Record<string, string>
+  noticeMailingDate: string
+  noticeRequirementDays: number
+  mailingDays: number
+  method: string
+  noticeTemplateId?: string
+  notes?: string
+}
+
 export interface LegalComplianceGuidance {
   state: string
   lineOfBusiness: string

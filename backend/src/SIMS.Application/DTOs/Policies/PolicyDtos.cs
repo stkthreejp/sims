@@ -256,6 +256,18 @@ public class CancelPolicyDto
     public string? Notes { get; set; }
 }
 
+public class IssueCancellationNoticeDto
+{
+    public string ReasonCode { get; set; } = string.Empty;
+    public IReadOnlyDictionary<string, string> ReasonInputs { get; set; } = new Dictionary<string, string>();
+    public DateOnly NoticeMailingDate { get; set; }
+    public int NoticeRequirementDays { get; set; }
+    public int MailingDays { get; set; }
+    public string Method { get; set; } = "Written Notice";
+    public Guid? NoticeTemplateId { get; set; }
+    public string? Notes { get; set; }
+}
+
 public class LegalComplianceGuidanceDto
 {
     public string State { get; set; } = string.Empty;
