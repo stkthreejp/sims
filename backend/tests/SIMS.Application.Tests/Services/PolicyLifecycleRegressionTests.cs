@@ -734,7 +734,19 @@ public class PolicyLifecycleRegressionTests
             Decision = "Approved",
             Notes = "Within program appetite.",
         };
-        db.AddRange(transaction, approval);
+        var taskType = new TaskType { Name = "Approval follow-up" };
+        var task = new TaskInstance
+        {
+            TaskType = taskType,
+            TaskTypeId = taskType.Id,
+            EntityType = TaskEntityType.PolicyTransaction,
+            EntityId = transaction.Id,
+            AssignedUserId = fixture.UserId,
+            Status = TaskInstanceStatus.Open,
+            Priority = TaskPriority.Medium,
+            DueDate = DateTime.UtcNow.AddDays(1),
+        };
+        db.AddRange(transaction, approval, taskType, task);
         await db.SaveChangesAsync();
         var policyService = CreatePolicyService(db, new RecordingInvoicingService());
 
@@ -747,6 +759,10 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(fixture.UserId, approvalDto.RequestedById);
         Assert.Equal(fixture.UserId, approvalDto.DecisionById);
         Assert.Equal("Within program appetite.", approvalDto.Notes);
+        var taskDto = Assert.Single(result.Value.Tasks);
+        Assert.Equal(task.Id, taskDto.Id);
+        Assert.Equal(TaskEntityType.PolicyTransaction, taskDto.EntityType);
+        Assert.Equal("TXN-APPROVAL-1", taskDto.PolicyTransactionNumber);
     }
 
     [Fact]

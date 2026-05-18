@@ -3,6 +3,7 @@ import type { PolicyFormType } from './policyForm.types'
 import type { Attachment } from './attachment.types'
 import type { InvoiceSummary } from './invoice.types'
 import type { OutboundCommunicationListItem } from './outboundCommunication.types'
+import type { TaskInstanceListItem } from './task.types'
 
 export type PolicyStatus = 'Active' | 'Renewed' | 'NonRenewed' | 'Expired' | 'Cancelled'
 export type PolicyTransactionStatus =
@@ -176,6 +177,7 @@ export interface PolicyTransactionArtifacts {
   communications: OutboundCommunicationListItem[]
   complianceChecklists: PolicyTransactionComplianceChecklist[]
   approvals: PolicyTransactionApproval[]
+  tasks: TaskInstanceListItem[]
 }
 
 export interface PolicyTransactionApproval {

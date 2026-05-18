@@ -719,6 +719,7 @@ function TransactionRows({
   policyDocumentEntityId: string
   canUploadProof: boolean
 }) {
+  const [expanded, setExpanded] = useState(false)
   const { data: artifacts } = useQuery({
     queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'],
     queryFn: () => policiesApi.getTransactionArtifacts(t.policyId, t.id),
@@ -727,7 +728,7 @@ function TransactionRows({
 
   return (
     <>
-      <tr>
+      <tr onClick={() => setExpanded((value) => !value)} className="cursor-pointer">
         <td className="id">{t.transactionNumber}</td>
         <td>{t.transactionType}</td>
         <td>
@@ -744,26 +745,17 @@ function TransactionRows({
         <td className="num font-medium">{formatCurrency(t.newTotalPremium)}</td>
         <td>{t.processedByName}</td>
       </tr>
-      {t.transactionType === 'Cancellation' && (
-        <CancellationTransactionDetails transaction={t} />
-      )}
-      {(t.priorVersion || t.resultingVersion) && (
-        <VersionChangeDetails transaction={t} />
-      )}
-      {artifacts && (
-        artifacts.documents.length > 0 ||
-        artifacts.ratingSnapshots.length > 0 ||
-        artifacts.invoices.length > 0 ||
-        artifacts.communications.length > 0 ||
-        artifacts.complianceChecklists.length > 0 ||
-        artifacts.approvals.length > 0 ||
-        (canUploadProof && proofUploadApplies)
-      ) && (
+      {expanded && artifacts && (
         <TransactionArtifactDetails
           artifacts={artifacts}
           policyDocumentEntityId={policyDocumentEntityId}
           canUploadProof={canUploadProof && proofUploadApplies}
         />
+      )}
+      {expanded && !artifacts && (
+        <tr>
+          <td colSpan={7} className="px-5 pb-4 text-sm text-slate-500">Loading transaction details...</td>
+        </tr>
       )}
     </>
   )
@@ -779,6 +771,7 @@ function TransactionArtifactDetails({
   canUploadProof: boolean
 }) {
   const qc = useQueryClient()
+  const [activeSection, setActiveSection] = useState('Versions')
   const proofUpload = useMutation({
     mutationFn: (file: File) =>
       attachmentsApi.upload('Policy', policyDocumentEntityId, file, 'ProofOfNotice', 'Proof of notice', artifacts.transaction.id),
@@ -788,158 +781,183 @@ function TransactionArtifactDetails({
     },
     onError: () => toast.error('Proof upload failed'),
   })
+  const transaction = artifacts.transaction
+  const sections = [
+    { id: 'Versions', count: (transaction.priorVersion ? 1 : 0) + (transaction.resultingVersion ? 1 : 0) },
+    { id: 'Rating', count: artifacts.ratingSnapshots.length },
+    { id: 'Documents', count: artifacts.documents.length },
+    { id: 'Communications', count: artifacts.communications.length },
+    { id: 'Accounting', count: artifacts.invoices.length },
+    { id: 'Compliance', count: artifacts.complianceChecklists.reduce((sum, checklist) => sum + checklist.items.length, 0) },
+    { id: 'Tasks', count: artifacts.tasks.length },
+    { id: 'Approvals', count: artifacts.approvals.length },
+  ]
 
   return (
     <tr>
       <td colSpan={7} className="px-5 pb-4">
-        <div className="grid gap-3 rounded border bg-white p-3 text-sm lg:grid-cols-5">
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold uppercase text-slate-500">Documents</div>
+        <div className="rounded border bg-white p-3 text-sm">
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {sections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className={`rounded border px-2.5 py-1 text-xs font-semibold ${activeSection === section.id ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'}`}
+              >
+                {section.id}
+                <span className="ml-1 text-slate-400">{section.count}</span>
+              </button>
+            ))}
+          </div>
+
+          {activeSection === 'Versions' && (
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
+              <VersionSummary label="Before" version={transaction.priorVersion} />
+              <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+              <VersionSummary label="After" version={transaction.resultingVersion} />
+            </div>
+          )}
+
+          {activeSection === 'Rating' && (
+            <CompactList empty="No linked rating snapshots.">
+              {artifacts.ratingSnapshots.map((rating) => (
+                <CompactRow key={rating.snapshotId} title={formatCurrency(rating.grandTotalPremium)} meta={`Mod ${rating.scheduleModifier.toFixed(2)} - ${formatDate(rating.ratedAt)}`} value={rating.isBoundSnapshot ? 'Bound' : undefined} />
+              ))}
+            </CompactList>
+          )}
+
+          {activeSection === 'Documents' && (
+            <div>
               {canUploadProof && (
-                <label className="sd-btn outline xs cursor-pointer">
-                  Upload proof
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                    disabled={proofUpload.isPending}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      event.currentTarget.value = ''
-                      if (file) proofUpload.mutate(file)
-                    }}
-                  />
-                </label>
+                <div className="mb-2">
+                  <label className="sd-btn outline xs cursor-pointer">
+                    Upload proof
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                      disabled={proofUpload.isPending}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        event.currentTarget.value = ''
+                        if (file) proofUpload.mutate(file)
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
+              <CompactList empty="No linked notice, proof, or policy documents.">
+                {artifacts.documents.map((doc) => (
+                  <CompactRow key={doc.id} title={doc.fileName} meta={`${DOCUMENT_TYPE_LABELS[doc.documentType]}${doc.policyVersionNumber != null ? ` - v${doc.policyVersionNumber}` : ''}`} value={formatDate(doc.createdAt)} />
+                ))}
+              </CompactList>
+            </div>
+          )}
+
+          {activeSection === 'Communications' && (
+            <CompactList empty="No linked communications.">
+              {artifacts.communications.map((communication) => (
+                <CompactRow
+                  key={communication.id}
+                  title={communication.subject}
+                  meta={`${formatCommunicationPurpose(communication.purpose)} - ${communication.status}`}
+                  value={communication.graphMessageWebLink ? (
+                    <a
+                      href={communication.graphMessageWebLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:text-blue-700"
+                    >
+                      Open
+                    </a>
+                  ) : (
+                    communication.sentAt ? formatDate(communication.sentAt) : formatDate(communication.createdAt)
+                  )}
+                />
+              ))}
+            </CompactList>
+          )}
+
+          {activeSection === 'Accounting' && (
+            <CompactList empty="No linked invoices or accounting records.">
+              {artifacts.invoices.map((invoice) => (
+                <CompactRow key={invoice.id} title={invoice.invoiceNumber} meta={`${invoice.status} - ${formatDate(invoice.invoiceDate)}`} value={formatCurrency(invoice.totalAmount)} />
+              ))}
+            </CompactList>
+          )}
+
+          {activeSection === 'Compliance' && (
+            <div className="space-y-3">
+              {transaction.transactionType === 'Cancellation' && (
+                <CancellationSummary transaction={transaction} />
+              )}
+              {artifacts.complianceChecklists.length === 0 ? (
+                <EmptyState text="No linked compliance checklist." />
+              ) : (
+                artifacts.complianceChecklists.flatMap((checklist) =>
+                  checklist.items.map((item) => (
+                    <CompactRow key={item.id} title={item.label} meta={checklist.purpose} value={item.isCompleted ? 'Complete' : 'Open'} />
+                  ))
+                )
               )}
             </div>
-            {artifacts.documents.length === 0 ? (
-              <div className="text-slate-500">No linked documents</div>
-            ) : (
-              <div className="space-y-2">
-                {artifacts.documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
-                      <div className="text-xs text-slate-500">
-                        {DOCUMENT_TYPE_LABELS[doc.documentType]}{doc.policyVersionNumber != null ? ` - v${doc.policyVersionNumber}` : ''}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-xs text-slate-400">{formatDate(doc.createdAt)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Invoices</div>
-            {artifacts.invoices.length === 0 ? (
-              <div className="text-slate-500">No linked invoices</div>
-            ) : (
-              <div className="space-y-2">
-                {artifacts.invoices.map((invoice) => (
-                  <div key={invoice.id} className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-medium text-slate-800">{invoice.invoiceNumber}</div>
-                      <div className="text-xs text-slate-500">{invoice.status} - {formatDate(invoice.invoiceDate)}</div>
-                    </div>
-                    <span className="font-mono text-slate-700">{formatCurrency(invoice.totalAmount)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Rating</div>
-            {artifacts.ratingSnapshots.length === 0 ? (
-              <div className="text-slate-500">No linked rating</div>
-            ) : (
-              <div className="space-y-2">
-                {artifacts.ratingSnapshots.map((rating) => (
-                  <div key={rating.snapshotId} className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium text-slate-800">{formatCurrency(rating.grandTotalPremium)}</div>
-                      <div className="text-xs text-slate-500">
-                        Mod {rating.scheduleModifier.toFixed(2)} - {formatDate(rating.ratedAt)}
-                      </div>
-                    </div>
-                    {rating.isBoundSnapshot && (
-                      <span className="shrink-0 rounded bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700">Bound</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Communications</div>
-            {artifacts.communications.length === 0 ? (
-              <div className="text-slate-500">No linked communications</div>
-            ) : (
-              <div className="space-y-2">
-                {artifacts.communications.map((communication) => (
-                  <div key={communication.id} className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium text-slate-800">{communication.subject}</div>
-                      <div className="text-xs text-slate-500">
-                        {formatCommunicationPurpose(communication.purpose)} - {communication.status}
-                      </div>
-                    </div>
-                    {communication.graphMessageWebLink ? (
-                      <a
-                        href={communication.graphMessageWebLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-700"
-                      >
-                        Open
-                      </a>
-                    ) : (
-                      <span className="shrink-0 text-xs text-slate-400">
-                        {communication.sentAt ? formatDate(communication.sentAt) : formatDate(communication.createdAt)}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Compliance</div>
-            {artifacts.complianceChecklists.length === 0 && artifacts.approvals.length === 0 ? (
-              <div className="text-slate-500">No linked checklist or approvals</div>
-            ) : (
-              <div className="space-y-3">
-                {artifacts.complianceChecklists.flatMap((checklist) =>
-                  checklist.items.map((item) => (
-                    <div key={item.id} className="flex items-start gap-2 text-slate-700">
-                      <span className={item.isCompleted ? 'text-green-700' : 'text-slate-400'}>
-                        {item.isCompleted ? '[x]' : '[ ]'}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="truncate font-medium text-slate-800">{item.label}</div>
-                        <div className="text-xs text-slate-500">
-                          {checklist.purpose}{item.completedAt ? ` - ${formatDate(item.completedAt)}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {artifacts.approvals.map((approval) => (
-                  <div key={approval.id} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
-                    <div className="font-medium text-slate-800">{approval.approvalType}</div>
-                    <div className="text-xs text-slate-500">
-                      {approval.decision ?? 'Pending'}{approval.decisionAt ? ` - ${formatDate(approval.decisionAt)}` : ''}
-                    </div>
-                    {approval.notes && <div className="mt-1 text-xs text-slate-600">{approval.notes}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
+
+          {activeSection === 'Tasks' && (
+            <CompactList empty="No linked tasks.">
+              {artifacts.tasks.map((task) => (
+                <CompactRow key={task.id} title={task.taskTypeName} meta={`${task.priority} - ${task.status}`} value={formatDate(task.dueDate)} />
+              ))}
+            </CompactList>
+          )}
+
+          {activeSection === 'Approvals' && (
+            <CompactList empty="No approval history.">
+              {artifacts.approvals.map((approval) => (
+                <CompactRow key={approval.id} title={approval.approvalType} meta={`${approval.requestedByName} requested ${formatDate(approval.requestedAt)}`} value={approval.decision ?? 'Pending'} sub={approval.notes ?? undefined} />
+              ))}
+            </CompactList>
+          )}
         </div>
       </td>
     </tr>
+  )
+}
+
+function CompactList({ empty, children }: { empty: string; children: React.ReactNode }) {
+  const rows = Array.isArray(children) ? children.filter(Boolean) : children
+  if (Array.isArray(rows) && rows.length === 0) return <EmptyState text={empty} />
+  return <div className="space-y-2">{rows}</div>
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="rounded border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-slate-500">{text}</div>
+}
+
+function CompactRow({ title, meta, value, sub }: { title: string; meta?: string; value?: React.ReactNode; sub?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded border border-slate-200 px-3 py-2">
+      <div className="min-w-0">
+        <div className="truncate font-medium text-slate-800">{title}</div>
+        {meta && <div className="text-xs text-slate-500">{meta}</div>}
+        {sub && <div className="mt-1 text-xs text-slate-600">{sub}</div>}
+      </div>
+      {value && <span className="shrink-0 text-xs font-medium text-slate-500">{value}</span>}
+    </div>
+  )
+}
+
+function CancellationSummary({ transaction }: { transaction: PolicyTransaction }) {
+  return (
+    <div className="rounded border border-red-100 bg-red-50/40 px-3 py-2 text-slate-700">
+      <div className="font-semibold text-slate-900">Cancellation Review</div>
+      <div className="mt-1 grid gap-1 text-xs sm:grid-cols-2">
+        <div><span className="text-slate-500">Reason:</span> {transaction.cancellationReason || 'Not recorded'}</div>
+        <div><span className="text-slate-500">Method:</span> {transaction.cancellationMethod || 'Not recorded'}</div>
+      </div>
+      {transaction.notes && <p className="mt-2 text-xs text-slate-600">{transaction.notes}</p>}
+    </div>
   )
 }
 

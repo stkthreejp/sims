@@ -2,6 +2,7 @@ using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.OutboundCommunications;
 using SIMS.Application.DTOs.Quotes;
+using SIMS.Application.DTOs.Tasks;
 using SIMS.Domain.Enums;
 
 namespace SIMS.Application.DTOs.Policies;
@@ -122,6 +123,7 @@ public class PolicyTransactionArtifactsDto
     public IReadOnlyList<OutboundCommunicationListItemDto> Communications { get; set; } = [];
     public IReadOnlyList<PolicyTransactionComplianceChecklistDto> ComplianceChecklists { get; set; } = [];
     public IReadOnlyList<PolicyTransactionApprovalDto> Approvals { get; set; } = [];
+    public IReadOnlyList<TaskInstanceListItemDto> Tasks { get; set; } = [];
 }
 
 public class PolicyTransactionApprovalDto

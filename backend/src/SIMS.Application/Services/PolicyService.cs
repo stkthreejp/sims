@@ -5,6 +5,7 @@ using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.OutboundCommunications;
 using SIMS.Application.DTOs.Policies;
 using SIMS.Application.DTOs.Quotes;
+using SIMS.Application.DTOs.Tasks;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Security;
 using SIMS.Domain.Entities;
@@ -292,6 +293,33 @@ public class PolicyService : IPolicyService
             })
             .ToListAsync();
 
+        var now = DateTime.UtcNow;
+        var tasks = await Db.Set<TaskInstance>()
+            .AsNoTracking()
+            .Include(t => t.TaskType)
+            .Where(t => t.EntityType == TaskEntityType.PolicyTransaction && t.EntityId == transactionId && !t.IsDeleted)
+            .OrderBy(t => t.Status)
+            .ThenByDescending(t => t.Priority)
+            .ThenBy(t => t.DueDate)
+            .Select(t => new TaskInstanceListItemDto
+            {
+                Id = t.Id,
+                TaskTypeName = t.TaskType.Name,
+                EntityType = t.EntityType,
+                EntityId = t.EntityId,
+                AssignedUserId = t.AssignedUserId,
+                Status = t.Status,
+                Priority = t.Priority,
+                DueDate = t.DueDate,
+                IsOverdue = t.Status != TaskInstanceStatus.Closed && t.Status != TaskInstanceStatus.Cancelled && t.DueDate < now,
+                EscalationLevel = t.EscalationLevel,
+                PolicyTransactionNumber = transaction.TransactionNumber,
+                PolicyTransactionType = transaction.TransactionType,
+                PolicyTransactionStatus = transaction.Status,
+                CreatedAt = t.CreatedAt,
+            })
+            .ToListAsync();
+
         var versions = policy.Versions.ToDictionary(v => v.Id);
         return Result<PolicyTransactionArtifactsDto>.Success(new PolicyTransactionArtifactsDto
         {
@@ -302,6 +330,7 @@ public class PolicyService : IPolicyService
             Communications = communications,
             ComplianceChecklists = complianceChecklists,
             Approvals = approvals,
+            Tasks = tasks,
         });
     }
 
