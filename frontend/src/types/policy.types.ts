@@ -174,6 +174,26 @@ export interface PolicyTransactionArtifacts {
   ratingSnapshots: RatingResult[]
   invoices: InvoiceSummary[]
   communications: OutboundCommunicationListItem[]
+  complianceChecklists: PolicyTransactionComplianceChecklist[]
+}
+
+export interface PolicyTransactionComplianceChecklist {
+  id: string
+  policyTransactionId: string
+  purpose: string
+  items: PolicyTransactionComplianceChecklistItem[]
+}
+
+export interface PolicyTransactionComplianceChecklistItem {
+  id: string
+  key: string
+  label: string
+  isCompleted: boolean
+  legalRequirementSectionId: string | null
+  completedById: string | null
+  completedAt: string | null
+  notes: string | null
+  snapshotJson: string | null
 }
 
 export interface Policy {

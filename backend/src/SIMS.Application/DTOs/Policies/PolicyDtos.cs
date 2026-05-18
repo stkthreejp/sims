@@ -120,6 +120,28 @@ public class PolicyTransactionArtifactsDto
     public IReadOnlyList<RatingResultDto> RatingSnapshots { get; set; } = [];
     public IReadOnlyList<InvoiceSummaryDto> Invoices { get; set; } = [];
     public IReadOnlyList<OutboundCommunicationListItemDto> Communications { get; set; } = [];
+    public IReadOnlyList<PolicyTransactionComplianceChecklistDto> ComplianceChecklists { get; set; } = [];
+}
+
+public class PolicyTransactionComplianceChecklistDto
+{
+    public Guid Id { get; set; }
+    public Guid PolicyTransactionId { get; set; }
+    public string Purpose { get; set; } = string.Empty;
+    public IReadOnlyList<PolicyTransactionComplianceChecklistItemDto> Items { get; set; } = [];
+}
+
+public class PolicyTransactionComplianceChecklistItemDto
+{
+    public Guid Id { get; set; }
+    public string Key { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public bool IsCompleted { get; set; }
+    public Guid? LegalRequirementSectionId { get; set; }
+    public Guid? CompletedById { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public string? Notes { get; set; }
+    public string? SnapshotJson { get; set; }
 }
 
 public class PolicyVersionSummaryDto

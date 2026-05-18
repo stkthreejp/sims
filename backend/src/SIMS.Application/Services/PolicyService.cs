@@ -241,6 +241,35 @@ public class PolicyService : IPolicyService
             })
             .ToList();
 
+        var complianceChecklists = await Db.Set<PolicyTransactionComplianceChecklist>()
+            .AsNoTracking()
+            .Include(c => c.Items)
+            .Where(c => c.PolicyTransactionId == transactionId && !c.IsDeleted)
+            .OrderBy(c => c.CreatedAt)
+            .Select(c => new PolicyTransactionComplianceChecklistDto
+            {
+                Id = c.Id,
+                PolicyTransactionId = c.PolicyTransactionId,
+                Purpose = c.Purpose,
+                Items = c.Items
+                    .Where(i => !i.IsDeleted)
+                    .OrderBy(i => i.CreatedAt)
+                    .Select(i => new PolicyTransactionComplianceChecklistItemDto
+                    {
+                        Id = i.Id,
+                        Key = i.Key,
+                        Label = i.Label,
+                        IsCompleted = i.IsCompleted,
+                        LegalRequirementSectionId = i.LegalRequirementSectionId,
+                        CompletedById = i.CompletedById,
+                        CompletedAt = i.CompletedAt,
+                        Notes = i.Notes,
+                        SnapshotJson = i.SnapshotJson,
+                    })
+                    .ToList(),
+            })
+            .ToListAsync();
+
         var versions = policy.Versions.ToDictionary(v => v.Id);
         return Result<PolicyTransactionArtifactsDto>.Success(new PolicyTransactionArtifactsDto
         {
@@ -249,6 +278,7 @@ public class PolicyService : IPolicyService
             RatingSnapshots = ratingSnapshots,
             Invoices = invoices,
             Communications = communications,
+            ComplianceChecklists = complianceChecklists,
         });
     }
 
@@ -756,6 +786,11 @@ public class PolicyService : IPolicyService
             Notes = dto.Notes
         };
         Db.Set<PolicyTransaction>().Add(cancellationTransaction);
+        Db.Set<PolicyTransactionComplianceChecklist>().Add(BuildComplianceChecklist(
+            cancellationTransaction,
+            dto.ComplianceChecklist,
+            legalRequirements,
+            access.UserId));
 
         await Db.SaveChangesAsync();
         await _policyVersions.CreateVersionAsync(policy, cancellationTransaction, priorVersion, access.UserId);
@@ -1108,5 +1143,56 @@ public class PolicyService : IPolicyService
         {
             return [];
         }
+    }
+
+    private static PolicyTransactionComplianceChecklist BuildComplianceChecklist(
+        PolicyTransaction transaction,
+        IReadOnlyList<CancellationComplianceChecklistItemDto> items,
+        IReadOnlyList<LegalRequirementSection> legalRequirements,
+        Guid completedById)
+    {
+        var requirementsById = legalRequirements.ToDictionary(r => r.Id);
+        var completedAt = DateTime.UtcNow;
+        var checklist = new PolicyTransactionComplianceChecklist
+        {
+            PolicyTransaction = transaction,
+            PolicyTransactionId = transaction.Id,
+            Purpose = transaction.TransactionType.ToString(),
+        };
+
+        foreach (var item in items)
+        {
+            var requirementIds = item.RequirementSectionIds.Length == 0
+                ? new Guid?[] { null }
+                : item.RequirementSectionIds.Select(id => (Guid?)id);
+
+            foreach (var requirementId in requirementIds)
+            {
+                requirementsById.TryGetValue(requirementId ?? Guid.Empty, out var requirement);
+                checklist.Items.Add(new PolicyTransactionComplianceChecklistItem
+                {
+                    Key = item.Key,
+                    Label = item.Label,
+                    IsCompleted = item.IsCompleted,
+                    LegalRequirementSectionId = requirementId,
+                    CompletedById = item.IsCompleted ? completedById : null,
+                    CompletedAt = item.IsCompleted ? completedAt : null,
+                    SnapshotJson = requirement == null
+                        ? JsonSerializer.Serialize(item)
+                        : JsonSerializer.Serialize(new
+                        {
+                            requirement.Id,
+                            requirement.State,
+                            requirement.Category,
+                            requirement.Topic,
+                            requirement.RequirementText,
+                            requirement.Citations,
+                            requirement.LastVerifiedAt
+                        }),
+                });
+            }
+        }
+
+        return checklist;
     }
 }

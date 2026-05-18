@@ -739,7 +739,8 @@ function TransactionRows({ transaction: t }: { transaction: PolicyTransaction })
         artifacts.documents.length > 0 ||
         artifacts.ratingSnapshots.length > 0 ||
         artifacts.invoices.length > 0 ||
-        artifacts.communications.length > 0
+        artifacts.communications.length > 0 ||
+        artifacts.complianceChecklists.length > 0
       ) && (
         <TransactionArtifactDetails artifacts={artifacts} />
       )}
@@ -751,7 +752,7 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
   return (
     <tr>
       <td colSpan={7} className="px-5 pb-4">
-        <div className="grid gap-3 rounded border bg-white p-3 text-sm lg:grid-cols-4">
+        <div className="grid gap-3 rounded border bg-white p-3 text-sm lg:grid-cols-5">
           <div>
             <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Documents</div>
             {artifacts.documents.length === 0 ? (
@@ -842,6 +843,30 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Compliance</div>
+            {artifacts.complianceChecklists.length === 0 ? (
+              <div className="text-slate-500">No linked checklist</div>
+            ) : (
+              <div className="space-y-2">
+                {artifacts.complianceChecklists.flatMap((checklist) =>
+                  checklist.items.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2 text-slate-700">
+                      <span className={item.isCompleted ? 'text-green-700' : 'text-slate-400'}>
+                        {item.isCompleted ? '[x]' : '[ ]'}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-slate-800">{item.label}</div>
+                        <div className="text-xs text-slate-500">
+                          {checklist.purpose}{item.completedAt ? ` - ${formatDate(item.completedAt)}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

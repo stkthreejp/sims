@@ -769,6 +769,30 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(PolicyTransactionStatus.Issued, transaction.Status);
         Assert.Contains("notice", transaction.CancellationComplianceChecklistJson);
         Assert.Contains("Send written notice before cancellation.", transaction.CancellationLegalRequirementSnapshotJson);
+        var checklist = await db.Set<PolicyTransactionComplianceChecklist>()
+            .Include(c => c.Items)
+            .SingleAsync(c => c.PolicyTransactionId == transaction.Id);
+        Assert.Equal("Cancellation", checklist.Purpose);
+        var checklistItem = Assert.Single(checklist.Items);
+        Assert.Equal("notice", checklistItem.Key);
+        Assert.Equal("Notice sent", checklistItem.Label);
+        Assert.True(checklistItem.IsCompleted);
+        Assert.Equal(requirement.Id, checklistItem.LegalRequirementSectionId);
+        Assert.Equal(fixture.UserId, checklistItem.CompletedById);
+        Assert.NotNull(checklistItem.CompletedAt);
+        Assert.Contains("Send written notice before cancellation.", checklistItem.SnapshotJson);
+
+        requirement.RequirementText = "Updated requirement after the transaction.";
+        await db.SaveChangesAsync();
+        var artifacts = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
+        Assert.True(artifacts.IsSuccess);
+        Assert.NotNull(artifacts.Value);
+        var artifactChecklist = Assert.Single(artifacts.Value.ComplianceChecklists);
+        var artifactItem = Assert.Single(artifactChecklist.Items);
+        Assert.Equal("notice", artifactItem.Key);
+        Assert.Contains("Send written notice before cancellation.", artifactItem.SnapshotJson);
+        Assert.DoesNotContain("Updated requirement after the transaction.", artifactItem.SnapshotJson);
+
         var versions = await db.Set<PolicyVersion>()
             .Where(v => v.PolicyId == fixture.Policy.Id)
             .OrderBy(v => v.VersionNumber)
