@@ -581,6 +581,27 @@
 .sd-table .id { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); }
 .sd-table .primary-cell { font-weight: 600; color: var(--ink); }
 
+.ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 0 0 12px;
+}
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  vertical-align: top;
+  min-width: 1em;
+}
+.ProseMirror th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.ProseMirror .selectedCell:after {
+  background: rgb(59 130 246 / 0.14);
+}
+
 /* LOB chip strip in card header */
 .sd-lob-strip {
   display: flex;

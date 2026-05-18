@@ -6,5 +6,8 @@ declare module 'mammoth/mammoth.browser' {
   interface ConvertOptions {
     arrayBuffer: ArrayBuffer
   }
-  export function convertToHtml(options: ConvertOptions): Promise<ConvertResult>
+  interface HtmlOptions {
+    styleMap?: string[]
+  }
+  export function convertToHtml(options: ConvertOptions, htmlOptions?: HtmlOptions): Promise<ConvertResult>
 }

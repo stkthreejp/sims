@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
+import { importWordDocument } from '@/lib/wordImport'
 import type { DocumentTemplateKind, DocumentTemplateListItem } from '@/types/documentTemplate.types'
 import { formatDateTime } from '@/lib/utils'
 
@@ -87,13 +88,11 @@ export function DocumentLibraryPage() {
     if (!file) return
     e.target.value = ''
 
-    const mammoth = await import('mammoth/mammoth.browser')
-    const arrayBuffer = await file.arrayBuffer()
-    const result = await mammoth.convertToHtml({ arrayBuffer })
+    const importedHtml = await importWordDocument(file)
 
     navigate('/document-library/new', {
       state: {
-        importedHtml: result.value,
+        importedHtml,
         importedName: file.name.replace(/\.(doc|docx)$/i, ''),
       },
     })

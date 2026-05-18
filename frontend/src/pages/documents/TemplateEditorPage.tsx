@@ -8,6 +8,7 @@ import { policyFormsApi } from '@/api/policyForms.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
+import { importWordDocument } from '@/lib/wordImport'
 import type { DocumentTemplateKind } from '@/types/documentTemplate.types'
 
 const ENTITY_TYPES: TemplateEntityType[] = ['General', 'Quote', 'Policy', 'Submission', 'Carrier', 'Agent']
@@ -147,11 +148,9 @@ export function TemplateEditorPage() {
     if (!file) return
     event.target.value = ''
     try {
-      const mammoth = await import('mammoth/mammoth.browser')
-      const arrayBuffer = await file.arrayBuffer()
-      const result = await mammoth.convertToHtml({ arrayBuffer })
-      if (activeBody === 'email') setEmailBodyHtml(result.value)
-      else setDocumentContent(result.value)
+      const importedHtml = await importWordDocument(file)
+      if (activeBody === 'email') setEmailBodyHtml(importedHtml)
+      else setDocumentContent(importedHtml)
       if (!name && file.name) setName(file.name.replace(/\.(doc|docx)$/i, ''))
       setIsDirty(true)
       toast.success('Word document imported')

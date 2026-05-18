@@ -280,7 +280,10 @@ export function TemplateEditor({ content, onChange, entityType, approvedTags = [
       TextStyle,
       Color,
       Image.configure({ inline: false, allowBase64: true }),
-      Table.configure({ resizable: true }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: { class: 'sims-template-table' },
+      }),
       TableRow,
       TableHeader,
       TableCell,
