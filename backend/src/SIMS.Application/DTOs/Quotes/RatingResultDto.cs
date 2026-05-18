@@ -3,6 +3,7 @@ namespace SIMS.Application.DTOs.Quotes;
 public class RatingResultDto
 {
     public Guid SnapshotId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
     public decimal ManualPremium { get; set; }
     public decimal ScheduleModifier { get; set; }
     public string? ScheduleModifierReason { get; set; }

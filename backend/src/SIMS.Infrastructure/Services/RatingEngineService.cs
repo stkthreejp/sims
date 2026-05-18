@@ -643,6 +643,7 @@ public class RatingEngineService : IRatingEngineService
     private static RatingResultDto MapSnapshotToDto(QuoteRatingSnapshot s, RatingPlanVersion v, string? ratedByName) => new()
     {
         SnapshotId = s.Id,
+        PolicyTransactionId = s.PolicyTransactionId,
         ManualPremium = s.ManualPremium,
         ScheduleModifier = s.ScheduleModifier,
         ScheduleModifierReason = s.ScheduleModifierReason,

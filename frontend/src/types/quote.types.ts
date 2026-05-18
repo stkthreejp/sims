@@ -208,6 +208,7 @@ export interface RatingLine {
 
 export interface RatingResult {
   snapshotId: string
+  policyTransactionId: string | null
   manualPremium: number
   scheduleModifier: number
   scheduleModifierReason: string | null

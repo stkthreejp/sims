@@ -9,6 +9,7 @@ using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 using System.Text.Json;
 
@@ -149,6 +150,46 @@ public class PolicyService : IPolicyService
             })
             .ToList();
 
+        var ratingRows = await Db.Set<QuoteRatingSnapshot>()
+            .AsNoTracking()
+            .Include(s => s.Lines)
+            .Include(s => s.RatingPlanVersion)
+            .Where(s => s.PolicyTransactionId == transactionId && !s.IsDeleted)
+            .OrderByDescending(s => s.RatedAt)
+            .ToListAsync();
+
+        var ratingSnapshots = ratingRows.Select(s => new RatingResultDto
+            {
+                SnapshotId = s.Id,
+                PolicyTransactionId = s.PolicyTransactionId,
+                ManualPremium = s.ManualPremium,
+                ScheduleModifier = s.ScheduleModifier,
+                ScheduleModifierReason = s.ScheduleModifierReason,
+                DebrisRemoval = s.DebrisRemoval,
+                RentalReimbursement = s.RentalReimbursement,
+                TowingStorageRecovery = s.TowingStorageRecovery,
+                NewlyAcquiredEquipment = s.NewlyAcquiredEquipment,
+                EndorsementPremium = s.EndorsementPremium,
+                GrandTotalPremium = s.GrandTotalPremium,
+                RatedAt = s.RatedAt,
+                RatedById = s.RatedById,
+                IsBoundSnapshot = s.IsBoundSnapshot,
+                ScheduleMin = s.RatingPlanVersion.ScheduleMin,
+                ScheduleMax = s.RatingPlanVersion.ScheduleMax,
+                MinimumPremium = s.RatingPlanVersion.MinimumPremium,
+                Lines = s.Lines
+                    .OrderBy(l => l.ExposureRef)
+                    .Select(l => new RatingLineDto
+                    {
+                        ExposureRef = l.ExposureRef,
+                        LinePremium = l.LinePremium,
+                        Inputs = l.Inputs,
+                        FactorsApplied = l.FactorsApplied,
+                    })
+                    .ToList(),
+            })
+            .ToList();
+
         var invoices = await Db.Set<Invoice>()
             .AsNoTracking()
             .Where(i => i.PolicyTransactionId == transactionId)
@@ -202,6 +243,7 @@ public class PolicyService : IPolicyService
         {
             Transaction = MapToTransactionDto(transaction, versions),
             Documents = documents,
+            RatingSnapshots = ratingSnapshots,
             Invoices = invoices,
             Communications = communications,
         });

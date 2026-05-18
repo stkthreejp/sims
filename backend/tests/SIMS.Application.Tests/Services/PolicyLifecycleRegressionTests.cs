@@ -142,6 +142,7 @@ public class PolicyLifecycleRegressionTests
         Assert.True(result.IsSuccess);
         Assert.False(olderSnapshot.IsBoundSnapshot);
         Assert.True(latestSnapshot.IsBoundSnapshot);
+        Assert.Null(latestSnapshot.PolicyTransactionId);
     }
 
     [Fact]
@@ -493,6 +494,66 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(OutboundCommunicationPurpose.PolicyIssue, communicationDto.Purpose);
         Assert.Equal("graph-message-1", communicationDto.GraphMessageId);
         Assert.Equal("https://graph.example/messages/1", communicationDto.GraphMessageWebLink);
+    }
+
+    [Fact]
+    public async Task PolicyTransactionArtifacts_ReturnsLinkedRatingSnapshot()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.Endorsement,
+            Status = PolicyTransactionStatus.Quoted,
+            TransactionNumber = "TXN-RATING-1",
+            EffectiveDate = fixture.Policy.EffectiveDate.AddMonths(1),
+            ProcessedById = fixture.UserId,
+        };
+        var ratingPlan = new RatingPlan
+        {
+            Id = Guid.NewGuid(),
+            Name = "IM Test Plan",
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+        };
+        var ratingVersion = new RatingPlanVersion
+        {
+            Id = Guid.NewGuid(),
+            RatingPlanId = ratingPlan.Id,
+            RatingPlan = ratingPlan,
+            VersionNumber = 1,
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            Status = PlanStatus.Active,
+            ScheduleMin = 0.85m,
+            ScheduleMax = 1.15m,
+            MinimumPremium = 500m,
+        };
+        var snapshot = new QuoteRatingSnapshot
+        {
+            QuoteId = fixture.Policy.BoundQuoteId,
+            Quote = fixture.Policy.BoundQuote,
+            PolicyTransactionId = transaction.Id,
+            RatingPlanVersionId = ratingVersion.Id,
+            RatingPlanVersion = ratingVersion,
+            RatedById = fixture.UserId,
+            RatedBy = fixture.Policy.BoundQuote.CreatedBy,
+            RatedAt = new DateTime(2026, 2, 1, 12, 0, 0, DateTimeKind.Utc),
+            ManualPremium = 900m,
+            ScheduleModifier = 1.05m,
+            GrandTotalPremium = 945m,
+        };
+        db.AddRange(transaction, ratingPlan, ratingVersion, snapshot);
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        var rating = Assert.Single(result.Value!.RatingSnapshots);
+        Assert.Equal(snapshot.Id, rating.SnapshotId);
+        Assert.Equal(transaction.Id, rating.PolicyTransactionId);
+        Assert.Equal(945m, rating.GrandTotalPremium);
     }
 
     [Fact]

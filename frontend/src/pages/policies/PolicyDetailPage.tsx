@@ -735,7 +735,12 @@ function TransactionRows({ transaction: t }: { transaction: PolicyTransaction })
       {(t.priorVersion || t.resultingVersion) && (
         <VersionChangeDetails transaction={t} />
       )}
-      {artifacts && (artifacts.documents.length > 0 || artifacts.invoices.length > 0 || artifacts.communications.length > 0) && (
+      {artifacts && (
+        artifacts.documents.length > 0 ||
+        artifacts.ratingSnapshots.length > 0 ||
+        artifacts.invoices.length > 0 ||
+        artifacts.communications.length > 0
+      ) && (
         <TransactionArtifactDetails artifacts={artifacts} />
       )}
     </>
@@ -746,7 +751,7 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
   return (
     <tr>
       <td colSpan={7} className="px-5 pb-4">
-        <div className="grid gap-3 rounded border bg-white p-3 text-sm lg:grid-cols-3">
+        <div className="grid gap-3 rounded border bg-white p-3 text-sm lg:grid-cols-4">
           <div>
             <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Documents</div>
             {artifacts.documents.length === 0 ? (
@@ -780,6 +785,28 @@ function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnTy
                       <div className="text-xs text-slate-500">{invoice.status} - {formatDate(invoice.invoiceDate)}</div>
                     </div>
                     <span className="font-mono text-slate-700">{formatCurrency(invoice.totalAmount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Rating</div>
+            {artifacts.ratingSnapshots.length === 0 ? (
+              <div className="text-slate-500">No linked rating</div>
+            ) : (
+              <div className="space-y-2">
+                {artifacts.ratingSnapshots.map((rating) => (
+                  <div key={rating.snapshotId} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-slate-800">{formatCurrency(rating.grandTotalPremium)}</div>
+                      <div className="text-xs text-slate-500">
+                        Mod {rating.scheduleModifier.toFixed(2)} - {formatDate(rating.ratedAt)}
+                      </div>
+                    </div>
+                    {rating.isBoundSnapshot && (
+                      <span className="shrink-0 rounded bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700">Bound</span>
+                    )}
                   </div>
                 ))}
               </div>

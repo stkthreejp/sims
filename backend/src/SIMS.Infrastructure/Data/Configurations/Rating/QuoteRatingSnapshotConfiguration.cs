@@ -18,6 +18,7 @@ public class QuoteRatingSnapshotConfiguration : IEntityTypeConfiguration<QuoteRa
         builder.Property(s => s.DeletedAt).HasColumnName("deleted_at");
 
         builder.Property(s => s.QuoteId).HasColumnName("quote_id");
+        builder.Property(s => s.PolicyTransactionId).HasColumnName("policy_transaction_id");
         builder.Property(s => s.RatingPlanVersionId).HasColumnName("rating_plan_version_id");
         builder.Property(s => s.RatedAt).HasColumnName("rated_at");
         builder.Property(s => s.RatedById).HasColumnName("rated_by_id");
@@ -34,9 +35,14 @@ public class QuoteRatingSnapshotConfiguration : IEntityTypeConfiguration<QuoteRa
         builder.Property(s => s.IsBoundSnapshot).HasColumnName("is_bound_snapshot");
 
         builder.HasIndex(s => s.QuoteId);
+        builder.HasIndex(s => s.PolicyTransactionId);
 
         builder.HasOne(s => s.Quote).WithMany()
             .HasForeignKey(s => s.QuoteId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.PolicyTransaction).WithMany()
+            .HasForeignKey(s => s.PolicyTransactionId).OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
 
         builder.HasOne(s => s.RatingPlanVersion).WithMany()
             .HasForeignKey(s => s.RatingPlanVersionId).OnDelete(DeleteBehavior.Restrict);

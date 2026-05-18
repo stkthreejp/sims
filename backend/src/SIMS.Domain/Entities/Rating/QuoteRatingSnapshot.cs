@@ -3,6 +3,7 @@ namespace SIMS.Domain.Entities.Rating;
 public class QuoteRatingSnapshot : BaseEntity
 {
     public Guid QuoteId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
     public Guid RatingPlanVersionId { get; set; }
     public DateTime RatedAt { get; set; }
     public Guid RatedById { get; set; }
@@ -24,6 +25,7 @@ public class QuoteRatingSnapshot : BaseEntity
     public bool IsBoundSnapshot { get; set; }
 
     public Quote Quote { get; set; } = null!;
+    public PolicyTransaction? PolicyTransaction { get; set; }
     public RatingPlanVersion RatingPlanVersion { get; set; } = null!;
     public User RatedBy { get; set; } = null!;
     public ICollection<QuoteRatingLine> Lines { get; set; } = new List<QuoteRatingLine>();
