@@ -99,6 +99,7 @@ public class PolicyService : IPolicyService
             .Include(p => p.Carrier)
             .Include(p => p.BoundQuote)
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Transactions).ThenInclude(t => t.CancellationDetail)
             .Include(p => p.Versions)
             .Where(p => p.Id == id && !p.IsDeleted)
             .ForAccessScope(access)
@@ -113,6 +114,7 @@ public class PolicyService : IPolicyService
     {
         var policy = await Db.Set<Policy>()
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Transactions).ThenInclude(t => t.CancellationDetail)
             .Include(p => p.Versions)
             .Where(p => p.Id == policyId && !p.IsDeleted)
             .ForAccessScope(access)
@@ -926,6 +928,7 @@ public class PolicyService : IPolicyService
             Method = string.IsNullOrWhiteSpace(dto.Method) ? "Written Notice" : dto.Method.Trim(),
             NoticeTemplateId = dto.NoticeTemplateId,
         };
+        transaction.CancellationDetail = detail;
 
         Db.Set<PolicyTransaction>().Add(transaction);
         Db.Set<PolicyCancellationDetail>().Add(detail);
@@ -1321,6 +1324,21 @@ public class PolicyService : IPolicyService
         PriorPolicyId = t.PriorPolicyId,
         CancellationReason = t.CancellationReason,
         CancellationMethod = t.CancellationMethod,
+        CancellationDetail = t.CancellationDetail == null ? null : new PolicyCancellationDetailDto
+        {
+            ReasonCode = t.CancellationDetail.ReasonCode,
+            ReasonLabel = t.CancellationDetail.ReasonLabel,
+            ReasonCategory = t.CancellationDetail.ReasonCategory,
+            ReasonLanguageTemplate = t.CancellationDetail.ReasonLanguageTemplate,
+            ReasonInputsJson = t.CancellationDetail.ReasonInputsJson,
+            ResolvedReasonLanguage = t.CancellationDetail.ResolvedReasonLanguage,
+            NoticeMailingDate = t.CancellationDetail.NoticeMailingDate,
+            NoticeRequirementDays = t.CancellationDetail.NoticeRequirementDays,
+            MailingDays = t.CancellationDetail.MailingDays,
+            CancellationEffectiveDate = t.CancellationDetail.CancellationEffectiveDate,
+            Method = t.CancellationDetail.Method,
+            NoticeTemplateId = t.CancellationDetail.NoticeTemplateId,
+        },
         CancellationComplianceChecklist = DeserializeChecklist(t.CancellationComplianceChecklistJson),
         CancellationLegalRequirementSnapshotJson = t.CancellationLegalRequirementSnapshotJson,
         PremiumBefore = t.PremiumBefore,

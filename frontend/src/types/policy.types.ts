@@ -139,6 +139,7 @@ export interface PolicyTransaction {
   priorPolicyId: string | null
   cancellationReason: string | null
   cancellationMethod: string | null
+  cancellationDetail: PolicyCancellationDetail | null
   cancellationComplianceChecklist: CancellationComplianceChecklistItem[]
   cancellationLegalRequirementSnapshotJson: string | null
   premiumBefore: number | null
@@ -167,6 +168,21 @@ export interface PolicyVersionSummary {
   totalPremium: number
   ratingSnapshotId: string | null
   createdAt: string
+}
+
+export interface PolicyCancellationDetail {
+  reasonCode: string
+  reasonLabel: string
+  reasonCategory: string
+  reasonLanguageTemplate: string
+  reasonInputsJson: string
+  resolvedReasonLanguage: string
+  noticeMailingDate: string
+  noticeRequirementDays: number
+  mailingDays: number
+  cancellationEffectiveDate: string
+  method: string
+  noticeTemplateId: string | null
 }
 
 export interface PolicyTransactionArtifacts {

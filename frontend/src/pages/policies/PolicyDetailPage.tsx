@@ -840,6 +840,7 @@ function TransactionArtifactDetails({
     { id: 'Documents', count: artifacts.documents.length },
     { id: 'Communications', count: artifacts.communications.length },
     { id: 'Accounting', count: artifacts.invoices.length },
+    ...(transaction.transactionType === 'Cancellation' ? [{ id: 'Cancellation', count: transaction.cancellationDetail ? 1 : 0 }] : []),
     { id: 'Compliance', count: artifacts.complianceChecklists.reduce((sum, checklist) => sum + checklist.items.length, 0) },
     { id: 'Tasks', count: artifacts.tasks.length },
     { id: 'Approvals', count: artifacts.approvals.length },
@@ -939,6 +940,10 @@ function TransactionArtifactDetails({
             </CompactList>
           )}
 
+          {activeSection === 'Cancellation' && (
+            <CancellationSummary transaction={transaction} />
+          )}
+
           {activeSection === 'Compliance' && (
             <div className="space-y-3">
               {transaction.transactionType === 'Cancellation' && (
@@ -1001,13 +1006,23 @@ function CompactRow({ title, meta, value, sub }: { title: string; meta?: string;
 }
 
 function CancellationSummary({ transaction }: { transaction: PolicyTransaction }) {
+  const detail = transaction.cancellationDetail
+
   return (
     <div className="rounded border border-red-100 bg-red-50/40 px-3 py-2 text-slate-700">
-      <div className="font-semibold text-slate-900">Cancellation Review</div>
-      <div className="mt-1 grid gap-1 text-xs sm:grid-cols-2">
-        <div><span className="text-slate-500">Reason:</span> {transaction.cancellationReason || 'Not recorded'}</div>
-        <div><span className="text-slate-500">Method:</span> {transaction.cancellationMethod || 'Not recorded'}</div>
+      <div className="font-semibold text-slate-900">Cancellation Notice Detail</div>
+      <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
+        <div><span className="text-slate-500">Reason:</span> {detail?.reasonLabel || transaction.cancellationReason || 'Not recorded'}</div>
+        <div><span className="text-slate-500">Code:</span> {detail?.reasonCode || transaction.reasonCode || '-'}</div>
+        <div><span className="text-slate-500">Category:</span> {detail?.reasonCategory || '-'}</div>
+        <div><span className="text-slate-500">Mailing Date:</span> {formatDate(detail?.noticeMailingDate ?? null)}</div>
+        <div><span className="text-slate-500">Notice Days:</span> {detail ? `${detail.noticeRequirementDays} + ${detail.mailingDays} mailing` : '-'}</div>
+        <div><span className="text-slate-500">Cancellation Date:</span> {formatDate(detail?.cancellationEffectiveDate ?? transaction.effectiveDate)}</div>
+        <div><span className="text-slate-500">Method:</span> {detail?.method || transaction.cancellationMethod || 'Not recorded'}</div>
       </div>
+      {detail?.resolvedReasonLanguage && (
+        <p className="mt-2 text-xs text-slate-700">{detail.resolvedReasonLanguage}</p>
+      )}
       {transaction.notes && <p className="mt-2 text-xs text-slate-600">{transaction.notes}</p>}
     </div>
   )

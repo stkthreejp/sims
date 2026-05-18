@@ -997,6 +997,42 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task CancellationNotice_DetailIsReturnedWithPolicyTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.IssueCancellationNoticeAsync(fixture.Policy.Id, new IssueCancellationNoticeDto
+        {
+            ReasonCode = "NP-01",
+            ReasonInputs = new Dictionary<string, string>
+            {
+                ["AMOUNT_DUE"] = "1,250.00",
+            },
+            NoticeMailingDate = new DateOnly(2026, 6, 1),
+            NoticeRequirementDays = 10,
+            MailingDays = 3,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(result.IsSuccess);
+
+        var policyResult = await policyService.GetByIdAsync(fixture.Policy.Id, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(policyResult.IsSuccess);
+        var transaction = Assert.Single(policyResult.Value!.Transactions, t => t.Id == result.Value!.Id);
+        Assert.NotNull(transaction.CancellationDetail);
+        Assert.Equal("NP-01", transaction.CancellationDetail!.ReasonCode);
+        Assert.Equal("Non-Payment - Standard", transaction.CancellationDetail.ReasonLabel);
+        Assert.Contains("$1,250.00", transaction.CancellationDetail.ResolvedReasonLanguage);
+        Assert.Equal(new DateOnly(2026, 6, 1), transaction.CancellationDetail.NoticeMailingDate);
+        Assert.Equal(10, transaction.CancellationDetail.NoticeRequirementDays);
+        Assert.Equal(3, transaction.CancellationDetail.MailingDays);
+        Assert.Equal(new DateOnly(2026, 6, 14), transaction.CancellationDetail.CancellationEffectiveDate);
+        Assert.Equal("Certified Mail", transaction.CancellationDetail.Method);
+    }
+
+    [Fact]
     public async Task CancellationNotice_GeneratesNoticeDocumentForPolicyTransaction()
     {
         await using var db = CreateDb();

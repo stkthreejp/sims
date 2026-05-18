@@ -97,6 +97,7 @@ public class PolicyTransactionDto
     public Guid? PriorPolicyId { get; set; }
     public string? CancellationReason { get; set; }
     public string? CancellationMethod { get; set; }
+    public PolicyCancellationDetailDto? CancellationDetail { get; set; }
     public IReadOnlyList<CancellationComplianceChecklistItemDto> CancellationComplianceChecklist { get; set; } = [];
     public string? CancellationLegalRequirementSnapshotJson { get; set; }
     public decimal? PremiumBefore { get; set; }
@@ -112,6 +113,22 @@ public class PolicyTransactionDto
     public string ProcessedByName { get; set; } = string.Empty;
     public DateTime ProcessedAt { get; set; }
     public string? Notes { get; set; }
+}
+
+public class PolicyCancellationDetailDto
+{
+    public string ReasonCode { get; set; } = string.Empty;
+    public string ReasonLabel { get; set; } = string.Empty;
+    public string ReasonCategory { get; set; } = string.Empty;
+    public string ReasonLanguageTemplate { get; set; } = string.Empty;
+    public string ReasonInputsJson { get; set; } = "{}";
+    public string ResolvedReasonLanguage { get; set; } = string.Empty;
+    public DateOnly NoticeMailingDate { get; set; }
+    public int NoticeRequirementDays { get; set; }
+    public int MailingDays { get; set; }
+    public DateOnly CancellationEffectiveDate { get; set; }
+    public string Method { get; set; } = string.Empty;
+    public Guid? NoticeTemplateId { get; set; }
 }
 
 public class PolicyTransactionArtifactsDto
