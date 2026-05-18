@@ -1235,6 +1235,77 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task CompleteNonRenewal_BeforeEffectiveDateFails()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var notice = await policyService.NonRenewAsync(fixture.Policy.Id, new NonRenewPolicyDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+            NoticeMailingDate = new DateOnly(2026, 11, 1),
+            NoticeRequirementDays = 45,
+            MailingDays = 3,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(notice.IsSuccess);
+
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
+        var result = await policyService.CompleteNonRenewalAsync(
+            fixture.Policy.Id,
+            transaction.Id,
+            new CompleteNonRenewalDto { CompletedDate = new DateOnly(2026, 12, 30) },
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("NON_RENEWAL_NOT_EFFECTIVE", result.ErrorCode);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Null(fixture.Policy.NonRenewedDate);
+    }
+
+    [Fact]
+    public async Task CompleteNonRenewal_OnEffectiveDateNonRenewsPolicyAndCreatesVersion()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var notice = await policyService.NonRenewAsync(fixture.Policy.Id, new NonRenewPolicyDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+            NoticeMailingDate = new DateOnly(2026, 11, 1),
+            NoticeRequirementDays = 45,
+            MailingDays = 3,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(notice.IsSuccess);
+
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
+        var result = await policyService.CompleteNonRenewalAsync(
+            fixture.Policy.Id,
+            transaction.Id,
+            new CompleteNonRenewalDto { CompletedDate = new DateOnly(2026, 12, 31) },
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(PolicyStatus.NonRenewed, fixture.Policy.Status);
+        Assert.Equal(new DateOnly(2026, 12, 31), fixture.Policy.NonRenewedDate);
+        Assert.Equal(PolicyTransactionStatus.Completed, transaction.Status);
+        Assert.NotNull(transaction.PriorPolicyVersionId);
+        Assert.NotNull(transaction.ResultingPolicyVersionId);
+        var versions = await db.Set<PolicyVersion>()
+            .Where(v => v.PolicyId == fixture.Policy.Id)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(PolicyStatus.Active, versions[0].Status);
+        Assert.Equal(PolicyStatus.NonRenewed, versions[1].Status);
+        Assert.Equal(versions[0].Id, transaction.PriorPolicyVersionId);
+        Assert.Equal(versions[1].Id, transaction.ResultingPolicyVersionId);
+    }
+
+    [Fact]
     public async Task Renewal_CreatesRenewalQuote()
     {
         await using var db = CreateDb();

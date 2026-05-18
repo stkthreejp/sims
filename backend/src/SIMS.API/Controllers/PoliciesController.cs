@@ -189,6 +189,14 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("{id:guid}/non-renewals/{txnId:guid}/complete")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public async Task<IActionResult> CompleteNonRenewal(Guid id, Guid txnId, [FromBody] CompleteNonRenewalDto dto)
+    {
+        var result = await _policies.CompleteNonRenewalAsync(id, txnId, dto, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // --- Notes (delegate to NoteService using the bound quote ID) ---
 
     [HttpGet("{id:guid}/notes")]

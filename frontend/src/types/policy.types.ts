@@ -369,6 +369,11 @@ export interface CompleteCancellation {
   notes?: string
 }
 
+export interface CompleteNonRenewal {
+  completedDate: string
+  notes?: string
+}
+
 export interface LegalComplianceGuidance {
   state: string
   lineOfBusiness: string

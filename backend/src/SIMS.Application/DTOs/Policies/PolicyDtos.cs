@@ -310,6 +310,12 @@ public class CompleteCancellationDto
     public string? Notes { get; set; }
 }
 
+public class CompleteNonRenewalDto
+{
+    public DateOnly CompletedDate { get; set; }
+    public string? Notes { get; set; }
+}
+
 public class LegalComplianceGuidanceDto
 {
     public string State { get; set; } = string.Empty;

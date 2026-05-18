@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Policy, PolicyListItem, PolicyTransaction, PolicyTransactionArtifacts, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance, CancellationReason, IssueCancellationNotice, CompleteCancellation } from '@/types/policy.types'
+import type { Policy, PolicyListItem, PolicyTransaction, PolicyTransactionArtifacts, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance, CancellationReason, IssueCancellationNotice, CompleteCancellation, CompleteNonRenewal } from '@/types/policy.types'
 import type { Quote } from '@/types/quote.types'
 import type { Note } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
@@ -56,6 +56,9 @@ export const policiesApi = {
 
   completeCancellation: (id: string, txnId: string, data: CompleteCancellation) =>
     apiClient.post<Policy>(`/policies/${id}/cancellations/${txnId}/complete`, data).then((r) => r.data),
+
+  completeNonRenewal: (id: string, txnId: string, data: CompleteNonRenewal) =>
+    apiClient.post<Policy>(`/policies/${id}/non-renewals/${txnId}/complete`, data).then((r) => r.data),
 
   nonRenew: (id: string, data: NonRenewPolicy) =>
     apiClient.post<Policy>(`/policies/${id}/non-renew`, data).then((r) => r.data),

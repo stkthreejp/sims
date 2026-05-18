@@ -1095,6 +1095,60 @@ public class PolicyService : IPolicyService
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
 
+    public async Task<Result<PolicyDto>> CompleteNonRenewalAsync(Guid policyId, Guid transactionId, CompleteNonRenewalDto dto, UserAccessScope access)
+    {
+        var db = Db;
+        var policy = await db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Transactions).ThenInclude(t => t.NonRenewalDetail)
+            .Include(p => p.Versions)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can complete a non-renewal.");
+
+        var transaction = policy.Transactions.FirstOrDefault(t => t.Id == transactionId && !t.IsDeleted);
+        if (transaction == null)
+            return Result<PolicyDto>.Failure("TRANSACTION_NOT_FOUND", "Non-renewal transaction not found.");
+        if (transaction.TransactionType != TransactionType.NonRenewal)
+            return Result<PolicyDto>.Failure("INVALID_TRANSACTION_TYPE", "Only non-renewal transactions can be completed here.");
+        if (transaction.Status is not (PolicyTransactionStatus.NoticeSent or PolicyTransactionStatus.PendingEffectiveDate or PolicyTransactionStatus.Issued))
+            return Result<PolicyDto>.Failure("INVALID_TRANSACTION_STATUS", "Only noticed non-renewal transactions can be completed.");
+        if (transaction.NonRenewalDetail == null)
+            return Result<PolicyDto>.Failure("NON_RENEWAL_DETAIL_REQUIRED", "Non-renewal notice detail is required before completing non-renewal.");
+        if (dto.CompletedDate < transaction.NonRenewalDetail.NonRenewalEffectiveDate)
+            return Result<PolicyDto>.Failure("NON_RENEWAL_NOT_EFFECTIVE", "Non-renewal cannot be completed before the effective non-renewal date.");
+
+        await using var dbTransaction = await db.Database.BeginTransactionAsync();
+
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
+        policy.Status = PolicyStatus.NonRenewed;
+        policy.NonRenewedDate = transaction.NonRenewalDetail.NonRenewalEffectiveDate;
+        policy.UpdatedAt = DateTime.UtcNow;
+        transaction.EffectiveDate = transaction.NonRenewalDetail.NonRenewalEffectiveDate;
+        transaction.Notes = string.IsNullOrWhiteSpace(dto.Notes) ? transaction.Notes : dto.Notes.Trim();
+        transaction.ProcessedById = access.UserId;
+        transaction.ProcessedAt = DateTime.UtcNow;
+
+        var transition = await _transactionLifecycle.TransitionAsync(
+            transaction,
+            PolicyTransactionStatus.Completed,
+            access.UserId,
+            string.IsNullOrWhiteSpace(dto.Notes) ? "Non-renewal completed." : dto.Notes.Trim());
+        if (!transition.IsSuccess)
+            return Result<PolicyDto>.Failure(transition.ErrorCode ?? "NON_RENEWAL_COMPLETION_FAILED", transition.ErrorMessage ?? "Non-renewal could not be completed.");
+
+        await _policyVersions.CreateVersionAsync(policy, transaction, priorVersion, access.UserId);
+        await dbTransaction.CommitAsync();
+
+        return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
     public async Task<Result<LegalComplianceGuidanceDto>> GetCancellationGuidanceAsync(Guid policyId, UserAccessScope access)
     {
         return await GetLegalGuidanceAsync(policyId, access, "Cancellation");

@@ -755,9 +755,14 @@ function TransactionRows({
     queryFn: () => policiesApi.getTransactionArtifacts(t.policyId, t.id),
   })
   const proofUploadApplies = t.transactionType === 'Cancellation' || t.transactionType === 'NonRenewal'
-  const canComplete = canCompleteCancellation &&
+  const hasCompletableStatus = t.status === 'NoticeSent' || t.status === 'PendingEffectiveDate' || t.status === 'Issued'
+  const canCompleteCancellationTransaction = canCompleteCancellation &&
     t.transactionType === 'Cancellation' &&
-    (t.status === 'NoticeSent' || t.status === 'PendingEffectiveDate' || t.status === 'Issued')
+    hasCompletableStatus
+  const canCompleteNonRenewal = canCompleteCancellation &&
+    t.transactionType === 'NonRenewal' &&
+    hasCompletableStatus
+  const canComplete = canCompleteCancellationTransaction || canCompleteNonRenewal
   const completeCancellation = useMutation({
     mutationFn: () => policiesApi.completeCancellation(t.policyId, t.id, {
       completedDate: new Date().toISOString().slice(0, 10),
@@ -769,6 +774,18 @@ function TransactionRows({
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Cancellation could not be completed'),
   })
+  const completeNonRenewal = useMutation({
+    mutationFn: () => policiesApi.completeNonRenewal(t.policyId, t.id, {
+      completedDate: new Date().toISOString().slice(0, 10),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'] })
+      toast.success('Non-renewal completed')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Non-renewal could not be completed'),
+  })
+  const completePending = completeCancellation.isPending || completeNonRenewal.isPending
 
   return (
     <>
@@ -794,12 +811,16 @@ function TransactionRows({
               <button
                 type="button"
                 className="sd-btn outline sm"
-                disabled={completeCancellation.isPending}
+                disabled={completePending}
                 onClick={(event) => {
                   event.stopPropagation()
-                  completeCancellation.mutate()
+                  if (canCompleteNonRenewal) {
+                    completeNonRenewal.mutate()
+                  } else {
+                    completeCancellation.mutate()
+                  }
                 }}
-                title="Complete the cancellation once the effective date has passed"
+                title={`Complete the ${canCompleteNonRenewal ? 'non-renewal' : 'cancellation'} once the effective date has passed`}
               >
                 <Check className="h-3.5 w-3.5" /> Complete
               </button>
