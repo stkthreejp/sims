@@ -10,6 +10,7 @@ public class Attachment : BaseEntity
     public Guid? CarrierId { get; set; }
     public Guid? AgentId { get; set; }
     public Guid? InsuredId { get; set; }
+    public Guid? PolicyTransactionId { get; set; }
     public Guid? PolicyVersionId { get; set; }
 
     public DocumentEntityType EntityType { get; set; }
@@ -29,6 +30,7 @@ public class Attachment : BaseEntity
     public Carrier? Carrier { get; set; }
     public Agent? Agent { get; set; }
     public Insured? Insured { get; set; }
+    public PolicyTransaction? PolicyTransaction { get; set; }
     public PolicyVersion? PolicyVersion { get; set; }
     public User UploadedBy { get; set; } = null!;
 }

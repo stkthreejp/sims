@@ -19,6 +19,7 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<Attachment>
         builder.HasIndex(a => new { a.EntityType, a.CarrierId, a.IsDeleted });
         builder.HasIndex(a => new { a.EntityType, a.AgentId, a.IsDeleted });
         builder.HasIndex(a => new { a.EntityType, a.InsuredId, a.IsDeleted });
+        builder.HasIndex(a => a.PolicyTransactionId);
         builder.HasIndex(a => a.PolicyVersionId);
 
         // Optional FK — only one will be populated per row
@@ -40,6 +41,10 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<Attachment>
 
         builder.HasOne(a => a.Insured).WithMany()
             .HasForeignKey(a => a.InsuredId).OnDelete(DeleteBehavior.Cascade)
+            .IsRequired(false);
+
+        builder.HasOne(a => a.PolicyTransaction).WithMany()
+            .HasForeignKey(a => a.PolicyTransactionId).OnDelete(DeleteBehavior.SetNull)
             .IsRequired(false);
 
         builder.HasOne(a => a.PolicyVersion).WithMany()

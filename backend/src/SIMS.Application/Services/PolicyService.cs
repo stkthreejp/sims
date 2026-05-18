@@ -105,6 +105,76 @@ public class PolicyService : IPolicyService
             : Result<PolicyDto>.Success(MapToDto(policy));
     }
 
+    public async Task<Result<PolicyTransactionArtifactsDto>> GetTransactionArtifactsAsync(Guid policyId, Guid transactionId, UserAccessScope access)
+    {
+        var policy = await Db.Set<Policy>()
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Versions)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+
+        if (policy == null)
+            return Result<PolicyTransactionArtifactsDto>.Failure("NOT_FOUND", "Policy not found.");
+
+        var transaction = policy.Transactions.FirstOrDefault(t => t.Id == transactionId && !t.IsDeleted);
+        if (transaction == null)
+            return Result<PolicyTransactionArtifactsDto>.Failure("TRANSACTION_NOT_FOUND", "Policy transaction not found.");
+
+        var documentRows = await Db.Set<Attachment>()
+            .AsNoTracking()
+            .Include(a => a.UploadedBy)
+            .Include(a => a.PolicyVersion)
+            .Where(a => a.PolicyTransactionId == transactionId && !a.IsDeleted)
+            .OrderBy(a => a.DocumentType)
+            .ThenByDescending(a => a.CreatedAt)
+            .ToListAsync();
+
+        var documents = documentRows.Select(a => new AttachmentDto
+            {
+                Id = a.Id,
+                EntityType = a.EntityType,
+                DocumentType = a.DocumentType,
+                PolicyTransactionId = a.PolicyTransactionId,
+                PolicyVersionId = a.PolicyVersionId,
+                PolicyVersionNumber = a.PolicyVersion != null ? a.PolicyVersion.VersionNumber : null,
+                FileName = a.FileName,
+                ContentType = a.ContentType,
+                FileSizeBytes = a.FileSizeBytes,
+                Description = a.Description,
+                UploadedById = a.UploadedById,
+                UploadedByName = a.UploadedBy?.FullName ?? "",
+                CreatedAt = a.CreatedAt,
+            })
+            .ToList();
+
+        var invoices = await Db.Set<Invoice>()
+            .AsNoTracking()
+            .Where(i => i.PolicyTransactionId == transactionId)
+            .OrderByDescending(i => i.InvoiceDate)
+            .ThenByDescending(i => i.Id)
+            .Select(i => new InvoiceSummaryDto(
+                i.Id,
+                i.InvoiceNumber,
+                i.InvoiceDate,
+                i.EffectiveDate,
+                i.GrossPremium,
+                i.TotalFees,
+                i.TotalAmount,
+                i.Status,
+                i.PolicyTransactionId,
+                i.PolicyVersionId))
+            .ToListAsync();
+
+        var versions = policy.Versions.ToDictionary(v => v.Id);
+        return Result<PolicyTransactionArtifactsDto>.Success(new PolicyTransactionArtifactsDto
+        {
+            Transaction = MapToTransactionDto(transaction, versions),
+            Documents = documents,
+            Invoices = invoices,
+        });
+    }
+
     public async Task<Result<PolicyIssuancePacketDto>> GetIssuancePacketAsync(Guid policyId, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
@@ -178,7 +248,7 @@ public class PolicyService : IPolicyService
             .FirstOrDefault();
 
         var assembly = (IPolicyAssemblyService)_sp.GetService(typeof(IPolicyAssemblyService))!;
-        var assemblyResult = await assembly.AssembleAndFileAsync(policyId, access.UserId, policyVersionId: newBusinessTxn?.ResultingPolicyVersionId);
+        var assemblyResult = await assembly.AssembleAndFileAsync(policyId, access.UserId, policyVersionId: newBusinessTxn?.ResultingPolicyVersionId, policyTransactionId: newBusinessTxn?.Id);
         if (!assemblyResult.IsSuccess)
             return Result<PolicyDto>.Failure(assemblyResult.ErrorCode ?? "POLICY_PACKET_FAILED", assemblyResult.ErrorMessage ?? "Policy packet could not be assembled.");
 

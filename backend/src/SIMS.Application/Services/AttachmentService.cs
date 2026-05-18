@@ -150,7 +150,8 @@ public class AttachmentService : IAttachmentService
         DocumentType documentType,
         string? description,
         Guid userId,
-        Guid? policyVersionId = null)
+        Guid? policyVersionId = null,
+        Guid? policyTransactionId = null)
     {
         if (!await CanAccessEntityAsync(entityType, entityId, userId))
             return Result<AttachmentDto>.Failure("ATTACHMENT_ACCESS_DENIED", "You do not have access to this attachment target.");
@@ -187,6 +188,7 @@ public class AttachmentService : IAttachmentService
             ContentType = contentType,
             FileSizeBytes = fileSizeBytes,
             Description = description,
+            PolicyTransactionId = policyTransactionId,
             PolicyVersionId = policyVersionId,
             UploadedById = userId,
         };
@@ -245,6 +247,7 @@ public class AttachmentService : IAttachmentService
         Id = a.Id,
         EntityType = a.EntityType,
         DocumentType = a.DocumentType,
+        PolicyTransactionId = a.PolicyTransactionId,
         PolicyVersionId = a.PolicyVersionId,
         PolicyVersionNumber = a.PolicyVersion?.VersionNumber,
         FileName = a.FileName,

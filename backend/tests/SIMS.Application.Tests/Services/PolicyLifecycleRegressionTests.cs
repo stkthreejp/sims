@@ -291,6 +291,7 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(fixture.UserId, transaction.CompletedById);
         Assert.NotNull(transaction.CompletedAt);
         Assert.Equal(transaction.ResultingPolicyVersionId, assembly.AssembledPolicyVersionId);
+        Assert.Equal(transaction.Id, assembly.AssembledPolicyTransactionId);
         var history = await db.Set<PolicyTransactionStatusHistory>()
             .Where(h => h.PolicyTransactionId == transaction.Id)
             .OrderBy(h => h.ChangedAt)
@@ -364,6 +365,94 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(PolicyStatus.Active, transactionDto.ResultingVersion.Status);
         Assert.Equal(1000m, transactionDto.PriorVersion.TotalPremium);
         Assert.Equal(1125m, transactionDto.ResultingVersion.TotalPremium);
+    }
+
+    [Fact]
+    public async Task PolicyTransactionArtifacts_ReturnsDocumentsAndInvoices()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var version = new PolicyVersion
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            VersionNumber = 1,
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ExpirationDate = fixture.Policy.ExpirationDate,
+            Status = fixture.Policy.Status,
+            PremiumAmount = fixture.Policy.PremiumAmount,
+            TaxesAndFees = fixture.Policy.TaxesAndFees,
+            TotalPremium = fixture.Policy.TotalPremium,
+            CreatedById = fixture.UserId,
+        };
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.NewBusiness,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = "TXN-ARTIFACTS-1",
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            ResultingPolicyVersionId = version.Id,
+            PremiumChange = fixture.Policy.TotalPremium,
+            NewTotalPremium = fixture.Policy.TotalPremium,
+            ProcessedById = fixture.UserId,
+        };
+        var attachment = new Attachment
+        {
+            QuoteId = fixture.Policy.BoundQuoteId,
+            EntityType = DocumentEntityType.Policy,
+            DocumentType = DocumentType.IssuedPolicyPacket,
+            PolicyTransactionId = transaction.Id,
+            PolicyVersionId = version.Id,
+            FileName = "issued.pdf",
+            BlobPath = "issued.pdf",
+            ContentType = "application/pdf",
+            FileSizeBytes = 123,
+            UploadedById = fixture.UserId,
+            UploadedBy = fixture.Policy.BoundQuote.CreatedBy,
+        };
+        var unrelatedAttachment = new Attachment
+        {
+            QuoteId = fixture.Policy.BoundQuoteId,
+            EntityType = DocumentEntityType.Policy,
+            DocumentType = DocumentType.Other,
+            FileName = "other.pdf",
+            BlobPath = "other.pdf",
+            ContentType = "application/pdf",
+            FileSizeBytes = 123,
+            UploadedById = fixture.UserId,
+            UploadedBy = fixture.Policy.BoundQuote.CreatedBy,
+        };
+        var invoice = new Invoice
+        {
+            InvoiceNumber = "INV-ARTIFACTS-1",
+            PolicyTransactionId = transaction.Id,
+            PolicyVersionId = version.Id,
+            EffectiveDate = fixture.Policy.EffectiveDate,
+            InvoiceDate = fixture.Policy.EffectiveDate,
+            GrossPremium = fixture.Policy.PremiumAmount,
+            TotalFees = fixture.Policy.TaxesAndFees,
+            TotalAmount = fixture.Policy.TotalPremium,
+            LedgerTransactionId = Guid.NewGuid(),
+            CreatedBy = fixture.UserId,
+        };
+        db.AddRange(version, transaction, attachment, unrelatedAttachment, invoice);
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(transaction.Id, result.Value!.Transaction.Id);
+        var document = Assert.Single(result.Value.Documents);
+        Assert.Equal(attachment.Id, document.Id);
+        Assert.Equal(transaction.Id, document.PolicyTransactionId);
+        Assert.Equal(version.Id, document.PolicyVersionId);
+        var invoiceDto = Assert.Single(result.Value.Invoices);
+        Assert.Equal(invoice.Id, invoiceDto.Id);
+        Assert.Equal(transaction.Id, invoiceDto.PolicyTransactionId);
+        Assert.Equal(version.Id, invoiceDto.PolicyVersionId);
     }
 
     [Fact]
@@ -891,11 +980,13 @@ public class PolicyLifecycleRegressionTests
     {
         public bool WasCalled { get; private set; }
         public Guid? AssembledPolicyVersionId { get; private set; }
+        public Guid? AssembledPolicyTransactionId { get; private set; }
 
-        public Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false, Guid? policyVersionId = null)
+        public Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false, Guid? policyVersionId = null, Guid? policyTransactionId = null)
         {
             WasCalled = true;
             AssembledPolicyVersionId = policyVersionId;
+            AssembledPolicyTransactionId = policyTransactionId;
             return Task.FromResult(Result<GeneratedDocumentDto>.Success(DocumentResult()));
         }
 

@@ -31,7 +31,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         _htmlToPdf = htmlToPdf;
     }
 
-    public async Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false, Guid? policyVersionId = null)
+    public async Task<Result<GeneratedDocumentDto>> AssembleAndFileAsync(Guid policyId, Guid userId, bool isPreview = false, Guid? policyVersionId = null, Guid? policyTransactionId = null)
     {
         var policy = await LoadPolicyForAssemblyAsync(policyId);
         if (policy == null)
@@ -79,7 +79,8 @@ public class PolicyAssemblyService : IPolicyAssemblyService
                 ? $"Draft policy packet preview for policy {policy.PolicyNumber} generated on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC."
                 : $"Issued policy packet for policy {policy.PolicyNumber} on {DateTime.UtcNow:MM/dd/yyyy HH:mm} UTC.",
             userId,
-            isPreview ? null : policyVersionId);
+            isPreview ? null : policyVersionId,
+            isPreview ? null : policyTransactionId);
 
         if (!attachmentResult.IsSuccess || attachmentResult.Value == null)
             return Result<GeneratedDocumentDto>.Failure(attachmentResult.ErrorCode ?? "ATTACHMENT_SAVE_FAILED", attachmentResult.ErrorMessage ?? "Policy packet could not be stored.");

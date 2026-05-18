@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
 import type { CancellationComplianceChecklistItem, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
+import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -704,6 +705,11 @@ function ReadinessIcon({ status }: { status: 'Ready' | 'Warning' | 'Blocked' }) 
 }
 
 function TransactionRows({ transaction: t }: { transaction: PolicyTransaction }) {
+  const { data: artifacts } = useQuery({
+    queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'],
+    queryFn: () => policiesApi.getTransactionArtifacts(t.policyId, t.id),
+  })
+
   return (
     <>
       <tr>
@@ -729,7 +735,59 @@ function TransactionRows({ transaction: t }: { transaction: PolicyTransaction })
       {(t.priorVersion || t.resultingVersion) && (
         <VersionChangeDetails transaction={t} />
       )}
+      {artifacts && (artifacts.documents.length > 0 || artifacts.invoices.length > 0) && (
+        <TransactionArtifactDetails artifacts={artifacts} />
+      )}
     </>
+  )
+}
+
+function TransactionArtifactDetails({ artifacts }: { artifacts: Awaited<ReturnType<typeof policiesApi.getTransactionArtifacts>> }) {
+  return (
+    <tr>
+      <td colSpan={7} className="px-5 pb-4">
+        <div className="grid gap-3 rounded border bg-white p-3 text-sm md:grid-cols-2">
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Documents</div>
+            {artifacts.documents.length === 0 ? (
+              <div className="text-slate-500">No linked documents</div>
+            ) : (
+              <div className="space-y-2">
+                {artifacts.documents.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
+                      <div className="text-xs text-slate-500">
+                        {DOCUMENT_TYPE_LABELS[doc.documentType]}{doc.policyVersionNumber != null ? ` · v${doc.policyVersionNumber}` : ''}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-xs text-slate-400">{formatDate(doc.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Invoices</div>
+            {artifacts.invoices.length === 0 ? (
+              <div className="text-slate-500">No linked invoices</div>
+            ) : (
+              <div className="space-y-2">
+                {artifacts.invoices.map((invoice) => (
+                  <div key={invoice.id} className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-medium text-slate-800">{invoice.invoiceNumber}</div>
+                      <div className="text-xs text-slate-500">{invoice.status} · {formatDate(invoice.invoiceDate)}</div>
+                    </div>
+                    <span className="font-mono text-slate-700">{formatCurrency(invoice.totalAmount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+    </tr>
   )
 }
 

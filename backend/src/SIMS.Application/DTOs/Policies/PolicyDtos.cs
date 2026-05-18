@@ -1,3 +1,5 @@
+using SIMS.Application.DTOs.Accounting;
+using SIMS.Application.DTOs.Attachments;
 using SIMS.Domain.Enums;
 
 namespace SIMS.Application.DTOs.Policies;
@@ -107,6 +109,13 @@ public class PolicyTransactionDto
     public string ProcessedByName { get; set; } = string.Empty;
     public DateTime ProcessedAt { get; set; }
     public string? Notes { get; set; }
+}
+
+public class PolicyTransactionArtifactsDto
+{
+    public PolicyTransactionDto Transaction { get; set; } = new();
+    public IReadOnlyList<AttachmentDto> Documents { get; set; } = [];
+    public IReadOnlyList<InvoiceSummaryDto> Invoices { get; set; } = [];
 }
 
 public class PolicyVersionSummaryDto

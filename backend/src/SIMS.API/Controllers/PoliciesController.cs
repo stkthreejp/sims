@@ -49,6 +49,17 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
     }
 
+    [HttpGet("{id:guid}/transactions/{txnId:guid}/artifacts")]
+    public async Task<IActionResult> GetTransactionArtifacts(Guid id, Guid txnId)
+    {
+        var result = await _policies.GetTransactionArtifactsAsync(id, txnId, CurrentAccess);
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : result.ErrorCode is "NOT_FOUND" or "TRANSACTION_NOT_FOUND"
+                ? NotFound(new { result.ErrorCode, result.ErrorMessage })
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpGet("{id:guid}/issuance-packet")]
     public async Task<IActionResult> GetIssuancePacket(Guid id)
     {

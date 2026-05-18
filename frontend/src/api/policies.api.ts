@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Policy, PolicyListItem, PolicyTransaction, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance } from '@/types/policy.types'
+import type { Policy, PolicyListItem, PolicyTransaction, PolicyTransactionArtifacts, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance } from '@/types/policy.types'
 import type { Quote } from '@/types/quote.types'
 import type { Note } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
@@ -14,6 +14,9 @@ export const policiesApi = {
 
   getById: (id: string) =>
     apiClient.get<Policy>(`/policies/${id}`).then((r) => r.data),
+
+  getTransactionArtifacts: (id: string, txnId: string) =>
+    apiClient.get<PolicyTransactionArtifacts>(`/policies/${id}/transactions/${txnId}/artifacts`).then((r) => r.data),
 
   addEndorsement: (id: string, data: CreateEndorsement) =>
     apiClient.post<PolicyTransaction>(`/policies/${id}/endorsements`, data).then((r) => r.data),

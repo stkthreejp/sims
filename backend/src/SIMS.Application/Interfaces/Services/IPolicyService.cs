@@ -11,6 +11,7 @@ public interface IPolicyService
     Task<PagedResult<PolicyListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access);
     Task<IEnumerable<PolicyListItemDto>> GetByInsuredAsync(Guid insuredId, UserAccessScope access);
     Task<Result<PolicyDto>> GetByIdAsync(Guid id, UserAccessScope access);
+    Task<Result<PolicyTransactionArtifactsDto>> GetTransactionArtifactsAsync(Guid policyId, Guid transactionId, UserAccessScope access);
     Task<Result<PolicyIssuancePacketDto>> GetIssuancePacketAsync(Guid policyId, UserAccessScope access);
     Task<Result<GeneratedDocumentDto>> GenerateIssuancePacketPreviewAsync(Guid policyId, UserAccessScope access);
     Task<Result<PolicyDto>> IssueAsync(Guid policyId, IssuePolicyDto dto, UserAccessScope access);
