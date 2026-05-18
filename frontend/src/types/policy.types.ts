@@ -140,6 +140,7 @@ export interface PolicyTransaction {
   cancellationReason: string | null
   cancellationMethod: string | null
   cancellationDetail: PolicyCancellationDetail | null
+  nonRenewalDetail: PolicyNonRenewalDetail | null
   cancellationComplianceChecklist: CancellationComplianceChecklistItem[]
   cancellationLegalRequirementSnapshotJson: string | null
   premiumBefore: number | null
@@ -181,6 +182,17 @@ export interface PolicyCancellationDetail {
   noticeRequirementDays: number
   mailingDays: number
   cancellationEffectiveDate: string
+  method: string
+  noticeTemplateId: string | null
+  noticeTemplateName: string | null
+}
+
+export interface PolicyNonRenewalDetail {
+  reason: string
+  noticeMailingDate: string
+  noticeRequirementDays: number
+  mailingDays: number
+  nonRenewalEffectiveDate: string
   method: string
   noticeTemplateId: string | null
   noticeTemplateName: string | null
@@ -313,6 +325,11 @@ export interface IssuePolicy {
 export interface NonRenewPolicy {
   nonRenewedDate: string
   reason?: string
+  noticeMailingDate: string
+  noticeRequirementDays: number
+  mailingDays: number
+  method: string
+  noticeTemplateId?: string
 }
 
 export interface CancelPolicy {

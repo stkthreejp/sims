@@ -1168,46 +1168,69 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
-    public async Task NonRenewal_UpdatesPolicyStatus()
+    public async Task NonRenewal_CreatesNoticeDetailWithoutClosingPolicy()
     {
         await using var db = CreateDb();
         var fixture = await SeedBoundPolicyAsync(db);
-        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
-        var nonRenewedDate = new DateOnly(2026, 12, 31);
+        var template = new DocumentTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Commercial Non-Renewal Notice - Sample",
+            EntityType = TemplateEntityType.Policy,
+            Kind = DocumentTemplateKind.Document,
+            HtmlContent = "<p>{{policy.policyNumber}}</p>",
+            CreatedById = fixture.UserId,
+            CreatedBy = fixture.Policy.BoundQuote.CreatedBy,
+            IsActive = true,
+        };
+        db.Add(template);
+        await db.SaveChangesAsync();
+        var documents = new RecordingDocumentGenerationService(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), documentGeneration: documents);
 
         var result = await policyService.NonRenewAsync(fixture.Policy.Id, new NonRenewPolicyDto
         {
-            NonRenewedDate = nonRenewedDate,
+            NonRenewedDate = new DateOnly(2026, 12, 31),
             Reason = "Carrier appetite change",
+            NoticeMailingDate = new DateOnly(2026, 11, 1),
+            NoticeRequirementDays = 45,
+            MailingDays = 3,
+            Method = "Certified Mail",
+            NoticeTemplateId = template.Id,
         }, UserAccessScope.All(fixture.UserId));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(PolicyStatus.NonRenewed, fixture.Policy.Status);
-        Assert.Equal(nonRenewedDate, fixture.Policy.NonRenewedDate);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Null(fixture.Policy.NonRenewedDate);
         var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
-        Assert.Equal(PolicyTransactionStatus.Completed, transaction.Status);
-        Assert.Equal(nonRenewedDate, transaction.EffectiveDate);
+        Assert.Equal(PolicyTransactionStatus.NoticeSent, transaction.Status);
+        Assert.Equal(new DateOnly(2026, 12, 31), transaction.EffectiveDate);
         Assert.Equal("Carrier appetite change", transaction.ReasonText);
         Assert.Equal(fixture.Policy.BoundQuoteId, transaction.SourceQuoteId);
         Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumBefore);
         Assert.Equal(fixture.Policy.TotalPremium, transaction.NewTotalPremium);
         Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumAfter);
-        var versions = await db.Set<PolicyVersion>()
-            .Where(v => v.PolicyId == fixture.Policy.Id)
-            .OrderBy(v => v.VersionNumber)
-            .ToListAsync();
-        Assert.Equal(2, versions.Count);
-        Assert.Equal(PolicyStatus.Active, versions[0].Status);
-        Assert.Equal(PolicyStatus.NonRenewed, versions[1].Status);
-        Assert.Equal(versions[0].Id, versions[1].PriorPolicyVersionId);
-        Assert.Equal(versions[0].Id, transaction.PriorPolicyVersionId);
-        Assert.Equal(versions[1].Id, transaction.ResultingPolicyVersionId);
+
+        var detail = await db.Set<PolicyNonRenewalDetail>().SingleAsync(d => d.PolicyTransactionId == transaction.Id);
+        Assert.Equal("Carrier appetite change", detail.Reason);
+        Assert.Equal(new DateOnly(2026, 11, 1), detail.NoticeMailingDate);
+        Assert.Equal(45, detail.NoticeRequirementDays);
+        Assert.Equal(3, detail.MailingDays);
+        Assert.Equal(new DateOnly(2026, 12, 31), detail.NonRenewalEffectiveDate);
+        Assert.Equal("Certified Mail", detail.Method);
+        Assert.Equal(template.Id, detail.NoticeTemplateId);
+        Assert.Equal(template.Id, documents.GeneratedTemplateId);
+        Assert.Equal(fixture.Policy.Id, documents.GeneratedPolicyId);
+        Assert.Equal(transaction.Id, documents.GeneratedPolicyTransactionId);
+        var notice = await db.Set<Attachment>().SingleAsync(a => a.PolicyTransactionId == transaction.Id);
+        Assert.Equal(DocumentType.CancellationNonRenewal, notice.DocumentType);
+
         var history = await db.Set<PolicyTransactionStatusHistory>()
             .Where(h => h.PolicyTransactionId == transaction.Id)
             .OrderBy(h => h.ChangedAt)
             .ToListAsync();
         Assert.Equal(
-            new[] { "policy.transaction.created", "policy.transaction.completed" },
+            new[] { "policy.transaction.created", "policy.transaction.notice_sent" },
             history.Select(h => h.EventName).ToArray());
     }
 

@@ -98,6 +98,7 @@ public class PolicyTransactionDto
     public string? CancellationReason { get; set; }
     public string? CancellationMethod { get; set; }
     public PolicyCancellationDetailDto? CancellationDetail { get; set; }
+    public PolicyNonRenewalDetailDto? NonRenewalDetail { get; set; }
     public IReadOnlyList<CancellationComplianceChecklistItemDto> CancellationComplianceChecklist { get; set; } = [];
     public string? CancellationLegalRequirementSnapshotJson { get; set; }
     public decimal? PremiumBefore { get; set; }
@@ -127,6 +128,18 @@ public class PolicyCancellationDetailDto
     public int NoticeRequirementDays { get; set; }
     public int MailingDays { get; set; }
     public DateOnly CancellationEffectiveDate { get; set; }
+    public string Method { get; set; } = string.Empty;
+    public Guid? NoticeTemplateId { get; set; }
+    public string? NoticeTemplateName { get; set; }
+}
+
+public class PolicyNonRenewalDetailDto
+{
+    public string Reason { get; set; } = string.Empty;
+    public DateOnly NoticeMailingDate { get; set; }
+    public int NoticeRequirementDays { get; set; }
+    public int MailingDays { get; set; }
+    public DateOnly NonRenewalEffectiveDate { get; set; }
     public string Method { get; set; } = string.Empty;
     public Guid? NoticeTemplateId { get; set; }
     public string? NoticeTemplateName { get; set; }
@@ -261,6 +274,11 @@ public class NonRenewPolicyDto
 {
     public DateOnly NonRenewedDate { get; set; }
     public string? Reason { get; set; }
+    public DateOnly NoticeMailingDate { get; set; }
+    public int NoticeRequirementDays { get; set; }
+    public int MailingDays { get; set; }
+    public string Method { get; set; } = "Written Notice";
+    public Guid? NoticeTemplateId { get; set; }
 }
 
 public class CancelPolicyDto

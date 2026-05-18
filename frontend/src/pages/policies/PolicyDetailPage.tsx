@@ -143,13 +143,21 @@ export function PolicyDetailPage() {
   })
 
   const nonRenewMutation = useMutation({
-    mutationFn: (data: { nonRenewedDate: string; reason?: string }) => policiesApi.nonRenew(id!, data),
+    mutationFn: (data: {
+      nonRenewedDate: string
+      reason?: string
+      noticeMailingDate: string
+      noticeRequirementDays: number
+      mailingDays: number
+      method: string
+      noticeTemplateId?: string
+    }) => policiesApi.nonRenew(id!, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', id] })
       setActionModal(null)
-      toast.success('Policy marked non-renewed')
+      toast.success('Non-renewal notice issued')
     },
-    onError: () => toast.error('Policy could not be non-renewed'),
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Non-renewal notice could not be issued'),
   })
 
   const issuePolicyMutation = useMutation({
@@ -310,6 +318,7 @@ export function PolicyDetailPage() {
         <NonRenewPolicyModal
           policy={policy}
           guidance={nonRenewalGuidance}
+          templates={policyDocumentTemplates}
           saving={nonRenewMutation.isPending}
           onClose={() => setActionModal(null)}
           onSave={(data) => nonRenewMutation.mutate(data)}
@@ -842,6 +851,7 @@ function TransactionArtifactDetails({
     { id: 'Communications', count: artifacts.communications.length },
     { id: 'Accounting', count: artifacts.invoices.length },
     ...(transaction.transactionType === 'Cancellation' ? [{ id: 'Cancellation', count: transaction.cancellationDetail ? 1 : 0 }] : []),
+    ...(transaction.transactionType === 'NonRenewal' ? [{ id: 'Non-Renewal', count: transaction.nonRenewalDetail ? 1 : 0 }] : []),
     { id: 'Compliance', count: artifacts.complianceChecklists.reduce((sum, checklist) => sum + checklist.items.length, 0) },
     { id: 'Tasks', count: artifacts.tasks.length },
     { id: 'Approvals', count: artifacts.approvals.length },
@@ -951,10 +961,26 @@ function TransactionArtifactDetails({
             />
           )}
 
+          {activeSection === 'Non-Renewal' && (
+            <NonRenewalSummary
+              transaction={transaction}
+              documents={artifacts.documents.filter((doc) => doc.documentType === 'CancellationNonRenewal' || doc.documentType === 'ProofOfNotice')}
+              canUploadProof={canUploadProof}
+              proofUploading={proofUpload.isPending}
+              onUploadProof={(file) => proofUpload.mutate(file)}
+            />
+          )}
+
           {activeSection === 'Compliance' && (
             <div className="space-y-3">
               {transaction.transactionType === 'Cancellation' && (
                 <CancellationSummary
+                  transaction={transaction}
+                  documents={artifacts.documents.filter((doc) => doc.documentType === 'CancellationNonRenewal' || doc.documentType === 'ProofOfNotice')}
+                />
+              )}
+              {transaction.transactionType === 'NonRenewal' && (
+                <NonRenewalSummary
                   transaction={transaction}
                   documents={artifacts.documents.filter((doc) => doc.documentType === 'CancellationNonRenewal' || doc.documentType === 'ProofOfNotice')}
                 />
@@ -1101,6 +1127,109 @@ function CancellationSummary({
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notice Documents</div>
           {[...noticeDocuments, ...proofDocuments].map((doc) => (
             <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-red-100 bg-white/80 px-2.5 py-2 text-xs">
+              <div className="min-w-0">
+                <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
+                <div className="text-slate-500">{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
+              </div>
+              <button
+                type="button"
+                className="sims-icon-btn shrink-0"
+                disabled={downloadingId === doc.id}
+                onClick={() => downloadDocument(doc)}
+                title="Download"
+              >
+                {downloadingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {transaction.notes && <p className="mt-2 text-xs text-slate-600">{transaction.notes}</p>}
+    </div>
+  )
+}
+
+function NonRenewalSummary({
+  transaction,
+  documents = [],
+  canUploadProof = false,
+  proofUploading = false,
+  onUploadProof,
+}: {
+  transaction: PolicyTransaction
+  documents?: Attachment[]
+  canUploadProof?: boolean
+  proofUploading?: boolean
+  onUploadProof?: (file: File) => void
+}) {
+  const detail = transaction.nonRenewalDetail
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const noticeDocuments = documents.filter((doc) => doc.documentType === 'CancellationNonRenewal')
+  const proofDocuments = documents.filter((doc) => doc.documentType === 'ProofOfNotice')
+  const hasProof = proofDocuments.length > 0
+
+  const downloadDocument = async (attachment: Attachment) => {
+    setDownloadingId(attachment.id)
+    try {
+      const url = await attachmentsApi.getDownloadUrl(attachment.id)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = attachment.fileName
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch {
+      toast.error('Failed to get download link')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  return (
+    <div className="rounded border border-orange-100 bg-orange-50/40 px-3 py-2 text-slate-700">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-semibold text-slate-900">Non-Renewal Notice Detail</div>
+        <span className={`sd-pill ${hasProof ? 'bound' : 'warning'}`}>
+          {hasProof ? 'Proof Filed' : 'Proof Not Filed'}
+        </span>
+      </div>
+      <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
+        <div><span className="text-slate-500">Reason:</span> {detail?.reason || transaction.reasonText || 'Not recorded'}</div>
+        <div><span className="text-slate-500">Mailing Date:</span> {formatDate(detail?.noticeMailingDate ?? null)}</div>
+        <div><span className="text-slate-500">Notice Days:</span> {detail ? `${detail.noticeRequirementDays} + ${detail.mailingDays} mailing` : '-'}</div>
+        <div><span className="text-slate-500">Non-Renewal Date:</span> {formatDate(detail?.nonRenewalEffectiveDate ?? transaction.effectiveDate)}</div>
+        <div><span className="text-slate-500">Method:</span> {detail?.method || 'Not recorded'}</div>
+        <div><span className="text-slate-500">Template:</span> {detail?.noticeTemplateName || (detail?.noticeTemplateId ? 'Selected template' : 'Default or not recorded')}</div>
+        <div><span className="text-slate-500">Proof:</span> {hasProof ? `${proofDocuments.length} document${proofDocuments.length === 1 ? '' : 's'} filed` : 'Not filed'}</div>
+      </div>
+      {!hasProof && (
+        <p className="mt-2 text-xs text-slate-500">Proof of notice is tracked here when applicable, but it is not required to issue the notice.</p>
+      )}
+      {canUploadProof && onUploadProof && (
+        <div className="mt-3">
+          <label className="sd-btn outline xs cursor-pointer">
+            {proofUploading ? 'Uploading...' : 'Upload proof'}
+            <input
+              type="file"
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+              disabled={proofUploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.currentTarget.value = ''
+                if (file) onUploadProof(file)
+              }}
+            />
+          </label>
+        </div>
+      )}
+      {documents.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notice Documents</div>
+          {[...noticeDocuments, ...proofDocuments].map((doc) => (
+            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-orange-100 bg-white/80 px-2.5 py-2 text-xs">
               <div className="min-w-0">
                 <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
                 <div className="text-slate-500">{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
@@ -1429,38 +1558,104 @@ function CancelPolicyModal({
 function NonRenewPolicyModal({
   policy,
   guidance,
+  templates,
   saving,
   onClose,
   onSave,
 }: {
   policy: Policy
   guidance?: LegalComplianceGuidance
+  templates: DocumentTemplateListItem[]
   saving: boolean
   onClose: () => void
-  onSave: (data: { nonRenewedDate: string; reason?: string }) => void
+  onSave: (data: {
+    nonRenewedDate: string
+    reason?: string
+    noticeMailingDate: string
+    noticeRequirementDays: number
+    mailingDays: number
+    method: string
+    noticeTemplateId?: string
+  }) => void
 }) {
   const [nonRenewedDate, setNonRenewedDate] = useState(toDateInput(policy.expirationDate))
+  const [noticeMailingDate, setNoticeMailingDate] = useState(toDateInput(new Date().toISOString()))
+  const [noticeRequirementDays, setNoticeRequirementDays] = useState('45')
+  const [mailingDays, setMailingDays] = useState('0')
+  const [method, setMethod] = useState('Written Notice')
+  const nonRenewalTemplates = templates.filter((template) => /non.?renew/i.test(template.name))
+  const [noticeTemplateId, setNoticeTemplateId] = useState('')
   const [reason, setReason] = useState('')
+  const calculatedNonRenewalDate = addDaysToDateInput(
+    noticeMailingDate,
+    Number(noticeRequirementDays || 0) + Number(mailingDays || 0)
+  )
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
     onSave({
       nonRenewedDate,
       reason: reason.trim() || undefined,
+      noticeMailingDate,
+      noticeRequirementDays: Number(noticeRequirementDays),
+      mailingDays: Number(mailingDays || 0),
+      method,
+      noticeTemplateId: noticeTemplateId || undefined,
     })
   }
 
   return (
-    <ActionModal title="Non-Renew Policy" onClose={onClose} wide>
+    <ActionModal title="Issue Non-Renewal Notice" onClose={onClose} wide>
       <form onSubmit={submit} className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
         <div className="space-y-4">
-          <Field label="Non-Renewed Date">
+          <Field label="Non-Renewal Effective Date">
             <input type="date" required value={nonRenewedDate} onChange={(e) => setNonRenewedDate(e.target.value)} className={inputClass} />
+          </Field>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Field label="Notice Mailing Date">
+              <input type="date" required value={noticeMailingDate} onChange={(e) => setNoticeMailingDate(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Notice Days">
+              <input type="number" min={1} required value={noticeRequirementDays} onChange={(e) => setNoticeRequirementDays(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Mailing Days">
+              <input type="number" min={0} required value={mailingDays} onChange={(e) => setMailingDays(e.target.value)} className={inputClass} />
+            </Field>
+          </div>
+          <Field label="Calculated Notice Date">
+            <input type="date" readOnly value={calculatedNonRenewalDate} className={inputClass} />
+          </Field>
+          <Field label="Notice Method">
+            <select value={method} onChange={(e) => setMethod(e.target.value)} className={selectClass}>
+              <option>Written Notice</option>
+              <option>Certified Mail</option>
+              <option>First-Class Mail</option>
+              <option>Electronic Notice</option>
+              <option>Carrier Issued</option>
+            </select>
+          </Field>
+          <Field label="Notice Template">
+            <select value={noticeTemplateId} onChange={(e) => setNoticeTemplateId(e.target.value)} className={selectClass}>
+              <option value="">Use default non-renewal template</option>
+              {nonRenewalTemplates.map((template) => (
+                <option key={template.id} value={template.id}>{template.name}</option>
+              ))}
+            </select>
           </Field>
           <Field label="Reason">
             <textarea rows={5} value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
           </Field>
-          <ModalActions saving={saving} onClose={onClose} submitLabel="Mark Non-Renewed" />
+          <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+            <div className="font-semibold text-slate-900">Notice Preview</div>
+            <div className="mt-2 grid gap-1 text-xs text-slate-600">
+              <div><span className="font-medium">Mailing date:</span> {formatDate(noticeMailingDate)}</div>
+              <div><span className="font-medium">Notice days:</span> {noticeRequirementDays || '0'} + {mailingDays || '0'} mailing days</div>
+              <div><span className="font-medium">Calculated date:</span> {formatDate(calculatedNonRenewalDate)}</div>
+              <div><span className="font-medium">Non-renewal date:</span> {formatDate(nonRenewedDate)}</div>
+              <div><span className="font-medium">Template:</span> {nonRenewalTemplates.find((template) => template.id === noticeTemplateId)?.name ?? 'Default non-renewal template'}</div>
+            </div>
+          </div>
+          <ModalActions saving={saving} onClose={onClose} submitLabel="Issue Notice" />
         </div>
         <LegalGuidancePanel guidance={guidance} mode="Non-renewal" />
       </form>

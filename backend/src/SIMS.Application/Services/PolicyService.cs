@@ -101,6 +101,8 @@ public class PolicyService : IPolicyService
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
             .Include(p => p.Transactions).ThenInclude(t => t.CancellationDetail)
                 .ThenInclude(d => d!.NoticeTemplate)
+            .Include(p => p.Transactions).ThenInclude(t => t.NonRenewalDetail)
+                .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Versions)
             .Where(p => p.Id == id && !p.IsDeleted)
             .ForAccessScope(access)
@@ -116,6 +118,8 @@ public class PolicyService : IPolicyService
         var policy = await Db.Set<Policy>()
             .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
             .Include(p => p.Transactions).ThenInclude(t => t.CancellationDetail)
+                .ThenInclude(d => d!.NoticeTemplate)
+            .Include(p => p.Transactions).ThenInclude(t => t.NonRenewalDetail)
                 .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Versions)
             .Where(p => p.Id == policyId && !p.IsDeleted)
@@ -1027,23 +1031,24 @@ public class PolicyService : IPolicyService
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can be non-renewed.");
 
-        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
-        policy.Status = PolicyStatus.NonRenewed;
-        policy.NonRenewedDate = dto.NonRenewedDate;
-        policy.UpdatedAt = DateTime.UtcNow;
+        if (dto.NoticeRequirementDays <= 0)
+            return Result<PolicyDto>.Failure("INVALID_NOTICE_DAYS", "Notice requirement days must be greater than zero.");
+        if (dto.MailingDays < 0)
+            return Result<PolicyDto>.Failure("INVALID_MAILING_DAYS", "Mailing days cannot be negative.");
+        if (dto.NonRenewedDate < policy.EffectiveDate || dto.NonRenewedDate > policy.ExpirationDate)
+            return Result<PolicyDto>.Failure("INVALID_DATE", "Non-renewal date must be within the policy term.");
+
         var transaction = new PolicyTransaction
         {
             PolicyId = policy.Id,
             Policy = policy,
             TransactionType = TransactionType.NonRenewal,
-            Status = PolicyTransactionStatus.Completed,
+            Status = PolicyTransactionStatus.NoticeSent,
             TransactionNumber = await GenerateTransactionNumberAsync(),
             EffectiveDate = dto.NonRenewedDate,
             SourceQuoteId = policy.BoundQuoteId,
             RequestedById = access.UserId,
             RequestedAt = DateTime.UtcNow,
-            CompletedById = access.UserId,
-            CompletedAt = DateTime.UtcNow,
             ReasonText = dto.Reason?.Trim(),
             PremiumBefore = policy.TotalPremium,
             PremiumChange = 0m,
@@ -1053,10 +1058,39 @@ public class PolicyService : IPolicyService
             ProcessedAt = DateTime.UtcNow,
             Notes = dto.Reason,
         };
+        var detail = new PolicyNonRenewalDetail
+        {
+            PolicyTransaction = transaction,
+            Reason = dto.Reason?.Trim() ?? string.Empty,
+            NoticeMailingDate = dto.NoticeMailingDate,
+            NoticeRequirementDays = dto.NoticeRequirementDays,
+            MailingDays = dto.MailingDays,
+            NonRenewalEffectiveDate = dto.NonRenewedDate,
+            Method = string.IsNullOrWhiteSpace(dto.Method) ? "Written Notice" : dto.Method.Trim(),
+            NoticeTemplateId = dto.NoticeTemplateId,
+        };
+        transaction.NonRenewalDetail = detail;
         Db.Set<PolicyTransaction>().Add(transaction);
+        Db.Set<PolicyNonRenewalDetail>().Add(detail);
         await Db.SaveChangesAsync();
-        await _policyVersions.CreateVersionAsync(policy, transaction, priorVersion, access.UserId);
-        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Non-renewal transaction completed.");
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Non-renewal notice issued.");
+
+        var noticeTemplateId = dto.NoticeTemplateId ?? await ResolveDefaultNonRenewalNoticeTemplateIdAsync();
+        if (noticeTemplateId.HasValue)
+        {
+            var documents = (IDocumentGenerationService?)_sp.GetService(typeof(IDocumentGenerationService));
+            if (documents != null)
+            {
+                var documentResult = await documents.GenerateForPolicyTransactionAsync(
+                    noticeTemplateId.Value,
+                    policy.Id,
+                    transaction.Id,
+                    DocumentType.CancellationNonRenewal,
+                    access.UserId);
+                if (!documentResult.IsSuccess)
+                    return Result<PolicyDto>.Failure(documentResult.ErrorCode ?? "NOTICE_GENERATION_FAILED", documentResult.ErrorMessage ?? "Non-renewal notice could not be generated.");
+            }
+        }
 
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
@@ -1148,6 +1182,19 @@ public class PolicyService : IPolicyService
                 && t.EntityType == TemplateEntityType.Policy
                 && t.Kind != DocumentTemplateKind.Email
                 && (EF.Functions.Like(t.Name, "%Cancellation%") || EF.Functions.Like(t.Name, "%Cancel%")))
+            .OrderBy(t => t.Name)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task<Guid?> ResolveDefaultNonRenewalNoticeTemplateIdAsync()
+    {
+        return await Db.Set<DocumentTemplate>()
+            .Where(t => !t.IsDeleted
+                && t.IsActive
+                && t.EntityType == TemplateEntityType.Policy
+                && t.Kind != DocumentTemplateKind.Email
+                && (EF.Functions.Like(t.Name, "%Non-Renewal%") || EF.Functions.Like(t.Name, "%NonRenewal%") || EF.Functions.Like(t.Name, "%Non-Renew%")))
             .OrderBy(t => t.Name)
             .Select(t => (Guid?)t.Id)
             .FirstOrDefaultAsync();
@@ -1341,6 +1388,17 @@ public class PolicyService : IPolicyService
             Method = t.CancellationDetail.Method,
             NoticeTemplateId = t.CancellationDetail.NoticeTemplateId,
             NoticeTemplateName = t.CancellationDetail.NoticeTemplate?.Name,
+        },
+        NonRenewalDetail = t.NonRenewalDetail == null ? null : new PolicyNonRenewalDetailDto
+        {
+            Reason = t.NonRenewalDetail.Reason,
+            NoticeMailingDate = t.NonRenewalDetail.NoticeMailingDate,
+            NoticeRequirementDays = t.NonRenewalDetail.NoticeRequirementDays,
+            MailingDays = t.NonRenewalDetail.MailingDays,
+            NonRenewalEffectiveDate = t.NonRenewalDetail.NonRenewalEffectiveDate,
+            Method = t.NonRenewalDetail.Method,
+            NoticeTemplateId = t.NonRenewalDetail.NoticeTemplateId,
+            NoticeTemplateName = t.NonRenewalDetail.NoticeTemplate?.Name,
         },
         CancellationComplianceChecklist = DeserializeChecklist(t.CancellationComplianceChecklistJson),
         CancellationLegalRequirementSnapshotJson = t.CancellationLegalRequirementSnapshotJson,
