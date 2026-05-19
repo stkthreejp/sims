@@ -1168,6 +1168,91 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task Reinstatement_ActivePolicyFails()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.ReinstateAsync(fixture.Policy.Id, new ReinstatePolicyDto
+        {
+            ReinstatedDate = new DateOnly(2026, 7, 15),
+            Reason = "Payment received",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_STATUS", result.ErrorCode);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Empty(await db.Set<PolicyTransaction>().Where(t => t.TransactionType == TransactionType.Reinstatement).ToListAsync());
+    }
+
+    [Fact]
+    public async Task Reinstatement_CancelledPolicyRestoresActiveAndCreatesVersion()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var cancellation = await policyService.CancelAsync(fixture.Policy.Id, new CancelPolicyDto
+        {
+            CancelledDate = new DateOnly(2026, 7, 1),
+            Reason = "Non-payment",
+            Method = "Certified Mail",
+            PremiumChange = 0m,
+            ComplianceChecklist =
+            [
+                new CancellationComplianceChecklistItemDto
+                {
+                    Key = "notice",
+                    Label = "Notice sent",
+                    IsCompleted = true,
+                }
+            ],
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(cancellation.IsSuccess);
+
+        var result = await policyService.ReinstateAsync(fixture.Policy.Id, new ReinstatePolicyDto
+        {
+            ReinstatedDate = new DateOnly(2026, 7, 15),
+            Reason = "Payment received",
+            Notes = "Producer confirmed payment.",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Null(fixture.Policy.CancelledDate);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.Reinstatement);
+        Assert.Equal(PolicyTransactionStatus.Issued, transaction.Status);
+        Assert.Equal(new DateOnly(2026, 7, 15), transaction.EffectiveDate);
+        Assert.Equal("Payment received", transaction.ReasonText);
+        Assert.Equal(fixture.Policy.TotalPremium, transaction.PremiumBefore);
+        Assert.Equal(0m, transaction.PremiumChange);
+        Assert.Equal(fixture.Policy.TotalPremium, transaction.NewTotalPremium);
+        var detail = await db.Set<PolicyReinstatementDetail>().SingleAsync(d => d.PolicyTransactionId == transaction.Id);
+        Assert.Equal(new DateOnly(2026, 7, 15), detail.ReinstatementEffectiveDate);
+        Assert.Equal("Payment received", detail.Reason);
+        Assert.Equal("Producer confirmed payment.", detail.Notes);
+        Assert.NotNull(transaction.PriorPolicyVersionId);
+        Assert.NotNull(transaction.ResultingPolicyVersionId);
+        var versions = await db.Set<PolicyVersion>()
+            .Where(v => v.PolicyId == fixture.Policy.Id)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(3, versions.Count);
+        Assert.Equal(PolicyStatus.Active, versions[0].Status);
+        Assert.Equal(PolicyStatus.Cancelled, versions[1].Status);
+        Assert.Equal(PolicyStatus.Active, versions[2].Status);
+        Assert.Equal(versions[1].Id, transaction.PriorPolicyVersionId);
+        Assert.Equal(versions[2].Id, transaction.ResultingPolicyVersionId);
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.issued" },
+            history.Select(h => h.EventName).ToArray());
+    }
+
+    [Fact]
     public async Task NonRenewal_CreatesNoticeDetailWithoutClosingPolicy()
     {
         await using var db = CreateDb();

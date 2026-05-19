@@ -103,6 +103,7 @@ public class PolicyService : IPolicyService
                 .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Transactions).ThenInclude(t => t.NonRenewalDetail)
                 .ThenInclude(d => d!.NoticeTemplate)
+            .Include(p => p.Transactions).ThenInclude(t => t.ReinstatementDetail)
             .Include(p => p.Versions)
             .Where(p => p.Id == id && !p.IsDeleted)
             .ForAccessScope(access)
@@ -121,6 +122,7 @@ public class PolicyService : IPolicyService
                 .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Transactions).ThenInclude(t => t.NonRenewalDetail)
                 .ThenInclude(d => d!.NoticeTemplate)
+            .Include(p => p.Transactions).ThenInclude(t => t.ReinstatementDetail)
             .Include(p => p.Versions)
             .Where(p => p.Id == policyId && !p.IsDeleted)
             .ForAccessScope(access)
@@ -1017,6 +1019,78 @@ public class PolicyService : IPolicyService
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
 
+    public async Task<Result<PolicyDto>> ReinstateAsync(Guid policyId, ReinstatePolicyDto dto, UserAccessScope access)
+    {
+        var db = Db;
+        var policy = await db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Transactions).ThenInclude(t => t.ReinstatementDetail)
+            .Include(p => p.Versions)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Cancelled)
+            return Result<PolicyDto>.Failure("INVALID_STATUS", "Only cancelled policies can be reinstated.");
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return Result<PolicyDto>.Failure("REASON_REQUIRED", "Reinstatement reason is required.");
+        if (dto.ReinstatedDate < policy.EffectiveDate || dto.ReinstatedDate > policy.ExpirationDate)
+            return Result<PolicyDto>.Failure("INVALID_DATE", "Reinstatement date must be within the policy term.");
+        if (policy.CancelledDate.HasValue && dto.ReinstatedDate < policy.CancelledDate.Value)
+            return Result<PolicyDto>.Failure("INVALID_DATE", "Reinstatement date cannot be before the cancellation date.");
+
+        await using var dbTransaction = await db.Database.BeginTransactionAsync();
+
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
+        var premiumBefore = policy.TotalPremium;
+        policy.Status = PolicyStatus.Active;
+        policy.CancelledDate = null;
+        policy.UpdatedAt = DateTime.UtcNow;
+
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            Policy = policy,
+            TransactionType = TransactionType.Reinstatement,
+            Status = PolicyTransactionStatus.Issued,
+            TransactionNumber = await GenerateTransactionNumberAsync(),
+            EffectiveDate = dto.ReinstatedDate,
+            SourceQuoteId = policy.BoundQuoteId,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            IssuedById = access.UserId,
+            IssuedAt = DateTime.UtcNow,
+            ReasonText = dto.Reason.Trim(),
+            PremiumBefore = premiumBefore,
+            PremiumChange = 0m,
+            NewTotalPremium = policy.TotalPremium,
+            PremiumAfter = policy.TotalPremium,
+            ProcessedById = access.UserId,
+            ProcessedAt = DateTime.UtcNow,
+            Notes = dto.Notes,
+        };
+        var detail = new PolicyReinstatementDetail
+        {
+            PolicyTransaction = transaction,
+            ReinstatementEffectiveDate = dto.ReinstatedDate,
+            Reason = dto.Reason.Trim(),
+            Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim(),
+        };
+        transaction.ReinstatementDetail = detail;
+
+        db.Set<PolicyTransaction>().Add(transaction);
+        db.Set<PolicyReinstatementDetail>().Add(detail);
+        await db.SaveChangesAsync();
+        await _policyVersions.CreateVersionAsync(policy, transaction, priorVersion, access.UserId);
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Reinstatement transaction issued.");
+        await dbTransaction.CommitAsync();
+
+        return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
     public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
@@ -1474,6 +1548,12 @@ public class PolicyService : IPolicyService
             Method = t.NonRenewalDetail.Method,
             NoticeTemplateId = t.NonRenewalDetail.NoticeTemplateId,
             NoticeTemplateName = t.NonRenewalDetail.NoticeTemplate?.Name,
+        },
+        ReinstatementDetail = t.ReinstatementDetail == null ? null : new PolicyReinstatementDetailDto
+        {
+            ReinstatementEffectiveDate = t.ReinstatementDetail.ReinstatementEffectiveDate,
+            Reason = t.ReinstatementDetail.Reason,
+            Notes = t.ReinstatementDetail.Notes,
         },
         CancellationComplianceChecklist = DeserializeChecklist(t.CancellationComplianceChecklistJson),
         CancellationLegalRequirementSnapshotJson = t.CancellationLegalRequirementSnapshotJson,

@@ -179,6 +179,14 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("{id:guid}/reinstate")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public async Task<IActionResult> Reinstate(Guid id, [FromBody] ReinstatePolicyDto dto)
+    {
+        var result = await _policies.ReinstateAsync(id, dto, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // --- Non-renewal ---
 
     [HttpPost("{id:guid}/non-renew")]

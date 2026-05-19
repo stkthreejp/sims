@@ -99,6 +99,7 @@ public class PolicyTransactionDto
     public string? CancellationMethod { get; set; }
     public PolicyCancellationDetailDto? CancellationDetail { get; set; }
     public PolicyNonRenewalDetailDto? NonRenewalDetail { get; set; }
+    public PolicyReinstatementDetailDto? ReinstatementDetail { get; set; }
     public IReadOnlyList<CancellationComplianceChecklistItemDto> CancellationComplianceChecklist { get; set; } = [];
     public string? CancellationLegalRequirementSnapshotJson { get; set; }
     public decimal? PremiumBefore { get; set; }
@@ -143,6 +144,13 @@ public class PolicyNonRenewalDetailDto
     public string Method { get; set; } = string.Empty;
     public Guid? NoticeTemplateId { get; set; }
     public string? NoticeTemplateName { get; set; }
+}
+
+public class PolicyReinstatementDetailDto
+{
+    public DateOnly ReinstatementEffectiveDate { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string? Notes { get; set; }
 }
 
 public class PolicyTransactionArtifactsDto
@@ -281,6 +289,13 @@ public class NonRenewPolicyDto
     public Guid? NoticeTemplateId { get; set; }
     public IReadOnlyList<CancellationComplianceChecklistItemDto> ComplianceChecklist { get; set; } = [];
     public Guid[] LegalRequirementSectionIds { get; set; } = [];
+}
+
+public class ReinstatePolicyDto
+{
+    public DateOnly ReinstatedDate { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string? Notes { get; set; }
 }
 
 public class CancelPolicyDto

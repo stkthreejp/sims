@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Ban, Download, FileSignature, FileX2, Loader2, Pin, PinOff, Pencil, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
+import { AlertTriangle, Ban, Download, FileSignature, FileX2, Loader2, Pin, PinOff, Pencil, RotateCcw, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
 import { attachmentsApi } from '@/api/attachments.api'
@@ -9,7 +9,7 @@ import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
-import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
+import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import type { Attachment } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
@@ -39,7 +39,7 @@ export function PolicyDetailPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [editSubject, setEditSubject] = useState('')
   const [editBody, setEditBody] = useState('')
-  const [actionModal, setActionModal] = useState<'endorse' | 'cancel' | 'nonRenew' | null>(null)
+  const [actionModal, setActionModal] = useState<'endorse' | 'cancel' | 'nonRenew' | 'reinstate' | null>(null)
 
   const { data: policy, isLoading } = useQuery({
     queryKey: ['policies', id],
@@ -152,6 +152,16 @@ export function PolicyDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Non-renewal notice could not be issued'),
   })
 
+  const reinstateMutation = useMutation({
+    mutationFn: (data: ReinstatePolicy) => policiesApi.reinstate(id!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', id] })
+      setActionModal(null)
+      toast.success('Policy reinstated')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be reinstated'),
+  })
+
   const issuePolicyMutation = useMutation({
     mutationFn: () => policiesApi.issue(id!, { issuedDate: new Date().toISOString().slice(0, 10) }),
     onSuccess: () => {
@@ -247,6 +257,14 @@ export function PolicyDetailPage() {
               </button>
             </>
           )}
+          {policy.status === 'Cancelled' && canCancelPolicies && (
+            <button
+              onClick={() => setActionModal('reinstate')}
+              className="sd-btn primary"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Reinstate
+            </button>
+          )}
           {canVoidTestBind && (
             <button
               onClick={() => {
@@ -314,6 +332,15 @@ export function PolicyDetailPage() {
           saving={nonRenewMutation.isPending}
           onClose={() => setActionModal(null)}
           onSave={(data) => nonRenewMutation.mutate(data)}
+        />
+      )}
+
+      {actionModal === 'reinstate' && (
+        <ReinstatePolicyModal
+          policy={policy}
+          saving={reinstateMutation.isPending}
+          onClose={() => setActionModal(null)}
+          onSave={(data) => reinstateMutation.mutate(data)}
         />
       )}
 
@@ -1409,6 +1436,56 @@ function EndorsePolicyModal({
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
         </Field>
         <ModalActions saving={saving} onClose={onClose} submitLabel="Add Endorsement" />
+      </form>
+    </ActionModal>
+  )
+}
+
+function ReinstatePolicyModal({
+  policy,
+  saving,
+  onClose,
+  onSave,
+}: {
+  policy: Policy
+  saving: boolean
+  onClose: () => void
+  onSave: (data: ReinstatePolicy) => void
+}) {
+  const [reinstatedDate, setReinstatedDate] = useState(toDateInput(new Date().toISOString()))
+  const [reason, setReason] = useState('')
+  const [notes, setNotes] = useState('')
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    onSave({
+      reinstatedDate,
+      reason: reason.trim(),
+      notes: notes.trim() || undefined,
+    })
+  }
+
+  return (
+    <ActionModal title="Reinstate Policy" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Reinstatement Date">
+          <input type="date" required value={reinstatedDate} onChange={(e) => setReinstatedDate(e.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Reason">
+          <textarea rows={3} required value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
+        </Field>
+        <Field label="Notes">
+          <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
+        </Field>
+        <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+          <div className="font-semibold text-slate-900">Reinstatement Preview</div>
+          <div className="mt-2 grid gap-1 text-xs text-slate-600">
+            <div><span className="font-medium">Policy:</span> {policy.policyNumber}</div>
+            <div><span className="font-medium">Current status:</span> {POLICY_STATUS_LABELS[policy.status]}</div>
+            <div><span className="font-medium">Reinstatement date:</span> {formatDate(reinstatedDate)}</div>
+          </div>
+        </div>
+        <ModalActions saving={saving} disabled={!reason.trim()} onClose={onClose} submitLabel="Reinstate" />
       </form>
     </ActionModal>
   )

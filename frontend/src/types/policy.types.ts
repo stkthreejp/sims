@@ -141,6 +141,7 @@ export interface PolicyTransaction {
   cancellationMethod: string | null
   cancellationDetail: PolicyCancellationDetail | null
   nonRenewalDetail: PolicyNonRenewalDetail | null
+  reinstatementDetail: PolicyReinstatementDetail | null
   cancellationComplianceChecklist: CancellationComplianceChecklistItem[]
   cancellationLegalRequirementSnapshotJson: string | null
   premiumBefore: number | null
@@ -196,6 +197,12 @@ export interface PolicyNonRenewalDetail {
   method: string
   noticeTemplateId: string | null
   noticeTemplateName: string | null
+}
+
+export interface PolicyReinstatementDetail {
+  reinstatementEffectiveDate: string
+  reason: string
+  notes: string | null
 }
 
 export interface PolicyTransactionArtifacts {
@@ -373,6 +380,12 @@ export interface CompleteCancellation {
 
 export interface CompleteNonRenewal {
   completedDate: string
+  notes?: string
+}
+
+export interface ReinstatePolicy {
+  reinstatedDate: string
+  reason: string
   notes?: string
 }
 
