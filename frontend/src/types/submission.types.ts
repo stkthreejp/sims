@@ -1,4 +1,6 @@
 export type SubmissionStatus = 'New' | 'InProgress' | 'Quoted' | 'Bound' | 'Declined' | 'Withdrawn'
+export type UnderwritingClearanceStatus = 'Clear' | 'Warning' | 'Blocked'
+export type UnderwritingClearanceCheckType = 'DuplicateSubmission' | 'ActivePolicyOverlap'
 
 export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
   New: 'New',
@@ -58,4 +60,18 @@ export interface SubmissionCreate {
 
 export interface SubmissionUpdate extends SubmissionCreate {
   status: SubmissionStatus
+}
+
+export interface UnderwritingClearanceResult {
+  checkType: UnderwritingClearanceCheckType
+  status: UnderwritingClearanceStatus
+  matchedRecordId: string | null
+  matchedRecordLabel: string | null
+  explanation: string
+}
+
+export interface UnderwritingClearanceEvaluation {
+  submissionId: string
+  overallStatus: UnderwritingClearanceStatus
+  results: UnderwritingClearanceResult[]
 }

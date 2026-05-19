@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Submission, SubmissionListItem, SubmissionCreate, SubmissionUpdate } from '@/types/submission.types'
+import type { Submission, SubmissionListItem, SubmissionCreate, SubmissionUpdate, UnderwritingClearanceEvaluation } from '@/types/submission.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const submissionsApi = {
@@ -11,6 +11,12 @@ export const submissionsApi = {
 
   getById: (id: string) =>
     apiClient.get<Submission>(`/submissions/${id}`).then((r) => r.data),
+
+  getClearance: (id: string) =>
+    apiClient.get<UnderwritingClearanceEvaluation>(`/submissions/${id}/clearance`).then((r) => r.data),
+
+  evaluateClearance: (id: string) =>
+    apiClient.post<UnderwritingClearanceEvaluation>(`/submissions/${id}/clearance/evaluate`).then((r) => r.data),
 
   create: (data: SubmissionCreate) =>
     apiClient.post<Submission>('/submissions', data).then((r) => r.data),

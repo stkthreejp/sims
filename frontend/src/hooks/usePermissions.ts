@@ -40,6 +40,7 @@ export function usePermissions() {
     canManageUsers: hasPermission('admin.users.manage'),
     canViewRoles: hasPermission('admin.roles.view'),
     canManageRoles: hasPermission('admin.roles.manage'),
+    canManageUnderwriting: hasPermission('underwriting.manage'),
 
     // Navigation sections (control sidebar visibility)
     canViewSubmissions: hasPermission('nav.submissions'),

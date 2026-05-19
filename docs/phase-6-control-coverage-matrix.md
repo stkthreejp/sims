@@ -51,9 +51,15 @@ Status values:
 - Added quote bind gate for blocked clearance results.
 - Added EF migration `AddUnderwritingClearanceResults`.
 
+## Third Implemented Slice
+
+- Added submission detail clearance panel for users with `underwriting.manage`.
+- Added manual clearance evaluation from the submission detail page.
+- Added quote bind messaging for blocked clearance results.
+- Added frontend clearance API client methods and types.
+
 ## Immediate Next Slice
 
 1. Add override permission and override audit fields for blocked clearance.
-2. Add submission detail UI panel for clearance status and evaluation.
-3. Add bind-block messaging in the quote UI.
-4. Start appetite result records after clearance UI is visible.
+2. Add appetite result records and required referral creation.
+3. Add bind/issue gates for unresolved required referrals.

@@ -19,7 +19,7 @@ import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS, GL_CLASS_CODE_OPTIONS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipment, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
-import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission } from '@/types/submission.types'
+import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission, type UnderwritingClearanceEvaluation, type UnderwritingClearanceStatus, type UnderwritingClearanceCheckType } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -149,12 +149,29 @@ function hasAutoExposureLine(linesOfBusiness: string[]) {
   )
 }
 
+const CLEARANCE_STATUS_LABELS: Record<UnderwritingClearanceStatus, string> = {
+  Clear: 'Clear',
+  Warning: 'Warning',
+  Blocked: 'Blocked',
+}
+
+const CLEARANCE_STATUS_PILL: Record<UnderwritingClearanceStatus, string> = {
+  Clear: 'bound',
+  Warning: 'quoted',
+  Blocked: 'declined',
+}
+
+const CLEARANCE_CHECK_LABELS: Record<UnderwritingClearanceCheckType, string> = {
+  DuplicateSubmission: 'Duplicate submission',
+  ActivePolicyOverlap: 'Active policy overlap',
+}
+
 export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
   const qc = useQueryClient()
-  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies } = usePermissions()
+  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies, canManageUnderwriting } = usePermissions()
 
   const extractionState = location.state as { extractionStatus?: string; emailId?: string } | null
   const [showExtractionBanner, setShowExtractionBanner] = useState(
@@ -220,6 +237,13 @@ export function SubmissionDetailPage() {
   const { data: submission, isLoading } = useQuery({
     queryKey: ['submissions', id],
     queryFn: () => submissionsApi.getById(id!),
+  })
+
+  const { data: clearance } = useQuery({
+    queryKey: ['submissions', id, 'clearance'],
+    queryFn: () => submissionsApi.getClearance(id!),
+    enabled: !!id && canManageUnderwriting,
+    retry: false,
   })
 
   const { data: quotes = [] } = useQuery({
@@ -484,6 +508,15 @@ export function SubmissionDetailPage() {
       toast.success('Submission updated')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to update submission'),
+  })
+
+  const evaluateClearanceMutation = useMutation({
+    mutationFn: () => submissionsApi.evaluateClearance(id!),
+    onSuccess: (result) => {
+      qc.setQueryData(['submissions', id, 'clearance'], result)
+      toast.success(result.overallStatus === 'Blocked' ? 'Clearance blocked' : 'Clearance evaluated')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to evaluate clearance'),
   })
 
   const createQuoteMutation = useMutation({
@@ -790,6 +823,57 @@ export function SubmissionDetailPage() {
       expirationDate: submissionForm.expirationDate || undefined,
       descriptionOfOperations: submissionForm.descriptionOfOperations || undefined,
     })
+  }
+
+  const renderClearancePanel = (value: UnderwritingClearanceEvaluation | undefined) => {
+    if (!canManageUnderwriting) return null
+
+    const status = value?.overallStatus
+    const results = value?.results ?? []
+
+    return (
+      <section className="sd-card" style={{ marginBottom: 14 }}>
+        <div className="sd-card-head">
+          <h3>Underwriting Clearance</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {status && <span className={`sd-pill ${CLEARANCE_STATUS_PILL[status]}`}>{CLEARANCE_STATUS_LABELS[status]}</span>}
+            <button
+              type="button"
+              className="sd-btn outline sm"
+              onClick={() => evaluateClearanceMutation.mutate()}
+              disabled={evaluateClearanceMutation.isPending}
+            >
+              <RefreshCw size={13} className={evaluateClearanceMutation.isPending ? 'animate-spin' : ''} />
+              {evaluateClearanceMutation.isPending ? 'Checking' : 'Evaluate'}
+            </button>
+          </div>
+        </div>
+        {results.length === 0 ? (
+          <div className="sd-card-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+            {status === 'Clear' ? 'No clearance conflicts found.' : 'No clearance review has been recorded.'}
+          </div>
+        ) : (
+          <div className="sd-card-body tight">
+            <div style={{ display: 'grid', gap: 1, background: 'var(--line-2)' }}>
+              {results.map((result) => (
+                <div key={`${result.checkType}-${result.matchedRecordId ?? result.matchedRecordLabel ?? 'none'}`} style={{ background: 'var(--surface)', padding: '10px 12px', display: 'grid', gridTemplateColumns: '180px 90px 1fr', gap: 12, alignItems: 'center' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>
+                    {CLEARANCE_CHECK_LABELS[result.checkType] ?? result.checkType}
+                  </div>
+                  <span className={`sd-pill ${CLEARANCE_STATUS_PILL[result.status]}`}>{CLEARANCE_STATUS_LABELS[result.status]}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{result.explanation}</div>
+                    {result.matchedRecordLabel && (
+                      <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>{result.matchedRecordLabel}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    )
   }
 
   // ── Shared quote list renderer ─────────────────────────────────────────────
@@ -1136,6 +1220,8 @@ export function SubmissionDetailPage() {
           <div className="v">{submission.agentName ?? <span style={{ color: 'var(--ink-4)' }}>—</span>}{submission.agencyName && <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}> · {submission.agencyName}</span>}</div>
         </div>
       </div>
+
+      {renderClearancePanel(clearance)}
 
       {/* Metrics */}
       <div className="sd-metrics">

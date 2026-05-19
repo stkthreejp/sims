@@ -609,7 +609,14 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
         navigate(`/policies/${bound.boundPolicyId}`)
       }
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Bind failed'),
+    onError: (err: any) => {
+      const data = err?.response?.data
+      if (data?.errorCode === 'CLEARANCE_BLOCKED') {
+        toast.error('Underwriting clearance is blocked. Open the submission and resolve the clearance result before binding.')
+        return
+      }
+      toast.error(data?.errorMessage ?? 'Bind failed')
+    },
   })
 
   return (
