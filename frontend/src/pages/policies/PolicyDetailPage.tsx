@@ -9,7 +9,7 @@ import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
-import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
+import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import type { Attachment } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
@@ -143,15 +143,7 @@ export function PolicyDetailPage() {
   })
 
   const nonRenewMutation = useMutation({
-    mutationFn: (data: {
-      nonRenewedDate: string
-      reason?: string
-      noticeMailingDate: string
-      noticeRequirementDays: number
-      mailingDays: number
-      method: string
-      noticeTemplateId?: string
-    }) => policiesApi.nonRenew(id!, data),
+    mutationFn: (data: NonRenewPolicy) => policiesApi.nonRenew(id!, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', id] })
       setActionModal(null)
@@ -1589,15 +1581,7 @@ function NonRenewPolicyModal({
   templates: DocumentTemplateListItem[]
   saving: boolean
   onClose: () => void
-  onSave: (data: {
-    nonRenewedDate: string
-    reason?: string
-    noticeMailingDate: string
-    noticeRequirementDays: number
-    mailingDays: number
-    method: string
-    noticeTemplateId?: string
-  }) => void
+  onSave: (data: NonRenewPolicy) => void
 }) {
   const [nonRenewedDate, setNonRenewedDate] = useState(toDateInput(policy.expirationDate))
   const [noticeMailingDate, setNoticeMailingDate] = useState(toDateInput(new Date().toISOString()))
@@ -1607,10 +1591,16 @@ function NonRenewPolicyModal({
   const nonRenewalTemplates = templates.filter((template) => /non.?renew/i.test(template.name))
   const [noticeTemplateId, setNoticeTemplateId] = useState('')
   const [reason, setReason] = useState('')
+  const [checklist, setChecklist] = useState<CancellationComplianceChecklistItem[]>(() => buildNonRenewalChecklist(guidance))
   const calculatedNonRenewalDate = addDaysToDateInput(
     noticeMailingDate,
     Number(noticeRequirementDays || 0) + Number(mailingDays || 0)
   )
+  const checklistComplete = checklist.every((item) => item.isCompleted)
+
+  useEffect(() => {
+    setChecklist(buildNonRenewalChecklist(guidance))
+  }, [guidance])
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -1622,6 +1612,8 @@ function NonRenewPolicyModal({
       mailingDays: Number(mailingDays || 0),
       method,
       noticeTemplateId: noticeTemplateId || undefined,
+      complianceChecklist: checklist,
+      legalRequirementSectionIds: uniqueIds(checklist.flatMap((item) => item.requirementSectionIds)),
     })
   }
 
@@ -1676,7 +1668,8 @@ function NonRenewPolicyModal({
               <div><span className="font-medium">Template:</span> {nonRenewalTemplates.find((template) => template.id === noticeTemplateId)?.name ?? 'Default non-renewal template'}</div>
             </div>
           </div>
-          <ModalActions saving={saving} onClose={onClose} submitLabel="Issue Notice" />
+          <ComplianceChecklist items={checklist} onChange={setChecklist} purpose="non-renewal transaction" />
+          <ModalActions saving={saving} disabled={!checklistComplete} onClose={onClose} submitLabel="Issue Notice" />
         </div>
         <LegalGuidancePanel guidance={guidance} mode="Non-renewal" />
       </form>
@@ -1742,9 +1735,11 @@ function LegalRequirementSummary({ row }: { row: LegalComplianceRequirement }) {
 function ComplianceChecklist({
   items,
   onChange,
+  purpose = 'cancellation transaction',
 }: {
   items: CancellationComplianceChecklistItem[]
   onChange: (items: CancellationComplianceChecklistItem[]) => void
+  purpose?: string
 }) {
   return (
     <section className="rounded-lg border p-4" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
@@ -1764,7 +1759,7 @@ function ComplianceChecklist({
           </label>
         ))}
       </div>
-      <p className="mt-3 text-xs" style={{ color: 'var(--ink-3)' }}>These selections are saved with the cancellation transaction.</p>
+      <p className="mt-3 text-xs" style={{ color: 'var(--ink-3)' }}>These selections are saved with the {purpose}.</p>
     </section>
   )
 }
@@ -1906,6 +1901,35 @@ function buildCancellationChecklist(guidance?: LegalComplianceGuidance): Cancell
       label: 'Return premium or unearned premium handling reviewed.',
       isCompleted: false,
       requirementSectionIds: ids(guidance?.returnPremiumRequirements),
+    },
+  ]
+}
+
+function buildNonRenewalChecklist(guidance?: LegalComplianceGuidance): CancellationComplianceChecklistItem[] {
+  return [
+    {
+      key: 'non-renewal-reason-reviewed',
+      label: 'Non-renewal reason reviewed against allowed and prohibited reasons.',
+      isCompleted: false,
+      requirementSectionIds: ids(guidance?.reasonRequirements),
+    },
+    {
+      key: 'non-renewal-notice-period-reviewed',
+      label: 'Notice period reviewed for the non-renewal effective date.',
+      isCompleted: false,
+      requirementSectionIds: ids(guidance?.noticeRequirements),
+    },
+    {
+      key: 'non-renewal-proof-method-selected',
+      label: 'Notice delivery/proof method selected and retained.',
+      isCompleted: false,
+      requirementSectionIds: ids(guidance?.proofOfNoticeRequirements),
+    },
+    {
+      key: 'non-renewal-lienholder-state-authority-reviewed',
+      label: 'Lienholder, mortgagee, and state authority notice requirements considered.',
+      isCompleted: false,
+      requirementSectionIds: ids([...(guidance?.lienholderRequirements ?? []), ...(guidance?.stateAuthorityRequirements ?? [])]),
     },
   ]
 }

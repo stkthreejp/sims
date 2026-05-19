@@ -1037,6 +1037,19 @@ public class PolicyService : IPolicyService
             return Result<PolicyDto>.Failure("INVALID_MAILING_DAYS", "Mailing days cannot be negative.");
         if (dto.NonRenewedDate < policy.EffectiveDate || dto.NonRenewedDate > policy.ExpirationDate)
             return Result<PolicyDto>.Failure("INVALID_DATE", "Non-renewal date must be within the policy term.");
+        if (dto.ComplianceChecklist.Any(i => !i.IsCompleted))
+            return Result<PolicyDto>.Failure("COMPLIANCE_REVIEW_REQUIRED", "Complete the non-renewal compliance checklist before issuing notice.");
+
+        var state = NormalizeState(policy.Submission?.Insured?.State);
+        var legalRequirementIds = dto.LegalRequirementSectionIds
+            .Concat(dto.ComplianceChecklist.SelectMany(i => i.RequirementSectionIds))
+            .Distinct()
+            .ToArray();
+        IReadOnlyList<LegalRequirementSection> legalRequirements = legalRequirementIds.Length == 0
+            ? []
+            : await GetRequirementQuery(state, "NonRenewal")
+                .Where(r => legalRequirementIds.Contains(r.Id))
+                .ToListAsync();
 
         var transaction = new PolicyTransaction
         {
@@ -1072,6 +1085,14 @@ public class PolicyService : IPolicyService
         transaction.NonRenewalDetail = detail;
         Db.Set<PolicyTransaction>().Add(transaction);
         Db.Set<PolicyNonRenewalDetail>().Add(detail);
+        if (dto.ComplianceChecklist.Count > 0)
+        {
+            Db.Set<PolicyTransactionComplianceChecklist>().Add(BuildComplianceChecklist(
+                transaction,
+                dto.ComplianceChecklist,
+                legalRequirements,
+                access.UserId));
+        }
         await Db.SaveChangesAsync();
         await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Non-renewal notice issued.");
 

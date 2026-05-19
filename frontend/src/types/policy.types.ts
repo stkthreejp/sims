@@ -330,6 +330,8 @@ export interface NonRenewPolicy {
   mailingDays: number
   method: string
   noticeTemplateId?: string
+  complianceChecklist: CancellationComplianceChecklistItem[]
+  legalRequirementSectionIds: string[]
 }
 
 export interface CancelPolicy {

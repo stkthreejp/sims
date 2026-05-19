@@ -1235,6 +1235,74 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task NonRenewal_RecordsLegalAndComplianceSnapshot()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var requirement = new LegalRequirementSection
+        {
+            Id = Guid.NewGuid(),
+            State = "North Carolina",
+            LineOfBusiness = "InlandMarine",
+            Action = "NonRenewal",
+            Category = "NOTICE REQUIREMENTS",
+            Topic = "Notice timing",
+            RequirementText = "Send written non-renewal notice before expiration.",
+            Citations = ["NC-NR-1"],
+        };
+        db.Add(requirement);
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.NonRenewAsync(fixture.Policy.Id, new NonRenewPolicyDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+            NoticeMailingDate = new DateOnly(2026, 11, 1),
+            NoticeRequirementDays = 45,
+            MailingDays = 3,
+            Method = "Certified Mail",
+            ComplianceChecklist =
+            [
+                new CancellationComplianceChecklistItemDto
+                {
+                    Key = "non-renewal-notice-period-reviewed",
+                    Label = "Notice period reviewed for the non-renewal effective date.",
+                    IsCompleted = true,
+                    RequirementSectionIds = [requirement.Id],
+                }
+            ],
+            LegalRequirementSectionIds = [requirement.Id],
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
+        Assert.Equal(PolicyTransactionStatus.NoticeSent, transaction.Status);
+        var checklist = await db.Set<PolicyTransactionComplianceChecklist>()
+            .Include(c => c.Items)
+            .SingleAsync(c => c.PolicyTransactionId == transaction.Id);
+        Assert.Equal("NonRenewal", checklist.Purpose);
+        var checklistItem = Assert.Single(checklist.Items);
+        Assert.Equal("non-renewal-notice-period-reviewed", checklistItem.Key);
+        Assert.True(checklistItem.IsCompleted);
+        Assert.Equal(requirement.Id, checklistItem.LegalRequirementSectionId);
+        Assert.Equal(fixture.UserId, checklistItem.CompletedById);
+        Assert.Contains("Send written non-renewal notice before expiration.", checklistItem.SnapshotJson);
+
+        requirement.RequirementText = "Updated non-renewal requirement after the transaction.";
+        await db.SaveChangesAsync();
+        var artifacts = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
+        Assert.True(artifacts.IsSuccess);
+        var artifactChecklist = Assert.Single(artifacts.Value!.ComplianceChecklists);
+        var artifactItem = Assert.Single(artifactChecklist.Items);
+        Assert.Equal("non-renewal-notice-period-reviewed", artifactItem.Key);
+        Assert.Contains("Send written non-renewal notice before expiration.", artifactItem.SnapshotJson);
+        Assert.DoesNotContain("Updated non-renewal requirement after the transaction.", artifactItem.SnapshotJson);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Null(fixture.Policy.NonRenewedDate);
+    }
+
+    [Fact]
     public async Task CompleteNonRenewal_BeforeEffectiveDateFails()
     {
         await using var db = CreateDb();

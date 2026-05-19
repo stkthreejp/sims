@@ -279,6 +279,8 @@ public class NonRenewPolicyDto
     public int MailingDays { get; set; }
     public string Method { get; set; } = "Written Notice";
     public Guid? NoticeTemplateId { get; set; }
+    public IReadOnlyList<CancellationComplianceChecklistItemDto> ComplianceChecklist { get; set; } = [];
+    public Guid[] LegalRequirementSectionIds { get; set; } = [];
 }
 
 public class CancelPolicyDto
