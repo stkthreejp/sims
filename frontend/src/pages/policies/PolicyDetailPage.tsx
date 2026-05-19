@@ -9,7 +9,7 @@ import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
-import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy } from '@/types/policy.types'
+import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy, StartRewritePolicy } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import type { Attachment, DocumentType } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
@@ -39,7 +39,7 @@ export function PolicyDetailPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [editSubject, setEditSubject] = useState('')
   const [editBody, setEditBody] = useState('')
-  const [actionModal, setActionModal] = useState<'endorse' | 'cancel' | 'nonRenew' | 'reinstate' | null>(null)
+  const [actionModal, setActionModal] = useState<'endorse' | 'cancel' | 'nonRenew' | 'reinstate' | 'rewrite' | null>(null)
 
   const { data: policy, isLoading } = useQuery({
     queryKey: ['policies', id],
@@ -162,6 +162,16 @@ export function PolicyDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be reinstated'),
   })
 
+  const startRewriteMutation = useMutation({
+    mutationFn: (data: StartRewritePolicy) => policiesApi.startRewrite(id!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', id] })
+      setActionModal(null)
+      toast.success('Rewrite transaction started')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Rewrite could not be started'),
+  })
+
   const issuePolicyMutation = useMutation({
     mutationFn: () => policiesApi.issue(id!, { issuedDate: new Date().toISOString().slice(0, 10) }),
     onSuccess: () => {
@@ -234,12 +244,20 @@ export function PolicyDetailPage() {
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {policy.status === 'Active' && canEndorsePolicies && (
-            <button
-              onClick={() => setActionModal('endorse')}
-              className="sd-btn primary"
-            >
-              <FileSignature className="h-3.5 w-3.5" /> Endorse
-            </button>
+            <>
+              <button
+                onClick={() => setActionModal('rewrite')}
+                className="sd-btn outline"
+              >
+                <FileText className="h-3.5 w-3.5" /> Rewrite
+              </button>
+              <button
+                onClick={() => setActionModal('endorse')}
+                className="sd-btn primary"
+              >
+                <FileSignature className="h-3.5 w-3.5" /> Endorse
+              </button>
+            </>
           )}
           {policy.status === 'Active' && canCancelPolicies && (
             <>
@@ -341,6 +359,15 @@ export function PolicyDetailPage() {
           saving={reinstateMutation.isPending}
           onClose={() => setActionModal(null)}
           onSave={(data) => reinstateMutation.mutate(data)}
+        />
+      )}
+
+      {actionModal === 'rewrite' && (
+        <StartRewritePolicyModal
+          policy={policy}
+          saving={startRewriteMutation.isPending}
+          onClose={() => setActionModal(null)}
+          onSave={(data) => startRewriteMutation.mutate(data)}
         />
       )}
 
@@ -894,6 +921,7 @@ function TransactionArtifactDetails({
     ...(transaction.transactionType === 'Cancellation' ? [{ id: 'Cancellation', count: transaction.cancellationDetail ? 1 : 0 }] : []),
     ...(transaction.transactionType === 'NonRenewal' ? [{ id: 'Non-Renewal', count: transaction.nonRenewalDetail ? 1 : 0 }] : []),
     ...(transaction.transactionType === 'Reinstatement' ? [{ id: 'Reinstatement', count: transaction.reinstatementDetail ? 1 : 0 }] : []),
+    ...(transaction.transactionType === 'Rewrite' ? [{ id: 'Rewrite', count: transaction.rewriteDetail ? 1 : 0 }] : []),
     { id: 'Compliance', count: artifacts.complianceChecklists.reduce((sum, checklist) => sum + checklist.items.length, 0) },
     { id: 'Tasks', count: artifacts.tasks.length },
     { id: 'Approvals', count: artifacts.approvals.length },
@@ -1021,6 +1049,10 @@ function TransactionArtifactDetails({
               proofUploading={proofUpload.isPending}
               onUploadProof={(file) => proofUpload.mutate(file)}
             />
+          )}
+
+          {activeSection === 'Rewrite' && (
+            <RewriteSummary transaction={transaction} />
           )}
 
           {activeSection === 'Compliance' && (
@@ -1211,6 +1243,44 @@ function ReinstatementSummary({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function RewriteSummary({ transaction }: { transaction: PolicyTransaction }) {
+  const detail = transaction.rewriteDetail
+
+  if (!detail) return <EmptyState text="No rewrite detail saved." />
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rewrite</div>
+            <div className="mt-1 text-sm font-semibold text-slate-900">{formatDate(transaction.effectiveDate)}</div>
+          </div>
+          <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[transaction.status]}`}>{POLICY_TRANSACTION_STATUS_LABELS[transaction.status]}</span>
+        </div>
+        <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+          <div><span className="text-slate-500">Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
+          <div>
+            <span className="text-slate-500">Replacement quote:</span>{' '}
+            <Link to={`/quotes/${detail.replacementQuoteId}`} className="text-blue-600 hover:text-blue-700">Open quote</Link>
+          </div>
+        </div>
+        {(detail.notes || transaction.notes) && <p className="mt-2 text-sm text-slate-600">{detail.notes ?? transaction.notes}</p>}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <VersionSummary label="Source version" version={transaction.priorVersion} />
+        <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+        <div>
+          <div className="text-xs font-semibold uppercase text-slate-500">Replacement quote</div>
+          <div className="mt-1">
+            <Link to={`/quotes/${detail.replacementQuoteId}`} className="font-medium text-blue-600 hover:text-blue-700">Open rewrite quote</Link>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1620,6 +1690,61 @@ function ReinstatePolicyModal({
           </div>
         </div>
         <ModalActions saving={saving} disabled={!reason.trim()} onClose={onClose} submitLabel="Reinstate" />
+      </form>
+    </ActionModal>
+  )
+}
+
+function StartRewritePolicyModal({
+  policy,
+  saving,
+  onClose,
+  onSave,
+}: {
+  policy: Policy
+  saving: boolean
+  onClose: () => void
+  onSave: (data: StartRewritePolicy) => void
+}) {
+  const [effectiveDate, setEffectiveDate] = useState(toDateInput(new Date().toISOString()))
+  const [expirationDate, setExpirationDate] = useState(toDateInput(policy.expirationDate))
+  const [reason, setReason] = useState('')
+  const [notes, setNotes] = useState('')
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    onSave({
+      effectiveDate,
+      expirationDate,
+      reason: reason.trim(),
+      notes: notes.trim() || undefined,
+    })
+  }
+
+  return (
+    <ActionModal title="Start Rewrite" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Rewrite Effective Date">
+          <input type="date" required value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Replacement Expiration Date">
+          <input type="date" required value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Reason">
+          <textarea rows={3} required value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
+        </Field>
+        <Field label="Notes">
+          <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
+        </Field>
+        <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+          <div className="font-semibold text-slate-900">Rewrite Preview</div>
+          <div className="mt-2 grid gap-1 text-xs text-slate-600">
+            <div><span className="font-medium">Source policy:</span> {policy.policyNumber}</div>
+            <div><span className="font-medium">Current term:</span> {formatDate(policy.effectiveDate)} - {formatDate(policy.expirationDate)}</div>
+            <div><span className="font-medium">Replacement term:</span> {formatDate(effectiveDate)} - {formatDate(expirationDate)}</div>
+          </div>
+        </div>
+        <ModalActions saving={saving} disabled={!reason.trim()} onClose={onClose} submitLabel="Start Rewrite" />
       </form>
     </ActionModal>
   )

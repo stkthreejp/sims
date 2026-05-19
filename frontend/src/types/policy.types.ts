@@ -142,6 +142,7 @@ export interface PolicyTransaction {
   cancellationDetail: PolicyCancellationDetail | null
   nonRenewalDetail: PolicyNonRenewalDetail | null
   reinstatementDetail: PolicyReinstatementDetail | null
+  rewriteDetail: PolicyRewriteDetail | null
   cancellationComplianceChecklist: CancellationComplianceChecklistItem[]
   cancellationLegalRequirementSnapshotJson: string | null
   premiumBefore: number | null
@@ -201,6 +202,14 @@ export interface PolicyNonRenewalDetail {
 
 export interface PolicyReinstatementDetail {
   reinstatementEffectiveDate: string
+  reason: string
+  notes: string | null
+}
+
+export interface PolicyRewriteDetail {
+  sourcePolicyId: string
+  sourcePolicyVersionId: string | null
+  replacementQuoteId: string
   reason: string
   notes: string | null
 }
@@ -296,6 +305,13 @@ export interface CreateEndorsement {
 export interface IssueEndorsement {
   effectiveDate?: string
   premiumChange?: number
+}
+
+export interface StartRewritePolicy {
+  effectiveDate: string
+  expirationDate?: string
+  reason: string
+  notes?: string
 }
 
 export interface PolicyIssuancePacket {

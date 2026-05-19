@@ -37,6 +37,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<PolicyCancellationDetail> PolicyCancellationDetails => Set<PolicyCancellationDetail>();
     public DbSet<PolicyNonRenewalDetail> PolicyNonRenewalDetails => Set<PolicyNonRenewalDetail>();
     public DbSet<PolicyReinstatementDetail> PolicyReinstatementDetails => Set<PolicyReinstatementDetail>();
+    public DbSet<PolicyRewriteDetail> PolicyRewriteDetails => Set<PolicyRewriteDetail>();
     public DbSet<PolicyTransactionStatusHistory> PolicyTransactionStatusHistory => Set<PolicyTransactionStatusHistory>();
     public DbSet<PolicyTransactionComplianceChecklist> PolicyTransactionComplianceChecklists => Set<PolicyTransactionComplianceChecklist>();
     public DbSet<PolicyTransactionComplianceChecklistItem> PolicyTransactionComplianceChecklistItems => Set<PolicyTransactionComplianceChecklistItem>();
@@ -179,6 +180,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<PolicyCancellationDetail>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyNonRenewalDetail>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyReinstatementDetail>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<PolicyRewriteDetail>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransactionStatusHistory>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransactionComplianceChecklist>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyTransactionComplianceChecklistItem>().HasQueryFilter(e => !e.IsDeleted);

@@ -104,6 +104,7 @@ public class PolicyService : IPolicyService
             .Include(p => p.Transactions).ThenInclude(t => t.NonRenewalDetail)
                 .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Transactions).ThenInclude(t => t.ReinstatementDetail)
+            .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
             .Include(p => p.Versions)
             .Where(p => p.Id == id && !p.IsDeleted)
             .ForAccessScope(access)
@@ -123,6 +124,7 @@ public class PolicyService : IPolicyService
             .Include(p => p.Transactions).ThenInclude(t => t.NonRenewalDetail)
                 .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Transactions).ThenInclude(t => t.ReinstatementDetail)
+            .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
             .Include(p => p.Versions)
             .Where(p => p.Id == policyId && !p.IsDeleted)
             .ForAccessScope(access)
@@ -1095,6 +1097,101 @@ public class PolicyService : IPolicyService
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
 
+    public async Task<Result<PolicyTransactionDto>> StartRewriteAsync(Guid policyId, StartRewritePolicyDto dto, UserAccessScope access)
+    {
+        var db = Db;
+        var policy = await db.Set<Policy>()
+            .Include(p => p.Submission)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
+            .Include(p => p.Versions)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyTransactionDto>.Failure("INVALID_STATUS", "Only active policies can be rewritten.");
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return Result<PolicyTransactionDto>.Failure("REASON_REQUIRED", "Rewrite reason is required.");
+        if (dto.EffectiveDate < policy.EffectiveDate || dto.EffectiveDate > policy.ExpirationDate)
+            return Result<PolicyTransactionDto>.Failure("INVALID_DATE", "Rewrite effective date must be within the policy term.");
+
+        var expirationDate = dto.ExpirationDate ?? policy.ExpirationDate;
+        if (expirationDate <= dto.EffectiveDate)
+            return Result<PolicyTransactionDto>.Failure("INVALID_DATE", "Rewrite expiration date must be after the effective date.");
+        if (policy.Transactions.Any(t => t.TransactionType == TransactionType.Rewrite
+            && t.Status is not (PolicyTransactionStatus.Declined or PolicyTransactionStatus.Withdrawn or PolicyTransactionStatus.Voided)
+            && !t.IsDeleted))
+            return Result<PolicyTransactionDto>.Failure("REWRITE_ALREADY_EXISTS", "This policy already has an active rewrite transaction.");
+
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
+        var quoteService = (IQuoteService)_sp.GetService(typeof(IQuoteService))!;
+        var rewriteQuote = await quoteService.CreateAsync(new QuoteCreateDto
+        {
+            SubmissionId = policy.SubmissionId,
+            CarrierId = policy.CarrierId,
+            LineOfBusiness = policy.LineOfBusiness,
+            EffectiveDate = dto.EffectiveDate,
+            ExpirationDate = expirationDate,
+            PremiumAmount = policy.PremiumAmount,
+            TaxesAndFees = policy.TaxesAndFees,
+            CompanyId = policy.BoundQuote?.CompanyId,
+            ProducerId = policy.BoundQuote?.ProducerId,
+            IsFilingState = policy.BoundQuote?.IsFilingState ?? false,
+            CoverageDescription = policy.BoundQuote?.CoverageDescription,
+            Deductible = policy.BoundQuote?.Deductible,
+            Limit = policy.BoundQuote?.Limit,
+            UninsuredMotoristLimit = policy.BoundQuote?.UninsuredMotoristLimit,
+            MedicalPaymentsLimit = policy.BoundQuote?.MedicalPaymentsLimit,
+        }, access.UserId);
+        if (!rewriteQuote.IsSuccess || rewriteQuote.Value == null)
+            return Result<PolicyTransactionDto>.Failure(rewriteQuote.ErrorCode ?? "REWRITE_QUOTE_FAILED", rewriteQuote.ErrorMessage ?? "Rewrite quote could not be created.");
+
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            Policy = policy,
+            TransactionType = TransactionType.Rewrite,
+            Status = PolicyTransactionStatus.Submitted,
+            TransactionNumber = await GenerateTransactionNumberAsync(),
+            EffectiveDate = dto.EffectiveDate,
+            ExpirationDate = expirationDate,
+            SourceQuoteId = policy.BoundQuoteId,
+            RenewalQuoteId = rewriteQuote.Value.Id,
+            PriorPolicyId = policy.Id,
+            PriorPolicyVersionId = priorVersion.Id,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            ReasonText = dto.Reason.Trim(),
+            PremiumBefore = policy.TotalPremium,
+            PremiumChange = 0m,
+            NewTotalPremium = policy.TotalPremium,
+            PremiumAfter = policy.TotalPremium,
+            ProcessedById = access.UserId,
+            ProcessedAt = DateTime.UtcNow,
+            Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim(),
+        };
+        var detail = new PolicyRewriteDetail
+        {
+            PolicyTransaction = transaction,
+            SourcePolicyId = policy.Id,
+            SourcePolicyVersionId = priorVersion.Id,
+            ReplacementQuoteId = rewriteQuote.Value.Id,
+            Reason = dto.Reason.Trim(),
+            Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim(),
+        };
+        transaction.RewriteDetail = detail;
+
+        db.Set<PolicyTransaction>().Add(transaction);
+        db.Set<PolicyRewriteDetail>().Add(detail);
+        await db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Rewrite transaction submitted.");
+        await db.Entry(transaction).Reference(t => t.ProcessedBy).LoadAsync();
+
+        return Result<PolicyTransactionDto>.Success(MapToTransactionDto(transaction));
+    }
+
     public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
@@ -1558,6 +1655,14 @@ public class PolicyService : IPolicyService
             ReinstatementEffectiveDate = t.ReinstatementDetail.ReinstatementEffectiveDate,
             Reason = t.ReinstatementDetail.Reason,
             Notes = t.ReinstatementDetail.Notes,
+        },
+        RewriteDetail = t.RewriteDetail == null ? null : new PolicyRewriteDetailDto
+        {
+            SourcePolicyId = t.RewriteDetail.SourcePolicyId,
+            SourcePolicyVersionId = t.RewriteDetail.SourcePolicyVersionId,
+            ReplacementQuoteId = t.RewriteDetail.ReplacementQuoteId,
+            Reason = t.RewriteDetail.Reason,
+            Notes = t.RewriteDetail.Notes,
         },
         CancellationComplianceChecklist = DeserializeChecklist(t.CancellationComplianceChecklistJson),
         CancellationLegalRequirementSnapshotJson = t.CancellationLegalRequirementSnapshotJson,

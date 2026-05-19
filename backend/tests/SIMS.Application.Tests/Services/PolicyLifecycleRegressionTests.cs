@@ -1316,6 +1316,43 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task Rewrite_ActivePolicyCreatesReplacementQuoteAndSubmittedTransaction()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var quotes = new RecordingQuoteService(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), quoteService: quotes);
+
+        var result = await policyService.StartRewriteAsync(fixture.Policy.Id, new StartRewritePolicyDto
+        {
+            EffectiveDate = new DateOnly(2026, 8, 1),
+            Reason = "Carrier requested new paper",
+            Notes = "Move to replacement policy form set.",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(TransactionType.Rewrite, result.Value!.TransactionType);
+        Assert.Equal(PolicyTransactionStatus.Submitted, result.Value.Status);
+        Assert.Equal(fixture.Policy.Id, result.Value.PriorPolicyId);
+        Assert.NotNull(result.Value.PriorPolicyVersionId);
+        Assert.NotNull(result.Value.RenewalQuoteId);
+        Assert.Single(quotes.CreateRequests);
+        var quote = await db.Set<Quote>().SingleAsync(q => q.Id == result.Value.RenewalQuoteId);
+        Assert.Equal(QuoteStatus.Draft, quote.Status);
+        Assert.Equal(fixture.Policy.SubmissionId, quote.SubmissionId);
+        Assert.Equal(fixture.Policy.CarrierId, quote.CarrierId);
+        Assert.Equal(new DateOnly(2026, 8, 1), quote.EffectiveDate);
+        Assert.Equal(fixture.Policy.ExpirationDate, quote.ExpirationDate);
+        var detail = await db.Set<PolicyRewriteDetail>().SingleAsync(d => d.PolicyTransactionId == result.Value.Id);
+        Assert.Equal(fixture.Policy.Id, detail.SourcePolicyId);
+        Assert.Equal(result.Value.PriorPolicyVersionId, detail.SourcePolicyVersionId);
+        Assert.Equal(quote.Id, detail.ReplacementQuoteId);
+        Assert.Equal("Carrier requested new paper", detail.Reason);
+        Assert.Equal("Move to replacement policy form set.", detail.Notes);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+    }
+
+    [Fact]
     public async Task NonRenewal_CreatesNoticeDetailWithoutClosingPolicy()
     {
         await using var db = CreateDb();
