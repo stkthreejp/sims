@@ -1250,6 +1250,63 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(
             new[] { "policy.transaction.created", "policy.transaction.issued" },
             history.Select(h => h.EventName).ToArray());
+        var artifacts = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
+        Assert.True(artifacts.IsSuccess);
+        Assert.Equal(new DateOnly(2026, 7, 15), artifacts.Value!.Transaction.ReinstatementDetail?.ReinstatementEffectiveDate);
+        Assert.Equal("Payment received", artifacts.Value.Transaction.ReinstatementDetail?.Reason);
+    }
+
+    [Fact]
+    public async Task Reinstatement_PendingReinstatementBlocksDuplicate()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var cancellation = await policyService.CancelAsync(fixture.Policy.Id, new CancelPolicyDto
+        {
+            CancelledDate = new DateOnly(2026, 7, 1),
+            Reason = "Non-payment",
+            Method = "Certified Mail",
+            PremiumChange = 0m,
+            ComplianceChecklist =
+            [
+                new CancellationComplianceChecklistItemDto
+                {
+                    Key = "notice",
+                    Label = "Notice sent",
+                    IsCompleted = true,
+                }
+            ],
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(cancellation.IsSuccess);
+        db.Set<PolicyTransaction>().Add(new PolicyTransaction
+        {
+            PolicyId = fixture.Policy.Id,
+            Policy = fixture.Policy,
+            TransactionType = TransactionType.Reinstatement,
+            Status = PolicyTransactionStatus.Submitted,
+            TransactionNumber = "TXN-REINSTATE-PENDING",
+            EffectiveDate = new DateOnly(2026, 7, 15),
+            RequestedById = fixture.UserId,
+            RequestedAt = DateTime.UtcNow,
+            ProcessedById = fixture.UserId,
+            ProcessedAt = DateTime.UtcNow,
+            ReasonText = "Pending reinstatement",
+            PremiumChange = 0m,
+            NewTotalPremium = fixture.Policy.TotalPremium,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await policyService.ReinstateAsync(fixture.Policy.Id, new ReinstatePolicyDto
+        {
+            ReinstatedDate = new DateOnly(2026, 7, 15),
+            Reason = "Payment received",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("REINSTATEMENT_ALREADY_EXISTS", result.ErrorCode);
+        Assert.Equal(PolicyStatus.Cancelled, fixture.Policy.Status);
+        Assert.Equal(1, await db.Set<PolicyTransaction>().CountAsync(t => t.TransactionType == TransactionType.Reinstatement));
     }
 
     [Fact]

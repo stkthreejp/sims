@@ -1041,6 +1041,10 @@ public class PolicyService : IPolicyService
             return Result<PolicyDto>.Failure("INVALID_DATE", "Reinstatement date must be within the policy term.");
         if (policy.CancelledDate.HasValue && dto.ReinstatedDate < policy.CancelledDate.Value)
             return Result<PolicyDto>.Failure("INVALID_DATE", "Reinstatement date cannot be before the cancellation date.");
+        if (policy.Transactions.Any(t => t.TransactionType == TransactionType.Reinstatement
+            && t.Status is not (PolicyTransactionStatus.Declined or PolicyTransactionStatus.Withdrawn or PolicyTransactionStatus.Voided)
+            && !t.IsDeleted))
+            return Result<PolicyDto>.Failure("REINSTATEMENT_ALREADY_EXISTS", "This policy already has an active reinstatement transaction.");
 
         await using var dbTransaction = await db.Database.BeginTransactionAsync();
 

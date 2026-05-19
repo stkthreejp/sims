@@ -892,6 +892,7 @@ function TransactionArtifactDetails({
     { id: 'Accounting', count: artifacts.invoices.length },
     ...(transaction.transactionType === 'Cancellation' ? [{ id: 'Cancellation', count: transaction.cancellationDetail ? 1 : 0 }] : []),
     ...(transaction.transactionType === 'NonRenewal' ? [{ id: 'Non-Renewal', count: transaction.nonRenewalDetail ? 1 : 0 }] : []),
+    ...(transaction.transactionType === 'Reinstatement' ? [{ id: 'Reinstatement', count: transaction.reinstatementDetail ? 1 : 0 }] : []),
     { id: 'Compliance', count: artifacts.complianceChecklists.reduce((sum, checklist) => sum + checklist.items.length, 0) },
     { id: 'Tasks', count: artifacts.tasks.length },
     { id: 'Approvals', count: artifacts.approvals.length },
@@ -1011,6 +1012,10 @@ function TransactionArtifactDetails({
             />
           )}
 
+          {activeSection === 'Reinstatement' && (
+            <ReinstatementSummary transaction={transaction} />
+          )}
+
           {activeSection === 'Compliance' && (
             <div className="space-y-3">
               {transaction.transactionType === 'Cancellation' && (
@@ -1077,6 +1082,36 @@ function CompactRow({ title, meta, value, sub }: { title: string; meta?: string;
         {sub && <div className="mt-1 text-xs text-slate-600">{sub}</div>}
       </div>
       {value && <span className="shrink-0 text-xs font-medium text-slate-500">{value}</span>}
+    </div>
+  )
+}
+
+function ReinstatementSummary({ transaction }: { transaction: PolicyTransaction }) {
+  const detail = transaction.reinstatementDetail
+
+  if (!detail) return <EmptyState text="No reinstatement detail saved." />
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reinstatement</div>
+            <div className="mt-1 text-sm font-semibold text-slate-900">{formatDate(detail.reinstatementEffectiveDate)}</div>
+          </div>
+          <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[transaction.status]}`}>{POLICY_TRANSACTION_STATUS_LABELS[transaction.status]}</span>
+        </div>
+        <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+          <div><span className="text-slate-500">Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
+          <div><span className="text-slate-500">Premium change:</span> {formatCurrency(transaction.premiumChange)}</div>
+        </div>
+        {(detail.notes || transaction.notes) && <p className="mt-2 text-sm text-slate-600">{detail.notes ?? transaction.notes}</p>}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <VersionSummary label="Cancelled version" version={transaction.priorVersion} />
+        <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+        <VersionSummary label="Reinstated version" version={transaction.resultingVersion} />
+      </div>
     </div>
   )
 }
