@@ -689,26 +689,36 @@ Clearance, appetite, referral, and authority checks need a stable place to attac
 
 ### Planned Changes
 
-1. Clearance
+1. Post-Phase-5 alignment
+   - Inventory every bind, issue, endorsement, cancellation, reinstatement, rewrite, void, rating promotion, commission override, and sensitive accounting endpoint.
+   - Mark whether each endpoint has permission, transaction status, approval, referral, and authority checks.
+   - Reuse the Phase 5 transaction artifact model and `PolicyTransactionApproval` instead of creating parallel approval history.
+
+2. Clearance
    - Add submission clearance result.
    - Check duplicate insured/account.
    - Check duplicate submission.
    - Check active policy overlap.
    - Check existing quote/bind conflict.
    - Track clearance status and reviewer.
+   - Store matched record, match explanation, compared-field snapshot, override reason, override user, and override timestamp.
 
-2. Appetite
+3. Appetite
    - Add configurable appetite rules by program/LOB/state.
    - Capture rule result: pass, warn, refer, decline.
    - Store rule version used.
    - Surface results in submission and quote workflows.
+   - Create referral records for refer outcomes.
+   - Block bind for unresolved decline outcomes.
 
-3. Referral
+4. Referral
    - Convert referral flags into referral decision records.
    - Track reason, severity, owner, status, due date, resolution.
    - Link referral to quote or policy transaction.
+   - Support submission-level referrals before a quote exists.
+   - Preserve source: UW writeup, appetite rule, authority rule, AI advisory, or manual.
 
-4. Authority
+5. Authority
    - Add authority rules for:
      - schedule credits/debits
      - premium thresholds
@@ -718,16 +728,37 @@ Clearance, appetite, referral, and authority checks need a stable place to attac
      - driver/vehicle/FMCSA thresholds
      - cancellation/reinstatement authority
    - Enforce server-side.
+   - Add authority checks for rating plan promotion, commission overrides, voids, and sensitive accounting actions.
+   - Store rule version and input snapshot used for each decision.
 
-5. Approval
+6. Approval
    - Add reusable approval request records.
    - Use for rating plan promotion, commission overrides, high-risk referrals, cancellations, voids, and sensitive accounting actions.
+   - Extend or wrap existing `PolicyTransactionApproval` so transaction approvals continue to appear in transaction artifacts.
+   - Create task engine follow-up for approval owners.
+
+7. UI and work queues
+   - Show clearance and appetite on submissions.
+   - Show referrals and authority results on quotes and UW writeups.
+   - Show referrals, approvals, authority results, and related tasks in policy transaction artifacts.
+   - Add manager views for pending referrals and approvals.
+
+8. Audit, migration, and reporting
+   - Backfill conservatively from existing approved UW writeups and referral fields where the historical decision is clear.
+   - Keep existing writeups and approvals readable.
+   - Add reports for open referrals, authority overrides, approval turnaround time, decline reasons, and clearance overrides.
 
 ### Acceptance Criteria
 
 - A risk can be cleared, referred, approved, declined, or escalated with full history.
 - Authority decisions are not just free-text writeup fields.
 - Underwriting controls can be reused across LOBs.
+- Bind, issue, cancellation, reinstatement, rating promotion, commission override, and sensitive accounting paths cannot bypass unresolved required controls.
+- Appetite and authority outcomes preserve the rule version and input snapshot used.
+- The design can move under Program Configuration in Phase 7 without rewriting Phase 6 history.
+
+Detailed execution plan: `docs/phase-6-underwriting-control-layer-plan.md`.
+Current control coverage matrix: `docs/phase-6-control-coverage-matrix.md`.
 
 ## Phase 7: Program Configuration
 
@@ -1495,11 +1526,16 @@ Detailed execution plan: `docs/phase-5-lifecycle-workflows-plan.md`.
 
 Scope:
 
+- Inventory control coverage across lifecycle, rating, commission, void, and accounting endpoints after Phase 5.
 - Add clearance checks.
 - Add appetite rules.
 - Convert referral flags into referral decision records.
-- Add reusable approval records.
+- Extend reusable approval records from the Phase 5 transaction approval foundation.
 - Enforce authority server-side.
+- Add referral and approval work queues.
+- Add audit/reporting for open referrals, overrides, decline reasons, and approval turnaround.
+
+Detailed execution plan: `docs/phase-6-underwriting-control-layer-plan.md`.
 
 ## Recommended Fifth Work Package
 

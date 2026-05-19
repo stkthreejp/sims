@@ -20,6 +20,7 @@ public class QuoteService : IQuoteService
     private readonly IPolicyNumberService _policyNumbers;
     private readonly IPolicyTransactionLifecycleService _transactionLifecycle;
     private readonly IPolicyVersionService _policyVersions;
+    private readonly IUnderwritingClearanceService _clearance;
 
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
@@ -32,7 +33,8 @@ public class QuoteService : IQuoteService
         IQuoteChecklistService checklist,
         IPolicyNumberService policyNumbers,
         IPolicyTransactionLifecycleService transactionLifecycle,
-        IPolicyVersionService policyVersions)
+        IPolicyVersionService policyVersions,
+        IUnderwritingClearanceService clearance)
     {
         _sp = sp;
         _workflowEngine = workflowEngine;
@@ -42,6 +44,7 @@ public class QuoteService : IQuoteService
         _policyNumbers = policyNumbers;
         _transactionLifecycle = transactionLifecycle;
         _policyVersions = policyVersions;
+        _clearance = clearance;
     }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -278,6 +281,9 @@ public class QuoteService : IQuoteService
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Quote is already bound.");
         if (!await HasIncludedPolicyFormsAsync(quote.Id))
             return Result<QuoteDto>.Failure("POLICY_FORMS_REQUIRED", "Select the policy forms for this quote before binding.");
+        var clearance = await _clearance.EvaluateSubmissionAsync(quote.SubmissionId, access.UserId);
+        if (clearance.OverallStatus == UnderwritingClearanceStatus.Blocked)
+            return Result<QuoteDto>.Failure("CLEARANCE_BLOCKED", "Resolve blocked underwriting clearance results before binding this quote.");
 
         await using var dbTransaction = await Db.Database.BeginTransactionAsync();
 

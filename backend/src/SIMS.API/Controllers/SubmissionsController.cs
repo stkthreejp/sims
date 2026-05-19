@@ -18,8 +18,13 @@ public class SetLinesOfBusinessRequest
 public class SubmissionsController : ControllerBase
 {
     private readonly ISubmissionService _submissionService;
+    private readonly IUnderwritingClearanceService _clearance;
 
-    public SubmissionsController(ISubmissionService submissionService) => _submissionService = submissionService;
+    public SubmissionsController(ISubmissionService submissionService, IUnderwritingClearanceService clearance)
+    {
+        _submissionService = submissionService;
+        _clearance = clearance;
+    }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
@@ -38,6 +43,19 @@ public class SubmissionsController : ControllerBase
         var result = await _submissionService.GetByIdAsync(id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
     }
+
+    [HttpGet("{id:guid}/clearance")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> GetClearance(Guid id, CancellationToken ct)
+    {
+        var result = await _clearance.GetLatestSubmissionAsync(id, ct);
+        return result == null ? NotFound() : Ok(result);
+    }
+
+    [HttpPost("{id:guid}/clearance/evaluate")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> EvaluateClearance(Guid id, CancellationToken ct)
+        => Ok(await _clearance.EvaluateSubmissionAsync(id, CurrentUserId, ct));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SubmissionCreateDto dto)

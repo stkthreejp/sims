@@ -166,6 +166,39 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteBind_BlocksWhenClearanceHasActivePolicyOverlap()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        fixture.Submission.EffectiveDate = new DateOnly(2026, 1, 5);
+        fixture.Submission.ExpirationDate = new DateOnly(2027, 1, 5);
+        fixture.Submission.LinesOfBusiness = $"[\"{fixture.Quote.LineOfBusiness}\"]";
+        db.Add(new Policy
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumber = "POL-OVERLAP-1",
+            SubmissionId = fixture.Submission.Id,
+            BoundQuoteId = Guid.NewGuid(),
+            CarrierId = fixture.Carrier.Id,
+            LineOfBusiness = fixture.Quote.LineOfBusiness,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+            Status = PolicyStatus.Active,
+            BoundDate = new DateOnly(2026, 1, 1),
+        });
+        await db.SaveChangesAsync();
+        var invoicing = new RecordingInvoicingService();
+        var quoteService = CreateQuoteService(db, invoicing);
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("CLEARANCE_BLOCKED", result.ErrorCode);
+        Assert.Empty(await db.Set<PolicyTransaction>().ToListAsync());
+        Assert.Empty(invoicing.BindRequests);
+    }
+
+    [Fact]
     public async Task Invoice_CanReconcileToResultingPolicyVersion()
     {
         await using var db = CreateDb();
@@ -1721,7 +1754,8 @@ public class PolicyLifecycleRegressionTests
             new NoOpQuoteChecklistService(),
             new StubPolicyNumberService(),
             new PolicyTransactionLifecycleService(db, workflow),
-            new PolicyVersionService(db));
+            new PolicyVersionService(db),
+            new UnderwritingClearanceService(db));
     }
 
     private static PolicyService CreatePolicyService(

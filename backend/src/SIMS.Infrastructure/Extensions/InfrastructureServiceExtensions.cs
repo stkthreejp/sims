@@ -72,6 +72,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IGeocodingService, GoogleGeocodingService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<IQuoteChecklistService, QuoteChecklistService>();
+        services.AddScoped<IUnderwritingClearanceService, UnderwritingClearanceService>();
         services.AddScoped<IPolicyNumberService, PolicyNumberService>();
         services.AddScoped<IPolicyNumberAdminService, PolicyNumberAdminService>();
         services.AddScoped<IPolicyTransactionLifecycleService, PolicyTransactionLifecycleService>();
