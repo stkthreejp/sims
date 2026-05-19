@@ -31,6 +31,7 @@ public static class AppPermissions
     public const string AdminSystemManage = "admin.system.manage";
 
     public const string UnderwritingManage = "underwriting.manage";
+    public const string UnderwritingClearanceOverride = "underwriting.clearance.override";
     public const string AccountingManage = "accounting.manage";
     public const string AccountingAdmin = "accounting.admin";
     public const string RatingManage = "rating.manage";
@@ -80,6 +81,7 @@ public static class AppPermissions
         new(AdminSystemManage, "Manage System Administration", "Admin"),
 
         new(UnderwritingManage, "Manage Underwriting Workflows", "Underwriting"),
+        new(UnderwritingClearanceOverride, "Override Underwriting Clearance Blocks", "Underwriting"),
         new(AccountingManage, "Manage Accounting Workflows", "Accounting"),
         new(AccountingAdmin, "Administer Accounting Workflows", "Accounting"),
         new(RatingManage, "Manage Rating Workflows", "Rating"),

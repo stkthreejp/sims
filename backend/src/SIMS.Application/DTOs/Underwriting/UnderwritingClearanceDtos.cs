@@ -16,4 +16,13 @@ public class UnderwritingClearanceResultDto
     public Guid? MatchedRecordId { get; set; }
     public string? MatchedRecordLabel { get; set; }
     public string Explanation { get; set; } = string.Empty;
+    public bool IsOverridden { get; set; }
+    public Guid? OverriddenById { get; set; }
+    public DateTime? OverriddenAt { get; set; }
+    public string? OverrideReason { get; set; }
+}
+
+public class UnderwritingClearanceOverrideDto
+{
+    public string Reason { get; set; } = string.Empty;
 }

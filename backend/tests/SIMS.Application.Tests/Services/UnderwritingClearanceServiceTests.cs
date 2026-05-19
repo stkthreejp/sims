@@ -126,6 +126,53 @@ public class UnderwritingClearanceServiceTests
         Assert.Equal("SUB-EXISTING", saved.MatchedRecordLabel);
     }
 
+    [Fact]
+    public async Task OverrideSubmissionAsync_RecordsBlockedClearanceOverrideAudit()
+    {
+        await using var db = CreateDb();
+        var insuredId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        db.AddRange(
+            CreateUser(userId),
+            CreateInsured(insuredId, userId, "Red Cedar Trucking"),
+            new Carrier { Id = carrierId, Name = "Test Carrier", Naic = "12345" });
+        var existingSubmission = CreateSubmission(
+            insuredId,
+            userId,
+            "SUB-POLICY",
+            new DateOnly(2026, 1, 1),
+            SubmissionStatus.Bound,
+            PolicyLineOfBusiness.CommercialAuto);
+        var target = CreateSubmission(
+            insuredId,
+            userId,
+            "SUB-TARGET",
+            new DateOnly(2026, 6, 1),
+            SubmissionStatus.New,
+            PolicyLineOfBusiness.CommercialAuto);
+        db.AddRange(existingSubmission, target);
+        db.Add(CreatePolicy(
+            existingSubmission.Id,
+            carrierId,
+            "POL-2026-001",
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2027, 1, 1),
+            PolicyLineOfBusiness.CommercialAuto));
+        await db.SaveChangesAsync();
+        var service = new UnderwritingClearanceService(db);
+        await service.EvaluateSubmissionAsync(target.Id, userId);
+
+        var result = await service.OverrideSubmissionAsync(target.Id, userId, "Existing policy is being cancelled before bind.");
+
+        Assert.Equal(UnderwritingClearanceStatus.Warning, result.OverallStatus);
+        var saved = await db.Set<UnderwritingClearanceResult>().SingleAsync();
+        Assert.True(saved.IsOverridden);
+        Assert.Equal(userId, saved.OverriddenById);
+        Assert.NotNull(saved.OverriddenAt);
+        Assert.Equal("Existing policy is being cancelled before bind.", saved.OverrideReason);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

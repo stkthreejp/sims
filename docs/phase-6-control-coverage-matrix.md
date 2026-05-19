@@ -58,8 +58,16 @@ Status values:
 - Added quote bind messaging for blocked clearance results.
 - Added frontend clearance API client methods and types.
 
+## Fourth Implemented Slice
+
+- Added `underwriting.clearance.override` permission.
+- Added blocked clearance override audit fields.
+- Added clearance override API endpoint.
+- Kept quote bind blocked unless blocked clearance results are overridden.
+- Added clearance override schema and permission migrations.
+
 ## Immediate Next Slice
 
-1. Add override permission and override audit fields for blocked clearance.
+1. Add clearance override UI action and audit display.
 2. Add appetite result records and required referral creation.
 3. Add bind/issue gates for unresolved required referrals.

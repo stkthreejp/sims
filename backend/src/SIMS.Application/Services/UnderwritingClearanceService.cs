@@ -41,6 +41,10 @@ public class UnderwritingClearanceService : IUnderwritingClearanceService
                 MatchedRecordId = r.MatchedRecordId,
                 MatchedRecordLabel = r.MatchedRecordLabel,
                 Explanation = r.Explanation,
+                IsOverridden = r.IsOverridden,
+                OverriddenById = r.OverriddenById,
+                OverriddenAt = r.OverriddenAt,
+                OverrideReason = r.OverrideReason,
             })
             .ToListAsync(ct);
 
@@ -95,11 +99,60 @@ public class UnderwritingClearanceService : IUnderwritingClearanceService
 
         await SaveResultsAsync(submission, reviewerId, results, ct);
 
+        return (await GetLatestSubmissionAsync(submission.Id, ct))!;
+    }
+
+    public async Task<UnderwritingClearanceEvaluationDto> OverrideSubmissionAsync(
+        Guid submissionId,
+        Guid overriddenById,
+        string reason,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new InvalidOperationException("A clearance override reason is required.");
+
+        var results = await _db.Set<UnderwritingClearanceResult>()
+            .Where(r => r.SubmissionId == submissionId)
+            .OrderBy(r => r.CheckType)
+            .ToListAsync(ct);
+
+        if (results.Count == 0)
+            throw new InvalidOperationException("Evaluate clearance before overriding it.");
+
+        var blocked = results.Where(r => r.Status == UnderwritingClearanceStatus.Blocked).ToList();
+        if (blocked.Count == 0)
+            throw new InvalidOperationException("Only blocked clearance results can be overridden.");
+
+        var now = DateTime.UtcNow;
+        foreach (var result in blocked)
+        {
+            result.IsOverridden = true;
+            result.OverriddenById = overriddenById;
+            result.OverriddenAt = now;
+            result.OverrideReason = reason.Trim();
+            result.UpdatedAt = now;
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        var dtos = results.Select(r => new UnderwritingClearanceResultDto
+        {
+            CheckType = r.CheckType,
+            Status = r.Status,
+            MatchedRecordId = r.MatchedRecordId,
+            MatchedRecordLabel = r.MatchedRecordLabel,
+            Explanation = r.Explanation,
+            IsOverridden = r.IsOverridden,
+            OverriddenById = r.OverriddenById,
+            OverriddenAt = r.OverriddenAt,
+            OverrideReason = r.OverrideReason,
+        }).ToList();
+
         return new UnderwritingClearanceEvaluationDto
         {
-            SubmissionId = submission.Id,
-            OverallStatus = ResolveOverallStatus(results),
-            Results = results,
+            SubmissionId = submissionId,
+            OverallStatus = ResolveOverallStatus(dtos),
+            Results = dtos,
         };
     }
 
@@ -112,10 +165,14 @@ public class UnderwritingClearanceService : IUnderwritingClearanceService
         var existing = await _db.Set<UnderwritingClearanceResult>()
             .Where(r => r.SubmissionId == submission.Id)
             .ToListAsync(ct);
+        var overrides = existing
+            .Where(r => r.IsOverridden)
+            .ToDictionary(r => r.CheckType);
         _db.RemoveRange(existing);
 
         foreach (var result in results)
         {
+            overrides.TryGetValue(result.CheckType, out var previous);
             _db.Set<UnderwritingClearanceResult>().Add(new UnderwritingClearanceResult
             {
                 SubmissionId = submission.Id,
@@ -127,6 +184,10 @@ public class UnderwritingClearanceService : IUnderwritingClearanceService
                 ReviewedById = reviewerId,
                 ReviewedAt = DateTime.UtcNow,
                 SnapshotJson = BuildSnapshotJson(submission),
+                IsOverridden = previous != null,
+                OverriddenById = previous?.OverriddenById,
+                OverriddenAt = previous?.OverriddenAt,
+                OverrideReason = previous?.OverrideReason,
             });
         }
 
@@ -182,10 +243,13 @@ public class UnderwritingClearanceService : IUnderwritingClearanceService
     private static UnderwritingClearanceStatus ResolveOverallStatus(
         IReadOnlyCollection<UnderwritingClearanceResultDto> results)
     {
-        if (results.Any(r => r.Status == UnderwritingClearanceStatus.Blocked))
+        if (results.Any(r => r.Status == UnderwritingClearanceStatus.Blocked && !r.IsOverridden))
             return UnderwritingClearanceStatus.Blocked;
 
         if (results.Any(r => r.Status == UnderwritingClearanceStatus.Warning))
+            return UnderwritingClearanceStatus.Warning;
+
+        if (results.Any(r => r.Status == UnderwritingClearanceStatus.Blocked && r.IsOverridden))
             return UnderwritingClearanceStatus.Warning;
 
         return UnderwritingClearanceStatus.Clear;

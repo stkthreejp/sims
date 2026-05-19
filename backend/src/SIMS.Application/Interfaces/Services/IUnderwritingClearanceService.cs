@@ -12,4 +12,10 @@ public interface IUnderwritingClearanceService
         Guid submissionId,
         Guid reviewerId,
         CancellationToken ct = default);
+
+    Task<UnderwritingClearanceEvaluationDto> OverrideSubmissionAsync(
+        Guid submissionId,
+        Guid overriddenById,
+        string reason,
+        CancellationToken ct = default);
 }

@@ -10,6 +10,7 @@ public class UnderwritingClearanceResultConfiguration : IEntityTypeConfiguration
     {
         builder.Property(r => r.MatchedRecordLabel).HasMaxLength(120);
         builder.Property(r => r.Explanation).HasMaxLength(500);
+        builder.Property(r => r.OverrideReason).HasMaxLength(500);
         builder.Property(r => r.SnapshotJson).HasColumnType("jsonb");
 
         builder.HasIndex(r => new { r.SubmissionId, r.CheckType });

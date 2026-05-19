@@ -13,6 +13,10 @@ public class UnderwritingClearanceResult : BaseEntity
     public Guid ReviewedById { get; set; }
     public DateTime ReviewedAt { get; set; } = DateTime.UtcNow;
     public string SnapshotJson { get; set; } = "{}";
+    public bool IsOverridden { get; set; }
+    public Guid? OverriddenById { get; set; }
+    public DateTime? OverriddenAt { get; set; }
+    public string? OverrideReason { get; set; }
 
     public Submission Submission { get; set; } = null!;
     public User ReviewedBy { get; set; } = null!;

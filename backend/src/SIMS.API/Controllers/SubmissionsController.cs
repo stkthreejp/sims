@@ -1,5 +1,6 @@
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Submissions;
+using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -56,6 +57,11 @@ public class SubmissionsController : ControllerBase
     [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> EvaluateClearance(Guid id, CancellationToken ct)
         => Ok(await _clearance.EvaluateSubmissionAsync(id, CurrentUserId, ct));
+
+    [HttpPost("{id:guid}/clearance/override")]
+    [Authorize(Policy = AppPermissions.UnderwritingClearanceOverride)]
+    public async Task<IActionResult> OverrideClearance(Guid id, [FromBody] UnderwritingClearanceOverrideDto dto, CancellationToken ct)
+        => Ok(await _clearance.OverrideSubmissionAsync(id, CurrentUserId, dto.Reason, ct));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SubmissionCreateDto dto)

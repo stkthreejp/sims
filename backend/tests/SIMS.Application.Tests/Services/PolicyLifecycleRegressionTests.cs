@@ -199,6 +199,41 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteBind_AllowsBlockedClearanceWhenOverridden()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        fixture.Submission.EffectiveDate = new DateOnly(2026, 1, 5);
+        fixture.Submission.ExpirationDate = new DateOnly(2027, 1, 5);
+        fixture.Submission.LinesOfBusiness = $"[\"{fixture.Quote.LineOfBusiness}\"]";
+        db.Add(new Policy
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumber = "POL-OVERLAP-1",
+            SubmissionId = fixture.Submission.Id,
+            BoundQuoteId = Guid.NewGuid(),
+            CarrierId = fixture.Carrier.Id,
+            LineOfBusiness = fixture.Quote.LineOfBusiness,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+            Status = PolicyStatus.Active,
+            BoundDate = new DateOnly(2026, 1, 1),
+        });
+        await db.SaveChangesAsync();
+        var clearance = new UnderwritingClearanceService(db);
+        await clearance.EvaluateSubmissionAsync(fixture.Submission.Id, fixture.UserId);
+        await clearance.OverrideSubmissionAsync(fixture.Submission.Id, fixture.UserId, "Renewal replacement policy.");
+        var invoicing = new RecordingInvoicingService();
+        var quoteService = CreateQuoteService(db, invoicing);
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Single(await db.Set<PolicyTransaction>().ToListAsync());
+        Assert.Single(invoicing.BindRequests);
+    }
+
+    [Fact]
     public async Task Invoice_CanReconcileToResultingPolicyVersion()
     {
         await using var db = CreateDb();
