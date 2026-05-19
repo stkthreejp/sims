@@ -42,6 +42,7 @@ export type DocumentType =
   | 'PolicyPacketPreview'
   | 'IssuedPolicyPacket'
   | 'ProofOfNotice'
+  | 'ReinstatementApproval'
 
 export interface Attachment {
   id: string
@@ -103,6 +104,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   PolicyPacketPreview: 'Policy Packet Preview',
   IssuedPolicyPacket: 'Issued Policy Packet',
   ProofOfNotice: 'Proof of Notice',
+  ReinstatementApproval: 'Reinstatement Approval',
 }
 
 export const DOCUMENT_TYPES_BY_ENTITY: Record<DocumentEntityType, DocumentType[]> = {
@@ -114,7 +116,7 @@ export const DOCUMENT_TYPES_BY_ENTITY: Record<DocumentEntityType, DocumentType[]
   Policy: [
     'IssuedPolicyPacket', 'PolicyPacketPreview', 'DeclarationsPage', 'PolicyForm', 'Endorsement', 'Binder', 'CertificateOfInsurance',
     'Invoice', 'PremiumFinanceAgreement', 'Audit', 'InspectionSurvey',
-    'CancellationNonRenewal', 'ProofOfNotice', 'Correspondence', 'Other',
+    'CancellationNonRenewal', 'ProofOfNotice', 'ReinstatementApproval', 'Correspondence', 'Other',
   ],
   Carrier: [
     'AppointmentLetter', 'AgencyAgreement', 'UnderwritingGuidelines',

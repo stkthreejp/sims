@@ -11,7 +11,7 @@ import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
 import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
-import type { Attachment } from '@/types/attachment.types'
+import type { Attachment, DocumentType } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import type { DocumentTemplateListItem } from '@/types/documentTemplate.types'
@@ -773,7 +773,7 @@ function TransactionRows({
     queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'],
     queryFn: () => policiesApi.getTransactionArtifacts(t.policyId, t.id),
   })
-  const proofUploadApplies = t.transactionType === 'Cancellation' || t.transactionType === 'NonRenewal'
+  const proofUploadApplies = t.transactionType === 'Cancellation' || t.transactionType === 'NonRenewal' || t.transactionType === 'Reinstatement'
   const hasCompletableStatus = t.status === 'NoticeSent' || t.status === 'PendingEffectiveDate' || t.status === 'Issued'
   const canCompleteCancellationTransaction = canCompleteCancellation &&
     t.transactionType === 'Cancellation' &&
@@ -874,12 +874,13 @@ function TransactionArtifactDetails({
 }) {
   const qc = useQueryClient()
   const [activeSection, setActiveSection] = useState('Versions')
+  const proofUploadConfig = getTransactionProofUploadConfig(artifacts.transaction.transactionType)
   const proofUpload = useMutation({
     mutationFn: (file: File) =>
-      attachmentsApi.upload('Policy', policyDocumentEntityId, file, 'ProofOfNotice', 'Proof of notice', artifacts.transaction.id),
+      attachmentsApi.upload('Policy', policyDocumentEntityId, file, proofUploadConfig.documentType, proofUploadConfig.description, artifacts.transaction.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', artifacts.transaction.policyId, 'transactions', artifacts.transaction.id, 'artifacts'] })
-      toast.success('Proof of notice uploaded')
+      toast.success(`${proofUploadConfig.description} uploaded`)
     },
     onError: () => toast.error('Proof upload failed'),
   })
@@ -937,7 +938,7 @@ function TransactionArtifactDetails({
               {canUploadProof && (
                 <div className="mb-2">
                   <label className="sd-btn outline xs cursor-pointer">
-                    Upload proof
+                    {proofUploadConfig.buttonLabel}
                     <input
                       type="file"
                       className="hidden"
@@ -1013,7 +1014,13 @@ function TransactionArtifactDetails({
           )}
 
           {activeSection === 'Reinstatement' && (
-            <ReinstatementSummary transaction={transaction} />
+            <ReinstatementSummary
+              transaction={transaction}
+              documents={artifacts.documents.filter((doc) => doc.documentType === 'ReinstatementApproval')}
+              canUploadProof={canUploadProof}
+              proofUploading={proofUpload.isPending}
+              onUploadProof={(file) => proofUpload.mutate(file)}
+            />
           )}
 
           {activeSection === 'Compliance' && (
@@ -1086,8 +1093,60 @@ function CompactRow({ title, meta, value, sub }: { title: string; meta?: string;
   )
 }
 
-function ReinstatementSummary({ transaction }: { transaction: PolicyTransaction }) {
+function getTransactionProofUploadConfig(transactionType: PolicyTransaction['transactionType']): {
+  documentType: DocumentType
+  description: string
+  buttonLabel: string
+} {
+  if (transactionType === 'Reinstatement') {
+    return {
+      documentType: 'ReinstatementApproval',
+      description: 'Reinstatement approval',
+      buttonLabel: 'Upload approval',
+    }
+  }
+
+  return {
+    documentType: 'ProofOfNotice',
+    description: 'Proof of notice',
+    buttonLabel: 'Upload proof',
+  }
+}
+
+function ReinstatementSummary({
+  transaction,
+  documents = [],
+  canUploadProof = false,
+  proofUploading = false,
+  onUploadProof,
+}: {
+  transaction: PolicyTransaction
+  documents?: Attachment[]
+  canUploadProof?: boolean
+  proofUploading?: boolean
+  onUploadProof?: (file: File) => void
+}) {
   const detail = transaction.reinstatementDetail
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const downloadDocument = async (attachment: Attachment) => {
+    setDownloadingId(attachment.id)
+    try {
+      const url = await attachmentsApi.getDownloadUrl(attachment.id)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = attachment.fileName
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch {
+      toast.error('Failed to get download link')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   if (!detail) return <EmptyState text="No reinstatement detail saved." />
 
@@ -1112,6 +1171,46 @@ function ReinstatementSummary({ transaction }: { transaction: PolicyTransaction 
         <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
         <VersionSummary label="Reinstated version" version={transaction.resultingVersion} />
       </div>
+      {canUploadProof && onUploadProof && (
+        <div>
+          <label className="sd-btn outline xs cursor-pointer">
+            {proofUploading ? 'Uploading...' : 'Upload approval'}
+            <input
+              type="file"
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+              disabled={proofUploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.currentTarget.value = ''
+                if (file) onUploadProof(file)
+              }}
+            />
+          </label>
+        </div>
+      )}
+      {documents.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reinstatement Documents</div>
+          {documents.map((doc) => (
+            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-white px-2.5 py-2 text-xs">
+              <div className="min-w-0">
+                <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
+                <div className="text-slate-500">{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
+              </div>
+              <button
+                type="button"
+                className="sims-icon-btn shrink-0"
+                disabled={downloadingId === doc.id}
+                onClick={() => downloadDocument(doc)}
+                title="Download"
+              >
+                {downloadingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

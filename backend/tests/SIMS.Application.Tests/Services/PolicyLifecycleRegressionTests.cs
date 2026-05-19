@@ -1250,10 +1250,16 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(
             new[] { "policy.transaction.created", "policy.transaction.issued" },
             history.Select(h => h.EventName).ToArray());
+        var confirmation = AttachmentFor(fixture, transaction.Id, DocumentType.ReinstatementApproval, "carrier-confirmation.pdf");
+        db.Add(confirmation);
+        await db.SaveChangesAsync();
         var artifacts = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, transaction.Id, UserAccessScope.All(fixture.UserId));
         Assert.True(artifacts.IsSuccess);
         Assert.Equal(new DateOnly(2026, 7, 15), artifacts.Value!.Transaction.ReinstatementDetail?.ReinstatementEffectiveDate);
         Assert.Equal("Payment received", artifacts.Value.Transaction.ReinstatementDetail?.Reason);
+        var document = Assert.Single(artifacts.Value.Documents);
+        Assert.Equal(DocumentType.ReinstatementApproval, document.DocumentType);
+        Assert.Equal(transaction.Id, document.PolicyTransactionId);
     }
 
     [Fact]
