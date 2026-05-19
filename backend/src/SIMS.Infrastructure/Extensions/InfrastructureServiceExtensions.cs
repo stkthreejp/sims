@@ -110,6 +110,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ISystemEventService, SystemEventService>();
         services.AddScoped<IHolidayCalendarService, HolidayCalendarService>();
         services.AddScoped<IEscalationRuleService, EscalationRuleService>();
+        services.AddScoped<IAiModelSettingsService, AiModelSettingsService>();
         services.AddScoped<IFeeCalculationService, FeeCalculationService>();
         services.AddScoped<IFeeAdminService, FeeAdminService>();
         services.AddScoped<ILedgerService, LedgerService>();

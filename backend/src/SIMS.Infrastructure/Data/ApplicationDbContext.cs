@@ -95,6 +95,9 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<ComplianceAttestationCampaign> ComplianceAttestationCampaigns => Set<ComplianceAttestationCampaign>();
     public DbSet<ComplianceAttestationRecipient> ComplianceAttestationRecipients => Set<ComplianceAttestationRecipient>();
     public DbSet<ComplianceAuditLog> ComplianceAuditLogs => Set<ComplianceAuditLog>();
+    public DbSet<AiModelRegistry> AiModelRegistry => Set<AiModelRegistry>();
+    public DbSet<AiUseCaseModelSetting> AiUseCaseModelSettings => Set<AiUseCaseModelSetting>();
+    public DbSet<AiModelSettingAuditLog> AiModelSettingAuditLogs => Set<AiModelSettingAuditLog>();
 
     // Rating
     public DbSet<EquipmentType> EquipmentTypes => Set<EquipmentType>();
@@ -236,6 +239,9 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<ComplianceAttestationCampaign>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ComplianceAttestationRecipient>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ComplianceAuditLog>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<AiModelRegistry>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<AiUseCaseModelSetting>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<AiModelSettingAuditLog>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaCarrierSnapshot>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaInspection>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaViolation>().HasQueryFilter(e => !e.IsDeleted);

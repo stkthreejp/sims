@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIMS.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SIMS.Infrastructure.Data;
 namespace SIMS.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260519235242_AddAiModelSettings")]
+    partial class AddAiModelSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -8333,15 +8336,15 @@ namespace SIMS.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsOverridden")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("MatchedRecordId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("MatchedRecordLabel")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
-
-                    b.Property<bool>("IsOverridden")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("OverriddenAt")
                         .HasColumnType("timestamp with time zone");
