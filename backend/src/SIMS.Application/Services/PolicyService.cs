@@ -225,8 +225,8 @@ public class PolicyService : IPolicyService
                 i.TotalAmount,
                 i.Status,
                 i.PolicyTransactionId,
-                null,
-                null,
+                transaction.TransactionNumber,
+                transaction.TransactionType,
                 i.PolicyVersionId,
                 null))
             .ToListAsync();

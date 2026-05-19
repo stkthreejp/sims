@@ -1034,7 +1034,13 @@ function TransactionArtifactDetails({
           {activeSection === 'Accounting' && (
             <CompactList empty="No linked invoices or accounting records.">
               {artifacts.invoices.map((invoice) => (
-                <CompactRow key={invoice.id} title={invoice.invoiceNumber} meta={`${invoice.status} - ${formatDate(invoice.invoiceDate)}`} value={formatCurrency(invoice.totalAmount)} />
+                <CompactRow
+                  key={invoice.id}
+                  title={invoice.invoiceNumber}
+                  meta={`${invoice.status} - ${formatDate(invoice.invoiceDate)}`}
+                  value={formatCurrency(invoice.totalAmount)}
+                  sub={invoice.policyTransactionNumber ? `${invoice.policyTransactionNumber}${invoice.policyTransactionType ? ` - ${invoice.policyTransactionType}` : ''}` : undefined}
+                />
               ))}
             </CompactList>
           )}

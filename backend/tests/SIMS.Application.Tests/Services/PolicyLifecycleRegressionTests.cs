@@ -613,6 +613,8 @@ public class PolicyLifecycleRegressionTests
         var invoiceDto = Assert.Single(result.Value.Invoices);
         Assert.Equal(invoice.Id, invoiceDto.Id);
         Assert.Equal(transaction.Id, invoiceDto.PolicyTransactionId);
+        Assert.Equal(transaction.TransactionNumber, invoiceDto.PolicyTransactionNumber);
+        Assert.Equal(transaction.TransactionType, invoiceDto.PolicyTransactionType);
         Assert.Equal(version.Id, invoiceDto.PolicyVersionId);
         var communicationDto = Assert.Single(result.Value.Communications);
         Assert.Equal(communication.Id, communicationDto.Id);
