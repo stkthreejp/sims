@@ -502,6 +502,7 @@ export function PolicyDetailPage() {
                   policyDocumentEntityId={policy.boundQuoteId}
                   canUploadProof={canUploadAttachments}
                   canCompleteCancellation={canCancelPolicies}
+                  canCompleteRewrite={canEndorsePolicies}
                 />
               ))}
             </tbody>
@@ -788,11 +789,13 @@ function TransactionRows({
   policyDocumentEntityId,
   canUploadProof,
   canCompleteCancellation,
+  canCompleteRewrite,
 }: {
   transaction: PolicyTransaction
   policyDocumentEntityId: string
   canUploadProof: boolean
   canCompleteCancellation: boolean
+  canCompleteRewrite: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const qc = useQueryClient()
@@ -879,6 +882,7 @@ function TransactionRows({
           artifacts={artifacts}
           policyDocumentEntityId={policyDocumentEntityId}
           canUploadProof={canUploadProof && proofUploadApplies}
+          canCompleteRewrite={canCompleteRewrite}
         />
       )}
       {expanded && !artifacts && (
@@ -894,10 +898,12 @@ function TransactionArtifactDetails({
   artifacts,
   policyDocumentEntityId,
   canUploadProof,
+  canCompleteRewrite,
 }: {
   artifacts: Awaited<ReturnType<typeof policiesApi.getTransactionArtifacts>>
   policyDocumentEntityId: string
   canUploadProof: boolean
+  canCompleteRewrite: boolean
 }) {
   const qc = useQueryClient()
   const [activeSection, setActiveSection] = useState('Versions')
@@ -910,6 +916,18 @@ function TransactionArtifactDetails({
       toast.success(`${proofUploadConfig.description} uploaded`)
     },
     onError: () => toast.error('Proof upload failed'),
+  })
+  const completeRewrite = useMutation({
+    mutationFn: () => policiesApi.completeRewrite(artifacts.transaction.policyId, artifacts.transaction.id, {
+      completedDate: new Date().toISOString().slice(0, 10),
+      notes: 'Replacement policy bound.',
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', artifacts.transaction.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies', artifacts.transaction.policyId, 'transactions', artifacts.transaction.id, 'artifacts'] })
+      toast.success('Rewrite completed')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Rewrite could not be completed'),
   })
   const transaction = artifacts.transaction
   const sections = [
@@ -1052,7 +1070,12 @@ function TransactionArtifactDetails({
           )}
 
           {activeSection === 'Rewrite' && (
-            <RewriteSummary transaction={transaction} />
+            <RewriteSummary
+              transaction={transaction}
+              canComplete={canCompleteRewrite}
+              completing={completeRewrite.isPending}
+              onComplete={() => completeRewrite.mutate()}
+            />
           )}
 
           {activeSection === 'Compliance' && (
@@ -1247,10 +1270,21 @@ function ReinstatementSummary({
   )
 }
 
-function RewriteSummary({ transaction }: { transaction: PolicyTransaction }) {
+function RewriteSummary({
+  transaction,
+  canComplete = false,
+  completing = false,
+  onComplete,
+}: {
+  transaction: PolicyTransaction
+  canComplete?: boolean
+  completing?: boolean
+  onComplete?: () => void
+}) {
   const detail = transaction.rewriteDetail
 
   if (!detail) return <EmptyState text="No rewrite detail saved." />
+  const isComplete = transaction.status === 'Completed'
 
   return (
     <div className="space-y-3">
@@ -1260,7 +1294,20 @@ function RewriteSummary({ transaction }: { transaction: PolicyTransaction }) {
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rewrite</div>
             <div className="mt-1 text-sm font-semibold text-slate-900">{formatDate(transaction.effectiveDate)}</div>
           </div>
-          <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[transaction.status]}`}>{POLICY_TRANSACTION_STATUS_LABELS[transaction.status]}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[transaction.status]}`}>{POLICY_TRANSACTION_STATUS_LABELS[transaction.status]}</span>
+            {canComplete && !isComplete && onComplete && (
+              <button
+                type="button"
+                className="sd-btn primary xs"
+                disabled={completing}
+                onClick={onComplete}
+                title="Complete after the replacement quote is bound"
+              >
+                <Check className="h-3.5 w-3.5" /> {completing ? 'Completing...' : 'Complete'}
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
           <div><span className="text-slate-500">Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
@@ -1268,6 +1315,12 @@ function RewriteSummary({ transaction }: { transaction: PolicyTransaction }) {
             <span className="text-slate-500">Replacement quote:</span>{' '}
             <Link to={`/quotes/${detail.replacementQuoteId}`} className="text-blue-600 hover:text-blue-700">Open quote</Link>
           </div>
+          {detail.replacementPolicyId && (
+            <div>
+              <span className="text-slate-500">Replacement policy:</span>{' '}
+              <Link to={`/policies/${detail.replacementPolicyId}`} className="text-blue-600 hover:text-blue-700">Open policy</Link>
+            </div>
+          )}
         </div>
         {(detail.notes || transaction.notes) && <p className="mt-2 text-sm text-slate-600">{detail.notes ?? transaction.notes}</p>}
       </div>

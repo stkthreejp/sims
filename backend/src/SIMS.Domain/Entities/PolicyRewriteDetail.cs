@@ -6,6 +6,7 @@ public class PolicyRewriteDetail : BaseEntity
     public Guid SourcePolicyId { get; set; }
     public Guid? SourcePolicyVersionId { get; set; }
     public Guid ReplacementQuoteId { get; set; }
+    public Guid? ReplacementPolicyId { get; set; }
     public string Reason { get; set; } = string.Empty;
     public string? Notes { get; set; }
 
@@ -13,4 +14,5 @@ public class PolicyRewriteDetail : BaseEntity
     public Policy SourcePolicy { get; set; } = null!;
     public PolicyVersion? SourcePolicyVersion { get; set; }
     public Quote ReplacementQuote { get; set; } = null!;
+    public Policy? ReplacementPolicy { get; set; }
 }

@@ -30,5 +30,9 @@ public class PolicyRewriteDetailConfiguration : IEntityTypeConfiguration<PolicyR
         builder.HasOne(d => d.ReplacementQuote).WithMany()
             .HasForeignKey(d => d.ReplacementQuoteId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(d => d.ReplacementPolicy).WithMany()
+            .HasForeignKey(d => d.ReplacementPolicyId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

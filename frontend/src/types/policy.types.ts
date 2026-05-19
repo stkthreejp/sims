@@ -210,6 +210,7 @@ export interface PolicyRewriteDetail {
   sourcePolicyId: string
   sourcePolicyVersionId: string | null
   replacementQuoteId: string
+  replacementPolicyId: string | null
   reason: string
   notes: string | null
 }
@@ -311,6 +312,11 @@ export interface StartRewritePolicy {
   effectiveDate: string
   expirationDate?: string
   reason: string
+  notes?: string
+}
+
+export interface CompleteRewritePolicy {
+  completedDate: string
   notes?: string
 }
 

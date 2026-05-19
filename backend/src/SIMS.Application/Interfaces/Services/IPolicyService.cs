@@ -27,6 +27,7 @@ public interface IPolicyService
     Task<Result<PolicyDto>> CompleteCancellationAsync(Guid policyId, Guid transactionId, CompleteCancellationDto dto, UserAccessScope access);
     Task<Result<PolicyDto>> ReinstateAsync(Guid policyId, ReinstatePolicyDto dto, UserAccessScope access);
     Task<Result<PolicyTransactionDto>> StartRewriteAsync(Guid policyId, StartRewritePolicyDto dto, UserAccessScope access);
+    Task<Result<PolicyDto>> CompleteRewriteAsync(Guid policyId, Guid transactionId, CompleteRewritePolicyDto dto, UserAccessScope access);
     Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access);
     Task<Result<PolicyDto>> CompleteNonRenewalAsync(Guid policyId, Guid transactionId, CompleteNonRenewalDto dto, UserAccessScope access);
     Task<Result<LegalComplianceGuidanceDto>> GetCancellationGuidanceAsync(Guid policyId, UserAccessScope access);

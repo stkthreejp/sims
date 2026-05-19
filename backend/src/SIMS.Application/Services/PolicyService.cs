@@ -1192,6 +1192,82 @@ public class PolicyService : IPolicyService
         return Result<PolicyTransactionDto>.Success(MapToTransactionDto(transaction));
     }
 
+    public async Task<Result<PolicyDto>> CompleteRewriteAsync(Guid policyId, Guid transactionId, CompleteRewritePolicyDto dto, UserAccessScope access)
+    {
+        var db = Db;
+        var policy = await db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
+            .Include(p => p.Versions)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can complete a rewrite.");
+
+        var transaction = policy.Transactions.FirstOrDefault(t => t.Id == transactionId && !t.IsDeleted);
+        if (transaction == null)
+            return Result<PolicyDto>.Failure("TRANSACTION_NOT_FOUND", "Rewrite transaction not found.");
+        if (transaction.TransactionType != TransactionType.Rewrite)
+            return Result<PolicyDto>.Failure("INVALID_TRANSACTION_TYPE", "Only rewrite transactions can be completed here.");
+        if (transaction.Status is not (PolicyTransactionStatus.Submitted or PolicyTransactionStatus.InReview or PolicyTransactionStatus.Approved or PolicyTransactionStatus.Quoted or PolicyTransactionStatus.Accepted or PolicyTransactionStatus.Bound or PolicyTransactionStatus.Issued))
+            return Result<PolicyDto>.Failure("INVALID_TRANSACTION_STATUS", "Only active rewrite transactions can be completed.");
+        if (transaction.RewriteDetail == null)
+            return Result<PolicyDto>.Failure("REWRITE_DETAIL_REQUIRED", "Rewrite detail is required before completing rewrite.");
+        if (dto.CompletedDate < transaction.EffectiveDate)
+            return Result<PolicyDto>.Failure("REWRITE_NOT_EFFECTIVE", "Rewrite cannot be completed before the rewrite effective date.");
+
+        var replacementPolicy = await db.Set<Policy>()
+            .Include(p => p.BoundQuote)
+            .Where(p => p.BoundQuoteId == transaction.RewriteDetail.ReplacementQuoteId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (replacementPolicy == null)
+            return Result<PolicyDto>.Failure("REPLACEMENT_POLICY_REQUIRED", "Bind the replacement quote before completing the rewrite.");
+        if (replacementPolicy.Status != PolicyStatus.Active || replacementPolicy.BoundQuote?.Status != QuoteStatus.Bound)
+            return Result<PolicyDto>.Failure("REPLACEMENT_POLICY_NOT_ACTIVE", "Replacement policy must be active and bound before completing the rewrite.");
+        if (replacementPolicy.Id == policy.Id)
+            return Result<PolicyDto>.Failure("INVALID_REPLACEMENT_POLICY", "Replacement policy cannot be the source policy.");
+
+        await using var dbTransaction = await db.Database.BeginTransactionAsync();
+
+        var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(policy, access.UserId);
+        policy.Status = PolicyStatus.Renewed;
+        policy.UpdatedAt = DateTime.UtcNow;
+        transaction.RewriteDetail.ReplacementPolicyId = replacementPolicy.Id;
+        transaction.Notes = string.IsNullOrWhiteSpace(dto.Notes) ? transaction.Notes : dto.Notes.Trim();
+        transaction.ProcessedById = access.UserId;
+        transaction.ProcessedAt = DateTime.UtcNow;
+
+        if (transaction.Status != PolicyTransactionStatus.Issued)
+        {
+            var issueTransition = await _transactionLifecycle.TransitionAsync(
+                transaction,
+                PolicyTransactionStatus.Issued,
+                access.UserId,
+                "Rewrite replacement policy bound.");
+            if (!issueTransition.IsSuccess)
+                return Result<PolicyDto>.Failure(issueTransition.ErrorCode ?? "REWRITE_ISSUE_FAILED", issueTransition.ErrorMessage ?? "Rewrite could not be issued.");
+        }
+
+        var transition = await _transactionLifecycle.TransitionAsync(
+            transaction,
+            PolicyTransactionStatus.Completed,
+            access.UserId,
+            string.IsNullOrWhiteSpace(dto.Notes) ? "Rewrite completed." : dto.Notes.Trim());
+        if (!transition.IsSuccess)
+            return Result<PolicyDto>.Failure(transition.ErrorCode ?? "REWRITE_COMPLETION_FAILED", transition.ErrorMessage ?? "Rewrite could not be completed.");
+
+        await _policyVersions.CreateVersionAsync(policy, transaction, priorVersion, access.UserId);
+        await dbTransaction.CommitAsync();
+
+        return Result<PolicyDto>.Success(MapToDto(policy));
+    }
+
     public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)
     {
         var policy = await Db.Set<Policy>()
@@ -1661,6 +1737,7 @@ public class PolicyService : IPolicyService
             SourcePolicyId = t.RewriteDetail.SourcePolicyId,
             SourcePolicyVersionId = t.RewriteDetail.SourcePolicyVersionId,
             ReplacementQuoteId = t.RewriteDetail.ReplacementQuoteId,
+            ReplacementPolicyId = t.RewriteDetail.ReplacementPolicyId,
             Reason = t.RewriteDetail.Reason,
             Notes = t.RewriteDetail.Notes,
         },

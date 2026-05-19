@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Policy, PolicyListItem, PolicyTransaction, PolicyTransactionArtifacts, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance, CancellationReason, IssueCancellationNotice, CompleteCancellation, CompleteNonRenewal, ReinstatePolicy, StartRewritePolicy } from '@/types/policy.types'
+import type { Policy, PolicyListItem, PolicyTransaction, PolicyTransactionArtifacts, CreateEndorsement, IssueEndorsement, IssuePolicy, PolicyIssuancePacket, NonRenewPolicy, CancelPolicy, LegalComplianceGuidance, CancellationReason, IssueCancellationNotice, CompleteCancellation, CompleteNonRenewal, ReinstatePolicy, StartRewritePolicy, CompleteRewritePolicy } from '@/types/policy.types'
 import type { Quote } from '@/types/quote.types'
 import type { Note } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
@@ -62,6 +62,9 @@ export const policiesApi = {
 
   startRewrite: (id: string, data: StartRewritePolicy) =>
     apiClient.post<PolicyTransaction>(`/policies/${id}/rewrite`, data).then((r) => r.data),
+
+  completeRewrite: (id: string, txnId: string, data: CompleteRewritePolicy) =>
+    apiClient.post<Policy>(`/policies/${id}/rewrites/${txnId}/complete`, data).then((r) => r.data),
 
   completeNonRenewal: (id: string, txnId: string, data: CompleteNonRenewal) =>
     apiClient.post<Policy>(`/policies/${id}/non-renewals/${txnId}/complete`, data).then((r) => r.data),

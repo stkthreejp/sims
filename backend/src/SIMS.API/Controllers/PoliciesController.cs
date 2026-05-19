@@ -195,6 +195,14 @@ public class PoliciesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("{id:guid}/rewrites/{txnId:guid}/complete")]
+    [Authorize(Policy = AppPermissions.PoliciesEndorse)]
+    public async Task<IActionResult> CompleteRewrite(Guid id, Guid txnId, [FromBody] CompleteRewritePolicyDto dto)
+    {
+        var result = await _policies.CompleteRewriteAsync(id, txnId, dto, CurrentAccess);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // --- Non-renewal ---
 
     [HttpPost("{id:guid}/non-renew")]

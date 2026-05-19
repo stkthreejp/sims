@@ -159,6 +159,7 @@ public class PolicyRewriteDetailDto
     public Guid SourcePolicyId { get; set; }
     public Guid? SourcePolicyVersionId { get; set; }
     public Guid ReplacementQuoteId { get; set; }
+    public Guid? ReplacementPolicyId { get; set; }
     public string Reason { get; set; } = string.Empty;
     public string? Notes { get; set; }
 }
@@ -313,6 +314,12 @@ public class StartRewritePolicyDto
     public DateOnly EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
     public string Reason { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+public class CompleteRewritePolicyDto
+{
+    public DateOnly CompletedDate { get; set; }
     public string? Notes { get; set; }
 }
 

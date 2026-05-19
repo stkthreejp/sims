@@ -1353,6 +1353,71 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task CompleteRewrite_BoundReplacementPolicySupersedesSourcePolicy()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var quotes = new RecordingQuoteService(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), quoteService: quotes);
+        var rewrite = await policyService.StartRewriteAsync(fixture.Policy.Id, new StartRewritePolicyDto
+        {
+            EffectiveDate = new DateOnly(2026, 8, 1),
+            Reason = "Carrier requested new paper",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(rewrite.IsSuccess);
+        var rewriteTransaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.Rewrite);
+        var replacementQuote = await db.Set<Quote>().SingleAsync(q => q.Id == rewriteTransaction.RenewalQuoteId);
+        replacementQuote.Status = QuoteStatus.Bound;
+        replacementQuote.PolicyNumber = "POL-REWRITE-1";
+        replacementQuote.BoundDate = new DateOnly(2026, 8, 1);
+        var replacementPolicy = new Policy
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumber = "POL-REWRITE-1",
+            SubmissionId = fixture.Policy.SubmissionId,
+            Submission = fixture.Policy.Submission,
+            BoundQuoteId = replacementQuote.Id,
+            BoundQuote = replacementQuote,
+            CarrierId = fixture.Policy.CarrierId,
+            Carrier = fixture.Policy.Carrier,
+            LineOfBusiness = fixture.Policy.LineOfBusiness,
+            EffectiveDate = replacementQuote.EffectiveDate,
+            ExpirationDate = replacementQuote.ExpirationDate,
+            PremiumAmount = replacementQuote.PremiumAmount,
+            TaxesAndFees = replacementQuote.TaxesAndFees,
+            TotalPremium = replacementQuote.TotalPremium,
+            Status = PolicyStatus.Active,
+            BoundDate = replacementQuote.BoundDate.Value,
+        };
+        db.Add(replacementPolicy);
+        await db.SaveChangesAsync();
+
+        var result = await policyService.CompleteRewriteAsync(
+            fixture.Policy.Id,
+            rewriteTransaction.Id,
+            new CompleteRewritePolicyDto { CompletedDate = new DateOnly(2026, 8, 1), Notes = "Replacement policy bound." },
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(PolicyStatus.Renewed, fixture.Policy.Status);
+        Assert.Equal(PolicyTransactionStatus.Completed, rewriteTransaction.Status);
+        Assert.Equal(replacementPolicy.Id, rewriteTransaction.RewriteDetail?.ReplacementPolicyId);
+        Assert.Equal("Replacement policy bound.", rewriteTransaction.Notes);
+        Assert.NotNull(rewriteTransaction.ResultingPolicyVersionId);
+        var sourceVersions = await db.Set<PolicyVersion>()
+            .Where(v => v.PolicyId == fixture.Policy.Id)
+            .OrderBy(v => v.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(2, sourceVersions.Count);
+        Assert.Equal(PolicyStatus.Active, sourceVersions[0].Status);
+        Assert.Equal(PolicyStatus.Renewed, sourceVersions[1].Status);
+        Assert.Equal(sourceVersions[1].Id, rewriteTransaction.ResultingPolicyVersionId);
+        var artifacts = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, rewriteTransaction.Id, UserAccessScope.All(fixture.UserId));
+        Assert.True(artifacts.IsSuccess);
+        Assert.Equal(replacementPolicy.Id, artifacts.Value!.Transaction.RewriteDetail?.ReplacementPolicyId);
+    }
+
+    [Fact]
     public async Task NonRenewal_CreatesNoticeDetailWithoutClosingPolicy()
     {
         await using var db = CreateDb();
