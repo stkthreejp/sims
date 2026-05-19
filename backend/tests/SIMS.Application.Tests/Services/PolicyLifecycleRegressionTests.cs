@@ -1415,6 +1415,8 @@ public class PolicyLifecycleRegressionTests
         var artifacts = await policyService.GetTransactionArtifactsAsync(fixture.Policy.Id, rewriteTransaction.Id, UserAccessScope.All(fixture.UserId));
         Assert.True(artifacts.IsSuccess);
         Assert.Equal(replacementPolicy.Id, artifacts.Value!.Transaction.RewriteDetail?.ReplacementPolicyId);
+        Assert.Equal(replacementQuote.QuoteNumber, artifacts.Value.Transaction.RewriteDetail?.ReplacementQuoteNumber);
+        Assert.Equal(replacementPolicy.PolicyNumber, artifacts.Value.Transaction.RewriteDetail?.ReplacementPolicyNumber);
     }
 
     [Fact]

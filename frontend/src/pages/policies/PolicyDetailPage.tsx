@@ -1313,12 +1313,12 @@ function RewriteSummary({
           <div><span className="text-slate-500">Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
           <div>
             <span className="text-slate-500">Replacement quote:</span>{' '}
-            <Link to={`/quotes/${detail.replacementQuoteId}`} className="text-blue-600 hover:text-blue-700">Open quote</Link>
+            <Link to={`/quotes/${detail.replacementQuoteId}`} className="text-blue-600 hover:text-blue-700">{detail.replacementQuoteNumber ?? 'Open quote'}</Link>
           </div>
           {detail.replacementPolicyId && (
             <div>
               <span className="text-slate-500">Replacement policy:</span>{' '}
-              <Link to={`/policies/${detail.replacementPolicyId}`} className="text-blue-600 hover:text-blue-700">Open policy</Link>
+              <Link to={`/policies/${detail.replacementPolicyId}`} className="text-blue-600 hover:text-blue-700">{detail.replacementPolicyNumber ?? 'Open policy'}</Link>
             </div>
           )}
         </div>
@@ -1330,7 +1330,7 @@ function RewriteSummary({
         <div>
           <div className="text-xs font-semibold uppercase text-slate-500">Replacement quote</div>
           <div className="mt-1">
-            <Link to={`/quotes/${detail.replacementQuoteId}`} className="font-medium text-blue-600 hover:text-blue-700">Open rewrite quote</Link>
+            <Link to={`/quotes/${detail.replacementQuoteId}`} className="font-medium text-blue-600 hover:text-blue-700">{detail.replacementQuoteNumber ?? 'Open rewrite quote'}</Link>
           </div>
         </div>
       </div>

@@ -210,7 +210,9 @@ export interface PolicyRewriteDetail {
   sourcePolicyId: string
   sourcePolicyVersionId: string | null
   replacementQuoteId: string
+  replacementQuoteNumber: string | null
   replacementPolicyId: string | null
+  replacementPolicyNumber: string | null
   reason: string
   notes: string | null
 }

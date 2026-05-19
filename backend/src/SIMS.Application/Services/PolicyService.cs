@@ -105,6 +105,9 @@ public class PolicyService : IPolicyService
                 .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Transactions).ThenInclude(t => t.ReinstatementDetail)
             .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
+                .ThenInclude(d => d!.ReplacementQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
+                .ThenInclude(d => d!.ReplacementPolicy)
             .Include(p => p.Versions)
             .Where(p => p.Id == id && !p.IsDeleted)
             .ForAccessScope(access)
@@ -125,6 +128,9 @@ public class PolicyService : IPolicyService
                 .ThenInclude(d => d!.NoticeTemplate)
             .Include(p => p.Transactions).ThenInclude(t => t.ReinstatementDetail)
             .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
+                .ThenInclude(d => d!.ReplacementQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.RewriteDetail)
+                .ThenInclude(d => d!.ReplacementPolicy)
             .Include(p => p.Versions)
             .Where(p => p.Id == policyId && !p.IsDeleted)
             .ForAccessScope(access)
@@ -1737,7 +1743,9 @@ public class PolicyService : IPolicyService
             SourcePolicyId = t.RewriteDetail.SourcePolicyId,
             SourcePolicyVersionId = t.RewriteDetail.SourcePolicyVersionId,
             ReplacementQuoteId = t.RewriteDetail.ReplacementQuoteId,
+            ReplacementQuoteNumber = t.RewriteDetail.ReplacementQuote?.QuoteNumber,
             ReplacementPolicyId = t.RewriteDetail.ReplacementPolicyId,
+            ReplacementPolicyNumber = t.RewriteDetail.ReplacementPolicy?.PolicyNumber,
             Reason = t.RewriteDetail.Reason,
             Notes = t.RewriteDetail.Notes,
         },
