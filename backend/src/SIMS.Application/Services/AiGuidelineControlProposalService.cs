@@ -175,7 +175,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
                 $"single-piece-over-{amount / 1000}k",
                 $"Single piece over {FormatAmount(amount)}",
                 "Guideline requires referral review when a single piece exceeds the threshold.",
-                JsonSerializer.Serialize(new { field = "singlePieceValue", op = ">", amount }),
+                JsonSerializer.Serialize(new { field = "largestSingleItemValue", @operator = ">", value = amount }),
                 false,
                 true,
                 AppPermissions.UnderwritingClearanceOverride,

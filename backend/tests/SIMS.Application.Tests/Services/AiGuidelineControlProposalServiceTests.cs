@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.DocumentAI;
 using SIMS.Application.DTOs.Underwriting;
@@ -147,7 +148,10 @@ public class AiGuidelineControlProposalServiceTests
         var pieceReferral = result.Value.Controls.Single(c => c.RuleKey == "single-piece-over-500k");
         Assert.Equal(UnderwritingControlItemType.ReferralTrigger, pieceReferral.ItemType);
         Assert.Equal(UnderwritingControlSeverity.ReferralRequired, pieceReferral.Severity);
-        Assert.Contains("\"amount\":500000", pieceReferral.ConditionJson);
+        using var condition = JsonDocument.Parse(pieceReferral.ConditionJson!);
+        Assert.Equal("largestSingleItemValue", condition.RootElement.GetProperty("field").GetString());
+        Assert.Equal(">", condition.RootElement.GetProperty("operator").GetString());
+        Assert.Equal(500000, condition.RootElement.GetProperty("value").GetInt32());
 
         Assert.Empty(await db.Set<UnderwritingGuidelineControl>()
             .Where(c => c.Status == UnderwritingControlStatus.Published)

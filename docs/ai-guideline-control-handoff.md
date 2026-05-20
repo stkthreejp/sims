@@ -172,6 +172,70 @@ Quote checklist generation currently uses published `DocumentChecklistItem` cont
 
 `Issue`, `PostBind`, and `Renewal` items are stored for review/publish now, but they will not appear in the bind checklist until their dedicated enforcement surfaces are added.
 
+## Condition JSON Guidance
+
+Use `conditionJson` when a proposed control only applies if measurable quote, submission, or policy facts meet a threshold. This is how the deterministic enforcement layer answers whether the rule is triggered.
+
+Default to `conditionJson: null` when the control always applies within the document scope.
+
+For simple threshold rules, use this exact shape:
+
+```json
+{
+  "field": "largestSingleItemValue",
+  "operator": ">",
+  "value": 500000
+}
+```
+
+Example for a conditional referral trigger:
+
+```json
+{
+  "itemType": "ReferralTrigger",
+  "stage": "Quote",
+  "severity": "ReferralRequired",
+  "ruleKey": "single-piece-over-500k",
+  "label": "Single piece over $500K",
+  "description": "Guideline requires referral review when a single piece exceeds the threshold.",
+  "conditionJson": "{\"field\":\"largestSingleItemValue\",\"operator\":\">\",\"value\":500000}",
+  "isBlocking": false,
+  "overrideAllowed": true,
+  "overridePermission": "underwriting.clearance.override",
+  "sourceCitation": "Page 3, Referral Requirements",
+  "aiConfidence": 0.84,
+  "sortOrder": 20
+}
+```
+
+Allowed `operator` values:
+
+- `>`
+- `>=`
+- `<`
+- `<=`
+- `==`
+- `!=`
+- `contains`
+- `in`
+
+Initial known `field` values:
+
+- `largestSingleItemValue`
+- `totalInsuredValue`
+- `premium`
+- `lossRatio`
+- `largestLossAmount`
+- `scheduleCreditPercent`
+- `driverCount`
+- `vehicleCount`
+- `fmcsaSafetyRating`
+- `stateCode`
+- `lineOfBusiness`
+- `carrierId`
+
+If the guideline needs a field that is not listed, still propose the control, but set `conditionJson: null` and explain the missing measurable field in `description` or `sourceCitation`. Do not invent a field name.
+
 ## Rule Key Guidance
 
 Use stable kebab-case keys:
