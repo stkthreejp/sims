@@ -110,6 +110,10 @@ public record AiGuidelineControlProposalRequest(
     CreateUnderwritingGuidelineDocumentRequest Document,
     string GuidelineText);
 
+public record AiGuidelineControlProposalFromAttachmentRequest(
+    Guid AttachmentId,
+    CreateUnderwritingGuidelineDocumentRequest Document);
+
 public record AiGuidelineControlProposalResult(
     UnderwritingGuidelineDocumentDto Document,
     IReadOnlyList<UnderwritingGuidelineControlDto> Controls,

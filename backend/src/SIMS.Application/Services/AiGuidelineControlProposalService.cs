@@ -1,9 +1,11 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Security;
+using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 
 namespace SIMS.Application.Services;
@@ -11,10 +13,60 @@ namespace SIMS.Application.Services;
 public partial class AiGuidelineControlProposalService : IAiGuidelineControlProposalService
 {
     private readonly IUnderwritingGuidelineControlService _guidelines;
+    private readonly DbContext? _db;
+    private readonly IBlobStorageService? _blobStorage;
+    private readonly IDocumentAiExtractionService? _documentAi;
 
     public AiGuidelineControlProposalService(IUnderwritingGuidelineControlService guidelines)
     {
         _guidelines = guidelines;
+    }
+
+    public AiGuidelineControlProposalService(
+        IUnderwritingGuidelineControlService guidelines,
+        DbContext db,
+        IBlobStorageService blobStorage,
+        IDocumentAiExtractionService documentAi)
+    {
+        _guidelines = guidelines;
+        _db = db;
+        _blobStorage = blobStorage;
+        _documentAi = documentAi;
+    }
+
+    public async Task<Result<AiGuidelineControlProposalResult>> ProposeFromAttachmentAsync(
+        AiGuidelineControlProposalFromAttachmentRequest request,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        if (_db == null || _blobStorage == null || _documentAi == null)
+            return Result<AiGuidelineControlProposalResult>.Failure("ATTACHMENT_EXTRACTION_NOT_CONFIGURED", "Guideline attachment extraction is not configured.");
+
+        var attachment = await _db.Set<Attachment>()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(a => a.Id == request.AttachmentId, ct);
+
+        if (attachment == null)
+            return Result<AiGuidelineControlProposalResult>.Failure("ATTACHMENT_NOT_FOUND", "Guideline attachment was not found.");
+
+        if (attachment.DocumentType != DocumentType.UnderwritingGuidelines)
+            return Result<AiGuidelineControlProposalResult>.Failure("ATTACHMENT_NOT_UNDERWRITING_GUIDELINES", "Only underwriting guideline attachments can be used for AI guideline control proposals.");
+
+        if (!IsSupportedTextSource(attachment))
+            return Result<AiGuidelineControlProposalResult>.Failure("UNSUPPORTED_GUIDELINE_ATTACHMENT", "Only PDF and plain-text underwriting guideline attachments are supported for AI proposals.");
+
+        var content = await _blobStorage.DownloadAsync(attachment.BlobPath);
+        var extractedText = await ExtractAttachmentTextAsync(attachment, content, ct);
+        if (string.IsNullOrWhiteSpace(extractedText))
+            return Result<AiGuidelineControlProposalResult>.Failure("GUIDELINE_TEXT_REQUIRED", "No guideline text could be extracted from the attachment.");
+
+        var document = request.Document with
+        {
+            SourceFileName = string.IsNullOrWhiteSpace(request.Document.SourceFileName) ? attachment.FileName : request.Document.SourceFileName,
+            SourceBlobName = string.IsNullOrWhiteSpace(request.Document.SourceBlobName) ? attachment.BlobPath : request.Document.SourceBlobName
+        };
+
+        return await ProposeFromTextAsync(new AiGuidelineControlProposalRequest(document, extractedText), userId, ct);
     }
 
     public async Task<Result<AiGuidelineControlProposalResult>> ProposeFromTextAsync(
@@ -46,6 +98,24 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
             document.Value,
             proposed.Value,
             ["AI proposed controls require human review in Admin > UW Controls before publishing."]));
+    }
+
+    private async Task<string> ExtractAttachmentTextAsync(Attachment attachment, byte[] content, CancellationToken ct)
+    {
+        if (IsPdf(attachment))
+        {
+            var extraction = await _documentAi!.ProcessAsync(
+                content,
+                string.IsNullOrWhiteSpace(attachment.ContentType) ? "application/pdf" : attachment.ContentType,
+                attachment.FileName,
+                ct);
+            return extraction.Text;
+        }
+
+        if (IsPlainText(attachment))
+            return System.Text.Encoding.UTF8.GetString(content);
+
+        return string.Empty;
     }
 
     private static List<CreateUnderwritingGuidelineControlRequest> ExtractControls(string text)
@@ -122,6 +192,17 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
 
     private static string FormatAmount(int amount) =>
         amount >= 1_000_000 ? $"${amount / 1_000_000}M" : $"${amount / 1000}K";
+
+    private static bool IsPdf(Attachment attachment) =>
+        attachment.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
+        attachment.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPlainText(Attachment attachment) =>
+        attachment.ContentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase) ||
+        attachment.FileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSupportedTextSource(Attachment attachment) =>
+        IsPdf(attachment) || IsPlainText(attachment);
 
     private static string SourceCitation(string text, string phrase)
     {

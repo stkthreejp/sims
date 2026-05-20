@@ -70,6 +70,32 @@ Payload:
 
 This helper creates the guideline document and submits proposed controls in one call. It still only creates `AiSuggested` controls; it does not approve, publish, retire, or enforce anything.
 
+AI attachment helper endpoint:
+
+```http
+POST /api/v1/admin/ai-guideline-control-proposals/from-attachment
+```
+
+Payload:
+
+```json
+{
+  "attachmentId": "00000000-0000-0000-0000-000000000000",
+  "document": {
+    "programName": "Longleaf",
+    "carrierId": null,
+    "lineOfBusiness": "InlandMarine",
+    "stateCode": "ALL",
+    "title": "Longleaf Inland Marine UW Guidelines",
+    "sourceFileName": null,
+    "sourceBlobName": null,
+    "notes": "Imported by AI for human review"
+  }
+}
+```
+
+This endpoint reads an uploaded `UnderwritingGuidelines` attachment, extracts text from supported files, fills missing source file/blob values from the attachment, then creates the same `AiSuggested` controls as the text helper. PDF files use the configured Document AI processor. Plain-text files are decoded directly. Other file types return `UNSUPPORTED_GUIDELINE_ATTACHMENT`.
+
 ## Step 2: Submit Proposed Controls
 
 Endpoint:

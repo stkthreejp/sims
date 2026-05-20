@@ -28,4 +28,13 @@ public class AiGuidelineControlProposalsController : ControllerBase
             ? Ok(result.Value)
             : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
+
+    [HttpPost("from-attachment")]
+    public async Task<IActionResult> ProposeFromAttachment([FromBody] AiGuidelineControlProposalFromAttachmentRequest request, CancellationToken ct)
+    {
+        var result = await _service.ProposeFromAttachmentAsync(request, UserId, ct);
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
 }

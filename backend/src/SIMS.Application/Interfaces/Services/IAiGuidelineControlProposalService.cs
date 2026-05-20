@@ -9,4 +9,9 @@ public interface IAiGuidelineControlProposalService
         AiGuidelineControlProposalRequest request,
         Guid userId,
         CancellationToken ct = default);
+
+    Task<Result<AiGuidelineControlProposalResult>> ProposeFromAttachmentAsync(
+        AiGuidelineControlProposalFromAttachmentRequest request,
+        Guid userId,
+        CancellationToken ct = default);
 }

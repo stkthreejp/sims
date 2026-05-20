@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using SIMS.Application.DTOs.DocumentAI;
 using SIMS.Application.DTOs.Underwriting;
+using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
@@ -10,6 +12,96 @@ namespace SIMS.Application.Tests.Services;
 
 public class AiGuidelineControlProposalServiceTests
 {
+    [Fact]
+    public async Task ProposeFromAttachmentAsync_ExtractsPdfAndCreatesAiSuggestedControls()
+    {
+        await using var db = CreateDb();
+        var attachmentId = Guid.NewGuid();
+        db.Set<Attachment>().Add(new Attachment
+        {
+            Id = attachmentId,
+            DocumentType = DocumentType.UnderwritingGuidelines,
+            EntityType = DocumentEntityType.Carrier,
+            FileName = "longleaf-guidelines.pdf",
+            BlobPath = "carrier-guidelines/longleaf-guidelines.pdf",
+            ContentType = "application/pdf",
+            FileSizeBytes = 12,
+            UploadedById = Guid.NewGuid()
+        });
+        await db.SaveChangesAsync();
+
+        var blob = new FakeBlobStorageService([1, 2, 3]);
+        var documentAi = new FakeDocumentAiExtractionService("""
+            Five years currently valued loss runs are required for underwriting review.
+            Signed application is required before bind.
+            """);
+        var guidelineService = new UnderwritingGuidelineControlService(db);
+        var service = new AiGuidelineControlProposalService(guidelineService, db, blob, documentAi);
+        var userId = Guid.NewGuid();
+
+        var result = await service.ProposeFromAttachmentAsync(new AiGuidelineControlProposalFromAttachmentRequest(
+            AttachmentId: attachmentId,
+            Document: new CreateUnderwritingGuidelineDocumentRequest(
+                ProgramName: "Longleaf",
+                CarrierId: null,
+                LineOfBusiness: PolicyLineOfBusiness.InlandMarine,
+                StateCode: "ALL",
+                Title: "Longleaf Inland Marine UW Guidelines",
+                SourceFileName: null,
+                SourceBlobName: null,
+                Notes: "Imported by AI for human review")), userId);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("longleaf-guidelines.pdf", result.Value!.Document.SourceFileName);
+        Assert.Equal("carrier-guidelines/longleaf-guidelines.pdf", result.Value.Document.SourceBlobName);
+        Assert.Equal(2, result.Value.Controls.Count);
+        Assert.All(result.Value.Controls, c => Assert.Equal(UnderwritingControlStatus.AiSuggested, c.Status));
+        Assert.Equal("carrier-guidelines/longleaf-guidelines.pdf", blob.DownloadedPath);
+        Assert.Equal("application/pdf", documentAi.MimeType);
+        Assert.Equal("longleaf-guidelines.pdf", documentAi.FileName);
+    }
+
+    [Fact]
+    public async Task ProposeFromAttachmentAsync_RejectsUnsupportedGuidelineFileTypes()
+    {
+        await using var db = CreateDb();
+        var attachmentId = Guid.NewGuid();
+        db.Set<Attachment>().Add(new Attachment
+        {
+            Id = attachmentId,
+            DocumentType = DocumentType.UnderwritingGuidelines,
+            EntityType = DocumentEntityType.Carrier,
+            FileName = "longleaf-guidelines.docx",
+            BlobPath = "carrier-guidelines/longleaf-guidelines.docx",
+            ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            FileSizeBytes = 12,
+            UploadedById = Guid.NewGuid()
+        });
+        await db.SaveChangesAsync();
+
+        var service = new AiGuidelineControlProposalService(
+            new UnderwritingGuidelineControlService(db),
+            db,
+            new FakeBlobStorageService([1, 2, 3]),
+            new FakeDocumentAiExtractionService("not used"));
+
+        var result = await service.ProposeFromAttachmentAsync(new AiGuidelineControlProposalFromAttachmentRequest(
+            AttachmentId: attachmentId,
+            Document: new CreateUnderwritingGuidelineDocumentRequest(
+                ProgramName: "Longleaf",
+                CarrierId: null,
+                LineOfBusiness: PolicyLineOfBusiness.InlandMarine,
+                StateCode: "ALL",
+                Title: "Longleaf Inland Marine UW Guidelines",
+                SourceFileName: null,
+                SourceBlobName: null,
+                Notes: null)), Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("UNSUPPORTED_GUIDELINE_ATTACHMENT", result.ErrorCode);
+    }
+
     [Fact]
     public async Task ProposeFromTextAsync_CreatesDocumentAndAiSuggestedControlsOnly()
     {
@@ -91,5 +183,37 @@ public class AiGuidelineControlProposalServiceTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+
+    private sealed class FakeBlobStorageService(byte[] content) : IBlobStorageService
+    {
+        public string? DownloadedPath { get; private set; }
+
+        public Task<string> UploadAsync(Stream content, string fileName, string contentType) =>
+            Task.FromResult("not-used");
+
+        public Task<string> GetDownloadUrlAsync(string blobPath, string fileName, TimeSpan? expiry = null) =>
+            Task.FromResult("not-used");
+
+        public Task<byte[]> DownloadAsync(string blobPath)
+        {
+            DownloadedPath = blobPath;
+            return Task.FromResult(content);
+        }
+
+        public Task DeleteAsync(string blobPath) => Task.CompletedTask;
+    }
+
+    private sealed class FakeDocumentAiExtractionService(string text) : IDocumentAiExtractionService
+    {
+        public string? MimeType { get; private set; }
+        public string? FileName { get; private set; }
+
+        public Task<DocumentAiExtractionResult> ProcessAsync(byte[] content, string mimeType, string fileName, CancellationToken cancellationToken = default)
+        {
+            MimeType = mimeType;
+            FileName = fileName;
+            return Task.FromResult(new DocumentAiExtractionResult { Text = text });
+        }
     }
 }
