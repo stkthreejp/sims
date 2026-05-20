@@ -235,6 +235,7 @@ export function UnderwritingControlsAdminPage() {
   }
 
   const guidelineAttachments = carrierAttachments.filter((a: Attachment) => a.documentType === 'UnderwritingGuidelines')
+  const supportedGuidelineAttachments = guidelineAttachments.filter(isSupportedGuidelineAttachment)
 
   if (loadingDocuments) return <LoadingSpinner />
 
@@ -329,10 +330,15 @@ export function UnderwritingControlsAdminPage() {
                     className={inputCls}
                   >
                     <option value="">{documentForm.carrierId ? 'Select guideline attachment' : 'Select company first'}</option>
-                    {guidelineAttachments.map((attachment) => (
+                    {supportedGuidelineAttachments.map((attachment) => (
                       <option key={attachment.id} value={attachment.id}>{attachment.fileName}</option>
                     ))}
                   </select>
+                  {documentForm.carrierId && guidelineAttachments.length > 0 && supportedGuidelineAttachments.length === 0 && (
+                    <div className="text-xs text-amber-700">
+                      Guideline import supports PDF and plain-text files.
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={submitAttachmentProposal}
@@ -597,6 +603,15 @@ function getApiErrorMessage(e: unknown, fallback: string) {
     return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
   }
   return fallback
+}
+
+function isSupportedGuidelineAttachment(attachment: Attachment) {
+  const fileName = attachment.fileName.toLowerCase()
+  const contentType = attachment.contentType.toLowerCase()
+  return fileName.endsWith('.pdf') ||
+    fileName.endsWith('.txt') ||
+    contentType === 'application/pdf' ||
+    contentType.startsWith('text/')
 }
 
 function itemTypeLabel(value: UnderwritingControlItemType) {
