@@ -8310,6 +8310,68 @@ namespace SIMS.Infrastructure.Migrations
                     b.ToTable("task_types", (string)null);
                 });
 
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingAppetiteResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EvaluatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EvaluatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Explanation")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("QuoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ReferralRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RuleName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Triggered")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EvaluatedById");
+
+                    b.HasIndex("QuoteId");
+
+                    b.HasIndex("SubmissionId", "QuoteId", "RuleCode");
+
+                    b.ToTable("UnderwritingAppetiteResults");
+                });
+
             modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingClearanceResult", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8333,15 +8395,15 @@ namespace SIMS.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsOverridden")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("MatchedRecordId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("MatchedRecordLabel")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
-
-                    b.Property<bool>("IsOverridden")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("OverriddenAt")
                         .HasColumnType("timestamp with time zone");
@@ -8379,6 +8441,75 @@ namespace SIMS.Infrastructure.Migrations
                     b.HasIndex("SubmissionId", "CheckType");
 
                     b.ToTable("UnderwritingClearanceResults");
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingReferral", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DecisionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecisionById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("QuoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReferralType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DecisionById");
+
+                    b.HasIndex("QuoteId");
+
+                    b.HasIndex("RequestedById");
+
+                    b.HasIndex("SubmissionId", "QuoteId", "ReferralType");
+
+                    b.ToTable("UnderwritingReferrals");
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.User", b =>
@@ -10412,6 +10543,32 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("ParentTaskType");
                 });
 
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingAppetiteResult", b =>
+                {
+                    b.HasOne("SIMS.Domain.Entities.User", "EvaluatedBy")
+                        .WithMany()
+                        .HasForeignKey("EvaluatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIMS.Domain.Entities.Quote", "Quote")
+                        .WithMany()
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.Submission", "Submission")
+                        .WithMany()
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("EvaluatedBy");
+
+                    b.Navigation("Quote");
+
+                    b.Navigation("Submission");
+                });
+
             modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingClearanceResult", b =>
                 {
                     b.HasOne("SIMS.Domain.Entities.User", "ReviewedBy")
@@ -10427,6 +10584,39 @@ namespace SIMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ReviewedBy");
+
+                    b.Navigation("Submission");
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingReferral", b =>
+                {
+                    b.HasOne("SIMS.Domain.Entities.User", "DecisionBy")
+                        .WithMany()
+                        .HasForeignKey("DecisionById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.Quote", "Quote")
+                        .WithMany()
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.User", "RequestedBy")
+                        .WithMany()
+                        .HasForeignKey("RequestedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIMS.Domain.Entities.Submission", "Submission")
+                        .WithMany()
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DecisionBy");
+
+                    b.Navigation("Quote");
+
+                    b.Navigation("RequestedBy");
 
                     b.Navigation("Submission");
                 });

@@ -72,8 +72,15 @@ Status values:
 - Added inline override reason capture on the submission clearance panel.
 - Added overridden status and audit display for blocked clearance results.
 
+## Sixth Implemented Slice
+
+- Added submission appetite result records.
+- Added required underwriting referral records from quote writeup referral flags.
+- Added quote bind gate for open required underwriting referrals.
+- Added focused tests for referral creation and bind blocking.
+
 ## Immediate Next Slice
 
-1. Add appetite result records and required referral creation.
-2. Add bind/issue gates for unresolved required referrals.
+1. Add referral decision endpoints for approve/decline/waive.
+2. Add policy issue gate for unresolved required referrals.
 3. Add submission appetite/referral UI visibility.

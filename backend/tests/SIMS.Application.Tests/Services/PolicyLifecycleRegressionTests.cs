@@ -234,6 +234,33 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteBind_BlocksWhenRequiredReferralIsOpen()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        db.Add(new UnderwritingReferral
+        {
+            SubmissionId = fixture.Submission.Id,
+            QuoteId = fixture.Quote.Id,
+            ReferralType = "ReferralPremiumOver100k",
+            Status = UnderwritingReferralStatus.Open,
+            Required = true,
+            Reason = "Premium over authority threshold.",
+            RequestedById = fixture.UserId,
+        });
+        await db.SaveChangesAsync();
+        var invoicing = new RecordingInvoicingService();
+        var quoteService = CreateQuoteService(db, invoicing);
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("REFERRAL_REQUIRED", result.ErrorCode);
+        Assert.Empty(await db.Set<PolicyTransaction>().ToListAsync());
+        Assert.Empty(invoicing.BindRequests);
+    }
+
+    [Fact]
     public async Task Invoice_CanReconcileToResultingPolicyVersion()
     {
         await using var db = CreateDb();
@@ -1790,7 +1817,8 @@ public class PolicyLifecycleRegressionTests
             new StubPolicyNumberService(),
             new PolicyTransactionLifecycleService(db, workflow),
             new PolicyVersionService(db),
-            new UnderwritingClearanceService(db));
+            new UnderwritingClearanceService(db),
+            new UnderwritingReferralService(db));
     }
 
     private static PolicyService CreatePolicyService(

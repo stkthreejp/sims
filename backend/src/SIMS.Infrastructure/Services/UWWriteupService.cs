@@ -11,6 +11,7 @@ namespace SIMS.Infrastructure.Services;
 public class UWWriteupService : IUWWriteupService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IUnderwritingReferralService _referrals;
 
     private static readonly JsonSerializerOptions _json = new()
     {
@@ -18,7 +19,11 @@ public class UWWriteupService : IUWWriteupService
         WriteIndented = false,
     };
 
-    public UWWriteupService(ApplicationDbContext db) => _db = db;
+    public UWWriteupService(ApplicationDbContext db, IUnderwritingReferralService referrals)
+    {
+        _db = db;
+        _referrals = referrals;
+    }
 
     public async Task<UWWriteupDto> GetOrCreateAsync(Guid quoteId, Guid userId, CancellationToken ct = default)
     {
@@ -123,6 +128,7 @@ public class UWWriteupService : IUWWriteupService
         }
 
         await _db.SaveChangesAsync(ct);
+        await _referrals.SyncFromWriteupAsync(quoteId, userId, currentPayload, ct);
         await _db.Entry(writeup).Reference(w => w.SubmittedBy).LoadAsync(ct);
         await _db.Entry(writeup).Reference(w => w.ApprovedBy).LoadAsync(ct);
         return await BuildDtoAsync(writeup, quoteId, userId, ct);

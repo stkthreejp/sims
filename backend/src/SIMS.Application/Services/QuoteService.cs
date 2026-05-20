@@ -21,6 +21,7 @@ public class QuoteService : IQuoteService
     private readonly IPolicyTransactionLifecycleService _transactionLifecycle;
     private readonly IPolicyVersionService _policyVersions;
     private readonly IUnderwritingClearanceService _clearance;
+    private readonly IUnderwritingReferralService _referrals;
 
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
@@ -34,7 +35,8 @@ public class QuoteService : IQuoteService
         IPolicyNumberService policyNumbers,
         IPolicyTransactionLifecycleService transactionLifecycle,
         IPolicyVersionService policyVersions,
-        IUnderwritingClearanceService clearance)
+        IUnderwritingClearanceService clearance,
+        IUnderwritingReferralService referrals)
     {
         _sp = sp;
         _workflowEngine = workflowEngine;
@@ -45,6 +47,7 @@ public class QuoteService : IQuoteService
         _transactionLifecycle = transactionLifecycle;
         _policyVersions = policyVersions;
         _clearance = clearance;
+        _referrals = referrals;
     }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -284,6 +287,8 @@ public class QuoteService : IQuoteService
         var clearance = await _clearance.EvaluateSubmissionAsync(quote.SubmissionId, access.UserId);
         if (clearance.OverallStatus == UnderwritingClearanceStatus.Blocked)
             return Result<QuoteDto>.Failure("CLEARANCE_BLOCKED", "Resolve blocked underwriting clearance results before binding this quote.");
+        if (await _referrals.HasOpenRequiredReferralsAsync(quote.SubmissionId))
+            return Result<QuoteDto>.Failure("REFERRAL_REQUIRED", "Resolve required underwriting referrals before binding this quote.");
 
         await using var dbTransaction = await Db.Database.BeginTransactionAsync();
 
