@@ -119,5 +119,34 @@ public class UnderwritingReferralService : IUnderwritingReferralService
             r.Status == UnderwritingReferralStatus.Open,
             ct);
 
+    public async Task<UnderwritingReferral> DecideAsync(
+        Guid referralId,
+        UnderwritingReferralStatus decision,
+        Guid decisionById,
+        string? notes,
+        CancellationToken ct = default)
+    {
+        if (decision == UnderwritingReferralStatus.Open)
+            throw new InvalidOperationException("Referral decision must close the referral.");
+
+        var referral = await _db.Set<UnderwritingReferral>()
+            .FirstOrDefaultAsync(r => r.Id == referralId, ct);
+
+        if (referral == null)
+            throw new InvalidOperationException("Underwriting referral not found.");
+
+        if (referral.Status != UnderwritingReferralStatus.Open)
+            throw new InvalidOperationException("Only open underwriting referrals can be decided.");
+
+        referral.Status = decision;
+        referral.DecisionById = decisionById;
+        referral.DecisionAt = DateTime.UtcNow;
+        referral.DecisionNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        referral.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        return referral;
+    }
+
     private sealed record AppetiteRule(string Code, string Name, Func<IMWriteupPayload, bool> IsTriggered);
 }

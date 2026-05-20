@@ -466,6 +466,35 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task IssuePolicy_BlocksWhenRequiredReferralIsOpen()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        db.Add(new UnderwritingReferral
+        {
+            SubmissionId = fixture.Submission.Id,
+            QuoteId = fixture.Quote.Id,
+            ReferralType = "ReferralPremiumOver100k",
+            Status = UnderwritingReferralStatus.Open,
+            Required = true,
+            Reason = "Premium over authority threshold.",
+            RequestedById = fixture.UserId,
+        });
+        await db.SaveChangesAsync();
+        var assembly = new RecordingPolicyAssemblyService();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), assembly: assembly);
+
+        var result = await policyService.IssueAsync(fixture.Policy.Id, new IssuePolicyDto
+        {
+            IssuedDate = new DateOnly(2026, 1, 5),
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("REFERRAL_REQUIRED", result.ErrorCode);
+        Assert.False(assembly.WasCalled);
+    }
+
+    [Fact]
     public async Task IssuePolicy_CompletesNewBusinessTransaction()
     {
         await using var db = CreateDb();
@@ -1837,6 +1866,7 @@ public class PolicyLifecycleRegressionTests
             .AddSingleton<IQuotePolicyFormSelectionService>(new NoOpQuotePolicyFormSelectionService())
             .AddSingleton<IPolicyAssemblyService>(assembly)
             .AddSingleton<IDocumentGenerationService>(documentGeneration ?? new RecordingDocumentGenerationService(db))
+            .AddSingleton<IUnderwritingReferralService>(new UnderwritingReferralService(db))
             .AddSingleton(quoteService)
             .BuildServiceProvider();
 

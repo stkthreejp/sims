@@ -38,6 +38,34 @@ public class UnderwritingReferralServiceTests
         Assert.True(referral.Required);
     }
 
+    [Fact]
+    public async Task DecideAsync_ApprovesOpenReferralAndRecordsDecisionAudit()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedQuoteAsync(db);
+        var referral = new UnderwritingReferral
+        {
+            SubmissionId = fixture.Submission.Id,
+            QuoteId = fixture.Quote.Id,
+            ReferralType = "ReferralPremiumOver100k",
+            Status = UnderwritingReferralStatus.Open,
+            Required = true,
+            Reason = "Premium over authority threshold.",
+            RequestedById = fixture.UserId,
+        };
+        db.Add(referral);
+        await db.SaveChangesAsync();
+        var service = new UnderwritingReferralService(db);
+
+        var result = await service.DecideAsync(referral.Id, UnderwritingReferralStatus.Approved, fixture.UserId, "Within appetite.");
+
+        Assert.Equal(UnderwritingReferralStatus.Approved, result.Status);
+        Assert.Equal(fixture.UserId, result.DecisionById);
+        Assert.NotNull(result.DecisionAt);
+        Assert.Equal("Within appetite.", result.DecisionNotes);
+        Assert.False(await service.HasOpenRequiredReferralsAsync(fixture.Submission.Id));
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

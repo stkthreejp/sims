@@ -412,6 +412,10 @@ public class PolicyService : IPolicyService
         if (policy.IssuedDate.HasValue)
             return Result<PolicyDto>.Failure("ALREADY_ISSUED", "Policy has already been issued.");
 
+        var referrals = (IUnderwritingReferralService?)_sp.GetService(typeof(IUnderwritingReferralService));
+        if (referrals != null && await referrals.HasOpenRequiredReferralsAsync(policy.SubmissionId))
+            return Result<PolicyDto>.Failure("REFERRAL_REQUIRED", "Resolve required underwriting referrals before issuing this policy.");
+
         var packet = await GetIssuancePacketAsync(policyId, access);
         if (!packet.IsSuccess)
             return Result<PolicyDto>.Failure(packet.ErrorCode ?? "ISSUANCE_PACKET_ERROR", packet.ErrorMessage ?? "Unable to load issuance packet.");
