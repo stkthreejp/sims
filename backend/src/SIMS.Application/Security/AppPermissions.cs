@@ -29,6 +29,8 @@ public static class AppPermissions
     public const string AdminRolesView = "admin.roles.view";
     public const string AdminRolesManage = "admin.roles.manage";
     public const string AdminSystemManage = "admin.system.manage";
+    public const string AdminUnderwritingControlsManage = "admin.underwriting-controls.manage";
+    public const string AdminUnderwritingControlsPublish = "admin.underwriting-controls.publish";
 
     public const string UnderwritingManage = "underwriting.manage";
     public const string UnderwritingClearanceOverride = "underwriting.clearance.override";
@@ -79,6 +81,8 @@ public static class AppPermissions
         new(AdminRolesView, "View Roles", "Admin"),
         new(AdminRolesManage, "Manage Roles", "Admin"),
         new(AdminSystemManage, "Manage System Administration", "Admin"),
+        new(AdminUnderwritingControlsManage, "Manage Underwriting Control Setup", "Admin"),
+        new(AdminUnderwritingControlsPublish, "Publish Underwriting Controls", "Admin"),
 
         new(UnderwritingManage, "Manage Underwriting Workflows", "Underwriting"),
         new(UnderwritingClearanceOverride, "Override Underwriting Clearance Blocks", "Underwriting"),

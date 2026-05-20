@@ -8443,6 +8443,260 @@ namespace SIMS.Infrastructure.Migrations
                     b.ToTable("UnderwritingClearanceResults");
                 });
 
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AfterJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("BeforeJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("GuidelineControlId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("GuidelineDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("GuidelineControlId", "CreatedAt");
+
+                    b.HasIndex("GuidelineDocumentId", "CreatedAt");
+
+                    b.ToTable("underwriting_guideline_audit_logs", (string)null);
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineControl", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("AiConfidence")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)");
+
+                    b.Property<Guid?>("CarrierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConditionJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("GuidelineDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsBlocking")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ItemType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<int>("LineOfBusiness")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("OverrideAllowed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OverridePermission")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ProgramName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PublishedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RetiredByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RetirementReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RuleKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceCitation")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StateCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierId");
+
+                    b.HasIndex("PublishedByUserId");
+
+                    b.HasIndex("RetiredByUserId");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("GuidelineDocumentId", "RuleKey");
+
+                    b.HasIndex("Status", "ProgramName", "CarrierId", "LineOfBusiness", "StateCode");
+
+                    b.ToTable("underwriting_guideline_controls", (string)null);
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CarrierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("LineOfBusiness")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ProgramName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("SourceBlobName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("SourceFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<string>("StateCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ProgramName", "CarrierId", "LineOfBusiness", "StateCode", "Version");
+
+                    b.ToTable("underwriting_guideline_documents", (string)null);
+                });
+
             modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingReferral", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10588,6 +10842,88 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("Submission");
                 });
 
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineAuditLog", b =>
+                {
+                    b.HasOne("SIMS.Domain.Entities.User", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SIMS.Domain.Entities.UnderwritingGuidelineControl", "GuidelineControl")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("GuidelineControlId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.UnderwritingGuidelineDocument", "GuidelineDocument")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("GuidelineDocumentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ActorUser");
+
+                    b.Navigation("GuidelineControl");
+
+                    b.Navigation("GuidelineDocument");
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineControl", b =>
+                {
+                    b.HasOne("SIMS.Domain.Entities.Carrier", "Carrier")
+                        .WithMany()
+                        .HasForeignKey("CarrierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.UnderwritingGuidelineDocument", "GuidelineDocument")
+                        .WithMany("Controls")
+                        .HasForeignKey("GuidelineDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SIMS.Domain.Entities.User", "PublishedByUser")
+                        .WithMany()
+                        .HasForeignKey("PublishedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.User", "RetiredByUser")
+                        .WithMany()
+                        .HasForeignKey("RetiredByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.User", "ReviewedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Carrier");
+
+                    b.Navigation("GuidelineDocument");
+
+                    b.Navigation("PublishedByUser");
+
+                    b.Navigation("RetiredByUser");
+
+                    b.Navigation("ReviewedByUser");
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineDocument", b =>
+                {
+                    b.HasOne("SIMS.Domain.Entities.Carrier", "Carrier")
+                        .WithMany()
+                        .HasForeignKey("CarrierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIMS.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Carrier");
+
+                    b.Navigation("CreatedByUser");
+                });
+
             modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingReferral", b =>
                 {
                     b.HasOne("SIMS.Domain.Entities.User", "DecisionBy")
@@ -10944,6 +11280,18 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("ChildTaskTypes");
 
                     b.Navigation("TaskInstances");
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineControl", b =>
+                {
+                    b.Navigation("AuditLogs");
+                });
+
+            modelBuilder.Entity("SIMS.Domain.Entities.UnderwritingGuidelineDocument", b =>
+                {
+                    b.Navigation("AuditLogs");
+
+                    b.Navigation("Controls");
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.User", b =>

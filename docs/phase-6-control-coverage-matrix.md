@@ -79,8 +79,28 @@ Status values:
 - Added quote bind gate for open required underwriting referrals.
 - Added focused tests for referral creation and bind blocking.
 
+## Seventh Implemented Slice
+
+- Added referral decision endpoints for approve, decline, and waive.
+- Added policy issue gate for unresolved required referrals.
+- Added submission appetite/referral UI visibility.
+
+## Eighth Implemented Slice
+
+- Added quote bind warning/disable messaging for open required referrals.
+- Added policy issue preview/issue blocking for open required referrals.
+- Linked quote and policy blocker messages back to submission referral review.
+
+## Ninth Implemented Slice
+
+- Added admin guideline document records scoped by program, company, line, and state/all states.
+- Added proposed/published underwriting control records for appetite rules, referral triggers, authority limits, document checklist items, and appetite notes.
+- Added review, approve, reject, publish, and retire API workflow.
+- Added audit log records for document creation and every control review/publish/retire action.
+- Added admin permissions for managing and publishing underwriting controls.
+
 ## Immediate Next Slice
 
-1. Add referral decision endpoints for approve/decline/waive.
-2. Add policy issue gate for unresolved required referrals.
-3. Add submission appetite/referral UI visibility.
+1. Add Admin UI for guideline documents and proposed/published controls.
+2. Add AI-agent import handoff endpoint usage notes for proposed controls.
+3. Wire published document checklist controls into quote checklist generation.
