@@ -4,12 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Ban, Download, FileSignature, FileX2, Loader2, Pin, PinOff, Pencil, RotateCcw, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
+import { quotesApi } from '@/api/quotes.api'
 import { submissionsApi } from '@/api/submissions.api'
 import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
 import { attachmentsApi } from '@/api/attachments.api'
 import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
+import type { QuoteChecklistItem } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
 import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy, StartRewritePolicy } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
@@ -104,6 +106,12 @@ export function PolicyDetailPage() {
     queryKey: ['submissions', policy?.submissionId, 'underwriting-referrals'],
     queryFn: () => submissionsApi.getUnderwritingReferrals(policy!.submissionId),
     enabled: !!policy?.submissionId,
+  })
+
+  const { data: policyChecklist = [] } = useQuery({
+    queryKey: ['quote-checklist', policy?.boundQuoteId, 'policy-documents'],
+    queryFn: () => quotesApi.getChecklist(policy!.boundQuoteId, ['Issue', 'PostBind']),
+    enabled: !!policy?.boundQuoteId,
   })
 
   const { data: enforcementSummary } = useQuery({
@@ -218,6 +226,15 @@ export function PolicyDetailPage() {
       toast.success('Underwriting blocker override recorded')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to override underwriting blocker'),
+  })
+
+  const togglePolicyChecklistMutation = useMutation({
+    mutationFn: ({ itemId, completed }: { itemId: string; completed: boolean }) =>
+      quotesApi.toggleChecklistItem(policy!.boundQuoteId, itemId, completed),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quote-checklist', policy?.boundQuoteId, 'policy-documents'] })
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Checklist item could not be updated'),
   })
 
   const previewPacketMutation = useMutation({
@@ -515,6 +532,10 @@ export function PolicyDetailPage() {
       <PolicyIssuancePanel
         packet={issuancePacket}
         canIssue={canIssuePolicies && policy.status === 'Active' && !policy.issuedDate}
+        checklist={policyChecklist.filter((item) => item.stage === 'Issue')}
+        canManageChecklist={canManageUnderwriting}
+        checklistSaving={togglePolicyChecklistMutation.isPending}
+        onToggleChecklist={(itemId, completed) => togglePolicyChecklistMutation.mutate({ itemId, completed })}
         referralSummary={referralSummary}
         submissionId={policy.submissionId}
         issuing={issuePolicyMutation.isPending}
@@ -677,6 +698,13 @@ export function PolicyDetailPage() {
 
       {/* Documents */}
       <div>
+        <PolicyDocumentChecklistPanel
+          title="Post-bind document checklist"
+          items={policyChecklist.filter((item) => item.stage === 'PostBind')}
+          canManage={canManageUnderwriting}
+          saving={togglePolicyChecklistMutation.isPending}
+          onToggle={(itemId, completed) => togglePolicyChecklistMutation.mutate({ itemId, completed })}
+        />
         <DocumentsSection entityType="Policy" entityId={policy.boundQuoteId} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
       </div>
     </div>
@@ -698,9 +726,66 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString()
 }
 
+function PolicyDocumentChecklistPanel({
+  title,
+  items,
+  canManage,
+  saving,
+  onToggle,
+}: {
+  title: string
+  items: QuoteChecklistItem[]
+  canManage: boolean
+  saving: boolean
+  onToggle: (itemId: string, completed: boolean) => void
+}) {
+  if (items.length === 0) return null
+
+  const openBlockers = items.filter((item) => item.isBlocker && !item.isCompleted).length
+
+  return (
+    <div className="mb-3 overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
+        <div>
+          <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{title}</div>
+          <div className="text-xs" style={{ color: 'var(--ink-3)' }}>
+            {openBlockers > 0 ? `${openBlockers} blocker${openBlockers === 1 ? '' : 's'} open` : 'Document items tracked from published UW controls'}
+          </div>
+        </div>
+      </div>
+      <div className="divide-y" style={{ borderColor: 'var(--line-2)' }}>
+        {items.map((item) => (
+          <label key={item.id} className="flex items-start gap-3 px-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={item.isCompleted}
+              disabled={!canManage || saving}
+              onChange={(e) => onToggle(item.id, e.target.checked)}
+            />
+            <span className="min-w-0 flex-1">
+              <span className={`block font-medium ${item.isCompleted ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{item.label}</span>
+              <span className="mt-0.5 flex flex-wrap gap-2 text-xs text-slate-400">
+                <span>{item.stage === 'PostBind' ? 'Post-bind' : item.stage}</span>
+                {item.isBlocker && <span className="font-semibold text-amber-700">Required</span>}
+                {item.completedAt && <span>Completed {new Date(item.completedAt).toLocaleString()}</span>}
+                {item.completedByName && <span>{item.completedByName}</span>}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function PolicyIssuancePanel({
   packet,
   canIssue,
+  checklist,
+  canManageChecklist,
+  checklistSaving,
+  onToggleChecklist,
   referralSummary,
   submissionId,
   issuing,
@@ -710,6 +795,10 @@ function PolicyIssuancePanel({
 }: {
   packet?: PolicyIssuancePacket
   canIssue: boolean
+  checklist: QuoteChecklistItem[]
+  canManageChecklist: boolean
+  checklistSaving: boolean
+  onToggleChecklist: (itemId: string, completed: boolean) => void
   referralSummary?: UnderwritingReferralSummary
   submissionId: string
   issuing: boolean
@@ -803,6 +892,13 @@ function PolicyIssuancePanel({
                 Preview creates a draft PDF for review. Issue policy creates and files the final issued packet.
               </div>
             )}
+            <PolicyDocumentChecklistPanel
+              title="Issue document checklist"
+              items={checklist}
+              canManage={canManageChecklist}
+              saving={checklistSaving}
+              onToggle={onToggleChecklist}
+            />
             <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>
               {includedForms.map((form) => (
                 <div key={form.id} className="flex items-center gap-3 border-b px-3 py-2.5 text-sm last:border-b-0" style={{ borderColor: 'var(--line-2)' }}>

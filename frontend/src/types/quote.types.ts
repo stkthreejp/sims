@@ -426,6 +426,7 @@ export interface FmcsaAnalyticsRefresh {
 export interface QuoteChecklistItem {
   id: string
   quoteId: string
+  stage: 'Submission' | 'Quote' | 'Bind' | 'Issue' | 'PostBind' | 'Renewal'
   triggerKey: string
   label: string
   isBlocker: boolean

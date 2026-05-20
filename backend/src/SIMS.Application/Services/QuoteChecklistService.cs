@@ -65,14 +65,18 @@ public class QuoteChecklistService : IQuoteChecklistService
             await Db.SaveChangesAsync();
     }
 
-    public async Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId)
+    public async Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
     {
+        var requestedStages = stages is { Count: > 0 }
+            ? stages.ToHashSet()
+            : EarlyChecklistStages.ToHashSet();
+
         var items = await Db.Set<QuoteChecklistItem>()
-            .Where(c => c.QuoteId == quoteId && !c.IsDeleted)
+            .Where(c => c.QuoteId == quoteId && !c.IsDeleted && requestedStages.Contains(c.Stage))
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
 
-        var addedItems = await AddMissingPublishedGuidelineItemsAsync(quoteId, items);
+        var addedItems = await AddMissingPublishedGuidelineItemsAsync(quoteId, items, requestedStages);
         if (addedItems.Count > 0)
             items.AddRange(addedItems);
 
@@ -166,11 +170,21 @@ public class QuoteChecklistService : IQuoteChecklistService
         return anyUpdated;
     }
 
-    private async Task<List<QuoteChecklistItem>> AddMissingPublishedGuidelineItemsAsync(Guid quoteId, List<QuoteChecklistItem> existingItems)
+    private static readonly UnderwritingControlStage[] EarlyChecklistStages =
+    [
+        UnderwritingControlStage.Submission,
+        UnderwritingControlStage.Quote,
+        UnderwritingControlStage.Bind
+    ];
+
+    private async Task<List<QuoteChecklistItem>> AddMissingPublishedGuidelineItemsAsync(
+        Guid quoteId,
+        List<QuoteChecklistItem> existingItems,
+        IReadOnlyCollection<UnderwritingControlStage> stages)
     {
         var existingKeys = existingItems.Select(i => i.TriggerKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var nextSortOrder = existingItems.Count == 0 ? 0 : existingItems.Max(i => i.SortOrder) + 1;
-        var missing = (await BuildPublishedGuidelineChecklistItemsAsync(quoteId, nextSortOrder))
+        var missing = (await BuildPublishedGuidelineChecklistItemsAsync(quoteId, nextSortOrder, stages))
             .Where(i => !existingKeys.Contains(i.TriggerKey))
             .ToList();
 
@@ -182,7 +196,10 @@ public class QuoteChecklistService : IQuoteChecklistService
         return missing;
     }
 
-    private async Task<List<QuoteChecklistItem>> BuildPublishedGuidelineChecklistItemsAsync(Guid quoteId, int startSortOrder)
+    private async Task<List<QuoteChecklistItem>> BuildPublishedGuidelineChecklistItemsAsync(
+        Guid quoteId,
+        int startSortOrder,
+        IReadOnlyCollection<UnderwritingControlStage>? stages = null)
     {
         var quote = await Db.Set<Quote>()
             .Include(q => q.Submission)
@@ -197,12 +214,7 @@ public class QuoteChecklistService : IQuoteChecklistService
             ? "ALL"
             : quote.Submission.Insured.State.Trim().ToUpperInvariant();
 
-        var allowedStages = new[]
-        {
-            UnderwritingControlStage.Submission,
-            UnderwritingControlStage.Quote,
-            UnderwritingControlStage.Bind
-        };
+        var allowedStages = stages is { Count: > 0 } ? stages : EarlyChecklistStages;
 
         var controls = await Db.Set<UnderwritingGuidelineControl>()
             .AsNoTracking()
@@ -222,6 +234,7 @@ public class QuoteChecklistService : IQuoteChecklistService
             TriggerKey = $"guideline:{control.Id}",
             Label = control.Label,
             IsBlocker = control.IsBlocking,
+            Stage = control.Stage,
             SortOrder = startSortOrder + index,
         }).ToList();
     }
@@ -238,6 +251,6 @@ public class QuoteChecklistService : IQuoteChecklistService
     }
 
     private static QuoteChecklistItemDto Map(QuoteChecklistItem i) => new(
-        i.Id, i.QuoteId, i.TriggerKey, i.Label, i.IsBlocker, i.SortOrder,
+        i.Id, i.QuoteId, i.Stage, i.TriggerKey, i.Label, i.IsBlocker, i.SortOrder,
         i.IsCompleted, i.CompletionSource, i.CompletedById, i.CompletedByName, i.CompletedAt);
 }

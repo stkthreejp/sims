@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Security;
+using SIMS.Domain.Enums;
 using System.Security.Claims;
 
 namespace SIMS.API.Controllers;
@@ -22,9 +23,9 @@ public class QuoteChecklistController : ControllerBase
         ?? "Unknown";
 
     [HttpGet]
-    public async Task<IActionResult> GetForQuote(Guid quoteId)
+    public async Task<IActionResult> GetForQuote(Guid quoteId, [FromQuery] UnderwritingControlStage[]? stages)
     {
-        var result = await _checklist.GetForQuoteAsync(quoteId);
+        var result = await _checklist.GetForQuoteAsync(quoteId, stages);
         return result.IsSuccess ? Ok(result.Value) : NotFound();
     }
 

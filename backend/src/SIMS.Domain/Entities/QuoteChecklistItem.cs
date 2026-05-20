@@ -1,8 +1,11 @@
 namespace SIMS.Domain.Entities;
 
+using SIMS.Domain.Enums;
+
 public class QuoteChecklistItem : BaseEntity
 {
     public Guid QuoteId { get; set; }
+    public UnderwritingControlStage Stage { get; set; } = UnderwritingControlStage.Bind;
     public string TriggerKey { get; set; } = string.Empty;   // e.g. "rated", "has_application"
     public string Label { get; set; } = string.Empty;
     public bool IsBlocker { get; set; } = true;

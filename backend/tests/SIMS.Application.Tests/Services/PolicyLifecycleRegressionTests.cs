@@ -88,6 +88,40 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteChecklist_ReturnsPublishedIssueAndPostBindDocumentItemsByStage()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        var document = new UnderwritingGuidelineDocument
+        {
+            Id = Guid.NewGuid(),
+            ProgramName = "Longleaf",
+            CarrierId = fixture.Carrier.Id,
+            LineOfBusiness = fixture.Quote.LineOfBusiness,
+            StateCode = "ALL",
+            Title = "Test guideline",
+            CreatedByUserId = fixture.UserId,
+        };
+        db.Add(document);
+        db.AddRange(
+            PublishedDocumentControl(document, fixture, UnderwritingControlStage.Bind, "bind-signed-app", "Signed application", 0),
+            PublishedDocumentControl(document, fixture, UnderwritingControlStage.Issue, "issue-subjectivities", "Subjectivities satisfied", 1),
+            PublishedDocumentControl(document, fixture, UnderwritingControlStage.PostBind, "post-bind-surplus-lines", "Surplus lines filing", 2));
+        await db.SaveChangesAsync();
+        var checklist = CreateQuoteChecklistService(db);
+
+        var issueItems = await checklist.GetForQuoteAsync(fixture.Quote.Id, [UnderwritingControlStage.Issue, UnderwritingControlStage.PostBind]);
+
+        Assert.True(issueItems.IsSuccess);
+        Assert.NotNull(issueItems.Value);
+        Assert.Equal(
+            new[] { "Subjectivities satisfied", "Surplus lines filing" },
+            issueItems.Value!.Select(i => i.Label).ToArray());
+        Assert.All(issueItems.Value, item => Assert.True(item.Stage is UnderwritingControlStage.Issue or UnderwritingControlStage.PostBind));
+        Assert.DoesNotContain(issueItems.Value, item => item.Label == "Signed application");
+    }
+
+    [Fact]
     public async Task QuoteBind_CreatesNewBusinessTransaction()
     {
         await using var db = CreateDb();
@@ -1922,6 +1956,15 @@ public class PolicyLifecycleRegressionTests
         return new PolicyService(services, invoicing, new RecordingVoidService(), new PolicyTransactionLifecycleService(db, workflow), new PolicyVersionService(db));
     }
 
+    private static QuoteChecklistService CreateQuoteChecklistService(ApplicationDbContext db)
+    {
+        var services = new ServiceCollection()
+            .AddSingleton<DbContext>(db)
+            .BuildServiceProvider();
+
+        return new QuoteChecklistService(services);
+    }
+
     private static QuoteBindDto BindRequest() => new()
     {
         BoundDate = new DateOnly(2026, 1, 5),
@@ -1954,6 +1997,32 @@ public class PolicyLifecycleRegressionTests
         await db.SaveChangesAsync();
         return fixture;
     }
+
+    private static UnderwritingGuidelineControl PublishedDocumentControl(
+        UnderwritingGuidelineDocument document,
+        QuoteFixture fixture,
+        UnderwritingControlStage stage,
+        string ruleKey,
+        string label,
+        int sortOrder) => new()
+        {
+            GuidelineDocumentId = document.Id,
+            GuidelineDocument = document,
+            ProgramName = document.ProgramName,
+            CarrierId = fixture.Carrier.Id,
+            LineOfBusiness = fixture.Quote.LineOfBusiness,
+            StateCode = "ALL",
+            ItemType = UnderwritingControlItemType.DocumentChecklistItem,
+            Stage = stage,
+            Severity = UnderwritingControlSeverity.HardBlock,
+            Status = UnderwritingControlStatus.Published,
+            RuleKey = ruleKey,
+            Label = label,
+            IsBlocking = true,
+            SortOrder = sortOrder,
+            PublishedByUserId = fixture.UserId,
+            PublishedAt = DateTime.UtcNow,
+        };
 
     private static async Task SeedSnapshotExposureDataAsync(ApplicationDbContext db, QuoteFixture fixture)
     {
@@ -2470,7 +2539,7 @@ public class PolicyLifecycleRegressionTests
 
     private sealed class NoOpQuoteChecklistService : IQuoteChecklistService
     {
-        public Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId)
+        public Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
             => Task.FromResult(Result<List<QuoteChecklistItemDto>>.Success([]));
 
         public Task SeedDefaultsAsync(Guid quoteId, PolicyLineOfBusiness lob)

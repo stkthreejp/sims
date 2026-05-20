@@ -1,8 +1,11 @@
 namespace SIMS.Application.DTOs.Quotes;
 
+using SIMS.Domain.Enums;
+
 public record QuoteChecklistItemDto(
     Guid Id,
     Guid QuoteId,
+    UnderwritingControlStage Stage,
     string TriggerKey,
     string Label,
     bool IsBlocker,

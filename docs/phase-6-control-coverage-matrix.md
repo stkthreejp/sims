@@ -129,8 +129,15 @@ Status values:
 - Added inline blocker override capture for users with `underwriting.clearance.override`.
 - Refreshed enforcement results after bind/issue failures caused by published blockers.
 
+## Fourteenth Implemented Slice
+
+- Added stage tracking to quote checklist items so published document checklist controls can be separated by submission, quote, bind, issue, post-bind, and renewal stages.
+- Added stage-filtered checklist API reads while preserving the quote page's existing early-stage bind checklist behavior.
+- Added policy page surfaces for Issue and PostBind document checklist controls tied to the bound quote.
+- Kept checklist completion manual and permissioned through the existing underwriting management path.
+
 ## Immediate Next Slice
 
-1. Add issue/post-bind document checklist surfaces.
-2. Add program selection to quote/submission scope matching when Program Configuration is available.
-3. Decide whether non-admin bind/issue users should see published enforcement results without `underwriting.manage`.
+1. Add program selection to quote/submission scope matching when Program Configuration is available.
+2. Decide whether non-admin bind/issue users should see published enforcement results without `underwriting.manage`.
+3. Add enforcement behavior for required issue/post-bind document checklist blockers if the business wants those to stop issue automatically.

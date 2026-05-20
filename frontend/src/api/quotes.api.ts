@@ -93,8 +93,11 @@ export const quotesApi = {
     apiClient.delete(`/quotes/${quoteId}/attachments/${attachmentId}`),
 
   // Checklist
-  getChecklist: (quoteId: string) =>
-    apiClient.get<QuoteChecklistItem[]>(`/quotes/${quoteId}/checklist`).then((r) => r.data),
+  getChecklist: (quoteId: string, stages?: QuoteChecklistItem['stage'][]) => {
+    const params = new URLSearchParams()
+    stages?.forEach((stage) => params.append('stages', stage))
+    return apiClient.get<QuoteChecklistItem[]>(`/quotes/${quoteId}/checklist`, { params }).then((r) => r.data)
+  },
 
   toggleChecklistItem: (quoteId: string, itemId: string, isCompleted: boolean) =>
     apiClient.patch<QuoteChecklistItem>(`/quotes/${quoteId}/checklist/${itemId}/toggle`, { isCompleted }).then((r) => r.data),
