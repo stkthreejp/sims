@@ -136,3 +136,42 @@ export interface AiGuidelineControlProposalResult {
   controls: UnderwritingGuidelineControl[]
   warnings: string[]
 }
+
+export type UnderwritingControlTargetType = 'Quote' | 'Policy'
+
+export type UnderwritingControlEvaluationStatus =
+  | 'Passed'
+  | 'Warning'
+  | 'ReferralRequired'
+  | 'Blocked'
+  | 'NotApplicable'
+  | 'UnknownField'
+  | 'Overridden'
+
+export interface UnderwritingControlEnforcementResult {
+  id: string
+  guidelineControlId: string
+  targetType: UnderwritingControlTargetType
+  targetId: string
+  stage: UnderwritingControlStage
+  status: UnderwritingControlEvaluationStatus
+  isBlocking: boolean
+  overrideAllowed: boolean
+  overridePermission: string | null
+  message: string
+  ruleKey: string
+  label: string
+  sourceCitation: string | null
+  conditionJson: string | null
+  inputSnapshotJson: string | null
+  evaluatedAt: string
+  overriddenByUserId: string | null
+  overriddenAt: string | null
+  overrideReason: string | null
+}
+
+export interface UnderwritingControlEvaluationSummary {
+  results: UnderwritingControlEnforcementResult[]
+  hasBlockingResults: boolean
+  blockingResults: UnderwritingControlEnforcementResult[]
+}

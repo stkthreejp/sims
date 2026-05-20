@@ -5,6 +5,7 @@ import { AlertTriangle, Ban, Download, FileSignature, FileX2, Loader2, Pin, PinO
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
 import { submissionsApi } from '@/api/submissions.api'
+import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
 import { attachmentsApi } from '@/api/attachments.api'
 import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -18,6 +19,7 @@ import type { Note } from '@/types/quote.types'
 import type { DocumentTemplateListItem } from '@/types/documentTemplate.types'
 import type { UnderwritingReferralSummary } from '@/types/submission.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
+import { UnderwritingControlEnforcementPanel } from '@/components/underwriting/UnderwritingControlEnforcementPanel'
 import { usePermissions } from '@/hooks/usePermissions'
 
 const POLICY_STATUS_PILL: Record<Policy['status'], string> = {
@@ -90,7 +92,7 @@ export function PolicyDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] }),
   })
 
-  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canIssuePolicies, canEndorsePolicies, canCancelPolicies, isAdmin } = usePermissions()
+  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canIssuePolicies, canEndorsePolicies, canCancelPolicies, canManageUnderwriting, canOverrideClearance, isAdmin } = usePermissions()
 
   const { data: issuancePacket } = useQuery({
     queryKey: ['policies', id, 'issuance-packet'],
@@ -102,6 +104,12 @@ export function PolicyDetailPage() {
     queryKey: ['submissions', policy?.submissionId, 'underwriting-referrals'],
     queryFn: () => submissionsApi.getUnderwritingReferrals(policy!.submissionId),
     enabled: !!policy?.submissionId,
+  })
+
+  const { data: enforcementSummary } = useQuery({
+    queryKey: ['underwriting-control-enforcement', 'Policy', id],
+    queryFn: () => underwritingGuidelinesApi.getEnforcementResults('Policy', id!),
+    enabled: !!id && canManageUnderwriting,
   })
 
   const { data: cancellationGuidance } = useQuery({
@@ -193,8 +201,23 @@ export function PolicyDetailPage() {
         toast.error('Required underwriting referrals are still open. Resolve referrals before issuing.')
         return
       }
+      if (e?.response?.data?.errorCode === 'UNDERWRITING_CONTROL_BLOCKED') {
+        qc.invalidateQueries({ queryKey: ['underwriting-control-enforcement', 'Policy', id] })
+        toast.error(e?.response?.data?.errorMessage ?? 'Published underwriting controls are blocking issue.')
+        return
+      }
       toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be issued')
     },
+  })
+
+  const overrideEnforcementMutation = useMutation({
+    mutationFn: ({ resultId, reason }: { resultId: string; reason: string }) =>
+      underwritingGuidelinesApi.overrideEnforcementResult(resultId, reason),
+    onSuccess: (result) => {
+      qc.setQueryData(['underwriting-control-enforcement', 'Policy', id], result)
+      toast.success('Underwriting blocker override recorded')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to override underwriting blocker'),
   })
 
   const previewPacketMutation = useMutation({
@@ -480,6 +503,14 @@ export function PolicyDetailPage() {
         )}
       </div>
       </div>
+
+      <UnderwritingControlEnforcementPanel
+        title="Published UW controls"
+        summary={enforcementSummary}
+        canOverride={canOverrideClearance}
+        isOverriding={overrideEnforcementMutation.isPending}
+        onOverride={(resultId, reason) => overrideEnforcementMutation.mutate({ resultId, reason })}
+      />
 
       <PolicyIssuancePanel
         packet={issuancePacket}

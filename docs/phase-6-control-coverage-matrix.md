@@ -122,8 +122,15 @@ Status values:
 - Documented the AI contract for unconditional blockers (`conditionJson: null`) and conditional blocker/referral rules using only the approved field/operator/value schema.
 - Preserved conservative condition handling: unknown or unsupported measurable fields are flagged as `UnknownField` instead of becoming invented blockers.
 
+## Thirteenth Implemented Slice
+
+- Added quote and policy page visibility for published underwriting control enforcement results.
+- Added status display for active blockers, warnings, referrals, unknown fields, and overridden results.
+- Added inline blocker override capture for users with `underwriting.clearance.override`.
+- Refreshed enforcement results after bind/issue failures caused by published blockers.
+
 ## Immediate Next Slice
 
-1. Add quote/policy UI visibility for published enforcement results and override actions.
-2. Add issue/post-bind document checklist surfaces.
-3. Add program selection to quote/submission scope matching when Program Configuration is available.
+1. Add issue/post-bind document checklist surfaces.
+2. Add program selection to quote/submission scope matching when Program Configuration is available.
+3. Decide whether non-admin bind/issue users should see published enforcement results without `underwriting.manage`.

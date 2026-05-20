@@ -10,10 +10,12 @@ import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import { submissionsApi } from '@/api/submissions.api'
 import { policyFormsApi } from '@/api/policyForms.api'
+import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
 import { LOB_LABELS, type CommissionOverrideRequest, type PolicyFormType, type PolicyLineOfBusiness, type QuotePolicyFormSelection, type QuotePolicyFormSelectionUpsert, type QuoteStatus } from '@/types/quote.types'
 import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
 import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { UnderwritingControlEnforcementPanel } from '@/components/underwriting/UnderwritingControlEnforcementPanel'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { attachmentsApi } from '@/api/attachments.api'
 import { documentGenerationApi } from '@/api/documentGeneration.api'
@@ -636,6 +638,11 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
         toast.error('Required underwriting referrals are still open. Resolve referrals before binding.')
         return
       }
+      if (data?.errorCode === 'UNDERWRITING_CONTROL_BLOCKED') {
+        qc.invalidateQueries({ queryKey: ['underwriting-control-enforcement', 'Quote', quoteId] })
+        toast.error(data?.errorMessage ?? 'Published underwriting controls are blocking bind.')
+        return
+      }
       toast.error(data?.errorMessage ?? 'Bind failed')
     },
   })
@@ -1023,7 +1030,7 @@ export function QuoteDetailPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { canCreatePolicies } = usePermissions()
+  const { canCreatePolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
   const [showBind, setShowBind] = useState(false)
   const [showRating, setShowRating] = useState(false)
   const [showReduce, setShowReduce] = useState(false)
@@ -1075,6 +1082,12 @@ export function QuoteDetailPage() {
     queryKey: ['submissions', quote?.submissionId, 'underwriting-referrals'],
     queryFn: () => submissionsApi.getUnderwritingReferrals(quote!.submissionId),
     enabled: !!quote?.submissionId,
+  })
+
+  const { data: enforcementSummary } = useQuery({
+    queryKey: ['underwriting-control-enforcement', 'Quote', quoteId],
+    queryFn: () => underwritingGuidelinesApi.getEnforcementResults('Quote', quoteId!),
+    enabled: !!quoteId && canManageUnderwriting,
   })
 
   const { data: checklist = [] } = useQuery({
@@ -1144,6 +1157,16 @@ export function QuoteDetailPage() {
       toast.success('Writeup saved')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to save writeup'),
+  })
+
+  const overrideEnforcementMutation = useMutation({
+    mutationFn: ({ resultId, reason }: { resultId: string; reason: string }) =>
+      underwritingGuidelinesApi.overrideEnforcementResult(resultId, reason),
+    onSuccess: (result) => {
+      qc.setQueryData(['underwriting-control-enforcement', 'Quote', quoteId], result)
+      toast.success('Underwriting blocker override recorded')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to override underwriting blocker'),
   })
 
   if (isLoading) {
@@ -1900,6 +1923,14 @@ export function QuoteDetailPage() {
             )}
 
             <ReferralBlockerNotice summary={referralSummary} submissionId={quote.submissionId} />
+
+            <UnderwritingControlEnforcementPanel
+              title="Published UW controls"
+              summary={enforcementSummary}
+              canOverride={canOverrideClearance}
+              isOverriding={overrideEnforcementMutation.isPending}
+              onOverride={(resultId, reason) => overrideEnforcementMutation.mutate({ resultId, reason })}
+            />
 
             {/* Quote details */}
             <Card>

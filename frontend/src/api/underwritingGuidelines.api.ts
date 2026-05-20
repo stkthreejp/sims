@@ -7,6 +7,8 @@ import type {
   UnderwritingGuidelineAuditLog,
   UnderwritingGuidelineControl,
   UnderwritingGuidelineDocument,
+  UnderwritingControlEvaluationSummary,
+  UnderwritingControlTargetType,
   UpdateUnderwritingGuidelineControlRequest,
 } from '@/types/underwritingGuidelines.types'
 
@@ -43,4 +45,10 @@ export const underwritingGuidelinesApi = {
 
   getAuditLog: (params?: { documentId?: string; controlId?: string }) =>
     apiClient.get<UnderwritingGuidelineAuditLog[]>('/admin/underwriting-guidelines/audit-log', { params }).then((r) => r.data),
+
+  getEnforcementResults: (targetType: UnderwritingControlTargetType, targetId: string) =>
+    apiClient.get<UnderwritingControlEvaluationSummary>(`/underwriting/control-enforcement/${targetType}/${targetId}`).then((r) => r.data),
+
+  overrideEnforcementResult: (resultId: string, reason: string) =>
+    apiClient.post<UnderwritingControlEvaluationSummary>(`/underwriting/control-enforcement/results/${resultId}/override`, { reason }).then((r) => r.data),
 }
