@@ -230,6 +230,8 @@ Initial Document AI Form Parser smoke test completed against two local sample PD
 
 Key implementation note: the general Form Parser is strong enough for field capture and confidence scoring, but it does not yet produce underwriting-ready normalized objects. Phase 1 still needs a SIMS mapping layer that converts raw form fields into the existing submission schema, and Phase 5 should add loss-run-specific normalization before writing any loss history rows.
 
+Normalization checkpoint added May 20, 2026: SIMS now has a preview-only mapper from raw Document AI fields into `GeminiExtractionResult` submission data and `SubmissionLossYearCreateDto` loss-year previews. It deliberately does not write submission or loss-history rows; low-confidence source fields remain marked for user review.
+
 ---
 
 ## Phase 2 — AI Submission Risk Scoring
