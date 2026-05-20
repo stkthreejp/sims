@@ -54,6 +54,8 @@ public class QuoteChecklistService : IQuoteChecklistService
             })
             .ToList();
 
+        items.AddRange(await BuildPublishedGuidelineChecklistItemsAsync(quoteId, items.Count));
+
         Db.Set<QuoteChecklistItem>().AddRange(items);
         await Db.SaveChangesAsync();
 
@@ -69,6 +71,10 @@ public class QuoteChecklistService : IQuoteChecklistService
             .Where(c => c.QuoteId == quoteId && !c.IsDeleted)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
+
+        var addedItems = await AddMissingPublishedGuidelineItemsAsync(quoteId, items);
+        if (addedItems.Count > 0)
+            items.AddRange(addedItems);
 
         if (items.Count == 0)
             return Result<List<QuoteChecklistItemDto>>.Success([]);
@@ -158,6 +164,66 @@ public class QuoteChecklistService : IQuoteChecklistService
         }
 
         return anyUpdated;
+    }
+
+    private async Task<List<QuoteChecklistItem>> AddMissingPublishedGuidelineItemsAsync(Guid quoteId, List<QuoteChecklistItem> existingItems)
+    {
+        var existingKeys = existingItems.Select(i => i.TriggerKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var nextSortOrder = existingItems.Count == 0 ? 0 : existingItems.Max(i => i.SortOrder) + 1;
+        var missing = (await BuildPublishedGuidelineChecklistItemsAsync(quoteId, nextSortOrder))
+            .Where(i => !existingKeys.Contains(i.TriggerKey))
+            .ToList();
+
+        if (missing.Count == 0)
+            return [];
+
+        Db.Set<QuoteChecklistItem>().AddRange(missing);
+        await Db.SaveChangesAsync();
+        return missing;
+    }
+
+    private async Task<List<QuoteChecklistItem>> BuildPublishedGuidelineChecklistItemsAsync(Guid quoteId, int startSortOrder)
+    {
+        var quote = await Db.Set<Quote>()
+            .Include(q => q.Submission)
+                .ThenInclude(s => s.Insured)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(q => q.Id == quoteId && !q.IsDeleted);
+
+        if (quote is null)
+            return [];
+
+        var state = string.IsNullOrWhiteSpace(quote.Submission.Insured.State)
+            ? "ALL"
+            : quote.Submission.Insured.State.Trim().ToUpperInvariant();
+
+        var allowedStages = new[]
+        {
+            UnderwritingControlStage.Submission,
+            UnderwritingControlStage.Quote,
+            UnderwritingControlStage.Bind
+        };
+
+        var controls = await Db.Set<UnderwritingGuidelineControl>()
+            .AsNoTracking()
+            .Where(c => c.Status == UnderwritingControlStatus.Published
+                && c.ItemType == UnderwritingControlItemType.DocumentChecklistItem
+                && allowedStages.Contains(c.Stage)
+                && c.LineOfBusiness == quote.LineOfBusiness
+                && (c.CarrierId == null || c.CarrierId == quote.CarrierId)
+                && (c.StateCode == "ALL" || c.StateCode == state))
+            .OrderBy(c => c.SortOrder)
+            .ThenBy(c => c.Label)
+            .ToListAsync();
+
+        return controls.Select((control, index) => new QuoteChecklistItem
+        {
+            QuoteId = quoteId,
+            TriggerKey = $"guideline:{control.Id}",
+            Label = control.Label,
+            IsBlocker = control.IsBlocking,
+            SortOrder = startSortOrder + index,
+        }).ToList();
     }
 
     private static bool AutoComplete(List<QuoteChecklistItem> items, string key, DateTime now)

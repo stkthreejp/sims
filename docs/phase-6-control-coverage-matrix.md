@@ -107,8 +107,15 @@ Status values:
 - Added approve, reject, publish, and retire UI actions with decision notes.
 - Added recent activity visibility from the guideline audit log.
 
+## Eleventh Implemented Slice
+
+- Added AI-agent handoff documentation for creating guideline documents and proposed controls.
+- Wired published `DocumentChecklistItem` controls into quote checklist generation for submission, quote, and bind stages.
+- Kept issue, post-bind, and renewal document requirements stored but out of the bind checklist until their dedicated enforcement surfaces exist.
+- Preserved conservative blocker behavior: published checklist controls only block bind when `isBlocking` is true.
+
 ## Immediate Next Slice
 
-1. Add AI-agent import handoff endpoint usage notes for proposed controls.
-2. Wire published document checklist controls into quote checklist generation.
-3. Add enforcement result records for published blockers at bind/issue checkpoints.
+1. Add enforcement result records for published blockers at bind/issue checkpoints.
+2. Add issue/post-bind document checklist surfaces.
+3. Add program selection to quote/submission scope matching when Program Configuration is available.
