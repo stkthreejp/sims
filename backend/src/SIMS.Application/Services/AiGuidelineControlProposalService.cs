@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.Interfaces.Services;
@@ -16,6 +17,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
     private readonly DbContext? _db;
     private readonly IBlobStorageService? _blobStorage;
     private readonly IDocumentAiExtractionService? _documentAi;
+    private readonly ILogger<AiGuidelineControlProposalService>? _logger;
 
     public AiGuidelineControlProposalService(IUnderwritingGuidelineControlService guidelines)
     {
@@ -26,12 +28,14 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         IUnderwritingGuidelineControlService guidelines,
         DbContext db,
         IBlobStorageService blobStorage,
-        IDocumentAiExtractionService documentAi)
+        IDocumentAiExtractionService documentAi,
+        ILogger<AiGuidelineControlProposalService>? logger = null)
     {
         _guidelines = guidelines;
         _db = db;
         _blobStorage = blobStorage;
         _documentAi = documentAi;
+        _logger = logger;
     }
 
     public async Task<Result<AiGuidelineControlProposalResult>> ProposeFromAttachmentAsync(
@@ -63,6 +67,12 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         }
         catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException || ex is HttpRequestException)
         {
+            _logger?.LogWarning(ex,
+                "AI guideline attachment extraction failed for attachment {AttachmentId}, file {FileName}, content type {ContentType}",
+                attachment.Id,
+                attachment.FileName,
+                attachment.ContentType);
+
             return Result<AiGuidelineControlProposalResult>.Failure(
                 "GUIDELINE_ATTACHMENT_EXTRACTION_FAILED",
                 "Guideline attachment could not be extracted. Verify Document AI configuration and that the uploaded file is readable.");
