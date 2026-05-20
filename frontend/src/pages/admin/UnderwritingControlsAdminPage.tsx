@@ -1,0 +1,573 @@
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
+import { Archive, Check, FileSearch, Plus, Rocket, Save, ShieldAlert, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { carriersApi } from '@/api/carriers.api'
+import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { PageHeader } from '@/components/common/PageHeader'
+import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
+import type {
+  CreateUnderwritingGuidelineControlRequest,
+  CreateUnderwritingGuidelineDocumentRequest,
+  UnderwritingControlItemType,
+  UnderwritingControlSeverity,
+  UnderwritingControlStage,
+  UnderwritingControlStatus,
+  UnderwritingGuidelineControl,
+  UnderwritingGuidelineDocument,
+  UpdateUnderwritingGuidelineControlRequest,
+} from '@/types/underwritingGuidelines.types'
+
+const US_STATES = [
+  'ALL', 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC',
+]
+
+const ITEM_TYPES: UnderwritingControlItemType[] = ['AppetiteRule', 'ReferralTrigger', 'AuthorityLimit', 'DocumentChecklistItem', 'AppetiteNote']
+const STAGES: UnderwritingControlStage[] = ['Submission', 'Quote', 'Bind', 'Issue', 'PostBind', 'Renewal']
+const SEVERITIES: UnderwritingControlSeverity[] = ['Informational', 'Warning', 'ReferralRequired', 'HardBlock']
+
+const STATUS_STYLES: Record<UnderwritingControlStatus, string> = {
+  AiSuggested: 'bg-sky-50 text-sky-700',
+  Draft: 'bg-slate-100 text-slate-700',
+  Approved: 'bg-amber-50 text-amber-700',
+  Published: 'bg-emerald-50 text-emerald-700',
+  Rejected: 'bg-rose-50 text-rose-700',
+  Retired: 'bg-zinc-100 text-zinc-600',
+}
+
+const inputCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
+const iconBtnCls = 'inline-flex items-center gap-1.5 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+
+const emptyDocument: CreateUnderwritingGuidelineDocumentRequest = {
+  programName: '',
+  carrierId: null,
+  lineOfBusiness: 'InlandMarine',
+  stateCode: 'ALL',
+  title: '',
+  sourceFileName: '',
+  sourceBlobName: '',
+  notes: '',
+}
+
+const emptyControl: CreateUnderwritingGuidelineControlRequest = {
+  itemType: 'DocumentChecklistItem',
+  stage: 'Submission',
+  severity: 'Warning',
+  ruleKey: '',
+  label: '',
+  description: '',
+  conditionJson: '',
+  isBlocking: false,
+  overrideAllowed: true,
+  overridePermission: 'underwriting.clearance.override',
+  sourceCitation: '',
+  aiConfidence: null,
+  sortOrder: 0,
+}
+
+export function UnderwritingControlsAdminPage() {
+  const qc = useQueryClient()
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
+  const [documentForm, setDocumentForm] = useState<CreateUnderwritingGuidelineDocumentRequest>(emptyDocument)
+  const [controlForm, setControlForm] = useState<CreateUnderwritingGuidelineControlRequest>(emptyControl)
+  const [editingControlId, setEditingControlId] = useState<string | null>(null)
+  const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
+
+  const { data: documents = [], isLoading: loadingDocuments } = useQuery({
+    queryKey: ['admin', 'underwriting-guidelines', 'documents'],
+    queryFn: underwritingGuidelinesApi.getDocuments,
+  })
+
+  const { data: carriers = [] } = useQuery({
+    queryKey: ['carriers', 'active'],
+    queryFn: () => carriersApi.getAll(true),
+  })
+
+  const selectedDocument = documents.find((doc) => doc.id === selectedDocumentId) ?? documents[0] ?? null
+  const activeDocumentId = selectedDocument?.id ?? null
+
+  const { data: controls = [], isLoading: loadingControls } = useQuery({
+    queryKey: ['admin', 'underwriting-guidelines', 'controls', activeDocumentId],
+    queryFn: () => underwritingGuidelinesApi.getControls(activeDocumentId!),
+    enabled: !!activeDocumentId,
+  })
+
+  const { data: auditLog = [] } = useQuery({
+    queryKey: ['admin', 'underwriting-guidelines', 'audit-log', activeDocumentId],
+    queryFn: () => underwritingGuidelinesApi.getAuditLog(activeDocumentId ? { documentId: activeDocumentId } : undefined),
+    enabled: !!activeDocumentId,
+  })
+
+  const groupedCounts = useMemo(() => {
+    return controls.reduce<Record<UnderwritingControlStatus, number>>((acc, control) => {
+      acc[control.status] = (acc[control.status] ?? 0) + 1
+      return acc
+    }, {} as Record<UnderwritingControlStatus, number>)
+  }, [controls])
+
+  const createDocument = useMutation({
+    mutationFn: underwritingGuidelinesApi.createDocument,
+    onSuccess: (doc) => {
+      toast.success('Guideline document created')
+      setDocumentForm(emptyDocument)
+      setSelectedDocumentId(doc.id)
+      qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'documents'] })
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Guideline document could not be created')),
+  })
+
+  const saveControl = useMutation({
+    mutationFn: (payload: CreateUnderwritingGuidelineControlRequest | UpdateUnderwritingGuidelineControlRequest) => {
+      if (!activeDocumentId) throw new Error('Select a guideline document first')
+      return editingControlId
+        ? underwritingGuidelinesApi.updateControl(editingControlId, payload as UpdateUnderwritingGuidelineControlRequest).then((saved) => [saved])
+        : underwritingGuidelinesApi.addProposedControls(activeDocumentId, { controls: [payload as CreateUnderwritingGuidelineControlRequest] })
+    },
+    onSuccess: () => {
+      toast.success(editingControlId ? 'Control updated' : 'Proposed control added')
+      setEditingControlId(null)
+      setControlForm(emptyControl)
+      invalidateControls(activeDocumentId)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Control could not be saved')),
+  })
+
+  const decideControl = useMutation({
+    mutationFn: ({ control, action }: { control: UnderwritingGuidelineControl; action: 'approve' | 'reject' | 'publish' | 'retire' }) => {
+      const notes = decisionNotes[control.id]
+      if (action === 'approve') return underwritingGuidelinesApi.approveControl(control.id, notes)
+      if (action === 'reject') return underwritingGuidelinesApi.rejectControl(control.id, notes)
+      if (action === 'publish') return underwritingGuidelinesApi.publishControl(control.id, notes)
+      return underwritingGuidelinesApi.retireControl(control.id, notes)
+    },
+    onSuccess: (_saved, vars) => {
+      toast.success(`Control ${vars.action}d`)
+      setDecisionNotes((prev) => ({ ...prev, [vars.control.id]: '' }))
+      invalidateControls(activeDocumentId)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Control action failed')),
+  })
+
+  function invalidateControls(documentId: string | null) {
+    qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'documents'] })
+    qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'controls', documentId] })
+    qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'audit-log', documentId] })
+  }
+
+  function submitDocument() {
+    createDocument.mutate({
+      ...documentForm,
+      carrierId: documentForm.carrierId || null,
+      stateCode: documentForm.stateCode || 'ALL',
+    })
+  }
+
+  function submitControl() {
+    const payload = {
+      ...controlForm,
+      conditionJson: controlForm.conditionJson?.trim() ? controlForm.conditionJson : null,
+      description: controlForm.description?.trim() ? controlForm.description : null,
+      overridePermission: controlForm.overridePermission?.trim() ? controlForm.overridePermission : null,
+      sourceCitation: controlForm.sourceCitation?.trim() ? controlForm.sourceCitation : null,
+      aiConfidence: controlForm.aiConfidence,
+      changeNotes: editingControlId ? 'Admin UI edit' : undefined,
+    }
+    saveControl.mutate(payload)
+  }
+
+  function editControl(control: UnderwritingGuidelineControl) {
+    setEditingControlId(control.id)
+    setControlForm({
+      itemType: control.itemType,
+      stage: control.stage,
+      severity: control.severity,
+      ruleKey: control.ruleKey,
+      label: control.label,
+      description: control.description ?? '',
+      conditionJson: control.conditionJson ?? '',
+      isBlocking: control.isBlocking,
+      overrideAllowed: control.overrideAllowed,
+      overridePermission: control.overridePermission ?? '',
+      sourceCitation: control.sourceCitation ?? '',
+      aiConfidence: control.aiConfidence,
+      sortOrder: control.sortOrder,
+    })
+  }
+
+  if (loadingDocuments) return <LoadingSpinner />
+
+  return (
+    <div className="p-6 space-y-5">
+      <PageHeader
+        title="Underwriting Controls"
+        subtitle="Guideline-scoped rules, blockers, referrals, and document checklist controls"
+      />
+
+      <section className="grid gap-5 xl:grid-cols-[360px_1fr]">
+        <div className="space-y-5">
+          <div className="rounded-lg border bg-white">
+            <div className="flex items-center gap-2 border-b px-5 py-4">
+              <FileSearch className="h-4 w-4 text-slate-500" />
+              <h2 className="text-sm font-semibold text-slate-800">Guideline Scope</h2>
+            </div>
+            <div className="space-y-3 p-5">
+              <input
+                value={documentForm.programName}
+                onChange={(e) => setDocumentForm((f) => ({ ...f, programName: e.target.value }))}
+                className={inputCls}
+                placeholder="Program"
+              />
+              <select
+                value={documentForm.carrierId ?? ''}
+                onChange={(e) => setDocumentForm((f) => ({ ...f, carrierId: e.target.value || null }))}
+                className={inputCls}
+              >
+                <option value="">All companies</option>
+                {carriers.map((carrier) => (
+                  <option key={carrier.id} value={carrier.id}>{carrier.name}</option>
+                ))}
+              </select>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={documentForm.lineOfBusiness}
+                  onChange={(e) => setDocumentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))}
+                  className={inputCls}
+                >
+                  {ACTIVE_LOBS.map((lob) => (
+                    <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
+                  ))}
+                </select>
+                <select
+                  value={documentForm.stateCode}
+                  onChange={(e) => setDocumentForm((f) => ({ ...f, stateCode: e.target.value }))}
+                  className={inputCls}
+                >
+                  {US_STATES.map((state) => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
+              </div>
+              <input
+                value={documentForm.title}
+                onChange={(e) => setDocumentForm((f) => ({ ...f, title: e.target.value }))}
+                className={inputCls}
+                placeholder="Guideline title"
+              />
+              <input
+                value={documentForm.sourceFileName ?? ''}
+                onChange={(e) => setDocumentForm((f) => ({ ...f, sourceFileName: e.target.value }))}
+                className={inputCls}
+                placeholder="Source file name"
+              />
+              <textarea
+                value={documentForm.notes ?? ''}
+                onChange={(e) => setDocumentForm((f) => ({ ...f, notes: e.target.value }))}
+                className={inputCls}
+                rows={3}
+                placeholder="Notes"
+              />
+              <button
+                type="button"
+                onClick={submitDocument}
+                disabled={createDocument.isPending || !documentForm.programName.trim() || !documentForm.title.trim()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                Create Guideline
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border bg-white">
+            <div className="border-b px-5 py-4">
+              <h2 className="text-sm font-semibold text-slate-800">Documents</h2>
+            </div>
+            <div className="divide-y">
+              {documents.length === 0 ? (
+                <div className="px-5 py-6 text-sm text-slate-500">No guideline documents yet.</div>
+              ) : documents.map((doc) => (
+                <button
+                  key={doc.id}
+                  type="button"
+                  onClick={() => setSelectedDocumentId(doc.id)}
+                  className={`w-full px-5 py-4 text-left hover:bg-slate-50 ${doc.id === activeDocumentId ? 'bg-blue-50' : ''}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-slate-900">{doc.title}</div>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">v{doc.version}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {doc.programName} / {doc.carrierName ?? 'All companies'} / {LOB_LABELS[doc.lineOfBusiness]} / {doc.stateCode}
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500">{doc.controlCount} controls</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <section className="rounded-lg border bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">{selectedDocument?.title ?? 'Select a guideline'}</h2>
+                {selectedDocument && (
+                  <div className="mt-1 text-xs text-slate-500">
+                    {selectedDocument.programName} / {selectedDocument.carrierName ?? 'All companies'} / {LOB_LABELS[selectedDocument.lineOfBusiness]} / {selectedDocument.stateCode}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(['AiSuggested', 'Draft', 'Approved', 'Published'] as UnderwritingControlStatus[]).map((status) => (
+                  <span key={status} className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}>
+                    {statusLabel(status)} {groupedCounts[status] ?? 0}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {activeDocumentId && (
+              <div className="border-b bg-slate-50 px-5 py-4">
+                <div className="grid gap-3 lg:grid-cols-4">
+                  <select
+                    value={controlForm.itemType}
+                    onChange={(e) => setControlForm((f) => ({ ...f, itemType: e.target.value as UnderwritingControlItemType }))}
+                    className={inputCls}
+                  >
+                    {ITEM_TYPES.map((type) => <option key={type} value={type}>{itemTypeLabel(type)}</option>)}
+                  </select>
+                  <select
+                    value={controlForm.stage}
+                    onChange={(e) => setControlForm((f) => ({ ...f, stage: e.target.value as UnderwritingControlStage }))}
+                    className={inputCls}
+                  >
+                    {STAGES.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}
+                  </select>
+                  <select
+                    value={controlForm.severity}
+                    onChange={(e) => setControlForm((f) => ({ ...f, severity: e.target.value as UnderwritingControlSeverity }))}
+                    className={inputCls}
+                  >
+                    {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severityLabel(severity)}</option>)}
+                  </select>
+                  <input
+                    value={controlForm.ruleKey}
+                    onChange={(e) => setControlForm((f) => ({ ...f, ruleKey: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Rule key"
+                  />
+                </div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+                  <input
+                    value={controlForm.label}
+                    onChange={(e) => setControlForm((f) => ({ ...f, label: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Control label"
+                  />
+                  <input
+                    value={controlForm.sourceCitation ?? ''}
+                    onChange={(e) => setControlForm((f) => ({ ...f, sourceCitation: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Source citation"
+                  />
+                  <div className="flex items-center gap-4 rounded border border-slate-300 bg-white px-3 py-2 text-sm">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={controlForm.isBlocking}
+                        onChange={(e) => setControlForm((f) => ({ ...f, isBlocking: e.target.checked }))}
+                      />
+                      Blocking
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={controlForm.overrideAllowed}
+                        onChange={(e) => setControlForm((f) => ({ ...f, overrideAllowed: e.target.checked }))}
+                      />
+                      Override
+                    </label>
+                  </div>
+                </div>
+                <textarea
+                  value={controlForm.description ?? ''}
+                  onChange={(e) => setControlForm((f) => ({ ...f, description: e.target.value }))}
+                  className={`${inputCls} mt-3`}
+                  rows={2}
+                  placeholder="Description"
+                />
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+                  <input
+                    value={controlForm.conditionJson ?? ''}
+                    onChange={(e) => setControlForm((f) => ({ ...f, conditionJson: e.target.value }))}
+                    className={inputCls}
+                    placeholder='Condition JSON, optional'
+                  />
+                  <input
+                    value={controlForm.overridePermission ?? ''}
+                    onChange={(e) => setControlForm((f) => ({ ...f, overridePermission: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Override permission"
+                  />
+                  <button
+                    type="button"
+                    onClick={submitControl}
+                    disabled={saveControl.isPending || !controlForm.ruleKey.trim() || !controlForm.label.trim()}
+                    className="inline-flex items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    {editingControlId ? 'Save Control' : 'Add Proposed'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loadingControls ? (
+              <LoadingSpinner />
+            ) : controls.length === 0 ? (
+              <div className="px-5 py-8 text-sm text-slate-500">No controls for this guideline yet.</div>
+            ) : (
+              <div className="divide-y">
+                {controls.map((control) => (
+                  <div key={control.id} className="px-5 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold text-slate-900">{control.label}</h3>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[control.status]}`}>{statusLabel(control.status)}</span>
+                          {control.isBlocking && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
+                              <ShieldAlert className="h-3 w-3" />
+                              Blocking
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {control.ruleKey} / {itemTypeLabel(control.itemType)} / {stageLabel(control.stage)} / {severityLabel(control.severity)}
+                        </div>
+                        {control.description && <p className="mt-2 text-sm text-slate-600">{control.description}</p>}
+                        {control.sourceCitation && <div className="mt-2 text-xs text-slate-500">Source: {control.sourceCitation}</div>}
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button type="button" onClick={() => editControl(control)} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                          <Save className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'approve' })} disabled={control.status === 'Approved' || control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                          <Check className="h-3.5 w-3.5" />
+                          Approve
+                        </button>
+                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'reject' })} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                          <X className="h-3.5 w-3.5" />
+                          Reject
+                        </button>
+                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'publish' })} disabled={control.status !== 'Approved'} className={iconBtnCls}>
+                          <Rocket className="h-3.5 w-3.5" />
+                          Publish
+                        </button>
+                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'retire' })} disabled={control.status !== 'Published'} className={iconBtnCls}>
+                          <Archive className="h-3.5 w-3.5" />
+                          Retire
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      value={decisionNotes[control.id] ?? ''}
+                      onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [control.id]: e.target.value }))}
+                      className={`${inputCls} mt-3`}
+                      placeholder="Decision notes"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-lg border bg-white">
+            <div className="border-b px-5 py-4">
+              <h2 className="text-sm font-semibold text-slate-800">Recent Activity</h2>
+            </div>
+            {auditLog.length === 0 ? (
+              <div className="px-5 py-6 text-sm text-slate-500">No activity recorded for this guideline.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3">Action</th>
+                    <th className="px-4 py-3">Notes</th>
+                    <th className="px-4 py-3">When</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {auditLog.slice(0, 12).map((row) => (
+                    <tr key={row.id}>
+                      <td className="px-4 py-3 font-medium text-slate-800">{row.action}</td>
+                      <td className="px-4 py-3 text-slate-600">{row.notes ?? '-'}</td>
+                      <td className="px-4 py-3 text-slate-500">{new Date(row.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function getApiErrorMessage(e: unknown, fallback: string) {
+  if (axios.isAxiosError(e)) {
+    const data = e.response?.data
+    if (typeof data === 'string') return data
+    return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
+  }
+  return fallback
+}
+
+function itemTypeLabel(value: UnderwritingControlItemType) {
+  return {
+    AppetiteRule: 'Appetite rule',
+    ReferralTrigger: 'Referral trigger',
+    AuthorityLimit: 'Authority limit',
+    DocumentChecklistItem: 'Document checklist',
+    AppetiteNote: 'Appetite note',
+  }[value]
+}
+
+function stageLabel(value: UnderwritingControlStage) {
+  return {
+    Submission: 'Submission',
+    Quote: 'Quote',
+    Bind: 'Bind',
+    Issue: 'Issue',
+    PostBind: 'Post-bind',
+    Renewal: 'Renewal',
+  }[value]
+}
+
+function severityLabel(value: UnderwritingControlSeverity) {
+  return {
+    Informational: 'Informational',
+    Warning: 'Warning',
+    ReferralRequired: 'Referral required',
+    HardBlock: 'Hard block',
+  }[value]
+}
+
+function statusLabel(value: UnderwritingControlStatus) {
+  return {
+    AiSuggested: 'AI suggested',
+    Draft: 'Draft',
+    Approved: 'Approved',
+    Published: 'Published',
+    Rejected: 'Rejected',
+    Retired: 'Retired',
+  }[value]
+}

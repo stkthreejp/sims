@@ -99,8 +99,16 @@ Status values:
 - Added audit log records for document creation and every control review/publish/retire action.
 - Added admin permissions for managing and publishing underwriting controls.
 
+## Tenth Implemented Slice
+
+- Added Admin > UW Controls page for guideline documents and scoped proposed/published controls.
+- Added guideline document creation by program, company, line, and state/all states.
+- Added manual proposed-control creation/editing for document checklist items, appetite rules, referral triggers, authority limits, and appetite notes.
+- Added approve, reject, publish, and retire UI actions with decision notes.
+- Added recent activity visibility from the guideline audit log.
+
 ## Immediate Next Slice
 
-1. Add Admin UI for guideline documents and proposed/published controls.
-2. Add AI-agent import handoff endpoint usage notes for proposed controls.
-3. Wire published document checklist controls into quote checklist generation.
+1. Add AI-agent import handoff endpoint usage notes for proposed controls.
+2. Wire published document checklist controls into quote checklist generation.
+3. Add enforcement result records for published blockers at bind/issue checkpoints.

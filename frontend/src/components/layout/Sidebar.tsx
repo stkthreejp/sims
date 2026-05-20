@@ -106,6 +106,7 @@ export function Sidebar() {
             {isAdmin && <NavItem to="/admin/database-status" label="Database Status" icon={Database} />}
             {isAdmin && <NavItem to="/admin/jobs" label="Jobs" icon={Settings2} />}
             {isAdmin && <NavItem to="/admin/ai-settings" label="AI Settings" icon={Bot} />}
+            {isAdmin && <NavItem to="/admin/underwriting-controls" label="UW Controls" icon={ShieldCheck} />}
             {isAdmin && <NavItem to="/admin/legal-requirements" label="Legal Tracker" icon={BookOpenCheck} />}
             {perms.canViewDocumentLibrary && <NavItem to="/document-library" label="Doc Library" icon={LayoutTemplate} />}
             {perms.canViewDocumentLibrary && <NavItem to="/admin/policy-forms" label="Policy Forms" icon={LayoutTemplate} />}
