@@ -126,3 +126,13 @@ export interface UpdateUnderwritingGuidelineControlRequest extends CreateUnderwr
   changeNotes?: string | null
 }
 
+export interface AiGuidelineControlProposalFromAttachmentRequest {
+  attachmentId: string
+  document: CreateUnderwritingGuidelineDocumentRequest
+}
+
+export interface AiGuidelineControlProposalResult {
+  document: UnderwritingGuidelineDocument
+  controls: UnderwritingGuidelineControl[]
+  warnings: string[]
+}

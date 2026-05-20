@@ -1,6 +1,8 @@
 import { apiClient } from './client'
 import type {
   AddProposedUnderwritingControlsRequest,
+  AiGuidelineControlProposalFromAttachmentRequest,
+  AiGuidelineControlProposalResult,
   CreateUnderwritingGuidelineDocumentRequest,
   UnderwritingGuidelineAuditLog,
   UnderwritingGuidelineControl,
@@ -14,6 +16,9 @@ export const underwritingGuidelinesApi = {
 
   createDocument: (data: CreateUnderwritingGuidelineDocumentRequest) =>
     apiClient.post<UnderwritingGuidelineDocument>('/admin/underwriting-guidelines/documents', data).then((r) => r.data),
+
+  proposeFromAttachment: (data: AiGuidelineControlProposalFromAttachmentRequest) =>
+    apiClient.post<AiGuidelineControlProposalResult>('/admin/ai-guideline-control-proposals/from-attachment', data).then((r) => r.data),
 
   getControls: (documentId: string) =>
     apiClient.get<UnderwritingGuidelineControl[]>(`/admin/underwriting-guidelines/documents/${documentId}/controls`).then((r) => r.data),
@@ -39,4 +44,3 @@ export const underwritingGuidelinesApi = {
   getAuditLog: (params?: { documentId?: string; controlId?: string }) =>
     apiClient.get<UnderwritingGuidelineAuditLog[]>('/admin/underwriting-guidelines/audit-log', { params }).then((r) => r.data),
 }
-

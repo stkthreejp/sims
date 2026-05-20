@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { Archive, Check, FileSearch, Plus, Rocket, Save, ShieldAlert, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { attachmentsApi } from '@/api/attachments.api'
 import { carriersApi } from '@/api/carriers.api'
 import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import type { Attachment } from '@/types/attachment.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type {
   CreateUnderwritingGuidelineControlRequest,
@@ -78,6 +80,7 @@ export function UnderwritingControlsAdminPage() {
   const [controlForm, setControlForm] = useState<CreateUnderwritingGuidelineControlRequest>(emptyControl)
   const [editingControlId, setEditingControlId] = useState<string | null>(null)
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
+  const [selectedAttachmentId, setSelectedAttachmentId] = useState('')
 
   const { data: documents = [], isLoading: loadingDocuments } = useQuery({
     queryKey: ['admin', 'underwriting-guidelines', 'documents'],
@@ -87,6 +90,12 @@ export function UnderwritingControlsAdminPage() {
   const { data: carriers = [] } = useQuery({
     queryKey: ['carriers', 'active'],
     queryFn: () => carriersApi.getAll(true),
+  })
+
+  const { data: carrierAttachments = [] } = useQuery({
+    queryKey: ['carrier', documentForm.carrierId, 'attachments'],
+    queryFn: () => attachmentsApi.getAll('Carrier', documentForm.carrierId!),
+    enabled: !!documentForm.carrierId,
   })
 
   const selectedDocument = documents.find((doc) => doc.id === selectedDocumentId) ?? documents[0] ?? null
@@ -120,6 +129,27 @@ export function UnderwritingControlsAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'documents'] })
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Guideline document could not be created')),
+  })
+
+  const proposeFromAttachment = useMutation({
+    mutationFn: () => underwritingGuidelinesApi.proposeFromAttachment({
+      attachmentId: selectedAttachmentId,
+      document: {
+        ...documentForm,
+        carrierId: documentForm.carrierId || null,
+        stateCode: documentForm.stateCode || 'ALL',
+        sourceFileName: null,
+        sourceBlobName: null,
+      },
+    }),
+    onSuccess: (result) => {
+      toast.success(`AI proposed ${result.controls.length} controls`)
+      setSelectedAttachmentId('')
+      setDocumentForm(emptyDocument)
+      setSelectedDocumentId(result.document.id)
+      invalidateControls(result.document.id)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'AI guideline proposal failed')),
   })
 
   const saveControl = useMutation({
@@ -168,6 +198,10 @@ export function UnderwritingControlsAdminPage() {
     })
   }
 
+  function submitAttachmentProposal() {
+    proposeFromAttachment.mutate()
+  }
+
   function submitControl() {
     const payload = {
       ...controlForm,
@@ -200,6 +234,8 @@ export function UnderwritingControlsAdminPage() {
     })
   }
 
+  const guidelineAttachments = carrierAttachments.filter((a: Attachment) => a.documentType === 'UnderwritingGuidelines')
+
   if (loadingDocuments) return <LoadingSpinner />
 
   return (
@@ -225,7 +261,10 @@ export function UnderwritingControlsAdminPage() {
               />
               <select
                 value={documentForm.carrierId ?? ''}
-                onChange={(e) => setDocumentForm((f) => ({ ...f, carrierId: e.target.value || null }))}
+                onChange={(e) => {
+                  setSelectedAttachmentId('')
+                  setDocumentForm((f) => ({ ...f, carrierId: e.target.value || null }))
+                }}
                 className={inputCls}
               >
                 <option value="">All companies</option>
@@ -281,6 +320,35 @@ export function UnderwritingControlsAdminPage() {
                 <Plus className="h-4 w-4" />
                 Create Guideline
               </button>
+              <div className="border-t pt-3">
+                <div className="grid gap-3">
+                  <select
+                    value={selectedAttachmentId}
+                    onChange={(e) => setSelectedAttachmentId(e.target.value)}
+                    disabled={!documentForm.carrierId}
+                    className={inputCls}
+                  >
+                    <option value="">{documentForm.carrierId ? 'Select guideline attachment' : 'Select company first'}</option>
+                    {guidelineAttachments.map((attachment) => (
+                      <option key={attachment.id} value={attachment.id}>{attachment.fileName}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={submitAttachmentProposal}
+                    disabled={
+                      proposeFromAttachment.isPending ||
+                      !documentForm.programName.trim() ||
+                      !documentForm.title.trim() ||
+                      !selectedAttachmentId
+                    }
+                    className="inline-flex w-full items-center justify-center gap-2 rounded bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+                  >
+                    <FileSearch className="h-4 w-4" />
+                    Propose From Attachment
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
