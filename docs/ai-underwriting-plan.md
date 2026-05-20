@@ -219,6 +219,17 @@ Migrate all PDF extraction — inbound email and direct uploads — from `Gemini
 
 **Effort:** Backend: ~4-5 days | Frontend: ~1-2 days | Migration: 1 optional citation detail table
 
+### Phase 1 Validation Notes
+
+Initial Document AI Form Parser smoke test completed against two local sample PDFs on May 20, 2026:
+
+| Sample | Result |
+|---|---|
+| ACORD submission packet | Parsed 9 pages, 127 form fields, 9 generic entities |
+| Loss run packet | Parsed 2 pages, 14 form fields, 2 generic entities |
+
+Key implementation note: the general Form Parser is strong enough for field capture and confidence scoring, but it does not yet produce underwriting-ready normalized objects. Phase 1 still needs a SIMS mapping layer that converts raw form fields into the existing submission schema, and Phase 5 should add loss-run-specific normalization before writing any loss history rows.
+
 ---
 
 ## Phase 2 — AI Submission Risk Scoring
