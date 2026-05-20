@@ -239,6 +239,71 @@
   box-shadow: 0 0 0 2px rgba(27, 117, 186, 0.12);
 }
 
+.admin-panel {
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.admin-panel-title {
+  color: var(--ink);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.admin-muted-panel {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.admin-empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--ink-4);
+  padding: 28px;
+  text-align: center;
+  font-size: var(--fs-body);
+}
+
+.admin-icon-action {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+
+.admin-icon-action:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.admin-icon-action.danger:hover {
+  background: var(--bad-bg);
+  color: var(--bad-fg);
+}
+
+.admin-panel .sd-table tbody tr:hover {
+  cursor: default;
+}
+
 .sims-drawer {
   margin: 0 0 0 auto;
   width: var(--drawer-w);

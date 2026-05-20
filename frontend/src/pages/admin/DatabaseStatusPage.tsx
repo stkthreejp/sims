@@ -25,7 +25,7 @@ export function DatabaseStatusPage() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="sd-btn primary"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
@@ -34,7 +34,7 @@ export function DatabaseStatusPage() {
       />
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3 text-sm text-red-700">
+        <div className="flex gap-3 rounded-lg p-4 text-sm" style={{ border: '1px solid #e7baad', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
           <div>
             <div className="font-semibold">Could not load database status.</div>
@@ -63,10 +63,10 @@ export function DatabaseStatusPage() {
             />
           </div>
 
-          <div className="bg-white border rounded-lg overflow-hidden">
-            <div className="px-5 py-4 border-b flex items-center gap-2">
-              <Database className="h-4 w-4 text-slate-500" />
-              <h3 className="font-semibold text-slate-800">Environment</h3>
+          <div className="admin-panel">
+            <div className="admin-panel-head justify-start">
+              <Database className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />
+              <h3 className="admin-panel-title">Environment</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 p-5 text-sm">
               <InfoRow label="Provider" value={data.providerName ?? 'Unknown'} />
@@ -76,22 +76,22 @@ export function DatabaseStatusPage() {
             </div>
           </div>
 
-          <div className="bg-white border rounded-lg overflow-hidden">
-            <div className="px-5 py-4 border-b">
-              <h3 className="font-semibold text-slate-800">Expected Tables</h3>
+          <div className="admin-panel">
+            <div className="admin-panel-head">
+              <h3 className="admin-panel-title">Expected Tables</h3>
             </div>
-            <table className="w-full text-sm">
+            <table className="sd-table">
               <thead>
-                <tr className="border-b bg-slate-50 text-xs text-slate-500 uppercase tracking-wide text-left">
-                  <th className="px-4 py-3">Table</th>
-                  <th className="px-4 py-3">Status</th>
+                <tr>
+                  <th>Table</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {data.expectedTables.map((table) => (
                   <tr key={table.name}>
-                    <td className="px-4 py-3 font-medium text-slate-800">{table.name}</td>
-                    <td className="px-4 py-3">
+                    <td className="primary-cell">{table.name}</td>
+                    <td>
                       <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${table.exists ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                         {table.exists ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                         {table.exists ? 'Exists' : 'Missing'}
@@ -104,7 +104,7 @@ export function DatabaseStatusPage() {
           </div>
 
           {data.pendingMigrations.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+            <div className="rounded-lg p-4 text-sm" style={{ border: '1px solid #f3d69a', background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
               <div className="font-semibold mb-2">Pending migrations</div>
               <ul className="space-y-1">
                 {data.pendingMigrations.map((migration) => (
@@ -114,7 +114,7 @@ export function DatabaseStatusPage() {
             </div>
           )}
 
-          <div className={`border rounded-lg p-4 text-sm ${healthy ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+          <div className="rounded-lg p-4 text-sm" style={healthy ? { border: '1px solid #b9dcc3', background: 'var(--good-bg)', color: 'var(--good-fg)' } : { border: '1px solid var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}>
             {healthy ? 'Database looks current for the loss history release.' : 'Database status loaded. Review the connection, pending migrations, and expected table results above.'}
           </div>
         </>
@@ -131,7 +131,7 @@ function StatusCard({ label, value, state }: { label: string; value: string; sta
   }[state]
 
   return (
-    <div className={`border rounded-lg p-4 ${styles}`}>
+    <div className={`rounded-lg p-4 ${styles}`}>
       <div className="text-xs font-medium uppercase tracking-wide opacity-75">{label}</div>
       <div className="mt-2 text-lg font-semibold">{value}</div>
     </div>
@@ -141,8 +141,8 @@ function StatusCard({ label, value, state }: { label: string; value: string; sta
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-xs text-slate-500 mb-1">{label}</div>
-      <div className="font-medium text-slate-800 break-words">{value}</div>
+      <div className="mb-1 text-xs" style={{ color: 'var(--ink-3)' }}>{label}</div>
+      <div className="break-words font-medium" style={{ color: 'var(--ink)' }}>{value}</div>
     </div>
   )
 }

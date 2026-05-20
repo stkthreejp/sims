@@ -33,7 +33,7 @@ export function AdminJobsPage() {
             type="button"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="sd-btn primary"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
@@ -41,23 +41,23 @@ export function AdminJobsPage() {
         }
       />
 
-      <section className="bg-white border rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b flex items-center justify-between gap-4">
+      <section className="admin-panel">
+        <div className="admin-panel-head">
           <div className="flex items-center gap-2">
-            <DatabaseZap className="h-4 w-4 text-slate-500" />
-            <h3 className="font-semibold text-slate-800">Safety Analytics</h3>
+            <DatabaseZap className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />
+            <h3 className="admin-panel-title">Safety Analytics</h3>
           </div>
           <StatusPill status={data?.hasRunningImport ? 'Running' : 'Ready'} />
         </div>
 
         {!data?.isConfigured ? (
-          <div className="p-5 text-sm text-amber-800 bg-amber-50 border-b border-amber-100 flex gap-2">
+          <div className="flex gap-2 p-5 text-sm" style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
             <AlertCircle className="h-4 w-4 mt-0.5" />
             Safety analytics database is not configured.
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-5 border-b">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-5" style={{ borderBottom: '1px solid var(--line-2)' }}>
               <Metric label="Peer carriers" value={data.carrierPeerSnapshotCount.toLocaleString()} />
               <Metric label="BASIC measures" value={data.basicPeerMeasureCount.toLocaleString()} />
               <Metric label="Latest status" value={data.latestBatches[0]?.status ?? 'No runs'} />
@@ -101,20 +101,20 @@ function useJobMutation(action: () => Promise<unknown>, successMessage: string) 
 
 function ScheduleTable({ jobs }: { jobs: Array<{ name: string; enabled: boolean; schedule: string; nextRunAtUtc: string | null; status: string }> }) {
   return (
-    <div className="border-t">
-      <div className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Schedule</div>
+    <div style={{ borderTop: '1px solid var(--line-2)' }}>
+      <div className="px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Schedule</div>
       <div className="grid grid-cols-1 gap-3 px-5 pb-5 md:grid-cols-3">
         {jobs.map((job) => (
-          <div key={job.name} className="rounded border bg-slate-50 p-4">
+          <div key={job.name} className="admin-muted-panel p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-800">{job.name}</div>
-                <div className="mt-1 text-xs text-slate-500">{job.schedule}</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{job.name}</div>
+                <div className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>{job.schedule}</div>
               </div>
               <StatusPill status={job.enabled ? job.status : 'Off'} />
             </div>
-            <div className="mt-3 text-xs text-slate-500">
-              Next run: <span className="font-medium text-slate-700">{job.nextRunAtUtc ? formatDateTime(job.nextRunAtUtc) : '-'}</span>
+            <div className="mt-3 text-xs" style={{ color: 'var(--ink-3)' }}>
+              Next run: <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{job.nextRunAtUtc ? formatDateTime(job.nextRunAtUtc) : '-'}</span>
             </div>
           </div>
         ))}
@@ -129,7 +129,7 @@ function JobButton({ label, onClick, busy, disabled, strong = false }: { label: 
       type="button"
       onClick={onClick}
       disabled={disabled || busy}
-      className={`inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-medium disabled:opacity-50 ${strong ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+      className={`sd-btn ${strong ? 'primary' : 'outline'}`}
     >
       {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
       {label}
@@ -139,9 +139,9 @@ function JobButton({ label, onClick, busy, disabled, strong = false }: { label: 
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border bg-slate-50 p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-2 text-lg font-semibold text-slate-800">{value}</div>
+    <div className="admin-muted-panel p-4">
+      <div className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>{label}</div>
+      <div className="mt-2 text-lg font-semibold" style={{ color: 'var(--ink)' }}>{value}</div>
     </div>
   )
 }
@@ -152,27 +152,27 @@ function BatchTable({ batches }: { batches: FmcsaAnalyticsImportBatch[] }) {
   }
 
   return (
-    <table className="w-full text-sm">
+    <table className="sd-table">
       <thead>
-        <tr className="border-y bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-          <th className="px-4 py-3">Job</th>
-          <th className="px-4 py-3">Status</th>
-          <th className="px-4 py-3">Rows</th>
-          <th className="px-4 py-3">Started</th>
-          <th className="px-4 py-3">Completed</th>
+        <tr>
+          <th>Job</th>
+          <th>Status</th>
+          <th>Rows</th>
+          <th>Started</th>
+          <th>Completed</th>
         </tr>
       </thead>
       <tbody className="divide-y">
         {batches.map((batch) => (
           <tr key={`${batch.sourceName}-${batch.startedAt}`}>
             <td className="px-4 py-3">
-              <div className="font-medium text-slate-800">{batch.sourceName}</div>
+              <div className="font-medium" style={{ color: 'var(--ink)' }}>{batch.sourceName}</div>
               {batch.errorMessage && <div className="mt-1 text-xs text-red-600">{batch.errorMessage}</div>}
             </td>
             <td className="px-4 py-3"><StatusPill status={batch.status} /></td>
             <td className="px-4 py-3 font-mono text-xs">{batch.rowsImported.toLocaleString()}</td>
-            <td className="px-4 py-3 text-slate-600">{formatDateTime(batch.startedAt)}</td>
-            <td className="px-4 py-3 text-slate-600">{batch.completedAt ? formatDateTime(batch.completedAt) : '-'}</td>
+            <td>{formatDateTime(batch.startedAt)}</td>
+            <td>{batch.completedAt ? formatDateTime(batch.completedAt) : '-'}</td>
           </tr>
         ))}
       </tbody>
@@ -182,11 +182,11 @@ function BatchTable({ batches }: { batches: FmcsaAnalyticsImportBatch[] }) {
 
 function PlaceholderJob({ title, description }: { title: string; description: string }) {
   return (
-    <section className="bg-white border rounded-lg p-5">
+    <section className="admin-panel p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="font-semibold text-slate-800">{title}</h3>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <h3 className="admin-panel-title">{title}</h3>
+          <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>{description}</p>
         </div>
         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">Not configured</span>
       </div>

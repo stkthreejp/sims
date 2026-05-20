@@ -114,17 +114,17 @@ export function RolePermissionsPage() {
         description="Control which sections and actions each role can access. Changes take effect on next login."
       />
 
-      <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+      <div className="admin-panel overflow-x-auto">
+        <table className="sd-table">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-56">
+            <tr>
+              <th className="w-56">
                 Permission
               </th>
               {roleColumns.map((role) => (
                 <th key={role.id} className="px-4 py-3 text-center min-w-[130px]">
                   <div className="flex flex-col items-center gap-1.5">
-                    <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-2)' }}>
                       {role.name}
                     </span>
                     {role.name === 'Admin' ? (
@@ -133,7 +133,7 @@ export function RolePermissionsPage() {
                       <button
                         onClick={() => save(role)}
                         disabled={!dirty.has(role.id) || saveMutation.isPending}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-30 disabled:cursor-default transition-opacity"
+                        className="sd-btn primary sm"
                       >
                         <Save className="h-2.5 w-2.5" />
                         Save
@@ -150,10 +150,11 @@ export function RolePermissionsPage() {
               return (
                 <>
                   {/* Category header row */}
-                  <tr key={`cat-${category}`} className="bg-slate-50 border-t border-slate-100">
+                  <tr key={`cat-${category}`} style={{ background: 'var(--surface-2)' }}>
                     <td
                       colSpan={roleColumns.length + 1}
-                      className="px-5 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400"
+                      className="px-5 py-2 text-[10px] font-bold uppercase tracking-widest"
+                      style={{ color: 'var(--ink-4)' }}
                     >
                       {category}
                     </td>
@@ -161,11 +162,11 @@ export function RolePermissionsPage() {
                   {perms.map((perm) => (
                     <tr
                       key={perm.id}
-                      className="border-t border-slate-50 hover:bg-slate-50/60 transition-colors"
+                      className="transition-colors"
                     >
                       <td className="px-5 py-2.5">
-                        <span className="text-slate-700 text-xs font-medium">{perm.displayName}</span>
-                        <span className="ml-2 text-[10px] text-slate-400 font-mono">{perm.name}</span>
+                        <span className="text-xs font-medium" style={{ color: 'var(--ink-2)' }}>{perm.displayName}</span>
+                        <span className="ml-2 text-[10px] font-mono" style={{ color: 'var(--ink-4)' }}>{perm.name}</span>
                       </td>
                       {roleColumns.map((role) => {
                         const isAdmin = role.name === 'Admin'
@@ -190,7 +191,7 @@ export function RolePermissionsPage() {
           </tbody>
         </table>
 
-        <div className="px-5 py-3 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-400">
+        <div className="flex items-center gap-1.5 px-5 py-3 text-[11px]" style={{ borderTop: '1px solid var(--line-2)', color: 'var(--ink-4)' }}>
           <Info className="h-3 w-3 flex-shrink-0" />
           Admin always has full access and cannot be edited. Users must log out and back in for changes to take effect.
         </div>

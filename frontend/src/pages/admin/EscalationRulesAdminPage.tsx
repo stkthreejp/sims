@@ -66,7 +66,7 @@ export function EscalationRulesAdminPage() {
         action={
           <button
             onClick={() => { setEditing(null); setForm(EMPTY); setShowForm(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+            className="sd-btn primary"
           >
             <Plus className="h-4 w-4" /> New Rule
           </button>
@@ -74,37 +74,37 @@ export function EscalationRulesAdminPage() {
       />
 
       {showForm && (
-        <div className="bg-white border rounded-lg p-5 space-y-4 max-w-xl">
-          <h3 className="font-semibold text-slate-700">{editing ? 'Edit Rule' : 'New Escalation Rule'}</h3>
+        <div className="admin-panel max-w-xl p-5 space-y-4">
+          <h3 className="admin-panel-title">{editing ? 'Edit Rule' : 'New Escalation Rule'}</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Task Type (blank = all types)</label>
+              <label className="sims-field-label">Task Type (blank = all types)</label>
               <select
                 value={form.taskTypeId}
                 onChange={(e) => setForm({ ...form, taskTypeId: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
+                className="sims-select"
               >
                 <option value="">(global — applies to all)</option>
                 {taskTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Hours Overdue *</label>
+              <label className="sims-field-label">Hours Overdue *</label>
               <input
                 type="number"
                 min={1}
                 value={form.hoursOverdue}
                 onChange={(e) => setForm({ ...form, hoursOverdue: Number(e.target.value) })}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
+                className="sims-input"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs text-slate-500 mb-1">Notify Role *</label>
+              <label className="sims-field-label">Notify Role *</label>
               <input
                 value={form.notifyRoleName}
                 onChange={(e) => setForm({ ...form, notifyRoleName: e.target.value })}
                 placeholder="e.g. Manager, Admin"
-                className="w-full border rounded-lg px-3 py-2 text-sm"
+                className="sims-input"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -130,13 +130,13 @@ export function EscalationRulesAdminPage() {
             <button
               disabled={saving || !form.notifyRoleName || form.hoursOverdue < 1}
               onClick={() => save()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+              className="sd-btn primary"
             >
               Save
             </button>
             <button
               onClick={() => { setShowForm(false); setEditing(null); setForm(EMPTY) }}
-              className="px-4 py-2 border rounded-lg text-sm"
+              className="sd-btn outline"
             >
               Cancel
             </button>
@@ -144,41 +144,41 @@ export function EscalationRulesAdminPage() {
         </div>
       )}
 
-      <div className="bg-white border rounded-lg overflow-hidden">
+      <div className="admin-panel">
         {rules.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-400">No escalation rules configured.</div>
+          <div className="admin-empty m-4">No escalation rules configured.</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="sd-table">
             <thead>
-              <tr className="border-b bg-slate-50 text-xs text-slate-500 uppercase tracking-wide text-left">
-                <th className="px-4 py-3">Task Type</th>
-                <th className="px-4 py-3">Hours Overdue</th>
-                <th className="px-4 py-3">Notify Role</th>
-                <th className="px-4 py-3">Priority+</th>
-                <th className="px-4 py-3">Active</th>
-                <th className="px-4 py-3" />
+              <tr>
+                <th>Task Type</th>
+                <th>Hours Overdue</th>
+                <th>Notify Role</th>
+                <th>Priority+</th>
+                <th>Active</th>
+                <th />
               </tr>
             </thead>
             <tbody className="divide-y">
               {rules.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-slate-700">{r.taskTypeName ?? <span className="text-slate-400 italic">All types</span>}</td>
-                  <td className="px-4 py-3 text-slate-600">{r.hoursOverdue}h</td>
-                  <td className="px-4 py-3 text-slate-600">{r.notifyRoleName}</td>
-                  <td className="px-4 py-3">
+                  <td>{r.taskTypeName ?? <span className="italic" style={{ color: 'var(--ink-4)' }}>All types</span>}</td>
+                  <td>{r.hoursOverdue}h</td>
+                  <td>{r.notifyRoleName}</td>
+                  <td>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.increasePriority ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
                       {r.increasePriority ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.isActive ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
                       {r.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <div className="flex gap-2 justify-end">
-                      <button onClick={() => openEdit(r)} className="text-slate-400 hover:text-slate-700"><Edit2 className="h-4 w-4" /></button>
-                      <button onClick={() => { if (confirm('Delete this rule?')) remove(r.id) }} className="text-slate-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(r)} className="admin-icon-action" aria-label="Edit rule"><Edit2 className="h-4 w-4" /></button>
+                      <button onClick={() => { if (confirm('Delete this rule?')) remove(r.id) }} className="admin-icon-action danger" aria-label="Delete rule"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </td>
                 </tr>

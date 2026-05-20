@@ -139,17 +139,17 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Statement reconciliation | Page | `/billing/statement-reconciliation` | Needs tweaking | Old billing workflow styling. | Medium |
 | Sync health | Page | `/billing/sync-health` | Needs tweaking | Old operational status styling. | Medium |
 | Admin shadow rating | Page | `/admin/rating/shadow` | Good | Strong token usage relative to other admin pages. | Low |
-| Admin jobs | Page | `/admin/jobs` | Needs tweaking | Mixed shared header and old cards/tables. | Medium |
+| Admin jobs | Page | `/admin/jobs` | Good | Utility admin pass aligned page actions, panels, metric cards, schedule cards, tables, and placeholders to SIMS token styling. | Low |
 | Admin rating | Page | `/admin/rating` | Needs tweaking | Old rating admin styling. | Medium |
 | Admin rating plan detail | Page | `/admin/rating/plans/:planId` | Needs tweaking | Old admin detail styling. | Medium |
 | Admin rating plan version | Page | `/admin/rating/versions/:versionId` | Needs tweaking | Large page with extensive old form/table styling. | High |
-| Database status | Page | `/admin/database-status` | Needs tweaking | Old status/card styling. | Medium |
-| Escalation rules | Page | `/admin/escalation-rules` | Needs tweaking | Old table/form styling. | Medium |
+| Database status | Page | `/admin/database-status` | Good | Utility admin pass aligned refresh action, diagnostic cards, environment panel, table shell, and status messages to SIMS token styling. | Low |
+| Escalation rules | Page | `/admin/escalation-rules` | Good | Utility admin pass aligned create/edit form, buttons, inputs, table, empty state, and icon actions to SIMS token styling. | Low |
 | Fees admin | Page | `/admin/fees` | Needs tweaking | Large admin workflow with old form/table styling. | High |
-| Holiday calendar | Page | `/admin/holiday-calendar` | Needs tweaking | Old table/form styling. | Medium |
+| Holiday calendar | Page | `/admin/holiday-calendar` | Good | Utility admin pass aligned add form, buttons, yearly holiday tables, empty state, and delete action to SIMS token styling. | Low |
 | Legal requirements | Page | `/admin/legal-requirements` | Needs tweaking | Large admin workflow with extensive old styling. | High |
-| Role permissions | Page | `/admin/role-permissions` | Needs tweaking | Old permission matrix styling. | Medium |
-| Task types admin | Page | `/admin/task-types` | Needs tweaking | Old table/form styling. | Medium |
+| Role permissions | Page | `/admin/role-permissions` | Good | Utility admin pass aligned permission matrix shell, headers, save actions, category rows, and footer note to SIMS token styling. | Low |
+| Task types admin | Page | `/admin/task-types` | Good | Utility admin pass aligned create/edit form, buttons, inputs, table, empty state, and icon actions to SIMS token styling. | Low |
 | Workflows admin | Page | `/admin/workflows` | Needs tweaking | Old workflow admin styling. | Medium |
 | Login | Page | `/login` | Never updated | Old auth card styling; should be aligned with SIMS brand guide. | Medium |
 
@@ -194,3 +194,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-16 | Codex | Template editor pass | Aligned the document template editor page and TipTap editor surface with SIMS header, field, segmented-control, toolbar, modal, dropdown, and table-action patterns; verified existing real wiring for template load/create/update, policy-form tag loading, and Word import. Type check passed. |
 | 2026-05-16 | Codex | Document library pass | Aligned the document library actions, filters, search, template cards, status pills, empty state, and icon actions with SIMS patterns; verified existing real backend wiring for template list, delete, Word import handoff, and editor navigation. Type check passed. |
 | 2026-05-16 | Codex | Shared documents insured wiring | Added backend support for insured-level document attachments and cleaned visible loading/upload metadata text in the shared DocumentsSection; insured document types remain Correspondence and Other. |
+| 2026-05-20 | Codex | Admin utility batch | Aligned Admin Jobs, Database Status, Escalation Rules, Holiday Calendar, Role Permissions, and Task Types with SIMS panel, button, field, table, empty-state, and icon-action styling; production frontend build passed. |
