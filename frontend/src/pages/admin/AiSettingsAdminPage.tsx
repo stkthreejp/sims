@@ -91,10 +91,11 @@ export function AiSettingsAdminPage() {
     setDrafts((prev) => ({
       ...prev,
       [useCase]: {
-        modelId: current.model.id,
-        promptVersion: current.promptVersion,
-        changeReason: '',
-        ...prev[useCase],
+        ...(prev[useCase] ?? {
+          modelId: current.model.id,
+          promptVersion: current.promptVersion,
+          changeReason: '',
+        }),
         ...patch,
       },
     }))
