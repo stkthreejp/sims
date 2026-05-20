@@ -75,6 +75,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IUnderwritingClearanceService, UnderwritingClearanceService>();
         services.AddScoped<IUnderwritingReferralService, UnderwritingReferralService>();
         services.AddScoped<IUnderwritingGuidelineControlService, UnderwritingGuidelineControlService>();
+        services.AddScoped<IAiGuidelineControlProposalService, AiGuidelineControlProposalService>();
         services.AddScoped<IPolicyNumberService, PolicyNumberService>();
         services.AddScoped<IPolicyNumberAdminService, PolicyNumberAdminService>();
         services.AddScoped<IPolicyTransactionLifecycleService, PolicyTransactionLifecycleService>();

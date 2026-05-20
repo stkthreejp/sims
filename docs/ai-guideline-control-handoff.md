@@ -44,6 +44,32 @@ Payload:
 
 Use `carrierId: null` when the guideline applies to all companies.
 
+AI helper endpoint:
+
+```http
+POST /api/v1/admin/ai-guideline-control-proposals/from-text
+```
+
+Payload:
+
+```json
+{
+  "document": {
+    "programName": "Longleaf",
+    "carrierId": null,
+    "lineOfBusiness": "InlandMarine",
+    "stateCode": "ALL",
+    "title": "Longleaf Inland Marine UW Guidelines",
+    "sourceFileName": "longleaf-im-guidelines.pdf",
+    "sourceBlobName": "optional/blob/path.pdf",
+    "notes": "Imported by AI for human review"
+  },
+  "guidelineText": "Extracted guideline text..."
+}
+```
+
+This helper creates the guideline document and submits proposed controls in one call. It still only creates `AiSuggested` controls; it does not approve, publish, retire, or enforce anything.
+
 ## Step 2: Submit Proposed Controls
 
 Endpoint:
@@ -140,4 +166,3 @@ Admin > UW Controls
 ```
 
 The human can edit, approve, reject, publish, or retire controls. Published blocking controls become live immediately, with override support when `overrideAllowed` is true.
-

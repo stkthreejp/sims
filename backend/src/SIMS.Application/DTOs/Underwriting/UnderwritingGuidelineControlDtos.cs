@@ -106,3 +106,11 @@ public record UpdateUnderwritingGuidelineControlRequest(
 
 public record UnderwritingGuidelineDecisionRequest(string? Notes);
 
+public record AiGuidelineControlProposalRequest(
+    CreateUnderwritingGuidelineDocumentRequest Document,
+    string GuidelineText);
+
+public record AiGuidelineControlProposalResult(
+    UnderwritingGuidelineDocumentDto Document,
+    IReadOnlyList<UnderwritingGuidelineControlDto> Controls,
+    IReadOnlyList<string> Warnings);

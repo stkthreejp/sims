@@ -134,7 +134,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         await _db.SaveChangesAsync(ct);
 
         foreach (var control in created)
-            AddAudit(doc.Id, control.Id, "ControlSuggested", userId, "AI or integration proposed control for human review.", null, control);
+            AddAudit(doc.Id, control.Id, "ControlSuggested", userId, "AI or integration proposed control for human review.", null, Snapshot(control));
 
         await _db.SaveChangesAsync(ct);
         return Result<IReadOnlyList<UnderwritingGuidelineControlDto>>.Success(created.Select(MapControl).ToList());
@@ -382,4 +382,3 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
             log.AfterJson,
             log.CreatedAt);
 }
-
