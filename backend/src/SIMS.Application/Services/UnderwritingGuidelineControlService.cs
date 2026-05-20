@@ -222,7 +222,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         control.Status = UnderwritingControlStatus.Published;
         control.PublishedByUserId = userId;
         control.PublishedAt = DateTime.UtcNow;
-        AddAudit(control.GuidelineDocumentId, control.Id, "ControlPublished", userId, notes, before, control);
+        AddAudit(control.GuidelineDocumentId, control.Id, "ControlPublished", userId, notes, before, Snapshot(control));
         await _db.SaveChangesAsync(ct);
 
         return Result<UnderwritingGuidelineControlDto>.Success(MapControl(control));
@@ -242,7 +242,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         control.RetiredByUserId = userId;
         control.RetiredAt = DateTime.UtcNow;
         control.RetirementReason = TrimToNull(reason);
-        AddAudit(control.GuidelineDocumentId, control.Id, "ControlRetired", userId, reason, before, control);
+        AddAudit(control.GuidelineDocumentId, control.Id, "ControlRetired", userId, reason, before, Snapshot(control));
         await _db.SaveChangesAsync(ct);
 
         return Result<UnderwritingGuidelineControlDto>.Success(MapControl(control));
@@ -274,7 +274,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         control.ReviewedByUserId = userId;
         control.ReviewedAt = DateTime.UtcNow;
         control.ReviewNotes = TrimToNull(notes);
-        AddAudit(control.GuidelineDocumentId, control.Id, action, userId, notes, before, control);
+        AddAudit(control.GuidelineDocumentId, control.Id, action, userId, notes, before, Snapshot(control));
         await _db.SaveChangesAsync(ct);
 
         return Result<UnderwritingGuidelineControlDto>.Success(MapControl(control));
