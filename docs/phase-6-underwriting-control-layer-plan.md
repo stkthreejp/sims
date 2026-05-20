@@ -8,7 +8,7 @@ Add auditable underwriting controls for clearance, appetite, referrals, authorit
 
 - Phase 5 is complete enough that policy transactions, status history, transaction artifacts, cancellation/non-renewal/reinstatement/rewrite detail records, and transaction approvals exist.
 - Phase 6 should reuse `PolicyTransaction`, `PolicyTransactionApproval`, UW writeups, quote checklists, task workflows, rating eligibility rules, FMCSA data, loss history, and permissions.
-- Program configuration is still Phase 7, so Phase 6 rules may use carrier/LOB/state/effective date fields now, but should be shaped so they can move under `Program` later.
+- Program Configuration foundation now exists in Phase 6, so new guideline/rule setup should prefer `ProgramId` while preserving carrier/LOB/state fallback for older records.
 - AI underwriting work remains advisory until deterministic clearance, referral, authority, and approval records exist.
 
 ## Scope
@@ -26,7 +26,7 @@ Phase 6 includes:
 
 Phase 6 excludes:
 
-- Full Program Configuration.
+- Full quote/submission program assignment and program-scoped enforcement matching beyond the foundation configuration table.
 - Bordereaux.
 - Claims.
 - Broker self-service clearance.
@@ -38,7 +38,7 @@ Phase 6 excludes:
 1. Do not create free-text-only underwriting controls. Every control outcome needs a structured record with reason, severity, status, owner, timestamps, and source context.
 2. Use `PolicyTransactionApproval` where the approval is tied to a policy transaction. Add a broader approval/request shape only where the target can be a submission, quote, rating plan version, accounting action, or future program setup.
 3. Authority must be enforced server-side before bind, issue, cancellation completion, reinstatement completion, sensitive accounting voids, rating promotion, and commission override actions.
-4. Appetite and authority rules should snapshot the rule version used. Later Phase 7 can move rule ownership under `Program` without losing history.
+4. Appetite and authority rules should snapshot the rule version used. Rule ownership should move under Program Configuration without losing older carrier/LOB/state history.
 5. Referral flags in UW writeups should become referral records, not remain isolated checkboxes.
 6. Approval, referral, and authority outcomes should be visible in transaction artifacts when tied to a transaction.
 
@@ -90,7 +90,7 @@ Acceptance:
 
 ## Workstream 6C: Appetite
 
-Add versioned appetite rule evaluation while keeping the rule model simple until Program Configuration exists.
+Add versioned appetite rule evaluation while keeping the rule model simple and aligned to Program Configuration where available.
 
 Initial rule dimensions:
 
@@ -304,4 +304,4 @@ Acceptance:
 - Referral decisions are structured records, not only UW writeup flags or notes.
 - Existing Phase 5 transaction artifacts show related approvals, referrals, authority checks, tasks, and documents where applicable.
 - Appetite and authority decisions preserve the rule version and input snapshot used.
-- The design can move under Program Configuration in Phase 7 without rewriting Phase 6 history.
+- The design can move more enforcement and reporting under Program Configuration without rewriting Phase 6 history.

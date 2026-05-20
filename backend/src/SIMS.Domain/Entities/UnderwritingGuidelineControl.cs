@@ -5,6 +5,7 @@ namespace SIMS.Domain.Entities;
 public class UnderwritingGuidelineControl : BaseEntity
 {
     public Guid GuidelineDocumentId { get; set; }
+    public Guid? ProgramId { get; set; }
     public string ProgramName { get; set; } = string.Empty;
     public Guid? CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
@@ -34,10 +35,10 @@ public class UnderwritingGuidelineControl : BaseEntity
     public string? RetirementReason { get; set; }
 
     public UnderwritingGuidelineDocument GuidelineDocument { get; set; } = null!;
+    public ProgramConfiguration? Program { get; set; }
     public Carrier? Carrier { get; set; }
     public User? ReviewedByUser { get; set; }
     public User? PublishedByUser { get; set; }
     public User? RetiredByUser { get; set; }
     public ICollection<UnderwritingGuidelineAuditLog> AuditLogs { get; set; } = new List<UnderwritingGuidelineAuditLog>();
 }
-

@@ -136,8 +136,15 @@ Status values:
 - Added policy page surfaces for Issue and PostBind document checklist controls tied to the bound quote.
 - Kept checklist completion manual and permissioned through the existing underwriting management path.
 
+## Fifteenth Implemented Slice
+
+- Added first-class Program Configuration records with program code, company, line, state/all-states scope, active status, and notes.
+- Added Admin > Programs for creating, editing, activating, and deactivating program scopes.
+- Linked underwriting guideline documents and proposed controls to optional `ProgramId` while preserving legacy `ProgramName` text.
+- Added program selection to Admin > UW Controls guideline setup so AI-imported/manual guideline documents can use the same program scope.
+
 ## Immediate Next Slice
 
-1. Add program selection to quote/submission scope matching when Program Configuration is available.
+1. Add program selection to quote/submission scope matching so published controls can target the selected program, with legacy carrier/line/state matching as fallback.
 2. Decide whether non-admin bind/issue users should see published enforcement results without `underwriting.manage`.
 3. Add enforcement behavior for required issue/post-bind document checklist blockers if the business wants those to stop issue automatically.

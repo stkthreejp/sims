@@ -12,12 +12,15 @@ Published controls are live immediately. Do not publish from the AI agent.
 
 Guidelines are scoped by:
 
+- Program id when available
 - Program name
 - Company/carrier id, or all companies
 - Line of business
 - State code, or `ALL`
 
 Most items should use `ALL` for state. Use a specific state only when the guideline requirement is state-specific.
+
+When SIMS has a matching Program Configuration, send `programId`. SIMS will use the configured program name, company, line, and state from that program. Use the free-text scope fields only when no program exists yet.
 
 ## Step 1: Create Guideline Document
 
@@ -31,6 +34,7 @@ Payload:
 
 ```json
 {
+  "programId": "00000000-0000-0000-0000-000000000000",
   "programName": "Longleaf",
   "carrierId": "00000000-0000-0000-0000-000000000000",
   "lineOfBusiness": "InlandMarine",
@@ -43,6 +47,7 @@ Payload:
 ```
 
 Use `carrierId: null` when the guideline applies to all companies.
+Use `programId: null` when the guideline is still being loaded before the program has been configured.
 
 AI helper endpoint:
 
@@ -55,6 +60,7 @@ Payload:
 ```json
 {
   "document": {
+    "programId": "00000000-0000-0000-0000-000000000000",
     "programName": "Longleaf",
     "carrierId": null,
     "lineOfBusiness": "InlandMarine",
@@ -82,6 +88,7 @@ Payload:
 {
   "attachmentId": "00000000-0000-0000-0000-000000000000",
   "document": {
+    "programId": "00000000-0000-0000-0000-000000000000",
     "programName": "Longleaf",
     "carrierId": null,
     "lineOfBusiness": "InlandMarine",

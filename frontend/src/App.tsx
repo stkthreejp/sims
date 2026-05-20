@@ -78,6 +78,7 @@ const DatabaseStatusPage = lazy(() => import('@/pages/admin/DatabaseStatusPage')
 const AdminJobsPage = lazy(() => import('@/pages/admin/AdminJobsPage').then((m) => ({ default: m.AdminJobsPage })))
 const LegalRequirementsPage = lazy(() => import('@/pages/admin/LegalRequirementsPage').then((m) => ({ default: m.LegalRequirementsPage })))
 const AiSettingsAdminPage = lazy(() => import('@/pages/admin/AiSettingsAdminPage').then((m) => ({ default: m.AiSettingsAdminPage })))
+const ProgramConfigurationAdminPage = lazy(() => import('@/pages/admin/ProgramConfigurationAdminPage').then((m) => ({ default: m.ProgramConfigurationAdminPage })))
 const UnderwritingControlsAdminPage = lazy(() => import('@/pages/admin/UnderwritingControlsAdminPage').then((m) => ({ default: m.UnderwritingControlsAdminPage })))
 
 // Quotes & Billing
@@ -213,6 +214,7 @@ export default function App() {
               <Route path="/admin/jobs" element={<AdminJobsPage />} />
               <Route path="/admin/legal-requirements" element={<LegalRequirementsPage />} />
               <Route path="/admin/ai-settings" element={<AiSettingsAdminPage />} />
+              <Route path="/admin/programs" element={<ProgramConfigurationAdminPage />} />
               <Route path="/admin/underwriting-controls" element={<UnderwritingControlsAdminPage />} />
               <Route path="/quotes/:quoteId" element={<QuoteDetailPage />} />
               <Route path="/quotes/:quoteId/writeup" element={<QuoteWriteupPage />} />

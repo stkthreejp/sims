@@ -17,6 +17,12 @@ public class UnderwritingGuidelineDocumentConfiguration : IEntityTypeConfigurati
         builder.Property(d => d.Notes).HasMaxLength(1000);
 
         builder.HasIndex(d => new { d.ProgramName, d.CarrierId, d.LineOfBusiness, d.StateCode, d.Version });
+        builder.HasIndex(d => new { d.ProgramId, d.Version });
+
+        builder.HasOne(d => d.Program)
+            .WithMany(p => p.GuidelineDocuments)
+            .HasForeignKey(d => d.ProgramId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(d => d.Carrier)
             .WithMany()

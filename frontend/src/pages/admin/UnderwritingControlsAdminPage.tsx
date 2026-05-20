@@ -5,6 +5,7 @@ import { Archive, Check, FileSearch, Plus, Rocket, Save, ShieldAlert, X } from '
 import { toast } from 'sonner'
 import { attachmentsApi } from '@/api/attachments.api'
 import { carriersApi } from '@/api/carriers.api'
+import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -47,6 +48,7 @@ const inputCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm focus
 const iconBtnCls = 'inline-flex items-center gap-1.5 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
 
 const emptyDocument: CreateUnderwritingGuidelineDocumentRequest = {
+  programId: null,
   programName: '',
   carrierId: null,
   lineOfBusiness: 'InlandMarine',
@@ -90,6 +92,11 @@ export function UnderwritingControlsAdminPage() {
   const { data: carriers = [] } = useQuery({
     queryKey: ['carriers', 'active'],
     queryFn: () => carriersApi.getAll(true),
+  })
+
+  const { data: programs = [] } = useQuery({
+    queryKey: ['admin', 'program-configurations', 'active'],
+    queryFn: () => programConfigurationsApi.getAll(false),
   })
 
   const { data: carrierAttachments = [] } = useQuery({
@@ -136,6 +143,7 @@ export function UnderwritingControlsAdminPage() {
       attachmentId: selectedAttachmentId,
       document: {
         ...documentForm,
+        programId: documentForm.programId || null,
         carrierId: documentForm.carrierId || null,
         stateCode: documentForm.stateCode || 'ALL',
         sourceFileName: null,
@@ -193,6 +201,7 @@ export function UnderwritingControlsAdminPage() {
   function submitDocument() {
     createDocument.mutate({
       ...documentForm,
+      programId: documentForm.programId || null,
       carrierId: documentForm.carrierId || null,
       stateCode: documentForm.stateCode || 'ALL',
     })
@@ -234,6 +243,19 @@ export function UnderwritingControlsAdminPage() {
     })
   }
 
+  function selectProgram(programId: string) {
+    const program = programs.find((p) => p.id === programId)
+    setSelectedAttachmentId('')
+    setDocumentForm((f) => ({
+      ...f,
+      programId: programId || null,
+      programName: program?.name ?? f.programName,
+      carrierId: program?.carrierId ?? f.carrierId,
+      lineOfBusiness: program?.lineOfBusiness ?? f.lineOfBusiness,
+      stateCode: program?.stateCode ?? f.stateCode,
+    }))
+  }
+
   const guidelineAttachments = carrierAttachments.filter((a: Attachment) => a.documentType === 'UnderwritingGuidelines')
   const supportedGuidelineAttachments = guidelineAttachments.filter(isSupportedGuidelineAttachment)
 
@@ -254,9 +276,21 @@ export function UnderwritingControlsAdminPage() {
               <h2 className="text-sm font-semibold text-slate-800">Guideline Scope</h2>
             </div>
             <div className="space-y-3 p-5">
+              <select
+                value={documentForm.programId ?? ''}
+                onChange={(e) => selectProgram(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Manual program scope</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>
+                    {program.name} / {program.carrierName ?? 'All companies'} / {LOB_LABELS[program.lineOfBusiness]} / {program.stateCode}
+                  </option>
+                ))}
+              </select>
               <input
                 value={documentForm.programName}
-                onChange={(e) => setDocumentForm((f) => ({ ...f, programName: e.target.value }))}
+                onChange={(e) => setDocumentForm((f) => ({ ...f, programName: e.target.value, programId: null }))}
                 className={inputCls}
                 placeholder="Program"
               />
@@ -264,7 +298,7 @@ export function UnderwritingControlsAdminPage() {
                 value={documentForm.carrierId ?? ''}
                 onChange={(e) => {
                   setSelectedAttachmentId('')
-                  setDocumentForm((f) => ({ ...f, carrierId: e.target.value || null }))
+                  setDocumentForm((f) => ({ ...f, carrierId: e.target.value || null, programId: null }))
                 }}
                 className={inputCls}
               >
@@ -276,7 +310,7 @@ export function UnderwritingControlsAdminPage() {
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={documentForm.lineOfBusiness}
-                  onChange={(e) => setDocumentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))}
+                  onChange={(e) => setDocumentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness, programId: null }))}
                   className={inputCls}
                 >
                   {ACTIVE_LOBS.map((lob) => (
@@ -285,7 +319,7 @@ export function UnderwritingControlsAdminPage() {
                 </select>
                 <select
                   value={documentForm.stateCode}
-                  onChange={(e) => setDocumentForm((f) => ({ ...f, stateCode: e.target.value }))}
+                  onChange={(e) => setDocumentForm((f) => ({ ...f, stateCode: e.target.value, programId: null }))}
                   className={inputCls}
                 >
                   {US_STATES.map((state) => (

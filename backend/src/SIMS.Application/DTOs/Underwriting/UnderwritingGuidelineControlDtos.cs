@@ -4,6 +4,8 @@ namespace SIMS.Application.DTOs.Underwriting;
 
 public record UnderwritingGuidelineDocumentDto(
     Guid Id,
+    Guid? ProgramId,
+    string? ProgramCode,
     string ProgramName,
     Guid? CarrierId,
     string? CarrierName,
@@ -21,6 +23,8 @@ public record UnderwritingGuidelineDocumentDto(
 public record UnderwritingGuidelineControlDto(
     Guid Id,
     Guid GuidelineDocumentId,
+    Guid? ProgramId,
+    string? ProgramCode,
     string ProgramName,
     Guid? CarrierId,
     string? CarrierName,
@@ -69,7 +73,8 @@ public record CreateUnderwritingGuidelineDocumentRequest(
     string Title,
     string? SourceFileName,
     string? SourceBlobName,
-    string? Notes);
+    string? Notes,
+    Guid? ProgramId = null);
 
 public record CreateUnderwritingGuidelineControlRequest(
     UnderwritingControlItemType ItemType,

@@ -31,6 +31,8 @@ export type UnderwritingControlStatus =
 
 export interface UnderwritingGuidelineDocument {
   id: string
+  programId: string | null
+  programCode: string | null
   programName: string
   carrierId: string | null
   carrierName: string | null
@@ -49,6 +51,8 @@ export interface UnderwritingGuidelineDocument {
 export interface UnderwritingGuidelineControl {
   id: string
   guidelineDocumentId: string
+  programId: string | null
+  programCode: string | null
   programName: string
   carrierId: string | null
   carrierName: string | null
@@ -92,6 +96,7 @@ export interface UnderwritingGuidelineAuditLog {
 }
 
 export interface CreateUnderwritingGuidelineDocumentRequest {
+  programId?: string | null
   programName: string
   carrierId: string | null
   lineOfBusiness: PolicyLineOfBusiness

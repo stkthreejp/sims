@@ -18,6 +18,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
     public async Task<IReadOnlyList<UnderwritingGuidelineDocumentDto>> GetDocumentsAsync(CancellationToken ct = default)
     {
         var docs = await _db.Set<UnderwritingGuidelineDocument>()
+            .Include(d => d.Program)
             .Include(d => d.Carrier)
             .Include(d => d.Controls)
             .OrderBy(d => d.ProgramName)
@@ -32,31 +33,54 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
 
     public async Task<Result<UnderwritingGuidelineDocumentDto>> CreateDocumentAsync(CreateUnderwritingGuidelineDocumentRequest request, Guid userId, CancellationToken ct = default)
     {
-        var validation = ValidateScope(request.ProgramName, request.StateCode);
+        ProgramConfiguration? program = null;
+        var programName = request.ProgramName;
+        var carrierId = request.CarrierId;
+        var lineOfBusiness = request.LineOfBusiness;
+        var stateCode = request.StateCode;
+
+        if (request.ProgramId.HasValue)
+        {
+            program = await _db.Set<ProgramConfiguration>()
+                .Include(p => p.Carrier)
+                .SingleOrDefaultAsync(p => p.Id == request.ProgramId.Value, ct);
+            if (program is null)
+                return Result<UnderwritingGuidelineDocumentDto>.Failure("PROGRAM_NOT_FOUND", "Program was not found.");
+            if (!program.IsActive)
+                return Result<UnderwritingGuidelineDocumentDto>.Failure("PROGRAM_INACTIVE", "Program is inactive.");
+
+            programName = program.Name;
+            carrierId = program.CarrierId;
+            lineOfBusiness = program.LineOfBusiness;
+            stateCode = program.StateCode;
+        }
+
+        var validation = ValidateScope(programName, stateCode);
         if (validation is not null)
             return Result<UnderwritingGuidelineDocumentDto>.Failure(validation.Value.Code, validation.Value.Message);
 
         if (string.IsNullOrWhiteSpace(request.Title))
             return Result<UnderwritingGuidelineDocumentDto>.Failure("TITLE_REQUIRED", "Guideline title is required.");
 
-        if (request.CarrierId.HasValue && !await _db.Set<Carrier>().AnyAsync(c => c.Id == request.CarrierId.Value, ct))
+        if (carrierId.HasValue && !await _db.Set<Carrier>().AnyAsync(c => c.Id == carrierId.Value, ct))
             return Result<UnderwritingGuidelineDocumentDto>.Failure("CARRIER_NOT_FOUND", "Company was not found.");
 
-        var normalizedProgram = request.ProgramName.Trim();
-        var normalizedState = NormalizeStateCode(request.StateCode);
+        var normalizedProgram = programName.Trim();
+        var normalizedState = NormalizeStateCode(stateCode);
         var nextVersion = await _db.Set<UnderwritingGuidelineDocument>()
             .Where(d => d.ProgramName == normalizedProgram
-                && d.CarrierId == request.CarrierId
-                && d.LineOfBusiness == request.LineOfBusiness
+                && d.CarrierId == carrierId
+                && d.LineOfBusiness == lineOfBusiness
                 && d.StateCode == normalizedState)
             .Select(d => (int?)d.Version)
             .MaxAsync(ct) ?? 0;
 
         var doc = new UnderwritingGuidelineDocument
         {
+            ProgramId = program?.Id,
             ProgramName = normalizedProgram,
-            CarrierId = request.CarrierId,
-            LineOfBusiness = request.LineOfBusiness,
+            CarrierId = carrierId,
+            LineOfBusiness = lineOfBusiness,
             StateCode = normalizedState,
             Title = request.Title.Trim(),
             SourceFileName = TrimToNull(request.SourceFileName),
@@ -67,11 +91,12 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         };
 
         _db.Set<UnderwritingGuidelineDocument>().Add(doc);
-        AddAudit(doc.Id, null, "DocumentCreated", userId, request.Notes, null, doc);
+        AddAudit(doc.Id, null, "DocumentCreated", userId, request.Notes, null, Snapshot(doc));
         await _db.SaveChangesAsync(ct);
 
-        doc.Carrier = request.CarrierId.HasValue
-            ? await _db.Set<Carrier>().FindAsync([request.CarrierId.Value], ct)
+        doc.Program = program;
+        doc.Carrier = carrierId.HasValue
+            ? await _db.Set<Carrier>().FindAsync([carrierId.Value], ct)
             : null;
 
         return Result<UnderwritingGuidelineDocumentDto>.Success(MapDocument(doc));
@@ -80,6 +105,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
     public async Task<IReadOnlyList<UnderwritingGuidelineControlDto>> GetControlsAsync(Guid guidelineDocumentId, CancellationToken ct = default)
     {
         var controls = await _db.Set<UnderwritingGuidelineControl>()
+            .Include(c => c.Program)
             .Include(c => c.Carrier)
             .Where(c => c.GuidelineDocumentId == guidelineDocumentId)
             .OrderBy(c => c.SortOrder)
@@ -91,7 +117,9 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
 
     public async Task<Result<IReadOnlyList<UnderwritingGuidelineControlDto>>> AddProposedControlsAsync(Guid guidelineDocumentId, AddProposedUnderwritingControlsRequest request, Guid userId, CancellationToken ct = default)
     {
-        var doc = await _db.Set<UnderwritingGuidelineDocument>().FindAsync([guidelineDocumentId], ct);
+        var doc = await _db.Set<UnderwritingGuidelineDocument>()
+            .Include(d => d.Program)
+            .SingleOrDefaultAsync(d => d.Id == guidelineDocumentId, ct);
         if (doc is null)
             return Result<IReadOnlyList<UnderwritingGuidelineControlDto>>.Failure("DOCUMENT_NOT_FOUND", "Guideline document was not found.");
 
@@ -108,6 +136,8 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
             var control = new UnderwritingGuidelineControl
             {
                 GuidelineDocumentId = doc.Id,
+                ProgramId = doc.ProgramId,
+                Program = doc.Program,
                 ProgramName = doc.ProgramName,
                 CarrierId = doc.CarrierId,
                 LineOfBusiness = doc.LineOfBusiness,
@@ -142,7 +172,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
 
     public async Task<Result<UnderwritingGuidelineControlDto>> UpdateControlAsync(Guid controlId, UpdateUnderwritingGuidelineControlRequest request, Guid userId, CancellationToken ct = default)
     {
-        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
+        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Program).Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
         if (control is null)
             return Result<UnderwritingGuidelineControlDto>.Failure("CONTROL_NOT_FOUND", "Guideline control was not found.");
 
@@ -168,7 +198,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         control.SourceCitation = TrimToNull(request.SourceCitation);
         control.SortOrder = request.SortOrder;
 
-        AddAudit(control.GuidelineDocumentId, control.Id, "ControlEdited", userId, request.ChangeNotes, before, control);
+        AddAudit(control.GuidelineDocumentId, control.Id, "ControlEdited", userId, request.ChangeNotes, before, Snapshot(control));
         await _db.SaveChangesAsync(ct);
         return Result<UnderwritingGuidelineControlDto>.Success(MapControl(control));
     }
@@ -181,7 +211,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
 
     public async Task<Result<UnderwritingGuidelineControlDto>> PublishControlAsync(Guid controlId, Guid userId, string? notes, CancellationToken ct = default)
     {
-        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
+        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Program).Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
         if (control is null)
             return Result<UnderwritingGuidelineControlDto>.Failure("CONTROL_NOT_FOUND", "Guideline control was not found.");
 
@@ -200,7 +230,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
 
     public async Task<Result<UnderwritingGuidelineControlDto>> RetireControlAsync(Guid controlId, Guid userId, string? reason, CancellationToken ct = default)
     {
-        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
+        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Program).Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
         if (control is null)
             return Result<UnderwritingGuidelineControlDto>.Failure("CONTROL_NOT_FOUND", "Guideline control was not found.");
 
@@ -232,7 +262,7 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
 
     private async Task<Result<UnderwritingGuidelineControlDto>> SetReviewStatusAsync(Guid controlId, Guid userId, UnderwritingControlStatus status, string action, string? notes, CancellationToken ct)
     {
-        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
+        var control = await _db.Set<UnderwritingGuidelineControl>().Include(c => c.Program).Include(c => c.Carrier).SingleOrDefaultAsync(c => c.Id == controlId, ct);
         if (control is null)
             return Result<UnderwritingGuidelineControlDto>.Failure("CONTROL_NOT_FOUND", "Guideline control was not found.");
 
@@ -305,6 +335,11 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
 
     private static object Snapshot(UnderwritingGuidelineControl c) => new
     {
+        c.ProgramId,
+        c.ProgramName,
+        c.CarrierId,
+        c.LineOfBusiness,
+        c.StateCode,
         c.ItemType,
         c.Stage,
         c.Severity,
@@ -320,9 +355,25 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         c.SortOrder
     };
 
+    private static object Snapshot(UnderwritingGuidelineDocument d) => new
+    {
+        d.ProgramId,
+        d.ProgramName,
+        d.CarrierId,
+        d.LineOfBusiness,
+        d.StateCode,
+        d.Title,
+        d.SourceFileName,
+        d.SourceBlobName,
+        d.Notes,
+        d.Version
+    };
+
     private static UnderwritingGuidelineDocumentDto MapDocument(UnderwritingGuidelineDocument doc) =>
         new(
             doc.Id,
+            doc.ProgramId,
+            doc.Program?.Code,
             doc.ProgramName,
             doc.CarrierId,
             doc.Carrier?.Name,
@@ -341,6 +392,8 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         new(
             control.Id,
             control.GuidelineDocumentId,
+            control.ProgramId,
+            control.Program?.Code,
             control.ProgramName,
             control.CarrierId,
             control.Carrier?.Name,

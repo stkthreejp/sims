@@ -22,12 +22,18 @@ public class UnderwritingGuidelineControlConfiguration : IEntityTypeConfiguratio
         builder.Property(c => c.RetirementReason).HasMaxLength(1000);
 
         builder.HasIndex(c => new { c.Status, c.ProgramName, c.CarrierId, c.LineOfBusiness, c.StateCode });
+        builder.HasIndex(c => new { c.Status, c.ProgramId });
         builder.HasIndex(c => new { c.GuidelineDocumentId, c.RuleKey });
 
         builder.HasOne(c => c.GuidelineDocument)
             .WithMany(d => d.Controls)
             .HasForeignKey(c => c.GuidelineDocumentId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(c => c.Program)
+            .WithMany(p => p.GuidelineControls)
+            .HasForeignKey(c => c.ProgramId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(c => c.Carrier)
             .WithMany()

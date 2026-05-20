@@ -74,6 +74,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IQuoteChecklistService, QuoteChecklistService>();
         services.AddScoped<IUnderwritingClearanceService, UnderwritingClearanceService>();
         services.AddScoped<IUnderwritingReferralService, UnderwritingReferralService>();
+        services.AddScoped<IProgramConfigurationService, ProgramConfigurationService>();
         services.AddScoped<IUnderwritingGuidelineControlService, UnderwritingGuidelineControlService>();
         services.AddScoped<IUnderwritingControlEnforcementService, UnderwritingControlEnforcementService>();
         services.AddScoped<IAiGuidelineControlProposalService, AiGuidelineControlProposalService>();
