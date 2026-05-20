@@ -6,6 +6,7 @@ using SIMS.Application.DTOs.OutboundCommunications;
 using SIMS.Application.DTOs.Policies;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.DTOs.Tasks;
+using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Policies;
 using SIMS.Application.Security;
@@ -415,6 +416,14 @@ public class PolicyService : IPolicyService
         var referrals = (IUnderwritingReferralService?)_sp.GetService(typeof(IUnderwritingReferralService));
         if (referrals != null && await referrals.HasOpenRequiredReferralsAsync(policy.SubmissionId))
             return Result<PolicyDto>.Failure("REFERRAL_REQUIRED", "Resolve required underwriting referrals before issuing this policy.");
+
+        var controlEnforcement = (IUnderwritingControlEnforcementService?)_sp.GetService(typeof(IUnderwritingControlEnforcementService));
+        if (controlEnforcement != null)
+        {
+            var controlSummary = await controlEnforcement.EvaluatePolicyAsync(policy.Id, UnderwritingControlStage.Issue, access.UserId);
+            if (controlSummary.HasBlockingResults)
+                return Result<PolicyDto>.Failure("UNDERWRITING_CONTROL_BLOCKED", BuildControlBlockMessage("issuing", controlSummary.BlockingResults));
+        }
 
         var packet = await GetIssuancePacketAsync(policyId, access);
         if (!packet.IsSuccess)
@@ -1849,5 +1858,12 @@ public class PolicyService : IPolicyService
         }
 
         return checklist;
+    }
+
+    private static string BuildControlBlockMessage(string action, IReadOnlyList<UnderwritingControlEnforcementResultDto> blockers)
+    {
+        var labels = blockers.Take(3).Select(b => b.Label);
+        var suffix = blockers.Count > 3 ? $" and {blockers.Count - 3} more" : "";
+        return $"Resolve published underwriting control blockers before {action}: {string.Join(", ", labels)}{suffix}.";
     }
 }

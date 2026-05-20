@@ -114,8 +114,16 @@ Status values:
 - Kept issue, post-bind, and renewal document requirements stored but out of the bind checklist until their dedicated enforcement surfaces exist.
 - Preserved conservative blocker behavior: published checklist controls only block bind when `isBlocking` is true.
 
+## Twelfth Implemented Slice
+
+- Added persisted enforcement results for published underwriting controls.
+- Added bind and issue evaluation checkpoints for published hard blockers, referral triggers, warnings, and non-applicable conditions.
+- Added override audit support for blocked enforcement results using the existing clearance override permission.
+- Documented the AI contract for unconditional blockers (`conditionJson: null`) and conditional blocker/referral rules using only the approved field/operator/value schema.
+- Preserved conservative condition handling: unknown or unsupported measurable fields are flagged as `UnknownField` instead of becoming invented blockers.
+
 ## Immediate Next Slice
 
-1. Add enforcement result records for published blockers at bind/issue checkpoints.
+1. Add quote/policy UI visibility for published enforcement results and override actions.
 2. Add issue/post-bind document checklist surfaces.
 3. Add program selection to quote/submission scope matching when Program Configuration is available.

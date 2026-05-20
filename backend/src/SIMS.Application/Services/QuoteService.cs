@@ -1,6 +1,7 @@
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Quotes;
+using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Security;
 using SIMS.Domain.Entities;
@@ -22,6 +23,7 @@ public class QuoteService : IQuoteService
     private readonly IPolicyVersionService _policyVersions;
     private readonly IUnderwritingClearanceService _clearance;
     private readonly IUnderwritingReferralService _referrals;
+    private readonly IUnderwritingControlEnforcementService _controlEnforcement;
 
     private Microsoft.EntityFrameworkCore.DbContext Db =>
         (Microsoft.EntityFrameworkCore.DbContext)_sp.GetService(typeof(Microsoft.EntityFrameworkCore.DbContext))!;
@@ -36,7 +38,8 @@ public class QuoteService : IQuoteService
         IPolicyTransactionLifecycleService transactionLifecycle,
         IPolicyVersionService policyVersions,
         IUnderwritingClearanceService clearance,
-        IUnderwritingReferralService referrals)
+        IUnderwritingReferralService referrals,
+        IUnderwritingControlEnforcementService controlEnforcement)
     {
         _sp = sp;
         _workflowEngine = workflowEngine;
@@ -48,6 +51,7 @@ public class QuoteService : IQuoteService
         _policyVersions = policyVersions;
         _clearance = clearance;
         _referrals = referrals;
+        _controlEnforcement = controlEnforcement;
     }
 
     public async Task<PagedResult<QuoteListItemDto>> GetAllAsync(QueryParameters query, UserAccessScope access)
@@ -289,6 +293,9 @@ public class QuoteService : IQuoteService
             return Result<QuoteDto>.Failure("CLEARANCE_BLOCKED", "Resolve blocked underwriting clearance results before binding this quote.");
         if (await _referrals.HasOpenRequiredReferralsAsync(quote.SubmissionId))
             return Result<QuoteDto>.Failure("REFERRAL_REQUIRED", "Resolve required underwriting referrals before binding this quote.");
+        var controlSummary = await _controlEnforcement.EvaluateQuoteAsync(quote.Id, UnderwritingControlStage.Bind, access.UserId);
+        if (controlSummary.HasBlockingResults)
+            return Result<QuoteDto>.Failure("UNDERWRITING_CONTROL_BLOCKED", BuildControlBlockMessage("binding", controlSummary.BlockingResults));
 
         await using var dbTransaction = await Db.Database.BeginTransactionAsync();
 
@@ -595,6 +602,13 @@ public class QuoteService : IQuoteService
             .IgnoreQueryFilters()
             .CountAsync(t => t.TransactionNumber.StartsWith(prefix));
         return $"{prefix}{(count + 1):D5}";
+    }
+
+    private static string BuildControlBlockMessage(string action, IReadOnlyList<UnderwritingControlEnforcementResultDto> blockers)
+    {
+        var labels = blockers.Take(3).Select(b => b.Label);
+        var suffix = blockers.Count > 3 ? $" and {blockers.Count - 3} more" : "";
+        return $"Resolve published underwriting control blockers before {action}: {string.Join(", ", labels)}{suffix}.";
     }
 
     private static QuoteListItemDto MapToListItemDto(Quote qt) => new()

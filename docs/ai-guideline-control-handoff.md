@@ -216,25 +216,21 @@ Allowed `operator` values:
 - `<=`
 - `==`
 - `!=`
-- `contains`
-- `in`
 
-Initial known `field` values:
+Current enforceable `field` values:
 
 - `largestSingleItemValue`
 - `totalInsuredValue`
-- `premium`
+- `premiumAmount`
+- `totalPremium`
 - `lossRatio`
-- `largestLossAmount`
-- `scheduleCreditPercent`
 - `driverCount`
 - `vehicleCount`
-- `fmcsaSafetyRating`
-- `stateCode`
-- `lineOfBusiness`
-- `carrierId`
+- `isFilingState` (`1` for true, `0` for false)
 
-If the guideline needs a field that is not listed, still propose the control, but set `conditionJson: null` and explain the missing measurable field in `description` or `sourceCitation`. Do not invent a field name.
+For unconditional blockers, use `conditionJson: null`.
+
+For conditional blockers or referrals, use only the documented field/operator/value schema above. If the field needed by the guideline is not listed, do not invent one. Flag the missing measurable field in `description` or `sourceCitation` so a human can decide whether SIMS needs a new measurable field before publishing.
 
 ## Rule Key Guidance
 

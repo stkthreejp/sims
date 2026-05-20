@@ -41,6 +41,53 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteBind_BlocksPublishedHardControl()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        db.Add(new UnderwritingGuidelineDocument
+        {
+            Id = Guid.NewGuid(),
+            ProgramName = "Longleaf",
+            CarrierId = fixture.Carrier.Id,
+            LineOfBusiness = fixture.Quote.LineOfBusiness,
+            StateCode = "ALL",
+            Title = "Test guideline",
+            CreatedByUserId = fixture.UserId,
+        });
+        await db.SaveChangesAsync();
+        var document = await db.Set<UnderwritingGuidelineDocument>().SingleAsync();
+        db.Add(new UnderwritingGuidelineControl
+        {
+            GuidelineDocumentId = document.Id,
+            ProgramName = document.ProgramName,
+            CarrierId = fixture.Carrier.Id,
+            LineOfBusiness = fixture.Quote.LineOfBusiness,
+            StateCode = "ALL",
+            ItemType = UnderwritingControlItemType.AppetiteRule,
+            Stage = UnderwritingControlStage.Bind,
+            Severity = UnderwritingControlSeverity.HardBlock,
+            Status = UnderwritingControlStatus.Published,
+            RuleKey = "test-hard-block",
+            Label = "Test hard block",
+            IsBlocking = true,
+            OverrideAllowed = true,
+            OverridePermission = AppPermissions.UnderwritingClearanceOverride,
+            PublishedByUserId = fixture.UserId,
+            PublishedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("UNDERWRITING_CONTROL_BLOCKED", result.ErrorCode);
+        var enforcement = await db.Set<UnderwritingControlEnforcementResult>().SingleAsync();
+        Assert.Equal(UnderwritingControlEvaluationStatus.Blocked, enforcement.Status);
+    }
+
+    [Fact]
     public async Task QuoteBind_CreatesNewBusinessTransaction()
     {
         await using var db = CreateDb();
@@ -1847,7 +1894,8 @@ public class PolicyLifecycleRegressionTests
             new PolicyTransactionLifecycleService(db, workflow),
             new PolicyVersionService(db),
             new UnderwritingClearanceService(db),
-            new UnderwritingReferralService(db));
+            new UnderwritingReferralService(db),
+            new UnderwritingControlEnforcementService(db));
     }
 
     private static PolicyService CreatePolicyService(
@@ -1867,6 +1915,7 @@ public class PolicyLifecycleRegressionTests
             .AddSingleton<IPolicyAssemblyService>(assembly)
             .AddSingleton<IDocumentGenerationService>(documentGeneration ?? new RecordingDocumentGenerationService(db))
             .AddSingleton<IUnderwritingReferralService>(new UnderwritingReferralService(db))
+            .AddSingleton<IUnderwritingControlEnforcementService>(new UnderwritingControlEnforcementService(db))
             .AddSingleton(quoteService)
             .BuildServiceProvider();
 
