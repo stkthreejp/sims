@@ -55,8 +55,19 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         if (!IsSupportedTextSource(attachment))
             return Result<AiGuidelineControlProposalResult>.Failure("UNSUPPORTED_GUIDELINE_ATTACHMENT", "Only PDF and plain-text underwriting guideline attachments are supported for AI proposals.");
 
-        var content = await _blobStorage.DownloadAsync(attachment.BlobPath);
-        var extractedText = await ExtractAttachmentTextAsync(attachment, content, ct);
+        string extractedText;
+        try
+        {
+            var content = await _blobStorage.DownloadAsync(attachment.BlobPath);
+            extractedText = await ExtractAttachmentTextAsync(attachment, content, ct);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException || ex is HttpRequestException)
+        {
+            return Result<AiGuidelineControlProposalResult>.Failure(
+                "GUIDELINE_ATTACHMENT_EXTRACTION_FAILED",
+                "Guideline attachment could not be extracted. Verify Document AI configuration and that the uploaded file is readable.");
+        }
+
         if (string.IsNullOrWhiteSpace(extractedText))
             return Result<AiGuidelineControlProposalResult>.Failure("GUIDELINE_TEXT_REQUIRED", "No guideline text could be extracted from the attachment.");
 

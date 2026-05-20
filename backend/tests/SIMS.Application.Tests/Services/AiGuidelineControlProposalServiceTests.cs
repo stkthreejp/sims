@@ -104,6 +104,46 @@ public class AiGuidelineControlProposalServiceTests
     }
 
     [Fact]
+    public async Task ProposeFromAttachmentAsync_ReturnsFailureWhenExtractionFails()
+    {
+        await using var db = CreateDb();
+        var attachmentId = Guid.NewGuid();
+        db.Set<Attachment>().Add(new Attachment
+        {
+            Id = attachmentId,
+            DocumentType = DocumentType.UnderwritingGuidelines,
+            EntityType = DocumentEntityType.Carrier,
+            FileName = "lloyds-guidelines.pdf",
+            BlobPath = "carrier-guidelines/lloyds-guidelines.pdf",
+            ContentType = "application/pdf",
+            FileSizeBytes = 12,
+            UploadedById = Guid.NewGuid()
+        });
+        await db.SaveChangesAsync();
+
+        var service = new AiGuidelineControlProposalService(
+            new UnderwritingGuidelineControlService(db),
+            db,
+            new FakeBlobStorageService([1, 2, 3]),
+            new FailingDocumentAiExtractionService());
+
+        var result = await service.ProposeFromAttachmentAsync(new AiGuidelineControlProposalFromAttachmentRequest(
+            AttachmentId: attachmentId,
+            Document: new CreateUnderwritingGuidelineDocumentRequest(
+                ProgramName: "Lloyds",
+                CarrierId: null,
+                LineOfBusiness: PolicyLineOfBusiness.InlandMarine,
+                StateCode: "ALL",
+                Title: "Lloyds UW Guidelines",
+                SourceFileName: null,
+                SourceBlobName: null,
+                Notes: null)), Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("GUIDELINE_ATTACHMENT_EXTRACTION_FAILED", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task ProposeFromTextAsync_CreatesDocumentAndAiSuggestedControlsOnly()
     {
         await using var db = CreateDb();
@@ -219,5 +259,11 @@ public class AiGuidelineControlProposalServiceTests
             FileName = fileName;
             return Task.FromResult(new DocumentAiExtractionResult { Text = text });
         }
+    }
+
+    private sealed class FailingDocumentAiExtractionService : IDocumentAiExtractionService
+    {
+        public Task<DocumentAiExtractionResult> ProcessAsync(byte[] content, string mimeType, string fileName, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Document AI settings are incomplete.");
     }
 }
