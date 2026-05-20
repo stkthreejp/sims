@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Ban, Download, FileSignature, FileX2, Loader2, Pin, PinOff, Pencil, RotateCcw, Trash2, Plus, X, Check, FileText, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { policiesApi } from '@/api/policies.api'
+import { submissionsApi } from '@/api/submissions.api'
 import { attachmentsApi } from '@/api/attachments.api'
 import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -15,6 +16,7 @@ import type { Attachment, DocumentType } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import type { DocumentTemplateListItem } from '@/types/documentTemplate.types'
+import type { UnderwritingReferralSummary } from '@/types/submission.types'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -94,6 +96,12 @@ export function PolicyDetailPage() {
     queryKey: ['policies', id, 'issuance-packet'],
     queryFn: () => policiesApi.getIssuancePacket(id!),
     enabled: !!id,
+  })
+
+  const { data: referralSummary } = useQuery({
+    queryKey: ['submissions', policy?.submissionId, 'underwriting-referrals'],
+    queryFn: () => submissionsApi.getUnderwritingReferrals(policy!.submissionId),
+    enabled: !!policy?.submissionId,
   })
 
   const { data: cancellationGuidance } = useQuery({
@@ -180,7 +188,13 @@ export function PolicyDetailPage() {
       qc.invalidateQueries({ queryKey: ['attachments', 'Policy', policy?.boundQuoteId] })
       toast.success('Policy issued and final packet filed')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be issued'),
+    onError: (e: any) => {
+      if (e?.response?.data?.errorCode === 'REFERRAL_REQUIRED') {
+        toast.error('Required underwriting referrals are still open. Resolve referrals before issuing.')
+        return
+      }
+      toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be issued')
+    },
   })
 
   const previewPacketMutation = useMutation({
@@ -470,6 +484,8 @@ export function PolicyDetailPage() {
       <PolicyIssuancePanel
         packet={issuancePacket}
         canIssue={canIssuePolicies && policy.status === 'Active' && !policy.issuedDate}
+        referralSummary={referralSummary}
+        submissionId={policy.submissionId}
         issuing={issuePolicyMutation.isPending}
         previewing={previewPacketMutation.isPending}
         onPreview={() => previewPacketMutation.mutate()}
@@ -654,6 +670,8 @@ function formatDate(value: string | null) {
 function PolicyIssuancePanel({
   packet,
   canIssue,
+  referralSummary,
+  submissionId,
   issuing,
   previewing,
   onPreview,
@@ -661,6 +679,8 @@ function PolicyIssuancePanel({
 }: {
   packet?: PolicyIssuancePacket
   canIssue: boolean
+  referralSummary?: UnderwritingReferralSummary
+  submissionId: string
   issuing: boolean
   previewing: boolean
   onPreview: () => void
@@ -668,10 +688,14 @@ function PolicyIssuancePanel({
 }) {
   const includedForms = packet?.forms.filter((form) => form.isIncluded) ?? []
   const excludedForms = packet?.forms.filter((form) => !form.isIncluded) ?? []
+  const openRequiredReferrals = referralSummary?.referrals.filter((referral) => referral.required && referral.status === 'Open') ?? []
+  const hasOpenRequiredReferrals = openRequiredReferrals.length > 0
   const ready = includedForms.length > 0 && (packet?.isReady ?? false)
   const issued = packet?.isIssued
   const actionBlockedReason = !canIssue
     ? 'You do not have permission to issue policies.'
+    : hasOpenRequiredReferrals
+      ? `${openRequiredReferrals.length} required underwriting referral${openRequiredReferrals.length === 1 ? '' : 's'} open.`
     : includedForms.length === 0
       ? 'No forms are included in this packet.'
       : !ready
@@ -686,8 +710,10 @@ function PolicyIssuancePanel({
           <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-3)' }}>
             {issued
               ? `Issued ${packet?.issuedDate ? new Date(packet.issuedDate).toLocaleDateString() : ''}`
-                : ready
+                : ready && !hasOpenRequiredReferrals
                 ? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready. Preview, then issue.`
+                : hasOpenRequiredReferrals
+                  ? 'Required underwriting referrals must be resolved before issue'
                 : includedForms.length > 0
                   ? 'Packet needs attention before preview or issue'
                 : 'No included policy forms found yet'}
@@ -700,7 +726,7 @@ function PolicyIssuancePanel({
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <button
-              disabled={!canIssue || !ready || previewing}
+              disabled={!canIssue || !ready || hasOpenRequiredReferrals || previewing}
               onClick={onPreview}
               className="sd-btn outline"
               title={actionBlockedReason ?? 'Generate a draft packet PDF for review'}
@@ -708,7 +734,7 @@ function PolicyIssuancePanel({
               <FileText className="h-3.5 w-3.5" /> {previewing ? 'Generating...' : 'Preview packet'}
             </button>
             <button
-              disabled={!canIssue || !ready || issuing}
+              disabled={!canIssue || !ready || hasOpenRequiredReferrals || issuing}
               onClick={onIssue}
               className="sd-btn primary"
               title={actionBlockedReason ?? 'File the final policy packet and mark this policy issued'}
@@ -727,12 +753,21 @@ function PolicyIssuancePanel({
           </div>
         ) : (
           <>
-            {!packet.isReady && packet.readinessMessages.length > 0 && (
+            {hasOpenRequiredReferrals && (
+              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
+                <div className="font-semibold">{openRequiredReferrals.length} required underwriting referral{openRequiredReferrals.length === 1 ? '' : 's'} open</div>
+                <div className="mt-1">Resolve submission referrals before previewing or issuing this policy.</div>
+                <Link to={`/submissions/${submissionId}`} className="mt-2 inline-flex font-semibold underline underline-offset-2">
+                  Open submission referrals
+                </Link>
+              </div>
+            )}
+            {!hasOpenRequiredReferrals && !packet.isReady && packet.readinessMessages.length > 0 && (
               <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
                 {packet.readinessMessages[0]}
               </div>
             )}
-            {ready && !issued && (
+            {ready && !issued && !hasOpenRequiredReferrals && (
               <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
                 Preview creates a draft PDF for review. Issue policy creates and files the final issued packet.
               </div>

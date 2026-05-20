@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
+import { submissionsApi } from '@/api/submissions.api'
 import { policyFormsApi } from '@/api/policyForms.api'
 import { LOB_LABELS, type CommissionOverrideRequest, type PolicyFormType, type PolicyLineOfBusiness, type QuotePolicyFormSelection, type QuotePolicyFormSelectionUpsert, type QuoteStatus } from '@/types/quote.types'
 import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
@@ -19,6 +20,7 @@ import { documentGenerationApi } from '@/api/documentGeneration.api'
 import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { uwWriteupApi } from '@/api/uwWriteup.api'
 import type { IMWriteupPayload, WriteupCondition } from '@/types/uwWriteup.types'
+import type { UnderwritingReferralSummary } from '@/types/submission.types'
 import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
 import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -297,6 +299,21 @@ function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; 
     >
       {children}
     </button>
+  )
+}
+
+function ReferralBlockerNotice({ summary, submissionId }: { summary?: UnderwritingReferralSummary; submissionId: string }) {
+  const openRequired = summary?.referrals.filter((referral) => referral.required && referral.status === 'Open') ?? []
+  if (openRequired.length === 0) return null
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      <div className="font-semibold">{openRequired.length} required underwriting referral{openRequired.length === 1 ? '' : 's'} open</div>
+      <div className="mt-1 text-amber-700">Resolve before binding or issuing.</div>
+      <Link to={`/submissions/${submissionId}`} className="mt-2 inline-flex font-semibold text-amber-900 underline underline-offset-2">
+        Open submission referrals
+      </Link>
+    </div>
   )
 }
 
@@ -613,6 +630,10 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
       const data = err?.response?.data
       if (data?.errorCode === 'CLEARANCE_BLOCKED') {
         toast.error('Underwriting clearance is blocked. Open the submission and resolve the clearance result before binding.')
+        return
+      }
+      if (data?.errorCode === 'REFERRAL_REQUIRED') {
+        toast.error('Required underwriting referrals are still open. Resolve referrals before binding.')
         return
       }
       toast.error(data?.errorMessage ?? 'Bind failed')
@@ -1050,6 +1071,12 @@ export function QuoteDetailPage() {
     enabled: !!quote?.submissionId,
   })
 
+  const { data: referralSummary } = useQuery({
+    queryKey: ['submissions', quote?.submissionId, 'underwriting-referrals'],
+    queryFn: () => submissionsApi.getUnderwritingReferrals(quote!.submissionId),
+    enabled: !!quote?.submissionId,
+  })
+
   const { data: checklist = [] } = useQuery({
     queryKey: ['quote-checklist', quoteId],
     queryFn: () => quotesApi.getChecklist(quoteId!),
@@ -1142,6 +1169,7 @@ export function QuoteDetailPage() {
   const isGeneralLiability = quote.lineOfBusiness === 'GeneralLiability'
   const isAuto = AUTO_LOBS.has(quote.lineOfBusiness)
   const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted).length
+  const openRequiredReferrals = referralSummary?.referrals.filter((referral) => referral.required && referral.status === 'Open').length ?? 0
   const includedPolicyFormCount = policyForms.filter((form) => form.isIncluded).length
   const hasSelectedPolicyForms = includedPolicyFormCount > 0
   const canReduce = quote.status !== 'Bound' && quote.status !== 'Cancelled' && quote.status !== 'Expired' && canCreatePolicies && !quote.commissionOverride
@@ -1182,9 +1210,11 @@ export function QuoteDetailPage() {
         ? 'Rate the quote before binding.'
         : !hasSelectedPolicyForms
           ? 'Select policy forms before binding.'
-          : openBlockers > 0
-            ? `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining.`
-            : null
+          : openRequiredReferrals > 0
+            ? `${openRequiredReferrals} required underwriting referral${openRequiredReferrals !== 1 ? 's' : ''} open.`
+            : openBlockers > 0
+              ? `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining.`
+              : null
   const canBind = bindUnavailableReason == null
   const showBindAction = quote.status !== 'Bound' && quote.status !== 'Declined' && quote.status !== 'Cancelled' && quote.status !== 'Expired'
 
@@ -1868,6 +1898,8 @@ export function QuoteDetailPage() {
                 </button>
               </div>
             )}
+
+            <ReferralBlockerNotice summary={referralSummary} submissionId={quote.submissionId} />
 
             {/* Quote details */}
             <Card>
