@@ -1,4 +1,5 @@
 using SIMS.Application.DTOs.UWWriteup;
+using SIMS.Application.DTOs.Underwriting;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 
@@ -13,6 +14,10 @@ public interface IUnderwritingReferralService
         CancellationToken ct = default);
 
     Task<bool> HasOpenRequiredReferralsAsync(
+        Guid submissionId,
+        CancellationToken ct = default);
+
+    Task<UnderwritingReferralSummaryDto> GetSubmissionSummaryAsync(
         Guid submissionId,
         CancellationToken ct = default);
 

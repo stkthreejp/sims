@@ -1,6 +1,7 @@
 export type SubmissionStatus = 'New' | 'InProgress' | 'Quoted' | 'Bound' | 'Declined' | 'Withdrawn'
 export type UnderwritingClearanceStatus = 'Clear' | 'Warning' | 'Blocked'
 export type UnderwritingClearanceCheckType = 'DuplicateSubmission' | 'ActivePolicyOverlap'
+export type UnderwritingReferralStatus = 'Open' | 'Approved' | 'Declined' | 'Waived'
 
 export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
   New: 'New',
@@ -78,4 +79,44 @@ export interface UnderwritingClearanceEvaluation {
   submissionId: string
   overallStatus: UnderwritingClearanceStatus
   results: UnderwritingClearanceResult[]
+}
+
+export interface UnderwritingAppetiteResult {
+  id: string
+  submissionId: string
+  quoteId: string | null
+  quoteNumber: string | null
+  ruleCode: string
+  ruleName: string
+  triggered: boolean
+  referralRequired: boolean
+  explanation: string
+  evaluatedById: string
+  evaluatedByName: string
+  evaluatedAt: string
+}
+
+export interface UnderwritingReferral {
+  id: string
+  submissionId: string
+  quoteId: string | null
+  quoteNumber: string | null
+  referralType: string
+  status: UnderwritingReferralStatus
+  required: boolean
+  reason: string
+  requestedById: string
+  requestedByName: string
+  requestedAt: string
+  decisionById: string | null
+  decisionByName: string | null
+  decisionAt: string | null
+  decisionNotes: string | null
+}
+
+export interface UnderwritingReferralSummary {
+  submissionId: string
+  hasOpenRequiredReferrals: boolean
+  appetiteResults: UnderwritingAppetiteResult[]
+  referrals: UnderwritingReferral[]
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.DTOs.UWWriteup;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
@@ -115,9 +116,72 @@ public class UnderwritingReferralService : IUnderwritingReferralService
     public Task<bool> HasOpenRequiredReferralsAsync(Guid submissionId, CancellationToken ct = default)
         => _db.Set<UnderwritingReferral>().AnyAsync(r =>
             r.SubmissionId == submissionId &&
+            !r.IsDeleted &&
             r.Required &&
             r.Status == UnderwritingReferralStatus.Open,
             ct);
+
+    public async Task<UnderwritingReferralSummaryDto> GetSubmissionSummaryAsync(Guid submissionId, CancellationToken ct = default)
+    {
+        var appetiteResults = await _db.Set<UnderwritingAppetiteResult>()
+            .AsNoTracking()
+            .Include(r => r.Quote)
+            .Include(r => r.EvaluatedBy)
+            .Where(r => r.SubmissionId == submissionId && !r.IsDeleted)
+            .OrderByDescending(r => r.EvaluatedAt)
+            .Select(r => new UnderwritingAppetiteResultDto
+            {
+                Id = r.Id,
+                SubmissionId = r.SubmissionId,
+                QuoteId = r.QuoteId,
+                QuoteNumber = r.Quote != null ? r.Quote.QuoteNumber : null,
+                RuleCode = r.RuleCode,
+                RuleName = r.RuleName,
+                Triggered = r.Triggered,
+                ReferralRequired = r.ReferralRequired,
+                Explanation = r.Explanation,
+                EvaluatedById = r.EvaluatedById,
+                EvaluatedByName = (r.EvaluatedBy.FirstName + " " + r.EvaluatedBy.LastName).Trim(),
+                EvaluatedAt = r.EvaluatedAt,
+            })
+            .ToListAsync(ct);
+
+        var referrals = await _db.Set<UnderwritingReferral>()
+            .AsNoTracking()
+            .Include(r => r.Quote)
+            .Include(r => r.RequestedBy)
+            .Include(r => r.DecisionBy)
+            .Where(r => r.SubmissionId == submissionId && !r.IsDeleted)
+            .OrderBy(r => r.Status == UnderwritingReferralStatus.Open ? 0 : 1)
+            .ThenByDescending(r => r.RequestedAt)
+            .Select(r => new UnderwritingReferralDto
+            {
+                Id = r.Id,
+                SubmissionId = r.SubmissionId,
+                QuoteId = r.QuoteId,
+                QuoteNumber = r.Quote != null ? r.Quote.QuoteNumber : null,
+                ReferralType = r.ReferralType,
+                Status = r.Status,
+                Required = r.Required,
+                Reason = r.Reason,
+                RequestedById = r.RequestedById,
+                RequestedByName = (r.RequestedBy.FirstName + " " + r.RequestedBy.LastName).Trim(),
+                RequestedAt = r.RequestedAt,
+                DecisionById = r.DecisionById,
+                DecisionByName = r.DecisionBy != null ? (r.DecisionBy.FirstName + " " + r.DecisionBy.LastName).Trim() : null,
+                DecisionAt = r.DecisionAt,
+                DecisionNotes = r.DecisionNotes,
+            })
+            .ToListAsync(ct);
+
+        return new UnderwritingReferralSummaryDto
+        {
+            SubmissionId = submissionId,
+            HasOpenRequiredReferrals = referrals.Any(r => r.Required && r.Status == UnderwritingReferralStatus.Open),
+            AppetiteResults = appetiteResults,
+            Referrals = referrals,
+        };
+    }
 
     public async Task<UnderwritingReferral> DecideAsync(
         Guid referralId,

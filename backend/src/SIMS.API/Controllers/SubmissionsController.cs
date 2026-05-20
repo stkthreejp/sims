@@ -20,11 +20,16 @@ public class SubmissionsController : ControllerBase
 {
     private readonly ISubmissionService _submissionService;
     private readonly IUnderwritingClearanceService _clearance;
+    private readonly IUnderwritingReferralService _referrals;
 
-    public SubmissionsController(ISubmissionService submissionService, IUnderwritingClearanceService clearance)
+    public SubmissionsController(
+        ISubmissionService submissionService,
+        IUnderwritingClearanceService clearance,
+        IUnderwritingReferralService referrals)
     {
         _submissionService = submissionService;
         _clearance = clearance;
+        _referrals = referrals;
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -62,6 +67,11 @@ public class SubmissionsController : ControllerBase
     [Authorize(Policy = AppPermissions.UnderwritingClearanceOverride)]
     public async Task<IActionResult> OverrideClearance(Guid id, [FromBody] UnderwritingClearanceOverrideDto dto, CancellationToken ct)
         => Ok(await _clearance.OverrideSubmissionAsync(id, CurrentUserId, dto.Reason, ct));
+
+    [HttpGet("{id:guid}/underwriting-referrals")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> GetUnderwritingReferrals(Guid id, CancellationToken ct)
+        => Ok(await _referrals.GetSubmissionSummaryAsync(id, ct));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SubmissionCreateDto dto)

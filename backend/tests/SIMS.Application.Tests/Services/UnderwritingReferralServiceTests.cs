@@ -66,6 +66,46 @@ public class UnderwritingReferralServiceTests
         Assert.False(await service.HasOpenRequiredReferralsAsync(fixture.Submission.Id));
     }
 
+    [Fact]
+    public async Task GetSubmissionSummaryAsync_ReturnsAppetiteResultsAndReferrals()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedQuoteAsync(db);
+        db.Add(new UnderwritingAppetiteResult
+        {
+            SubmissionId = fixture.Submission.Id,
+            QuoteId = fixture.Quote.Id,
+            RuleCode = "ReferralPremiumOver100k",
+            RuleName = "Premium over 100k",
+            Triggered = true,
+            ReferralRequired = true,
+            Explanation = "Premium over 100k requires underwriting referral.",
+            EvaluatedById = fixture.UserId,
+        });
+        db.Add(new UnderwritingReferral
+        {
+            SubmissionId = fixture.Submission.Id,
+            QuoteId = fixture.Quote.Id,
+            ReferralType = "ReferralPremiumOver100k",
+            Status = UnderwritingReferralStatus.Open,
+            Required = true,
+            Reason = "Premium over authority threshold.",
+            RequestedById = fixture.UserId,
+        });
+        await db.SaveChangesAsync();
+        var service = new UnderwritingReferralService(db);
+
+        var summary = await service.GetSubmissionSummaryAsync(fixture.Submission.Id);
+
+        Assert.True(summary.HasOpenRequiredReferrals);
+        var appetite = Assert.Single(summary.AppetiteResults);
+        Assert.Equal("Q-REF-1", appetite.QuoteNumber);
+        Assert.Equal("Premium over 100k", appetite.RuleName);
+        var referral = Assert.Single(summary.Referrals);
+        Assert.Equal("Q-REF-1", referral.QuoteNumber);
+        Assert.Equal("ReferralPremiumOver100k", referral.ReferralType);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

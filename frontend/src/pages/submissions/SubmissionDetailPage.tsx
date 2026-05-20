@@ -19,7 +19,7 @@ import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS, GL_CLASS_CODE_OPTIONS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipment, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
-import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission, type UnderwritingClearanceEvaluation, type UnderwritingClearanceStatus, type UnderwritingClearanceCheckType } from '@/types/submission.types'
+import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission, type UnderwritingClearanceEvaluation, type UnderwritingClearanceStatus, type UnderwritingClearanceCheckType, type UnderwritingReferralSummary, type UnderwritingReferralStatus } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -166,6 +166,19 @@ const CLEARANCE_CHECK_LABELS: Record<UnderwritingClearanceCheckType, string> = {
   ActivePolicyOverlap: 'Active policy overlap',
 }
 
+const REFERRAL_STATUS_PILL: Record<UnderwritingReferralStatus, string> = {
+  Open: 'declined',
+  Approved: 'bound',
+  Declined: 'declined',
+  Waived: 'quoted',
+}
+
+const REFERRAL_DECISION_LABELS: Record<Exclude<UnderwritingReferralStatus, 'Open'>, string> = {
+  Approved: 'Approve',
+  Declined: 'Decline',
+  Waived: 'Waive',
+}
+
 export function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -189,6 +202,8 @@ export function SubmissionDetailPage() {
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
   const [showClearanceOverride, setShowClearanceOverride] = useState(false)
   const [clearanceOverrideReason, setClearanceOverrideReason] = useState('')
+  const [referralDecision, setReferralDecision] = useState<{ referralId: string; status: Exclude<UnderwritingReferralStatus, 'Open'> } | null>(null)
+  const [referralDecisionNotes, setReferralDecisionNotes] = useState('')
 
   const openLossHistory = () => {
     if (id) navigate(`/submissions/${id}/loss-history`)
@@ -246,6 +261,12 @@ export function SubmissionDetailPage() {
     queryFn: () => submissionsApi.getClearance(id!),
     enabled: !!id && canManageUnderwriting,
     retry: false,
+  })
+
+  const { data: referralSummary } = useQuery({
+    queryKey: ['submissions', id, 'underwriting-referrals'],
+    queryFn: () => submissionsApi.getUnderwritingReferrals(id!),
+    enabled: !!id && canManageUnderwriting,
   })
 
   const { data: quotes = [] } = useQuery({
@@ -531,6 +552,18 @@ export function SubmissionDetailPage() {
       toast.success('Clearance override recorded')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to override clearance'),
+  })
+
+  const decideReferralMutation = useMutation({
+    mutationFn: ({ referralId, status, notes }: { referralId: string; status: Exclude<UnderwritingReferralStatus, 'Open'>; notes?: string }) =>
+      submissionsApi.decideUnderwritingReferral(referralId, status, notes),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submissions', id, 'underwriting-referrals'] })
+      setReferralDecision(null)
+      setReferralDecisionNotes('')
+      toast.success('Referral decision recorded')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to record referral decision'),
   })
 
   const createQuoteMutation = useMutation({
@@ -848,6 +881,15 @@ export function SubmissionDetailPage() {
     overrideClearanceMutation.mutate(reason)
   }
 
+  const submitReferralDecision = () => {
+    if (!referralDecision) return
+    decideReferralMutation.mutate({
+      referralId: referralDecision.referralId,
+      status: referralDecision.status,
+      notes: referralDecisionNotes.trim() || undefined,
+    })
+  }
+
   const renderClearancePanel = (value: UnderwritingClearanceEvaluation | undefined) => {
     if (!canManageUnderwriting) return null
 
@@ -938,6 +980,105 @@ export function SubmissionDetailPage() {
             )}
           </div>
         )}
+      </section>
+    )
+  }
+
+  const renderReferralPanel = (summary: UnderwritingReferralSummary | undefined) => {
+    if (!canManageUnderwriting) return null
+
+    const referrals = summary?.referrals ?? []
+    const appetiteResults = summary?.appetiteResults ?? []
+    const openRequiredCount = referrals.filter((referral) => referral.required && referral.status === 'Open').length
+
+    return (
+      <section className="sd-card" style={{ marginBottom: 14 }}>
+        <div className="sd-card-head">
+          <h3>Underwriting Referrals</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {summary?.hasOpenRequiredReferrals && <span className="sd-pill declined">{openRequiredCount} open required</span>}
+            {!summary?.hasOpenRequiredReferrals && referrals.length > 0 && <span className="sd-pill bound">Resolved</span>}
+          </div>
+        </div>
+        <div className="sd-card-body tight">
+          {referrals.length === 0 && appetiteResults.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '2px 0' }}>No appetite referrals recorded.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {referrals.length > 0 && (
+                <div style={{ display: 'grid', gap: 1, background: 'var(--line-2)' }}>
+                  {referrals.map((referral) => {
+                    const activeDecision = referralDecision?.referralId === referral.id ? referralDecision : null
+                    return (
+                      <div key={referral.id} style={{ background: 'var(--surface)', padding: '10px 12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'center' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>{referral.referralType}</div>
+                          <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>{referral.quoteNumber ?? 'Submission'}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <span className={`sd-pill ${REFERRAL_STATUS_PILL[referral.status]}`}>{referral.status}</span>
+                          {referral.required && <span className="sd-pill quoted">Required</span>}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{referral.reason}</div>
+                          <div style={{ marginTop: 5, fontSize: 11.5, color: 'var(--ink-4)' }}>
+                            Requested by {referral.requestedByName || 'Unknown'}
+                            {referral.requestedAt ? ` · ${new Date(referral.requestedAt).toLocaleString()}` : ''}
+                          </div>
+                          {referral.decisionAt && (
+                            <div style={{ marginTop: 5, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                              Decision by {referral.decisionByName || 'Unknown'} · {new Date(referral.decisionAt).toLocaleString()}
+                              {referral.decisionNotes ? ` · ${referral.decisionNotes}` : ''}
+                            </div>
+                          )}
+                          {activeDecision && (
+                            <div style={{ marginTop: 9, padding: 10, border: '1px solid var(--line-2)', borderRadius: 8, background: 'var(--surface-2)' }}>
+                              <label style={labelStyle}>{REFERRAL_DECISION_LABELS[activeDecision.status]} notes</label>
+                              <textarea
+                                value={referralDecisionNotes}
+                                onChange={(e) => setReferralDecisionNotes(e.target.value)}
+                                rows={2}
+                                style={inputStyle}
+                              />
+                              <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+                                <button type="button" className="sd-btn primary sm" onClick={submitReferralDecision} disabled={decideReferralMutation.isPending}>
+                                  <Check size={13} />
+                                  {decideReferralMutation.isPending ? 'Saving' : REFERRAL_DECISION_LABELS[activeDecision.status]}
+                                </button>
+                                <button type="button" className="sd-btn outline sm" onClick={() => { setReferralDecision(null); setReferralDecisionNotes('') }} disabled={decideReferralMutation.isPending}>
+                                  <X size={13} />
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+                          {referral.status === 'Open' && (
+                            <>
+                              <button type="button" className="sd-btn outline sm" onClick={() => { setReferralDecision({ referralId: referral.id, status: 'Approved' }); setReferralDecisionNotes('') }}>Approve</button>
+                              <button type="button" className="sd-btn outline sm" onClick={() => { setReferralDecision({ referralId: referral.id, status: 'Declined' }); setReferralDecisionNotes('') }}>Decline</button>
+                              <button type="button" className="sd-btn outline sm" onClick={() => { setReferralDecision({ referralId: referral.id, status: 'Waived' }); setReferralDecisionNotes('') }}>Waive</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {appetiteResults.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {appetiteResults.map((result) => (
+                    <span key={result.id} className="sd-lob-chip" title={result.explanation}>
+                      {result.quoteNumber ?? 'Submission'} · {result.ruleName}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </section>
     )
   }
@@ -1288,6 +1429,7 @@ export function SubmissionDetailPage() {
       </div>
 
       {renderClearancePanel(clearance)}
+      {renderReferralPanel(referralSummary)}
 
       {/* Metrics */}
       <div className="sd-metrics">
