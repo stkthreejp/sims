@@ -232,6 +232,8 @@ Key implementation note: the general Form Parser is strong enough for field capt
 
 Normalization checkpoint added May 20, 2026: SIMS now has a preview-only mapper from raw Document AI fields into `GeminiExtractionResult` submission data and `SubmissionLossYearCreateDto` loss-year previews. It deliberately does not write submission or loss-history rows; low-confidence source fields remain marked for user review.
 
+Preview endpoint checkpoint added May 20, 2026: SIMS now exposes a guarded submission-attachment AI preview path for PDFs. The endpoint downloads the attachment, runs Document AI, returns the normalized preview, and leaves all submission and loss-history tables unchanged.
+
 ---
 
 ## Phase 2 — AI Submission Risk Scoring

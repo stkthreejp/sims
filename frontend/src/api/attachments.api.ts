@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import type { Attachment, DocumentEntityType, DocumentType } from '@/types/attachment.types'
+import type { DocumentAiNormalizationPreview } from '@/types/documentAi.types'
 
 const entityPath = (entityType: DocumentEntityType): string => {
   switch (entityType) {
@@ -41,6 +42,11 @@ export const attachmentsApi = {
     apiClient
       .get<{ url: string }>(`/attachments/${id}/download-url`)
       .then((r) => r.data.url),
+
+  previewDocumentAi: (submissionId: string, attachmentId: string) =>
+    apiClient
+      .post<DocumentAiNormalizationPreview>(`/submissions/${submissionId}/attachments/${attachmentId}/ai-preview`)
+      .then((r) => r.data),
 
   delete: (id: string) =>
     apiClient.delete(`/attachments/${id}`),

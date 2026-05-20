@@ -103,6 +103,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IEmailIngestionService, EmailIngestionService>();
         services.AddScoped<IGeminiExtractionService, GeminiExtractionService>();
         services.AddScoped<IDocumentAiExtractionService, DocumentAiExtractionService>();
+        services.AddScoped<IDocumentAiPreviewService, DocumentAiPreviewService>();
         services.AddScoped<ITaskTypeService, TaskTypeService>();
         services.AddScoped<IDueDateFormulaService, DueDateFormulaService>();
         services.AddScoped<IWorkflowEngineService, WorkflowEngineService>();

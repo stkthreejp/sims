@@ -2,12 +2,13 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Upload, Trash2, Download, FileText, ChevronDown, ChevronRight,
-  Paperclip, Loader2, Plus, X,
+  Paperclip, Loader2, Plus, X, FileSearch,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { attachmentsApi } from '@/api/attachments.api'
 import type { Attachment, DocumentEntityType, DocumentType } from '@/types/attachment.types'
 import { DOCUMENT_TYPE_LABELS, DOCUMENT_TYPES_BY_ENTITY } from '@/types/attachment.types'
+import type { DocumentAiNormalizationPreview } from '@/types/documentAi.types'
 
 // ── File size helper ──────────────────────────────────────────────────────────
 
@@ -158,17 +159,157 @@ function UploadDialog({
 
 // ── Document row ──────────────────────────────────────────────────────────────
 
+function DocumentAiPreviewDialog({
+  attachment,
+  preview,
+  onClose,
+}: {
+  attachment: Attachment
+  preview: DocumentAiNormalizationPreview
+  onClose: () => void
+}) {
+  const submissionData = preview.submissionData
+  const hasSubmissionData = Boolean(
+    submissionData.descriptionOfOperations ||
+    submissionData.dba ||
+    submissionData.entityType ||
+    submissionData.imCoverages
+  )
+
+  return (
+    <div className="sims-modal-backdrop">
+      <div className="sims-modal max-w-4xl">
+        <div className="sims-modal-head">
+          <h2 className="sims-modal-title">AI preview</h2>
+          <button type="button" onClick={onClose} className="sims-icon-btn" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="sims-modal-body space-y-5">
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{attachment.fileName}</p>
+            <p className="text-xs" style={{ color: 'var(--ink-4)' }}>Preview only. No SIMS records have been updated.</p>
+          </div>
+
+          {preview.warnings.length > 0 && (
+            <div className="rounded-md border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}>
+              {preview.warnings.map((warning) => <div key={warning}>{warning}</div>)}
+            </div>
+          )}
+
+          {hasSubmissionData && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>Submission fields</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <PreviewField label="Operations" value={submissionData.descriptionOfOperations} />
+                <PreviewField label="DBA" value={submissionData.dba} />
+                <PreviewField label="Entity" value={submissionData.entityType} />
+                <PreviewField label="Inland marine" value={submissionData.imCoverages ? 'Detected' : null} />
+              </div>
+            </section>
+          )}
+
+          {preview.lossYears.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>Loss year preview</h3>
+              <div className="overflow-x-auto rounded-md border" style={{ borderColor: 'var(--line)' }}>
+                <table className="w-full text-left text-sm">
+                  <thead style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Year</th>
+                      <th className="px-3 py-2 font-medium">LOB</th>
+                      <th className="px-3 py-2 font-medium">Carrier</th>
+                      <th className="px-3 py-2 font-medium">Policy</th>
+                      <th className="px-3 py-2 font-medium">As of</th>
+                      <th className="px-3 py-2 text-right font-medium">Paid</th>
+                      <th className="px-3 py-2 text-right font-medium">Reserve</th>
+                      <th className="px-3 py-2 text-right font-medium">Expense</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.lossYears.map((year) => (
+                      <tr key={`${year.policyYear}-${year.policyNumber ?? ''}`} className="border-t" style={{ borderColor: 'var(--line)' }}>
+                        <td className="px-3 py-2">{year.policyYear}</td>
+                        <td className="px-3 py-2">{year.lineOfBusiness || '-'}</td>
+                        <td className="px-3 py-2">{year.carrierName || '-'}</td>
+                        <td className="px-3 py-2">{year.policyNumber || '-'}</td>
+                        <td className="px-3 py-2">{year.asOfDate || '-'}</td>
+                        <td className="px-3 py-2 text-right">{formatMoney(year.paidOverride)}</td>
+                        <td className="px-3 py-2 text-right">{formatMoney(year.reservedOverride)}</td>
+                        <td className="px-3 py-2 text-right">{formatMoney(year.expenseOverride)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {preview.fieldsRequiringReview.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>Needs review</h3>
+              <div className="max-h-56 overflow-auto rounded-md border" style={{ borderColor: 'var(--line)' }}>
+                {preview.fieldsRequiringReview.slice(0, 40).map((field, index) => (
+                  <div key={`${field.pageNumber}-${field.name}-${index}`} className="grid gap-2 border-b px-3 py-2 text-sm sm:grid-cols-[1fr_1fr_auto]" style={{ borderColor: 'var(--line)' }}>
+                    <span className="font-medium" style={{ color: 'var(--ink)' }}>{field.name || '-'}</span>
+                    <span style={{ color: 'var(--ink-2)' }}>{field.value || '-'}</span>
+                    <span className="text-xs" style={{ color: 'var(--ink-4)' }}>p{field.pageNumber} {Math.round(field.confidence * 100)}%</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        <div className="sims-modal-foot">
+          <button onClick={onClose} className="sd-btn primary">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PreviewField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-md border px-3 py-2" style={{ borderColor: 'var(--line)' }}>
+      <div className="text-xs" style={{ color: 'var(--ink-4)' }}>{label}</div>
+      <div className="mt-0.5 text-sm font-medium" style={{ color: 'var(--ink)' }}>{value || '-'}</div>
+    </div>
+  )
+}
+
+function formatMoney(value?: number | null): string {
+  if (value == null) return '-'
+  return value.toLocaleString(undefined, { style: 'currency', currency: 'USD' })
+}
+
 function DocumentRow({
   attachment,
+  entityType,
+  entityId,
   onDelete,
   canDelete,
 }: {
   attachment: Attachment
+  entityType: DocumentEntityType
+  entityId: string
   onDelete: () => void
   canDelete: boolean
 }) {
   const [downloading, setDownloading] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [preview, setPreview] = useState<DocumentAiNormalizationPreview | null>(null)
+  const canPreview = entityType === 'Submission' && (
+    attachment.contentType.toLowerCase().includes('pdf') ||
+    attachment.fileName.toLowerCase().endsWith('.pdf')
+  )
+
+  const previewMutation = useMutation({
+    mutationFn: () => attachmentsApi.previewDocumentAi(entityId, attachment.id),
+    onSuccess: (data) => setPreview(data),
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'AI preview failed'),
+  })
 
   const handleDownload = async () => {
     setDownloading(true)
@@ -230,6 +371,16 @@ function DocumentRow({
         </div>
       ) : (
         <div className="ml-2 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          {canPreview && (
+            <button
+              onClick={() => previewMutation.mutate()}
+              disabled={previewMutation.isPending}
+              className="sims-icon-btn hover:text-emerald-600"
+              title="AI preview"
+            >
+              {previewMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSearch className="h-3.5 w-3.5" />}
+            </button>
+          )}
           <button
             onClick={handleDownload}
             disabled={downloading}
@@ -249,6 +400,13 @@ function DocumentRow({
           )}
         </div>
       )}
+      {preview && (
+        <DocumentAiPreviewDialog
+          attachment={attachment}
+          preview={preview}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   )
 }
@@ -258,12 +416,16 @@ function DocumentRow({
 function DocumentZone({
   label,
   attachments,
+  entityType,
+  entityId,
   defaultOpen,
   onDelete,
   canDelete,
 }: {
   label: string
   attachments: Attachment[]
+  entityType: DocumentEntityType
+  entityId: string
   defaultOpen: boolean
   onDelete: (id: string) => void
   canDelete: boolean
@@ -302,7 +464,14 @@ function DocumentZone({
             <p className="px-3 py-2 text-xs" style={{ color: 'var(--ink-4)' }}>No documents uploaded</p>
           ) : (
             attachments.map((a) => (
-              <DocumentRow key={a.id} attachment={a} onDelete={() => onDelete(a.id)} canDelete={canDelete} />
+              <DocumentRow
+                key={a.id}
+                attachment={a}
+                entityType={entityType}
+                entityId={entityId}
+                onDelete={() => onDelete(a.id)}
+                canDelete={canDelete}
+              />
             ))
           )}
         </div>
@@ -383,6 +552,8 @@ export function DocumentsSection({
               key={t}
               label={DOCUMENT_TYPE_LABELS[t]}
               attachments={grouped[t]}
+              entityType={entityType}
+              entityId={entityId}
               defaultOpen={grouped[t].length > 0}
               onDelete={(id) => deleteMutation.mutate(id)}
               canDelete={canDelete}
