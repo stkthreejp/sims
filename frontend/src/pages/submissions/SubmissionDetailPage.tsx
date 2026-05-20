@@ -171,7 +171,7 @@ export function SubmissionDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const qc = useQueryClient()
-  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies, canManageUnderwriting } = usePermissions()
+  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
 
   const extractionState = location.state as { extractionStatus?: string; emailId?: string } | null
   const [showExtractionBanner, setShowExtractionBanner] = useState(
@@ -187,6 +187,8 @@ export function SubmissionDetailPage() {
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quoteForm, setQuoteForm] = useState<QuoteForm>(emptyQuoteForm())
+  const [showClearanceOverride, setShowClearanceOverride] = useState(false)
+  const [clearanceOverrideReason, setClearanceOverrideReason] = useState('')
 
   const openLossHistory = () => {
     if (id) navigate(`/submissions/${id}/loss-history`)
@@ -514,9 +516,21 @@ export function SubmissionDetailPage() {
     mutationFn: () => submissionsApi.evaluateClearance(id!),
     onSuccess: (result) => {
       qc.setQueryData(['submissions', id, 'clearance'], result)
+      setShowClearanceOverride(false)
       toast.success(result.overallStatus === 'Blocked' ? 'Clearance blocked' : 'Clearance evaluated')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to evaluate clearance'),
+  })
+
+  const overrideClearanceMutation = useMutation({
+    mutationFn: (reason: string) => submissionsApi.overrideClearance(id!, reason),
+    onSuccess: (result) => {
+      qc.setQueryData(['submissions', id, 'clearance'], result)
+      setShowClearanceOverride(false)
+      setClearanceOverrideReason('')
+      toast.success('Clearance override recorded')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to override clearance'),
   })
 
   const createQuoteMutation = useMutation({
@@ -825,11 +839,21 @@ export function SubmissionDetailPage() {
     })
   }
 
+  const submitClearanceOverride = () => {
+    const reason = clearanceOverrideReason.trim()
+    if (!reason) {
+      toast.error('Override reason is required')
+      return
+    }
+    overrideClearanceMutation.mutate(reason)
+  }
+
   const renderClearancePanel = (value: UnderwritingClearanceEvaluation | undefined) => {
     if (!canManageUnderwriting) return null
 
     const status = value?.overallStatus
     const results = value?.results ?? []
+    const hasBlockedResult = results.some((result) => result.status === 'Blocked' && !result.isOverridden)
 
     return (
       <section className="sd-card" style={{ marginBottom: 14 }}>
@@ -837,6 +861,17 @@ export function SubmissionDetailPage() {
           <h3>Underwriting Clearance</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {status && <span className={`sd-pill ${CLEARANCE_STATUS_PILL[status]}`}>{CLEARANCE_STATUS_LABELS[status]}</span>}
+            {hasBlockedResult && canOverrideClearance && (
+              <button
+                type="button"
+                className="sd-btn outline sm"
+                onClick={() => setShowClearanceOverride((value) => !value)}
+                disabled={overrideClearanceMutation.isPending}
+              >
+                <Check size={13} />
+                Override
+              </button>
+            )}
             <button
               type="button"
               className="sd-btn outline sm"
@@ -860,16 +895,47 @@ export function SubmissionDetailPage() {
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>
                     {CLEARANCE_CHECK_LABELS[result.checkType] ?? result.checkType}
                   </div>
-                  <span className={`sd-pill ${CLEARANCE_STATUS_PILL[result.status]}`}>{CLEARANCE_STATUS_LABELS[result.status]}</span>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <span className={`sd-pill ${CLEARANCE_STATUS_PILL[result.status]}`}>{CLEARANCE_STATUS_LABELS[result.status]}</span>
+                    {result.isOverridden && <span className="sd-pill quoted">Overridden</span>}
+                  </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{result.explanation}</div>
                     {result.matchedRecordLabel && (
                       <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>{result.matchedRecordLabel}</div>
                     )}
+                    {result.isOverridden && (
+                      <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                        Override: {result.overrideReason}
+                        {result.overriddenAt ? ` · ${new Date(result.overriddenAt).toLocaleString()}` : ''}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+            {showClearanceOverride && hasBlockedResult && canOverrideClearance && (
+              <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line-2)', borderRadius: 8, background: 'var(--surface-2)' }}>
+                <label style={labelStyle}>Override reason</label>
+                <textarea
+                  value={clearanceOverrideReason}
+                  onChange={(e) => setClearanceOverrideReason(e.target.value)}
+                  rows={3}
+                  style={inputStyle}
+                  placeholder="Document why this blocked clearance can proceed."
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button type="button" className="sd-btn primary sm" onClick={submitClearanceOverride} disabled={overrideClearanceMutation.isPending}>
+                    <Check size={13} />
+                    {overrideClearanceMutation.isPending ? 'Recording' : 'Record Override'}
+                  </button>
+                  <button type="button" className="sd-btn outline sm" onClick={() => setShowClearanceOverride(false)} disabled={overrideClearanceMutation.isPending}>
+                    <X size={13} />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>

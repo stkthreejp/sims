@@ -41,6 +41,7 @@ export function usePermissions() {
     canViewRoles: hasPermission('admin.roles.view'),
     canManageRoles: hasPermission('admin.roles.manage'),
     canManageUnderwriting: hasPermission('underwriting.manage'),
+    canOverrideClearance: hasPermission('underwriting.clearance.override'),
 
     // Navigation sections (control sidebar visibility)
     canViewSubmissions: hasPermission('nav.submissions'),

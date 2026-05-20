@@ -66,8 +66,14 @@ Status values:
 - Kept quote bind blocked unless blocked clearance results are overridden.
 - Added clearance override schema and permission migrations.
 
+## Fifth Implemented Slice
+
+- Added clearance override UI action for users with `underwriting.clearance.override`.
+- Added inline override reason capture on the submission clearance panel.
+- Added overridden status and audit display for blocked clearance results.
+
 ## Immediate Next Slice
 
-1. Add clearance override UI action and audit display.
-2. Add appetite result records and required referral creation.
-3. Add bind/issue gates for unresolved required referrals.
+1. Add appetite result records and required referral creation.
+2. Add bind/issue gates for unresolved required referrals.
+3. Add submission appetite/referral UI visibility.

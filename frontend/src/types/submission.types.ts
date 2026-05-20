@@ -68,6 +68,10 @@ export interface UnderwritingClearanceResult {
   matchedRecordId: string | null
   matchedRecordLabel: string | null
   explanation: string
+  isOverridden: boolean
+  overriddenById: string | null
+  overriddenAt: string | null
+  overrideReason: string | null
 }
 
 export interface UnderwritingClearanceEvaluation {

@@ -18,6 +18,9 @@ export const submissionsApi = {
   evaluateClearance: (id: string) =>
     apiClient.post<UnderwritingClearanceEvaluation>(`/submissions/${id}/clearance/evaluate`).then((r) => r.data),
 
+  overrideClearance: (id: string, reason: string) =>
+    apiClient.post<UnderwritingClearanceEvaluation>(`/submissions/${id}/clearance/override`, { reason }).then((r) => r.data),
+
   create: (data: SubmissionCreate) =>
     apiClient.post<Submission>('/submissions', data).then((r) => r.data),
 
