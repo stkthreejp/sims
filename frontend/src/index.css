@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Reddit+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -47,6 +49,7 @@
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-policy-number: 'Reddit Mono', var(--font-mono);
 
   --fs-xs:   10.5px;
   --fs-sm:   11.5px;

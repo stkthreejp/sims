@@ -200,7 +200,7 @@ export function PolicyNumbersAdminPage() {
             </label>
             <label className="block">
               <span className="sims-field-label">Format</span>
-              <input value={sequenceForm.format} onChange={(e) => setSequenceForm((f) => ({ ...f, format: e.target.value }))} className="sims-input font-mono" />
+              <input value={sequenceForm.format} onChange={(e) => setSequenceForm((f) => ({ ...f, format: e.target.value }))} className="sims-input" style={policyNumberStyle} />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
@@ -209,7 +209,7 @@ export function PolicyNumbersAdminPage() {
               </label>
               <label className="block">
                 <span className="sims-field-label">Term suffix</span>
-                <input value={sequenceForm.termSuffixFormat} onChange={(e) => setSequenceForm((f) => ({ ...f, termSuffixFormat: e.target.value }))} className="sims-input font-mono" />
+                <input value={sequenceForm.termSuffixFormat} onChange={(e) => setSequenceForm((f) => ({ ...f, termSuffixFormat: e.target.value }))} className="sims-input" style={policyNumberStyle} />
               </label>
             </div>
             <div className="grid grid-cols-2 gap-3 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
@@ -234,7 +234,7 @@ export function PolicyNumbersAdminPage() {
               <p className="m-0 mb-2 text-[10.5px] font-semibold uppercase tracking-[0.04em]" style={{ color: 'var(--ink-3)' }}>Preview</p>
               <div className="space-y-1">
                 {(preview?.numbers ?? []).map((number) => (
-                  <p key={number} className="m-0 font-mono text-sm" style={{ color: 'var(--ink)' }}>{number}</p>
+                  <p key={number} className="m-0 text-sm" style={{ ...policyNumberStyle, color: 'var(--ink)' }}>{number}</p>
                 ))}
               </div>
             </div>
@@ -337,7 +337,7 @@ export function PolicyNumbersAdminPage() {
               {sequences.map((sequence) => (
                 <tr key={sequence.id}>
                   <td className="primary-cell">{sequence.name}</td>
-                  <td className="id">{sequence.format}{sequence.termSuffixFormat}</td>
+                  <td style={policyNumberStyle}>{sequence.format}{sequence.termSuffixFormat}</td>
                   <td className="num">{sequence.nextNumber}</td>
                   <td>
                     <div className="flex flex-wrap gap-1">
@@ -387,3 +387,5 @@ function cleanAssignment(assignment: PolicyNumberAssignmentUpsert): PolicyNumber
     priority: Number(assignment.priority) || 0,
   }
 }
+
+const policyNumberStyle = { fontFamily: 'var(--font-policy-number)' }
