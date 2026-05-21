@@ -90,6 +90,8 @@ export interface Quote {
   submissionNumber: string
   insuredId: string
   insuredName: string
+  programId: string | null
+  programName: string | null
   carrierId: string
   carrierName: string
   lineOfBusiness: PolicyLineOfBusiness
@@ -127,6 +129,7 @@ export interface Quote {
 
 export interface QuoteCreate {
   submissionId: string
+  programId?: string | null
   carrierId: string
   lineOfBusiness: PolicyLineOfBusiness
   effectiveDate: string

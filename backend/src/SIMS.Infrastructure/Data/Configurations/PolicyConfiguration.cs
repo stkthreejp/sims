@@ -25,7 +25,12 @@ public class PolicyConfiguration : IEntityTypeConfiguration<Policy>
         builder.HasOne(p => p.BoundQuote).WithMany()
             .HasForeignKey(p => p.BoundQuoteId).OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(p => p.Program).WithMany()
+            .HasForeignKey(p => p.ProgramId).OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(p => p.Carrier).WithMany()
             .HasForeignKey(p => p.CarrierId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(p => p.ProgramId);
     }
 }

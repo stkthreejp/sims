@@ -12,6 +12,7 @@ public class Policy : BaseEntity
     public Guid? WritingCompanyId { get; set; }
     public Guid SubmissionId { get; set; }
     public Guid BoundQuoteId { get; set; }
+    public Guid? ProgramId { get; set; }
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public DateOnly EffectiveDate { get; set; }
@@ -28,6 +29,7 @@ public class Policy : BaseEntity
     // Navigation
     public Submission Submission { get; set; } = null!;
     public Quote BoundQuote { get; set; } = null!;
+    public ProgramConfiguration? Program { get; set; }
     public Carrier Carrier { get; set; } = null!;
     public ICollection<PolicyTransaction> Transactions { get; set; } = new List<PolicyTransaction>();
     public ICollection<PolicyVersion> Versions { get; set; } = new List<PolicyVersion>();

@@ -41,8 +41,13 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.HasOne(q => q.Submission).WithMany(s => s.Quotes)
             .HasForeignKey(q => q.SubmissionId).OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(q => q.Program).WithMany()
+            .HasForeignKey(q => q.ProgramId).OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(q => q.Carrier).WithMany(c => c.Quotes)
             .HasForeignKey(q => q.CarrierId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(q => q.ProgramId);
 
         builder.HasOne(q => q.CreatedBy).WithMany()
             .HasForeignKey(q => q.CreatedById).OnDelete(DeleteBehavior.Restrict);

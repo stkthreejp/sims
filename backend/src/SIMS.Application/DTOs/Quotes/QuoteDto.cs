@@ -10,6 +10,8 @@ public class QuoteDto
     public string SubmissionNumber { get; set; } = string.Empty;
     public Guid InsuredId { get; set; }
     public string InsuredName { get; set; } = string.Empty;
+    public Guid? ProgramId { get; set; }
+    public string? ProgramName { get; set; }
     public Guid CarrierId { get; set; }
     public string CarrierName { get; set; } = string.Empty;
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
@@ -85,6 +87,7 @@ public class QuoteListItemDto
 public class QuoteCreateDto
 {
     public Guid SubmissionId { get; set; }
+    public Guid? ProgramId { get; set; }
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public DateOnly EffectiveDate { get; set; }

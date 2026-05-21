@@ -143,8 +143,15 @@ Status values:
 - Linked underwriting guideline documents and proposed controls to optional `ProgramId` while preserving legacy `ProgramName` text.
 - Added program selection to Admin > UW Controls guideline setup so AI-imported/manual guideline documents can use the same program scope.
 
+## Sixteenth Implemented Slice
+
+- Added nullable program assignment to quotes and bound policies.
+- Added program selection to submission quote creation, with company/line filled from the selected program when configured.
+- Updated published underwriting control matching so program-specific controls only apply to quotes/policies assigned to that program.
+- Preserved legacy controls without `ProgramId` using the existing company, line, and state/all-states matching path.
+
 ## Immediate Next Slice
 
-1. Add program selection to quote/submission scope matching so published controls can target the selected program, with legacy carrier/line/state matching as fallback.
-2. Decide whether non-admin bind/issue users should see published enforcement results without `underwriting.manage`.
-3. Add enforcement behavior for required issue/post-bind document checklist blockers if the business wants those to stop issue automatically.
+1. Decide whether non-admin bind/issue users should see published enforcement results without `underwriting.manage`.
+2. Add enforcement behavior for required issue/post-bind document checklist blockers if the business wants those to stop issue automatically.
+3. Add quote/program reporting or filters if underwriters need to audit which program each quote used.

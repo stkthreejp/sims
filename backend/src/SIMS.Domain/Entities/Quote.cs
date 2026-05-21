@@ -6,6 +6,7 @@ public class Quote : BaseEntity
 {
     public string QuoteNumber { get; set; } = string.Empty;
     public Guid SubmissionId { get; set; }
+    public Guid? ProgramId { get; set; }
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public QuoteStatus Status { get; set; } = QuoteStatus.Draft;
@@ -56,6 +57,7 @@ public class Quote : BaseEntity
 
     // Navigation
     public Submission Submission { get; set; } = null!;
+    public ProgramConfiguration? Program { get; set; }
     public Carrier Carrier { get; set; } = null!;
     public User CreatedBy { get; set; } = null!;
     public ICollection<Note> Notes { get; set; } = new List<Note>();

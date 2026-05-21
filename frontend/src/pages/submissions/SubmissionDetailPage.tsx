@@ -10,6 +10,7 @@ import { submissionsApi } from '@/api/submissions.api'
 import { inboundEmailsApi } from '@/api/inboundEmails.api'
 import { quotesApi } from '@/api/quotes.api'
 import { carriersApi } from '@/api/carriers.api'
+import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { usersApi } from '@/api/users.api'
 import { agentsApi } from '@/api/agents.api'
 import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionAdditionalInterestsApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
@@ -89,6 +90,7 @@ const STATUS_TO_STAGE: Record<SubmissionStatus, { idx: number; label: string }> 
 }
 
 type QuoteForm = {
+  programId: string
   carrierId: string
   lineOfBusiness: PolicyLineOfBusiness | ''
   effectiveDate: string
@@ -106,7 +108,7 @@ type QuoteForm = {
 }
 
 const emptyQuoteForm = (): QuoteForm => ({
-  carrierId: '', lineOfBusiness: '', effectiveDate: '', expirationDate: '',
+  programId: '', carrierId: '', lineOfBusiness: '', effectiveDate: '', expirationDate: '',
   premiumAmount: '', taxesAndFees: '0',
   coverageDescription: '', deductible: '', limit: '',
   uninsuredMotoristLimit: '', medicalPaymentsLimit: '',
@@ -278,6 +280,11 @@ export function SubmissionDetailPage() {
   const { data: carriers = [] } = useQuery({
     queryKey: ['carriers', 'active'],
     queryFn: () => carriersApi.getAll(true),
+  })
+
+  const { data: programs = [] } = useQuery({
+    queryKey: ['admin', 'program-configurations', 'active'],
+    queryFn: () => programConfigurationsApi.getAll(false),
   })
 
   const { data: usersData } = useQuery({
@@ -483,6 +490,7 @@ export function SubmissionDetailPage() {
     }
   }, [submission, expLob])
 
+  const selectedProgram = programs.find((p) => p.id === quoteForm.programId)
   const selectedCarrier = carriers.find((c) => c.id === quoteForm.carrierId)
   const submissionLobOptions = submission?.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS
   const availableLobs = selectedCarrier
@@ -741,6 +749,7 @@ export function SubmissionDetailPage() {
     }
     createQuoteMutation.mutate({
       submissionId: id!,
+      programId: quoteForm.programId || null,
       carrierId: quoteForm.carrierId,
       lineOfBusiness: quoteForm.lineOfBusiness as PolicyLineOfBusiness,
       effectiveDate: quoteForm.effectiveDate,
@@ -762,8 +771,22 @@ export function SubmissionDetailPage() {
     const val = e.target.value
     setQuoteForm((prev) => {
       const next = { ...prev, [k]: val }
-      if (k === 'carrierId') next.lineOfBusiness = ''
+      if (k === 'programId') {
+        const program = programs.find((p) => p.id === val)
+        next.carrierId = program?.carrierId ?? ''
+        next.lineOfBusiness = program?.lineOfBusiness ?? ''
+      }
+      if (k === 'carrierId') {
+        const program = programs.find((p) => p.id === prev.programId)
+        if (!program || program.carrierId) {
+          next.programId = ''
+          next.lineOfBusiness = ''
+        } else {
+          next.lineOfBusiness = program.lineOfBusiness
+        }
+      }
       if (k === 'lineOfBusiness') {
+        next.programId = ''
         if (val === 'GeneralLiability' && glCoverages?.eachOccurrence)
           next.limit = String(glCoverages.eachOccurrence)
         else if (val === 'InlandMarine') {
@@ -1173,8 +1196,9 @@ export function SubmissionDetailPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
-              { label: 'Carrier *', node: <select value={quoteForm.carrierId} onChange={setQF('carrierId')} style={inputStyle}><option value="">— Select carrier —</option>{carriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select> },
-              { label: 'Line of Business *', node: <select value={quoteForm.lineOfBusiness} onChange={setQF('lineOfBusiness')} disabled={!quoteForm.carrierId} style={inputStyle}><option value="">— Select LOB —</option>{availableLobs.map((l) => <option key={l} value={l}>{getLobLabel(l)}</option>)}</select> },
+              { label: 'Program', node: <select value={quoteForm.programId} onChange={setQF('programId')} style={inputStyle}><option value="">Manual company/line</option>{programs.map((p) => <option key={p.id} value={p.id}>{p.name} / {p.carrierName ?? 'All companies'} / {getLobLabel(p.lineOfBusiness)} / {p.stateCode}</option>)}</select> },
+              { label: 'Carrier *', node: <select value={quoteForm.carrierId} onChange={setQF('carrierId')} disabled={!!selectedProgram?.carrierId} style={inputStyle}><option value="">— Select carrier —</option>{carriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select> },
+              { label: 'Line of Business *', node: <select value={quoteForm.lineOfBusiness} onChange={setQF('lineOfBusiness')} disabled={!quoteForm.carrierId || !!selectedProgram} style={inputStyle}><option value="">— Select LOB —</option>{availableLobs.map((l) => <option key={l} value={l}>{getLobLabel(l)}</option>)}</select> },
               { label: 'Effective Date *', node: <input type="date" value={quoteForm.effectiveDate} onChange={setQF('effectiveDate')} style={inputStyle} /> },
               { label: 'Expiration Date *', node: <input type="date" value={quoteForm.expirationDate} onChange={setQF('expirationDate')} style={inputStyle} /> },
               { label: 'Premium', node: <input type="number" value={quoteForm.premiumAmount} onChange={setQF('premiumAmount')} placeholder="0.00" style={inputStyle} /> },

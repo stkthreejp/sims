@@ -26,7 +26,7 @@ Phase 6 includes:
 
 Phase 6 excludes:
 
-- Full quote/submission program assignment and program-scoped enforcement matching beyond the foundation configuration table.
+- Full submission-level program assignment independent of quote selection.
 - Bordereaux.
 - Claims.
 - Broker self-service clearance.

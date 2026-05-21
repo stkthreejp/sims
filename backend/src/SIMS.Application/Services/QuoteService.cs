@@ -58,6 +58,7 @@ public class QuoteService : IQuoteService
     {
         var q = Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
+            .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => !qt.IsDeleted)
             .ForAccessScope(access)
@@ -97,6 +98,7 @@ public class QuoteService : IQuoteService
     {
         var quotes = await Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
+            .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.SubmissionId == submissionId && !qt.IsDeleted)
             .ForAccessScope(access)
@@ -110,6 +112,7 @@ public class QuoteService : IQuoteService
     {
         var quotes = await Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
+            .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.Submission.InsuredId == insuredId && qt.Status == QuoteStatus.Bound && !qt.IsDeleted)
             .OrderByDescending(qt => qt.BoundDate)
@@ -122,6 +125,7 @@ public class QuoteService : IQuoteService
     {
         var quote = await Db.Set<Quote>()
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
+            .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.Id == id && !qt.IsDeleted)
             .ForAccessScope(access)
@@ -139,16 +143,30 @@ public class QuoteService : IQuoteService
         if (submission == null)
             return Result<QuoteDto>.Failure("INVALID_SUBMISSION", "Submission not found.");
 
+        ProgramConfiguration? program = null;
+        var carrierId = dto.CarrierId;
+        var lineOfBusiness = dto.LineOfBusiness;
+        if (dto.ProgramId.HasValue)
+        {
+            program = await Db.Set<ProgramConfiguration>()
+                .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
+            if (program == null)
+                return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
+            if (program.CarrierId.HasValue)
+                carrierId = program.CarrierId.Value;
+            lineOfBusiness = program.LineOfBusiness;
+        }
+
         var carrier = await Db.Set<Carrier>()
-            .FirstOrDefaultAsync(c => c.Id == dto.CarrierId && !c.IsDeleted && c.IsActive);
+            .FirstOrDefaultAsync(c => c.Id == carrierId && !c.IsDeleted && c.IsActive);
         if (carrier == null)
             return Result<QuoteDto>.Failure("INVALID_CARRIER", "Carrier not found or inactive.");
 
         // Look up commission rates from setup tables
         var asOfDate = dto.EffectiveDate;
-        var lobKey = dto.LineOfBusiness.ToString();
+        var lobKey = lineOfBusiness.ToString();
 
-        var carrierRates = await _carrierCommissions.GetActiveRatesAsync(dto.CarrierId, lobKey, asOfDate);
+        var carrierRates = await _carrierCommissions.GetActiveRatesAsync(carrierId, lobKey, asOfDate);
         var agentRate = submission.AgentId.HasValue
             ? await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate)
             : null;
@@ -160,8 +178,10 @@ public class QuoteService : IQuoteService
         {
             QuoteNumber = quoteNumber,
             SubmissionId = dto.SubmissionId,
-            CarrierId = dto.CarrierId,
-            LineOfBusiness = dto.LineOfBusiness,
+            ProgramId = program?.Id,
+            Program = program,
+            CarrierId = carrierId,
+            LineOfBusiness = lineOfBusiness,
             EffectiveDate = dto.EffectiveDate,
             ExpirationDate = dto.ExpirationDate,
             PremiumAmount = dto.PremiumAmount,
@@ -187,6 +207,7 @@ public class QuoteService : IQuoteService
         await _checklist.SeedDefaultsAsync(quote.Id, quote.LineOfBusiness);
 
         await Db.Entry(quote).Reference(qt => qt.Submission).LoadAsync();
+        await Db.Entry(quote).Reference(qt => qt.Program).LoadAsync();
         await Db.Entry(quote).Reference(qt => qt.Carrier).LoadAsync();
 
         await _workflowEngine.FireEventAsync(
@@ -202,6 +223,7 @@ public class QuoteService : IQuoteService
     {
         var quote = await Db.Set<Quote>()
             .Include(qt => qt.Submission)
+            .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.Id == id && !qt.IsDeleted)
             .ForAccessScope(access)
@@ -210,11 +232,27 @@ public class QuoteService : IQuoteService
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot edit a bound policy.");
 
-        var previousStatus = quote.Status;
-        var lobChanged = quote.CarrierId != dto.CarrierId || quote.LineOfBusiness != dto.LineOfBusiness;
+        ProgramConfiguration? program = null;
+        var carrierId = dto.CarrierId;
+        var lineOfBusiness = dto.LineOfBusiness;
+        if (dto.ProgramId.HasValue)
+        {
+            program = await Db.Set<ProgramConfiguration>()
+                .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
+            if (program == null)
+                return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
+            if (program.CarrierId.HasValue)
+                carrierId = program.CarrierId.Value;
+            lineOfBusiness = program.LineOfBusiness;
+        }
 
-        quote.CarrierId = dto.CarrierId;
-        quote.LineOfBusiness = dto.LineOfBusiness;
+        var previousStatus = quote.Status;
+        var lobChanged = quote.CarrierId != carrierId || quote.LineOfBusiness != lineOfBusiness;
+
+        quote.ProgramId = program?.Id;
+        quote.Program = program;
+        quote.CarrierId = carrierId;
+        quote.LineOfBusiness = lineOfBusiness;
         quote.EffectiveDate = dto.EffectiveDate;
         quote.ExpirationDate = dto.ExpirationDate;
         quote.PremiumAmount = dto.PremiumAmount;
@@ -231,9 +269,9 @@ public class QuoteService : IQuoteService
         // Re-look up commission rates if carrier or LOB changed
         if (lobChanged)
         {
-            var lobKey = dto.LineOfBusiness.ToString();
+            var lobKey = lineOfBusiness.ToString();
             var asOfDate = dto.EffectiveDate;
-            var carrierRates = await _carrierCommissions.GetActiveRatesAsync(dto.CarrierId, lobKey, asOfDate);
+            var carrierRates = await _carrierCommissions.GetActiveRatesAsync(carrierId, lobKey, asOfDate);
             quote.CarrierCommissionRate = carrierRates?.CommissionRate ?? 0;
             quote.SMMRetentionRate = carrierRates?.SMMRetentionRate ?? 0;
 
@@ -247,8 +285,8 @@ public class QuoteService : IQuoteService
 
         await Db.SaveChangesAsync();
 
-        if (quote.CarrierId != dto.CarrierId)
-            await Db.Entry(quote).Reference(qt => qt.Carrier).LoadAsync();
+        await Db.Entry(quote).Reference(qt => qt.Program).LoadAsync();
+        await Db.Entry(quote).Reference(qt => qt.Carrier).LoadAsync();
 
         if (dto.Status != previousStatus)
         {
@@ -279,6 +317,7 @@ public class QuoteService : IQuoteService
             .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
             .Include(qt => qt.Submission).ThenInclude(s => s.Locations)
             .Include(qt => qt.Submission).ThenInclude(s => s.Vehicles)
+            .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.Id == id && !qt.IsDeleted)
             .ForAccessScope(access)
@@ -334,6 +373,7 @@ public class QuoteService : IQuoteService
             PolicyNumberAssignmentId = policyNumber.AssignmentId,
             SubmissionId = quote.SubmissionId,
             BoundQuoteId = quote.Id,
+            ProgramId = quote.ProgramId,
             CarrierId = quote.CarrierId,
             LineOfBusiness = quote.LineOfBusiness,
             EffectiveDate = dto.EffectiveDate,
@@ -486,6 +526,7 @@ public class QuoteService : IQuoteService
     {
         var quote = await Db.Set<Quote>()
             .Include(qt => qt.Submission)
+            .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.Id == id && !qt.IsDeleted)
             .ForAccessScope(access)
@@ -663,6 +704,8 @@ public class QuoteService : IQuoteService
             SubmissionNumber = qt.Submission?.SubmissionNumber ?? "",
             InsuredId = qt.Submission?.InsuredId ?? Guid.Empty,
             InsuredName = qt.Submission?.Insured?.DisplayName ?? "",
+            ProgramId = qt.ProgramId,
+            ProgramName = qt.Program?.Name,
             CarrierId = qt.CarrierId,
             CarrierName = qt.Carrier?.Name ?? "",
             LineOfBusiness = qt.LineOfBusiness,

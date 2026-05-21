@@ -36,6 +36,7 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             return new UnderwritingControlEvaluationSummaryDto([]);
 
         var controls = await GetMatchingControlsAsync(
+            quote.ProgramId,
             quote.LineOfBusiness,
             quote.CarrierId,
             quote.Submission.Insured.State,
@@ -67,6 +68,7 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             return new UnderwritingControlEvaluationSummaryDto([]);
 
         var controls = await GetMatchingControlsAsync(
+            policy.ProgramId,
             policy.LineOfBusiness,
             policy.CarrierId,
             policy.Submission.Insured.State,
@@ -117,6 +119,7 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
     }
 
     private async Task<List<UnderwritingGuidelineControl>> GetMatchingControlsAsync(
+        Guid? programId,
         PolicyLineOfBusiness lineOfBusiness,
         Guid carrierId,
         string? stateCode,
@@ -127,9 +130,11 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
         return await _db.Set<UnderwritingGuidelineControl>()
             .Where(c => c.Status == UnderwritingControlStatus.Published
                 && stages.Contains(c.Stage)
-                && c.LineOfBusiness == lineOfBusiness
-                && (c.CarrierId == null || c.CarrierId == carrierId)
-                && (c.StateCode == "ALL" || c.StateCode == state))
+                && ((c.ProgramId.HasValue && programId.HasValue && c.ProgramId.Value == programId.Value)
+                    || (c.ProgramId == null
+                        && c.LineOfBusiness == lineOfBusiness
+                        && (c.CarrierId == null || c.CarrierId == carrierId)
+                        && (c.StateCode == "ALL" || c.StateCode == state))))
             .OrderBy(c => c.SortOrder)
             .ThenBy(c => c.Label)
             .ToListAsync(ct);
