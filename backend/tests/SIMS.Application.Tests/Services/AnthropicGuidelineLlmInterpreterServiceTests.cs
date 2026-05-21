@@ -56,7 +56,7 @@ public class AnthropicGuidelineLlmInterpreterServiceTests
         var unsupported = controls.Single(c => c.RuleKey == "roof-age-over-20");
         Assert.Null(unsupported.ConditionJson);
         Assert.Contains("Unsupported condition field", unsupported.Description);
-        Assert.Equal("claude-sonnet-4-20250514", handler.ModelId);
+        Assert.Equal("claude-sonnet-4-6", handler.ModelId);
         Assert.Equal("test-key", handler.ApiKey);
     }
 

@@ -13,7 +13,7 @@ namespace SIMS.Infrastructure.Services;
 
 public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterpreterService
 {
-    private const string DefaultModelId = "claude-sonnet-4-20250514";
+    private const string DefaultModelId = "claude-sonnet-4-6";
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private static readonly HashSet<string> AllowedConditionFields = new(StringComparer.Ordinal)
     {
