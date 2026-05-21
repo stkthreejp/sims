@@ -138,15 +138,15 @@ Status values:
 
 ## Fifteenth Implemented Slice
 
-- Added first-class Program Configuration records with program code, company, line, state/all-states scope, active status, and notes.
-- Added Admin > Programs for creating, editing, activating, and deactivating program scopes.
+- Added first-class Program Configuration records with program code, active status, and notes. Program now represents the umbrella product, such as Longleaf or ShuttleBee.
+- Added Admin > Programs for creating, editing, activating, and deactivating program products.
 - Linked underwriting guideline documents and proposed controls to optional `ProgramId` while preserving legacy `ProgramName` text.
-- Added program selection to Admin > UW Controls guideline setup so AI-imported/manual guideline documents can use the same program scope.
+- Added program selection to Admin > UW Controls guideline setup so AI-imported/manual guideline documents can use the same program identity while company, line, and state stay on the guideline scope.
 
 ## Sixteenth Implemented Slice
 
 - Added nullable program assignment to quotes and bound policies.
-- Added program selection to submission quote creation, with company/line filled from the selected program when configured.
+- Added program selection to submission quote creation without filling or locking company/line, so LOB remains on the quote/policy transaction.
 - Updated published underwriting control matching so program-specific controls only apply to quotes/policies assigned to that program.
 - Preserved legacy controls without `ProgramId` using the existing company, line, and state/all-states matching path.
 

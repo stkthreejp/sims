@@ -42,7 +42,6 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         if (request.ProgramId.HasValue)
         {
             program = await _db.Set<ProgramConfiguration>()
-                .Include(p => p.Carrier)
                 .SingleOrDefaultAsync(p => p.Id == request.ProgramId.Value, ct);
             if (program is null)
                 return Result<UnderwritingGuidelineDocumentDto>.Failure("PROGRAM_NOT_FOUND", "Program was not found.");
@@ -50,9 +49,6 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
                 return Result<UnderwritingGuidelineDocumentDto>.Failure("PROGRAM_INACTIVE", "Program is inactive.");
 
             programName = program.Name;
-            carrierId = program.CarrierId;
-            lineOfBusiness = program.LineOfBusiness;
-            stateCode = program.StateCode;
         }
 
         var validation = ValidateScope(programName, stateCode);

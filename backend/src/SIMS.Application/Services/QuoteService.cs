@@ -152,9 +152,6 @@ public class QuoteService : IQuoteService
                 .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
             if (program == null)
                 return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
-            if (program.CarrierId.HasValue)
-                carrierId = program.CarrierId.Value;
-            lineOfBusiness = program.LineOfBusiness;
         }
 
         var carrier = await Db.Set<Carrier>()
@@ -241,9 +238,6 @@ public class QuoteService : IQuoteService
                 .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
             if (program == null)
                 return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
-            if (program.CarrierId.HasValue)
-                carrierId = program.CarrierId.Value;
-            lineOfBusiness = program.LineOfBusiness;
         }
 
         var previousStatus = quote.Status;

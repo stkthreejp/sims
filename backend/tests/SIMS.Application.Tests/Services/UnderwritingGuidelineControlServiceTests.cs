@@ -14,14 +14,10 @@ public class UnderwritingGuidelineControlServiceTests
     public async Task ApproveControlAsync_WritesAuditWithoutSerializingEfNavigationGraph()
     {
         await using var db = CreateDb();
-        var carrier = new Carrier { Name = "Lloyds of London", IsActive = true };
         var program = new ProgramConfiguration
         {
             Name = "Lloyds GL",
             Code = "LLOYDS-GL",
-            Carrier = carrier,
-            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
-            StateCode = "ALL",
             IsActive = true
         };
         db.Add(program);

@@ -250,9 +250,6 @@ export function UnderwritingControlsAdminPage() {
       ...f,
       programId: programId || null,
       programName: program?.name ?? f.programName,
-      carrierId: program?.carrierId ?? f.carrierId,
-      lineOfBusiness: program?.lineOfBusiness ?? f.lineOfBusiness,
-      stateCode: program?.stateCode ?? f.stateCode,
     }))
   }
 
@@ -284,7 +281,7 @@ export function UnderwritingControlsAdminPage() {
                 <option value="">Manual program scope</option>
                 {programs.map((program) => (
                   <option key={program.id} value={program.id}>
-                    {program.name} / {program.carrierName ?? 'All companies'} / {LOB_LABELS[program.lineOfBusiness]} / {program.stateCode}
+                    {program.name}
                   </option>
                 ))}
               </select>
@@ -298,7 +295,7 @@ export function UnderwritingControlsAdminPage() {
                 value={documentForm.carrierId ?? ''}
                 onChange={(e) => {
                   setSelectedAttachmentId('')
-                  setDocumentForm((f) => ({ ...f, carrierId: e.target.value || null, programId: null }))
+                  setDocumentForm((f) => ({ ...f, carrierId: e.target.value || null }))
                 }}
                 className={inputCls}
               >
@@ -310,7 +307,7 @@ export function UnderwritingControlsAdminPage() {
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={documentForm.lineOfBusiness}
-                  onChange={(e) => setDocumentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness, programId: null }))}
+                  onChange={(e) => setDocumentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))}
                   className={inputCls}
                 >
                   {ACTIVE_LOBS.map((lob) => (
@@ -319,7 +316,7 @@ export function UnderwritingControlsAdminPage() {
                 </select>
                 <select
                   value={documentForm.stateCode}
-                  onChange={(e) => setDocumentForm((f) => ({ ...f, stateCode: e.target.value, programId: null }))}
+                  onChange={(e) => setDocumentForm((f) => ({ ...f, stateCode: e.target.value }))}
                   className={inputCls}
                 >
                   {US_STATES.map((state) => (

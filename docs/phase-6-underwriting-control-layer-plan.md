@@ -8,7 +8,7 @@ Add auditable underwriting controls for clearance, appetite, referrals, authorit
 
 - Phase 5 is complete enough that policy transactions, status history, transaction artifacts, cancellation/non-renewal/reinstatement/rewrite detail records, and transaction approvals exist.
 - Phase 6 should reuse `PolicyTransaction`, `PolicyTransactionApproval`, UW writeups, quote checklists, task workflows, rating eligibility rules, FMCSA data, loss history, and permissions.
-- Program Configuration foundation now exists in Phase 6, so new guideline/rule setup should prefer `ProgramId` while preserving carrier/LOB/state fallback for older records.
+- Program Configuration foundation now exists in Phase 6 as the umbrella product identity, so new guideline/rule setup should prefer `ProgramId` while keeping carrier/LOB/state on the guideline, rule, quote, and policy scopes.
 - AI underwriting work remains advisory until deterministic clearance, referral, authority, and approval records exist.
 
 ## Scope

@@ -11,7 +11,7 @@ namespace SIMS.Application.Tests.Services;
 public class ProgramConfigurationServiceTests
 {
     [Fact]
-    public async Task CreateAsync_NormalizesProgramCodeAndState()
+    public async Task CreateAsync_NormalizesProgramCode()
     {
         await using var db = CreateDb();
         var service = new ProgramConfigurationService(db);
@@ -19,15 +19,11 @@ public class ProgramConfigurationServiceTests
         var result = await service.CreateAsync(new CreateProgramConfigurationRequest(
             Name: "Longleaf Inland Marine",
             Code: " longleaf-im ",
-            CarrierId: null,
-            LineOfBusiness: PolicyLineOfBusiness.InlandMarine,
-            StateCode: "*",
             IsActive: true,
             Notes: "Preferred guideline scope"));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("LONGLEAF-IM", result.Value!.Code);
-        Assert.Equal("ALL", result.Value.StateCode);
     }
 
     [Fact]
@@ -39,18 +35,12 @@ public class ProgramConfigurationServiceTests
         await service.CreateAsync(new CreateProgramConfigurationRequest(
             "Longleaf Inland Marine",
             "LONGLEAF-IM",
-            null,
-            PolicyLineOfBusiness.InlandMarine,
-            "ALL",
             true,
             null));
 
         var duplicate = await service.CreateAsync(new CreateProgramConfigurationRequest(
             "Longleaf IM Duplicate",
             "longleaf-im",
-            null,
-            PolicyLineOfBusiness.InlandMarine,
-            "ALL",
             true,
             null));
 
@@ -59,17 +49,13 @@ public class ProgramConfigurationServiceTests
     }
 
     [Fact]
-    public async Task CreateDocumentAsync_UsesProgramConfigurationScopeWhenProgramIdProvided()
+    public async Task CreateDocumentAsync_UsesProgramIdentityWithoutOverridingCarrierLineOrState()
     {
         await using var db = CreateDb();
-        var carrier = new Carrier { Name = "Longleaf Insurance Company", IsActive = true };
         var program = new ProgramConfiguration
         {
             Name = "Longleaf Inland Marine",
             Code = "LONGLEAF-IM",
-            Carrier = carrier,
-            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
-            StateCode = "TX",
             IsActive = true
         };
         db.Add(program);
@@ -91,9 +77,9 @@ public class ProgramConfigurationServiceTests
         Assert.Equal(program.Id, result.Value!.ProgramId);
         Assert.Equal("LONGLEAF-IM", result.Value.ProgramCode);
         Assert.Equal("Longleaf Inland Marine", result.Value.ProgramName);
-        Assert.Equal(carrier.Id, result.Value.CarrierId);
-        Assert.Equal(PolicyLineOfBusiness.InlandMarine, result.Value.LineOfBusiness);
-        Assert.Equal("TX", result.Value.StateCode);
+        Assert.Null(result.Value.CarrierId);
+        Assert.Equal(PolicyLineOfBusiness.GeneralLiability, result.Value.LineOfBusiness);
+        Assert.Equal("ALL", result.Value.StateCode);
     }
 
     private static ApplicationDbContext CreateDb()

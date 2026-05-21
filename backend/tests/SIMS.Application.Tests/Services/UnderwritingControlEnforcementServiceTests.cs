@@ -104,9 +104,6 @@ public class UnderwritingControlEnforcementServiceTests
             Id = programId ?? Guid.NewGuid(),
             Name = "Longleaf Inland Marine",
             Code = "LONGLEAF-IM",
-            Carrier = carrier,
-            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
-            StateCode = "TX",
             IsActive = true
         };
         var quote = new Quote

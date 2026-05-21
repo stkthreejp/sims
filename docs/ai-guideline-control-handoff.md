@@ -20,7 +20,7 @@ Guidelines are scoped by:
 
 Most items should use `ALL` for state. Use a specific state only when the guideline requirement is state-specific.
 
-When SIMS has a matching Program Configuration, send `programId`. SIMS will use the configured program name, company, line, and state from that program. Use the free-text scope fields only when no program exists yet.
+When SIMS has a matching Program Configuration, send `programId`. SIMS will use the configured program name from that record, while company, line, and state still come from the document scope fields. Use `programId: null` only when no program exists yet.
 
 ## Step 1: Create Guideline Document
 
