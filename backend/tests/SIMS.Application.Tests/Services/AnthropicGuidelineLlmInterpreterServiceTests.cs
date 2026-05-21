@@ -60,6 +60,33 @@ public class AnthropicGuidelineLlmInterpreterServiceTests
         Assert.Equal("test-key", handler.ApiKey);
     }
 
+    [Fact]
+    public async Task InterpretAsync_TruncatesLongGuidelineTextBeforeSendingToClaude()
+    {
+        await using var db = CreateDb();
+        var handler = new FakeHttpMessageHandler("""
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"controls\":[]}"
+                }
+              ]
+            }
+            """);
+        var service = new AnthropicGuidelineLlmInterpreterService(
+            new FakeHttpClientFactory(handler),
+            Configuration(),
+            db,
+            NullLogger<AnthropicGuidelineLlmInterpreterService>.Instance);
+
+        await service.InterpretAsync(new string('A', 80_000));
+
+        Assert.NotNull(handler.UserContent);
+        Assert.True(handler.UserContent!.Length < 50_000);
+        Assert.Contains("truncated", handler.UserContent, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static IConfiguration Configuration() =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -89,6 +116,7 @@ public class AnthropicGuidelineLlmInterpreterServiceTests
     {
         public string? ApiKey { get; private set; }
         public string? ModelId { get; private set; }
+        public string? UserContent { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -96,6 +124,10 @@ public class AnthropicGuidelineLlmInterpreterServiceTests
             var body = await request.Content!.ReadAsStringAsync(cancellationToken);
             using var document = System.Text.Json.JsonDocument.Parse(body);
             ModelId = document.RootElement.GetProperty("model").GetString();
+            UserContent = document.RootElement
+                .GetProperty("messages")[0]
+                .GetProperty("content")
+                .GetString();
 
             return new HttpResponseMessage(HttpStatusCode.OK)
             {

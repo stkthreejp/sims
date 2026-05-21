@@ -14,6 +14,7 @@ namespace SIMS.Infrastructure.Services;
 public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterpreterService
 {
     private const string DefaultModelId = "claude-sonnet-4-6";
+    private const int MaxGuidelineTextChars = 35_000;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private static readonly HashSet<string> AllowedConditionFields = new(StringComparer.Ordinal)
     {
@@ -65,6 +66,7 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
         }
 
         var modelId = await ResolveModelIdAsync(ct);
+        var promptText = PrepareGuidelineText(guidelineText);
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/messages");
         request.Headers.Add("x-api-key", apiKey);
         request.Headers.Add("anthropic-version", "2023-06-01");
@@ -79,7 +81,7 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
                 new
                 {
                     role = "user",
-                    content = $"Interpret this underwriting guideline text into proposed SIMS controls.\n\n{guidelineText}"
+                    content = $"Interpret this underwriting guideline text into proposed SIMS controls.\n\n{promptText}"
                 }
             }
         });
@@ -327,6 +329,15 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
 
     private static string TrimForLog(string value) =>
         value.Length <= 500 ? value : value[..500];
+
+    private static string PrepareGuidelineText(string guidelineText)
+    {
+        if (guidelineText.Length <= MaxGuidelineTextChars)
+            return guidelineText;
+
+        return guidelineText[..MaxGuidelineTextChars] +
+            "\n\n[Guideline text truncated before AI interpretation because the extracted attachment was too large.]";
+    }
 
     private const string SystemPrompt = """
         You interpret insurance underwriting guideline text into SIMS proposed underwriting controls.

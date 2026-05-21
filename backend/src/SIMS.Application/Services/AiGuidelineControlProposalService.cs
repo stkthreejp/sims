@@ -102,7 +102,10 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         if (string.IsNullOrWhiteSpace(request.GuidelineText))
             return Result<AiGuidelineControlProposalResult>.Failure("GUIDELINE_TEXT_REQUIRED", "Guideline text is required.");
 
-        var (controls, usedLlm, fallbackReason) = await ExtractControlsAsync(request.GuidelineText, ct);
+        var (controls, usedLlm, fallbackReason, failureCode) = await ExtractControlsAsync(request.GuidelineText, ct);
+        if (!string.IsNullOrWhiteSpace(failureCode))
+            return Result<AiGuidelineControlProposalResult>.Failure(failureCode, fallbackReason ?? "AI guideline proposal failed.");
+
         if (controls.Count == 0)
         {
             var reason = string.IsNullOrWhiteSpace(fallbackReason) ? null : $" {fallbackReason}";
@@ -266,7 +269,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         return controls;
     }
 
-    private async Task<(List<CreateUnderwritingGuidelineControlRequest> Controls, bool UsedLlm, string? FallbackReason)> ExtractControlsAsync(string text, CancellationToken ct)
+    private async Task<(List<CreateUnderwritingGuidelineControlRequest> Controls, bool UsedLlm, string? FallbackReason, string? FailureCode)> ExtractControlsAsync(string text, CancellationToken ct)
     {
         if (_llmInterpreter is not null)
         {
@@ -274,19 +277,25 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
             {
                 var llmControls = await _llmInterpreter.InterpretAsync(text, ct);
                 if (llmControls.Count > 0)
-                    return (llmControls.ToList(), true, null);
+                    return (llmControls.ToList(), true, null, null);
 
                 _logger?.LogWarning("AI guideline LLM interpretation returned no controls; falling back to pattern parser.");
-                return (ExtractControls(text), false, "LLM returned no controls, so SIMS used the fallback pattern parser.");
+                return (ExtractControls(text), false, "LLM returned no controls, so SIMS used the fallback pattern parser.", null);
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is HttpRequestException || ex is JsonException || ex is TaskCanceledException)
             {
+                if (ex is TaskCanceledException)
+                {
+                    _logger?.LogWarning(ex, "AI guideline LLM interpretation timed out.");
+                    return ([], false, "Claude timed out while reading the guideline. Try again, or use a smaller guideline attachment.", "GUIDELINE_LLM_TIMEOUT");
+                }
+
                 _logger?.LogWarning(ex, "AI guideline LLM interpretation failed; falling back to pattern parser.");
-                return (ExtractControls(text), false, "LLM interpretation failed, so SIMS used the fallback pattern parser.");
+                return (ExtractControls(text), false, "LLM interpretation failed, so SIMS used the fallback pattern parser.", null);
             }
         }
 
-        return (ExtractControls(text), false, "LLM interpretation is not configured, so SIMS used the fallback pattern parser.");
+        return (ExtractControls(text), false, "LLM interpretation is not configured, so SIMS used the fallback pattern parser.", null);
     }
 
     private static IReadOnlyList<string> BuildWarnings(bool usedLlm, string? fallbackReason)

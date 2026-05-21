@@ -321,6 +321,35 @@ public class AiGuidelineControlProposalServiceTests
     }
 
     [Fact]
+    public async Task ProposeFromTextAsync_ReturnsCleanFailureWhenLlmTimesOut()
+    {
+        await using var db = CreateDb();
+        var service = new AiGuidelineControlProposalService(
+            new UnderwritingGuidelineControlService(db),
+            llmInterpreter: new TimeoutGuidelineLlmInterpreter());
+
+        var result = await service.ProposeFromTextAsync(new AiGuidelineControlProposalRequest(
+            Document: new CreateUnderwritingGuidelineDocumentRequest(
+                ProgramName: "Lloyds GL",
+                CarrierId: null,
+                LineOfBusiness: PolicyLineOfBusiness.GeneralLiability,
+                StateCode: "ALL",
+                Title: "Lloyds GL Guidelines",
+                SourceFileName: null,
+                SourceBlobName: null,
+                Notes: null),
+            GuidelineText: """
+                Five years currently valued loss runs are required for underwriting review.
+                Signed application is required before bind.
+                """), Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("GUIDELINE_LLM_TIMEOUT", result.ErrorCode);
+        Assert.Contains("timed out", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await db.Set<UnderwritingGuidelineDocument>().ToListAsync());
+    }
+
+    [Fact]
     public async Task ProposeFromTextAsync_RequiresGuidelineText()
     {
         var guidelineService = new UnderwritingGuidelineControlService(CreateDb());
@@ -393,5 +422,11 @@ public class AiGuidelineControlProposalServiceTests
     {
         public Task<IReadOnlyList<CreateUnderwritingGuidelineControlRequest>> InterpretAsync(string guidelineText, CancellationToken ct = default) =>
             Task.FromResult(controls);
+    }
+
+    private sealed class TimeoutGuidelineLlmInterpreter : IAiGuidelineLlmInterpreterService
+    {
+        public Task<IReadOnlyList<CreateUnderwritingGuidelineControlRequest>> InterpretAsync(string guidelineText, CancellationToken ct = default) =>
+            throw new TaskCanceledException("Claude timed out.");
     }
 }
