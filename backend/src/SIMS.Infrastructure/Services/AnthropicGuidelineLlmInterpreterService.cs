@@ -230,7 +230,10 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
         if (string.IsNullOrWhiteSpace(modelId) || modelId.Equals("claude-sonnet-default", StringComparison.OrdinalIgnoreCase))
             return DefaultModelId;
 
-        return modelId.Trim();
+        var trimmed = modelId.Trim();
+        return trimmed.Equals("claude-sonnet-4-20250514", StringComparison.OrdinalIgnoreCase)
+            ? DefaultModelId
+            : trimmed;
     }
 
     private static CreateUnderwritingGuidelineControlRequest? MapControl(AiGuidelineControlItem item, int fallbackSortOrder)

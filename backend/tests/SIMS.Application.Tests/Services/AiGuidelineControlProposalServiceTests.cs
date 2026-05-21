@@ -296,6 +296,31 @@ public class AiGuidelineControlProposalServiceTests
     }
 
     [Fact]
+    public async Task ProposeFromTextAsync_ReturnsFallbackReasonWhenNoControlsAreProposed()
+    {
+        await using var db = CreateDb();
+        var service = new AiGuidelineControlProposalService(
+            new UnderwritingGuidelineControlService(db),
+            llmInterpreter: new FakeGuidelineLlmInterpreter([]));
+
+        var result = await service.ProposeFromTextAsync(new AiGuidelineControlProposalRequest(
+            Document: new CreateUnderwritingGuidelineDocumentRequest(
+                ProgramName: "Lloyds GL",
+                CarrierId: null,
+                LineOfBusiness: PolicyLineOfBusiness.GeneralLiability,
+                StateCode: "ALL",
+                Title: "Lloyds GL Guidelines",
+                SourceFileName: null,
+                SourceBlobName: null,
+                Notes: null),
+            GuidelineText: "General prose without an actionable underwriting rule."), Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("NO_CONTROLS_PROPOSED", result.ErrorCode);
+        Assert.Contains("LLM returned no controls", result.ErrorMessage);
+    }
+
+    [Fact]
     public async Task ProposeFromTextAsync_RequiresGuidelineText()
     {
         var guidelineService = new UnderwritingGuidelineControlService(CreateDb());

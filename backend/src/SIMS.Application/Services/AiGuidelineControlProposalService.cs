@@ -104,7 +104,10 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
 
         var (controls, usedLlm, fallbackReason) = await ExtractControlsAsync(request.GuidelineText, ct);
         if (controls.Count == 0)
-            return Result<AiGuidelineControlProposalResult>.Failure("NO_CONTROLS_PROPOSED", "No proposed controls were found in the guideline text.");
+        {
+            var reason = string.IsNullOrWhiteSpace(fallbackReason) ? null : $" {fallbackReason}";
+            return Result<AiGuidelineControlProposalResult>.Failure("NO_CONTROLS_PROPOSED", $"No proposed controls were found in the guideline text.{reason}");
+        }
 
         var document = await _guidelines.CreateDocumentAsync(request.Document, userId, ct);
         if (!document.IsSuccess || document.Value == null)

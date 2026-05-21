@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { Archive, Check, FileSearch, Pencil, Plus, Rocket, Save, ShieldAlert, Trash2, X } from 'lucide-react'
+import { Archive, Check, FileSearch, Loader2, Pencil, Plus, Rocket, Save, ShieldAlert, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { attachmentsApi } from '@/api/attachments.api'
 import { carriersApi } from '@/api/carriers.api'
@@ -440,9 +440,14 @@ export function UnderwritingControlsAdminPage() {
                     }
                     className="sd-btn accent w-full"
                   >
-                    <FileSearch className="h-4 w-4" />
-                    Propose From Attachment
+                    {proposeFromAttachment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}
+                    {proposeFromAttachment.isPending ? 'Reading guideline with AI...' : 'Propose From Attachment'}
                   </button>
+                  {proposeFromAttachment.isPending && (
+                    <div className="text-xs" style={{ color: 'var(--ink-3)' }}>
+                      This can take a minute for larger PDFs.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
