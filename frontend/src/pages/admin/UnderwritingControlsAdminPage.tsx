@@ -438,7 +438,7 @@ export function UnderwritingControlsAdminPage() {
                       !documentForm.title.trim() ||
                       !selectedAttachmentId
                     }
-                    className="sd-btn outline w-full"
+                    className="sd-btn accent w-full"
                   >
                     <FileSearch className="h-4 w-4" />
                     Propose From Attachment

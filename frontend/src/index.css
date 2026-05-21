@@ -444,6 +444,8 @@
 .sd-btn:hover { background: var(--hover); color: var(--ink); }
 .sd-btn.outline { border: 1px solid var(--line-2); background: var(--surface); color: var(--ink-2); }
 .sd-btn.outline:hover { border-color: var(--line); background: var(--hover); color: var(--ink); }
+.sd-btn.accent { border: 1px solid #cfe0ef; background: var(--accent-soft); color: var(--accent-ink); }
+.sd-btn.accent:hover { border-color: var(--accent-light); background: #d8e8f4; color: var(--accent-ink); }
 .sd-btn.primary { background: var(--accent); color: #fff; border: 0; }
 .sd-btn.primary:hover { background: var(--accent-deep); color: #fff; }
 .sd-btn.success { background: #1b8754; color: #fff; border: 0; }
