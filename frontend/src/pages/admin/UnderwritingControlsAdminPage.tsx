@@ -34,6 +34,7 @@ const US_STATES = [
 const ITEM_TYPES: UnderwritingControlItemType[] = ['AppetiteRule', 'ReferralTrigger', 'AuthorityLimit', 'DocumentChecklistItem', 'AppetiteNote']
 const STAGES: UnderwritingControlStage[] = ['Submission', 'Quote', 'Bind', 'Issue', 'PostBind', 'Renewal']
 const SEVERITIES: UnderwritingControlSeverity[] = ['Informational', 'Warning', 'ReferralRequired', 'HardBlock']
+const REVIEW_STATUSES: Array<UnderwritingControlStatus | 'All'> = ['All', 'AiSuggested', 'Draft', 'Approved', 'Published', 'Rejected', 'Retired']
 
 const STATUS_STYLES: Record<UnderwritingControlStatus, string> = {
   AiSuggested: 'bg-sky-50 text-sky-700',
@@ -86,7 +87,14 @@ export function UnderwritingControlsAdminPage() {
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
   const [selectedAttachmentId, setSelectedAttachmentId] = useState('')
   const [aiJsonInput, setAiJsonInput] = useState('')
+  const [controlStatusFilter, setControlStatusFilter] = useState<UnderwritingControlStatus | 'All'>('All')
+  const [controlSeverityFilter, setControlSeverityFilter] = useState<UnderwritingControlSeverity | 'All'>('All')
+  const [controlStageFilter, setControlStageFilter] = useState<UnderwritingControlStage | 'All'>('All')
+  const [blockingOnly, setBlockingOnly] = useState(false)
+  const [controlSearch, setControlSearch] = useState('')
+  const [selectedControlIds, setSelectedControlIds] = useState<string[]>([])
   const aiJsonFileInputRef = useRef<HTMLInputElement | null>(null)
+  const controlEditorRef = useRef<HTMLDivElement | null>(null)
 
   const { data: documents = [], isLoading: loadingDocuments } = useQuery({
     queryKey: ['admin', 'underwriting-guidelines', 'documents'],
@@ -130,6 +138,26 @@ export function UnderwritingControlsAdminPage() {
       return acc
     }, {} as Record<UnderwritingControlStatus, number>)
   }, [controls])
+
+  const visibleControls = useMemo(() => {
+    const search = controlSearch.trim().toLowerCase()
+    return controls.filter((control) => {
+      if (controlStatusFilter !== 'All' && control.status !== controlStatusFilter) return false
+      if (controlSeverityFilter !== 'All' && control.severity !== controlSeverityFilter) return false
+      if (controlStageFilter !== 'All' && control.stage !== controlStageFilter) return false
+      if (blockingOnly && !control.isBlocking) return false
+      if (!search) return true
+      return [
+        control.ruleKey,
+        control.label,
+        control.description,
+        control.sourceCitation,
+      ].some((value) => value?.toLowerCase().includes(search))
+    })
+  }, [blockingOnly, controlSearch, controlSeverityFilter, controlStageFilter, controlStatusFilter, controls])
+
+  const selectedControls = visibleControls.filter((control) => selectedControlIds.includes(control.id))
+  const selectableVisibleControls = visibleControls.filter((control) => control.status !== 'Published' && control.status !== 'Retired')
 
   const createDocument = useMutation({
     mutationFn: (payload: CreateUnderwritingGuidelineDocumentRequest) => editingDocumentId
@@ -230,6 +258,22 @@ export function UnderwritingControlsAdminPage() {
       invalidateControls(activeDocumentId)
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Control action failed')),
+  })
+
+  const bulkDecideControls = useMutation({
+    mutationFn: async ({ selected, action }: { selected: UnderwritingGuidelineControl[]; action: 'approve' | 'reject' }) => {
+      for (const control of selected) {
+        if (action === 'approve') await underwritingGuidelinesApi.approveControl(control.id, decisionNotes[control.id])
+        else await underwritingGuidelinesApi.rejectControl(control.id, decisionNotes[control.id])
+      }
+      return { selected, action }
+    },
+    onSuccess: ({ selected, action }) => {
+      toast.success(`${selected.length} controls ${action}d`)
+      setSelectedControlIds([])
+      invalidateControls(activeDocumentId)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Bulk control action failed')),
   })
 
   function invalidateControls(documentId: string | null) {
@@ -338,6 +382,26 @@ export function UnderwritingControlsAdminPage() {
       aiConfidence: control.aiConfidence,
       sortOrder: control.sortOrder,
     })
+    setTimeout(() => controlEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
+
+  function cancelControlEdit() {
+    setEditingControlId(null)
+    setControlForm(emptyControl)
+  }
+
+  function toggleControlSelection(controlId: string) {
+    setSelectedControlIds((prev) => prev.includes(controlId)
+      ? prev.filter((id) => id !== controlId)
+      : [...prev, controlId])
+  }
+
+  function toggleAllVisibleControls() {
+    const visibleIds = selectableVisibleControls.map((control) => control.id)
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedControlIds.includes(id))
+    setSelectedControlIds((prev) => allSelected
+      ? prev.filter((id) => !visibleIds.includes(id))
+      : Array.from(new Set([...prev, ...visibleIds])))
   }
 
   function selectProgram(programId: string) {
@@ -611,7 +675,15 @@ export function UnderwritingControlsAdminPage() {
             </div>
 
             {activeDocumentId && (
-              <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+              <div ref={controlEditorRef} className="px-5 py-4" style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+                {editingControlId && (
+                  <div className="mb-3 flex items-center justify-between rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <span>Editing control</span>
+                    <button type="button" onClick={cancelControlEdit} className="font-medium">
+                      Cancel
+                    </button>
+                  </div>
+                )}
                 <div className="grid gap-3 lg:grid-cols-4">
                   <select
                     value={controlForm.itemType}
@@ -711,11 +783,79 @@ export function UnderwritingControlsAdminPage() {
             ) : controls.length === 0 ? (
               <div className="admin-empty m-4">No controls for this guideline yet.</div>
             ) : (
-              <div className="divide-y">
-                {controls.map((control) => (
+              <>
+                <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--line-2)' }}>
+                  <div className="grid gap-3 lg:grid-cols-[1fr_160px_160px_160px_auto]">
+                    <input
+                      value={controlSearch}
+                      onChange={(e) => setControlSearch(e.target.value)}
+                      className={inputCls}
+                      placeholder="Search controls"
+                    />
+                    <select value={controlStatusFilter} onChange={(e) => setControlStatusFilter(e.target.value as UnderwritingControlStatus | 'All')} className={inputCls}>
+                      {REVIEW_STATUSES.map((status) => <option key={status} value={status}>{status === 'All' ? 'All statuses' : statusLabel(status)}</option>)}
+                    </select>
+                    <select value={controlStageFilter} onChange={(e) => setControlStageFilter(e.target.value as UnderwritingControlStage | 'All')} className={inputCls}>
+                      <option value="All">All stages</option>
+                      {STAGES.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}
+                    </select>
+                    <select value={controlSeverityFilter} onChange={(e) => setControlSeverityFilter(e.target.value as UnderwritingControlSeverity | 'All')} className={inputCls}>
+                      <option value="All">All severities</option>
+                      {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severityLabel(severity)}</option>)}
+                    </select>
+                    <label className="admin-muted-panel flex items-center gap-2 px-3 text-sm">
+                      <input type="checkbox" checked={blockingOnly} onChange={(e) => setBlockingOnly(e.target.checked)} />
+                      Blocking
+                    </label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={selectableVisibleControls.length > 0 && selectableVisibleControls.every((control) => selectedControlIds.includes(control.id))}
+                        onChange={toggleAllVisibleControls}
+                      />
+                      Select visible editable
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-slate-500">{visibleControls.length} visible / {selectedControls.length} selected</span>
+                      <button
+                        type="button"
+                        onClick={() => bulkDecideControls.mutate({ selected: selectedControls, action: 'approve' })}
+                        disabled={bulkDecideControls.isPending || selectedControls.length === 0}
+                        className="sd-btn outline sm"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Approve Selected
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => bulkDecideControls.mutate({ selected: selectedControls, action: 'reject' })}
+                        disabled={bulkDecideControls.isPending || selectedControls.length === 0}
+                        className="sd-btn outline sm"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Reject Selected
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {visibleControls.length === 0 ? (
+                  <div className="admin-empty m-4">No controls match the current filters.</div>
+                ) : (
+                  <div className="divide-y">
+                    {visibleControls.map((control) => (
                   <div key={control.id} className="px-5 py-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
+                      <div className="flex min-w-0 flex-1 gap-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={selectedControlIds.includes(control.id)}
+                          disabled={control.status === 'Published' || control.status === 'Retired'}
+                          onChange={() => toggleControlSelection(control.id)}
+                        />
+                        <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-sm font-semibold text-slate-900">{control.label}</h3>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[control.status]}`}>{statusLabel(control.status)}</span>
@@ -731,6 +871,7 @@ export function UnderwritingControlsAdminPage() {
                         </div>
                         {control.description && <p className="mt-2 text-sm text-slate-600">{control.description}</p>}
                         {control.sourceCitation && <div className="mt-2 text-xs text-slate-500">Source: {control.sourceCitation}</div>}
+                        </div>
                       </div>
                       <div className="flex flex-wrap justify-end gap-2">
                         <button type="button" onClick={() => editControl(control)} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
@@ -762,8 +903,10 @@ export function UnderwritingControlsAdminPage() {
                       placeholder="Decision notes"
                     />
                   </div>
-                ))}
-              </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </section>
 
