@@ -32,8 +32,8 @@ public class AiModelSettingsService : IAiModelSettingsService
 
         var sonnet = await EnsureModelAsync(
             provider: "Anthropic",
-            modelId: "claude-sonnet-default",
-            displayName: "Claude Sonnet Default",
+            modelId: "claude-sonnet-4-20250514",
+            displayName: "Claude Sonnet 4",
             allowedUseCases: [RiskScoring, ReferralJudgment, NarrativeDrafting, BatchTriage],
             defaultUseCases: [RiskScoring, ReferralJudgment, NarrativeDrafting, BatchTriage],
             costNotes: "Recommended default while the SMM Underwriter skill is maintained in Claude.",

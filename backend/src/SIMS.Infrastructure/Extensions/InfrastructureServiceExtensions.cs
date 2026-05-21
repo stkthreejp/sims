@@ -77,6 +77,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IProgramConfigurationService, ProgramConfigurationService>();
         services.AddScoped<IUnderwritingGuidelineControlService, UnderwritingGuidelineControlService>();
         services.AddScoped<IUnderwritingControlEnforcementService, UnderwritingControlEnforcementService>();
+        services.AddScoped<IAiGuidelineLlmInterpreterService, AnthropicGuidelineLlmInterpreterService>();
         services.AddScoped<IAiGuidelineControlProposalService, AiGuidelineControlProposalService>();
         services.AddScoped<IPolicyNumberService, PolicyNumberService>();
         services.AddScoped<IPolicyNumberAdminService, PolicyNumberAdminService>();
@@ -156,6 +157,12 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<LegiScanClient>();
         services.AddHttpClient("gemini", c => c.Timeout = TimeSpan.FromSeconds(
             int.TryParse(configuration["HttpClients:GeminiTimeoutSeconds"], out var geminiTimeout) ? geminiTimeout : 60));
+        services.AddHttpClient("anthropic", c =>
+        {
+            c.BaseAddress = new Uri(configuration["Anthropic:BaseUrl"] ?? "https://api.anthropic.com");
+            c.Timeout = TimeSpan.FromSeconds(
+                int.TryParse(configuration["HttpClients:AnthropicTimeoutSeconds"], out var anthropicTimeout) ? anthropicTimeout : 90);
+        });
         services.AddHttpClient("qbo_oauth", c => c.Timeout = TimeSpan.FromSeconds(
             int.TryParse(configuration["HttpClients:QboOAuthTimeoutSeconds"], out var qboOAuthTimeout) ? qboOAuthTimeout : 30));
         services.AddHttpClient("qbo_api", c => c.Timeout = TimeSpan.FromSeconds(

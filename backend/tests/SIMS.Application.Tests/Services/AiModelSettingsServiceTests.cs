@@ -16,7 +16,7 @@ public class AiModelSettingsServiceTests
         await service.EnsureDefaultsAsync();
 
         var models = await db.AiModelRegistry.ToListAsync();
-        Assert.Contains(models, m => m.Provider == "Anthropic" && m.ModelId == "claude-sonnet-default" && m.Active);
+        Assert.Contains(models, m => m.Provider == "Anthropic" && m.ModelId == "claude-sonnet-4-20250514" && m.Active);
         Assert.Contains(models, m => m.Provider == "GoogleDocumentAI" && m.ModelId == "FORM_PARSER_PROCESSOR" && m.Active);
 
         var settings = await db.AiUseCaseModelSettings.ToListAsync();

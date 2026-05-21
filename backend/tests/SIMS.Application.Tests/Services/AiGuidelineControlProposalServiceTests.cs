@@ -240,6 +240,62 @@ public class AiGuidelineControlProposalServiceTests
     }
 
     [Fact]
+    public async Task ProposeFromTextAsync_UsesLlmInterpreterBeforePatternFallback()
+    {
+        await using var db = CreateDb();
+        var service = new AiGuidelineControlProposalService(
+            new UnderwritingGuidelineControlService(db),
+            llmInterpreter: new FakeGuidelineLlmInterpreter([
+                new CreateUnderwritingGuidelineControlRequest(
+                    UnderwritingControlItemType.DocumentChecklistItem,
+                    UnderwritingControlStage.Submission,
+                    UnderwritingControlSeverity.Warning,
+                    "operations-description",
+                    "Operations description",
+                    "Guideline requires an operations narrative.",
+                    null,
+                    false,
+                    true,
+                    "underwriting.clearance.override",
+                    "AI interpreted guideline text",
+                    0.78m,
+                    10),
+                new CreateUnderwritingGuidelineControlRequest(
+                    UnderwritingControlItemType.ReferralTrigger,
+                    UnderwritingControlStage.Quote,
+                    UnderwritingControlSeverity.ReferralRequired,
+                    "loss-ratio-over-50",
+                    "Loss ratio over 50%",
+                    "Guideline requires referral review when loss ratio exceeds 50%.",
+                    """{"field":"lossRatio","operator":">","value":50}""",
+                    false,
+                    true,
+                    "underwriting.clearance.override",
+                    "AI interpreted guideline text",
+                    0.81m,
+                    20)
+            ]));
+
+        var result = await service.ProposeFromTextAsync(new AiGuidelineControlProposalRequest(
+            Document: new CreateUnderwritingGuidelineDocumentRequest(
+                ProgramName: "Lloyds GL",
+                CarrierId: null,
+                LineOfBusiness: PolicyLineOfBusiness.GeneralLiability,
+                StateCode: "ALL",
+                Title: "Lloyds GL Guidelines",
+                SourceFileName: null,
+                SourceBlobName: null,
+                Notes: null),
+            GuidelineText: "This underwriting guide has prose that does not match the fallback parser."), Guid.NewGuid());
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(2, result.Value!.Controls.Count);
+        Assert.Contains(result.Value.Controls, c => c.RuleKey == "operations-description");
+        Assert.Contains(result.Value.Warnings, w => w.Contains("LLM", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task ProposeFromTextAsync_RequiresGuidelineText()
     {
         var guidelineService = new UnderwritingGuidelineControlService(CreateDb());
@@ -306,5 +362,11 @@ public class AiGuidelineControlProposalServiceTests
     {
         public Task<DocumentAiExtractionResult> ProcessAsync(byte[] content, string mimeType, string fileName, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Document AI settings are incomplete.");
+    }
+
+    private sealed class FakeGuidelineLlmInterpreter(IReadOnlyList<CreateUnderwritingGuidelineControlRequest> controls) : IAiGuidelineLlmInterpreterService
+    {
+        public Task<IReadOnlyList<CreateUnderwritingGuidelineControlRequest>> InterpretAsync(string guidelineText, CancellationToken ct = default) =>
+            Task.FromResult(controls);
     }
 }

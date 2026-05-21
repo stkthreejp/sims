@@ -18,10 +18,12 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
     private readonly IBlobStorageService? _blobStorage;
     private readonly IDocumentAiExtractionService? _documentAi;
     private readonly ILogger<AiGuidelineControlProposalService>? _logger;
+    private readonly IAiGuidelineLlmInterpreterService? _llmInterpreter;
 
-    public AiGuidelineControlProposalService(IUnderwritingGuidelineControlService guidelines)
+    public AiGuidelineControlProposalService(IUnderwritingGuidelineControlService guidelines, IAiGuidelineLlmInterpreterService? llmInterpreter = null)
     {
         _guidelines = guidelines;
+        _llmInterpreter = llmInterpreter;
     }
 
     public AiGuidelineControlProposalService(
@@ -29,13 +31,15 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         DbContext db,
         IBlobStorageService blobStorage,
         IDocumentAiExtractionService documentAi,
-        ILogger<AiGuidelineControlProposalService>? logger = null)
+        ILogger<AiGuidelineControlProposalService>? logger = null,
+        IAiGuidelineLlmInterpreterService? llmInterpreter = null)
     {
         _guidelines = guidelines;
         _db = db;
         _blobStorage = blobStorage;
         _documentAi = documentAi;
         _logger = logger;
+        _llmInterpreter = llmInterpreter;
     }
 
     public async Task<Result<AiGuidelineControlProposalResult>> ProposeFromAttachmentAsync(
@@ -98,7 +102,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         if (string.IsNullOrWhiteSpace(request.GuidelineText))
             return Result<AiGuidelineControlProposalResult>.Failure("GUIDELINE_TEXT_REQUIRED", "Guideline text is required.");
 
-        var controls = ExtractControls(request.GuidelineText);
+        var (controls, usedLlm) = await ExtractControlsAsync(request.GuidelineText, ct);
         if (controls.Count == 0)
             return Result<AiGuidelineControlProposalResult>.Failure("NO_CONTROLS_PROPOSED", "No proposed controls were found in the guideline text.");
 
@@ -118,7 +122,9 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         return Result<AiGuidelineControlProposalResult>.Success(new AiGuidelineControlProposalResult(
             document.Value,
             proposed.Value,
-            ["AI proposed controls require human review in Admin > UW Controls before publishing."]));
+            usedLlm
+                ? ["LLM interpreted guideline controls require human review in Admin > UW Controls before publishing."]
+                : ["AI proposed controls require human review in Admin > UW Controls before publishing."]));
     }
 
     private async Task<string> ExtractAttachmentTextAsync(Attachment attachment, byte[] content, CancellationToken ct)
@@ -257,6 +263,25 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         }
 
         return controls;
+    }
+
+    private async Task<(List<CreateUnderwritingGuidelineControlRequest> Controls, bool UsedLlm)> ExtractControlsAsync(string text, CancellationToken ct)
+    {
+        if (_llmInterpreter is not null)
+        {
+            try
+            {
+                var llmControls = await _llmInterpreter.InterpretAsync(text, ct);
+                if (llmControls.Count > 0)
+                    return (llmControls.ToList(), true);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is HttpRequestException || ex is JsonException || ex is TaskCanceledException)
+            {
+                _logger?.LogWarning(ex, "AI guideline LLM interpretation failed; falling back to pattern parser.");
+            }
+        }
+
+        return (ExtractControls(text), false);
     }
 
     private static void AddControl(List<CreateUnderwritingGuidelineControlRequest> controls, CreateUnderwritingGuidelineControlRequest control)
