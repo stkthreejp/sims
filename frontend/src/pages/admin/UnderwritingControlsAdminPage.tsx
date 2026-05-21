@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { Archive, Check, FileSearch, Loader2, Pencil, Plus, Rocket, Save, ShieldAlert, Trash2, X } from 'lucide-react'
@@ -86,6 +86,7 @@ export function UnderwritingControlsAdminPage() {
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
   const [selectedAttachmentId, setSelectedAttachmentId] = useState('')
   const [aiJsonInput, setAiJsonInput] = useState('')
+  const aiJsonFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const { data: documents = [], isLoading: loadingDocuments } = useQuery({
     queryKey: ['admin', 'underwriting-guidelines', 'documents'],
@@ -197,15 +198,20 @@ export function UnderwritingControlsAdminPage() {
     onError: (err) => toast.error(getApiErrorMessage(err, 'Control could not be saved')),
   })
 
-  const importAiJson = useMutation({
-    mutationFn: (parsedControls: CreateUnderwritingGuidelineControlRequest[]) => {
-      if (!activeDocumentId) throw new Error('Select a guideline document first')
-      return underwritingGuidelinesApi.addProposedControls(activeDocumentId, { controls: parsedControls })
+  const createFromAiJson = useMutation({
+    mutationFn: async (payload: { document: CreateUnderwritingGuidelineDocumentRequest; controls: CreateUnderwritingGuidelineControlRequest[] }) => {
+      const doc = editingDocumentId
+        ? await underwritingGuidelinesApi.updateDocument(editingDocumentId, payload.document)
+        : await underwritingGuidelinesApi.createDocument(payload.document)
+      const controls = await underwritingGuidelinesApi.addProposedControls(doc.id, { controls: payload.controls })
+      return { doc, controls }
     },
-    onSuccess: (saved) => {
-      toast.success(`Imported ${saved.length} proposed controls`)
+    onSuccess: ({ doc, controls }) => {
+      toast.success(`Guideline created with ${controls.length} proposed controls`)
       setAiJsonInput('')
-      invalidateControls(activeDocumentId)
+      resetDocumentForm()
+      setSelectedDocumentId(doc.id)
+      invalidateControls(doc.id)
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'AI JSON controls could not be imported')),
   })
@@ -288,9 +294,30 @@ export function UnderwritingControlsAdminPage() {
 
   function submitAiJsonImport() {
     try {
-      importAiJson.mutate(parseAiControlJson(aiJsonInput))
+      createFromAiJson.mutate({
+        document: {
+          ...documentForm,
+          programId: documentForm.programId || null,
+          carrierId: documentForm.carrierId || null,
+          stateCode: documentForm.stateCode || 'ALL',
+        },
+        controls: parseAiControlJson(aiJsonInput),
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'AI JSON could not be parsed')
+    }
+  }
+
+  async function uploadAiJsonFile(file: File | null) {
+    if (!file) return
+    try {
+      const text = await file.text()
+      setAiJsonInput(text)
+      toast.success(`${file.name} loaded`)
+    } catch {
+      toast.error('AI JSON file could not be read')
+    } finally {
+      if (aiJsonFileInputRef.current) aiJsonFileInputRef.current.value = ''
     }
   }
 
@@ -427,12 +454,53 @@ export function UnderwritingControlsAdminPage() {
               <button
                 type="button"
                 onClick={submitDocument}
-                disabled={createDocument.isPending || !documentForm.programName.trim() || !documentForm.title.trim()}
+                disabled={createDocument.isPending || createFromAiJson.isPending || !documentForm.programName.trim() || !documentForm.title.trim()}
                 className="sd-btn primary w-full"
               >
                 <Plus className="h-4 w-4" />
                 {editingDocumentId ? 'Save Guideline' : 'Create Guideline'}
               </button>
+              <div className="rounded-md border border-dashed border-slate-300 bg-white p-3">
+                <input
+                  ref={aiJsonFileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => uploadAiJsonFile(e.target.files?.[0] ?? null)}
+                />
+                <textarea
+                  value={aiJsonInput}
+                  onChange={(e) => setAiJsonInput(e.target.value)}
+                  className={textareaCls}
+                  rows={5}
+                  placeholder="Paste or upload AI controls JSON"
+                />
+                <div className="mt-3 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => aiJsonFileInputRef.current?.click()}
+                    disabled={createFromAiJson.isPending}
+                    className="sd-btn outline w-full"
+                  >
+                    <FileSearch className="h-4 w-4" />
+                    Upload JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submitAiJsonImport}
+                    disabled={
+                      createFromAiJson.isPending ||
+                      !documentForm.programName.trim() ||
+                      !documentForm.title.trim() ||
+                      !aiJsonInput.trim()
+                    }
+                    className="sd-btn accent w-full"
+                  >
+                    <FileSearch className="h-4 w-4" />
+                    {createFromAiJson.isPending ? 'Creating...' : 'Create From AI JSON'}
+                  </button>
+                </div>
+              </div>
               <div className="pt-3" style={{ borderTop: '1px solid var(--line-2)' }}>
                 <div className="grid gap-3">
                   <select
@@ -634,29 +702,6 @@ export function UnderwritingControlsAdminPage() {
                     <Save className="h-4 w-4" />
                     {editingControlId ? 'Save Control' : 'Add Proposed'}
                   </button>
-                </div>
-                <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-white p-3">
-                  <textarea
-                    value={aiJsonInput}
-                    onChange={(e) => setAiJsonInput(e.target.value)}
-                    className={textareaCls}
-                    rows={5}
-                    placeholder="Paste AI controls JSON"
-                  />
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-xs text-slate-500">
-                      Imports controls into the selected guideline for review.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={submitAiJsonImport}
-                      disabled={importAiJson.isPending || !aiJsonInput.trim()}
-                      className="sd-btn outline"
-                    >
-                      <FileSearch className="h-4 w-4" />
-                      {importAiJson.isPending ? 'Importing...' : 'Import AI JSON'}
-                    </button>
-                  </div>
                 </div>
               </div>
             )}

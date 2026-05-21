@@ -8,6 +8,8 @@ Read the underwriting guideline document and return proposed controls that a hum
 
 Do not approve, publish, or enforce anything. The output is only a proposed control list for human review.
 
+In SIMS, fill out the Guideline Scope fields first, then use `Upload JSON` or paste the JSON and click `Create From AI JSON`. SIMS will create the guideline document and add the proposed controls for review.
+
 ## Required Output
 
 Return JSON only. Do not include markdown fences, commentary, explanations, or text before/after the JSON.
@@ -123,4 +125,3 @@ For conditionJson:
 
 Prefer clear, actionable controls. Skip vague prose that does not create a reviewable requirement, blocker, referral, authority limit, appetite rule, or checklist item.
 ```
-
