@@ -57,6 +57,7 @@ public class AnthropicGuidelineLlmInterpreterServiceTests
         Assert.Null(unsupported.ConditionJson);
         Assert.Contains("Unsupported condition field", unsupported.Description);
         Assert.Equal("claude-sonnet-4-6", handler.ModelId);
+        Assert.Equal(2500, handler.MaxTokens);
         Assert.Equal("test-key", handler.ApiKey);
     }
 
@@ -116,6 +117,7 @@ public class AnthropicGuidelineLlmInterpreterServiceTests
     {
         public string? ApiKey { get; private set; }
         public string? ModelId { get; private set; }
+        public int? MaxTokens { get; private set; }
         public string? UserContent { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -124,6 +126,7 @@ public class AnthropicGuidelineLlmInterpreterServiceTests
             var body = await request.Content!.ReadAsStringAsync(cancellationToken);
             using var document = System.Text.Json.JsonDocument.Parse(body);
             ModelId = document.RootElement.GetProperty("model").GetString();
+            MaxTokens = document.RootElement.GetProperty("max_tokens").GetInt32();
             UserContent = document.RootElement
                 .GetProperty("messages")[0]
                 .GetProperty("content")

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ namespace SIMS.Infrastructure.Services;
 public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterpreterService
 {
     private const string DefaultModelId = "claude-sonnet-4-6";
+    private const int MaxOutputTokens = 2_500;
     private const int MaxGuidelineTextChars = 35_000;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private static readonly HashSet<string> AllowedConditionFields = new(StringComparer.Ordinal)
@@ -67,13 +69,20 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
 
         var modelId = await ResolveModelIdAsync(ct);
         var promptText = PrepareGuidelineText(guidelineText);
+        _logger.LogInformation(
+            "Anthropic guideline interpretation starting with model {ModelId}; extracted chars {ExtractedChars}; prompt chars {PromptChars}; max output tokens {MaxOutputTokens}.",
+            modelId,
+            guidelineText.Length,
+            promptText.Length,
+            MaxOutputTokens);
+
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/messages");
         request.Headers.Add("x-api-key", apiKey);
         request.Headers.Add("anthropic-version", "2023-06-01");
         request.Content = JsonContent.Create(new
         {
             model = modelId,
-            max_tokens = 6000,
+            max_tokens = MaxOutputTokens,
             temperature = 0,
             system = SystemPrompt,
             messages = new[]
@@ -86,7 +95,14 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
             }
         });
 
+        var stopwatch = Stopwatch.StartNew();
         using var response = await _httpClient.SendAsync(request, ct);
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "Anthropic guideline interpretation completed HTTP call with status {StatusCode} in {ElapsedMs}ms.",
+            response.StatusCode,
+            stopwatch.ElapsedMilliseconds);
+
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(ct);
