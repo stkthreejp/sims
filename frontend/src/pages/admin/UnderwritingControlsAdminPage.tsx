@@ -44,8 +44,9 @@ const STATUS_STYLES: Record<UnderwritingControlStatus, string> = {
   Retired: 'bg-zinc-100 text-zinc-600',
 }
 
-const inputCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
-const iconBtnCls = 'inline-flex items-center gap-1.5 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+const inputCls = 'sims-input'
+const textareaCls = 'sims-textarea'
+const iconBtnCls = 'sd-btn outline sm'
 
 const emptyDocument: CreateUnderwritingGuidelineDocumentRequest = {
   programId: null,
@@ -314,10 +315,10 @@ export function UnderwritingControlsAdminPage() {
 
       <section className="grid gap-5 xl:grid-cols-[360px_1fr]">
         <div className="space-y-5">
-          <div className="rounded-lg border bg-white">
-            <div className="flex items-center gap-2 border-b px-5 py-4">
-              <FileSearch className="h-4 w-4 text-slate-500" />
-              <h2 className="text-sm font-semibold text-slate-800">Guideline Scope</h2>
+          <div className="admin-panel">
+            <div className="admin-panel-head justify-start">
+              <FileSearch className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />
+              <h2 className="admin-panel-title">Guideline Scope</h2>
               {editingDocumentId && (
                 <button type="button" onClick={resetDocumentForm} className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-700">
                   Cancel edit
@@ -397,7 +398,7 @@ export function UnderwritingControlsAdminPage() {
               <textarea
                 value={documentForm.notes ?? ''}
                 onChange={(e) => setDocumentForm((f) => ({ ...f, notes: e.target.value }))}
-                className={inputCls}
+                className={textareaCls}
                 rows={3}
                 placeholder="Notes"
               />
@@ -405,12 +406,12 @@ export function UnderwritingControlsAdminPage() {
                 type="button"
                 onClick={submitDocument}
                 disabled={createDocument.isPending || !documentForm.programName.trim() || !documentForm.title.trim()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="sd-btn primary w-full"
               >
                 <Plus className="h-4 w-4" />
                 {editingDocumentId ? 'Save Guideline' : 'Create Guideline'}
               </button>
-              <div className="border-t pt-3">
+              <div className="pt-3" style={{ borderTop: '1px solid var(--line-2)' }}>
                 <div className="grid gap-3">
                   <select
                     value={selectedAttachmentId}
@@ -437,7 +438,7 @@ export function UnderwritingControlsAdminPage() {
                       !documentForm.title.trim() ||
                       !selectedAttachmentId
                     }
-                    className="inline-flex w-full items-center justify-center gap-2 rounded bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+                    className="sd-btn outline w-full"
                   >
                     <FileSearch className="h-4 w-4" />
                     Propose From Attachment
@@ -447,28 +448,29 @@ export function UnderwritingControlsAdminPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border bg-white">
-            <div className="border-b px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-800">Documents</h2>
+          <div className="admin-panel">
+            <div className="admin-panel-head">
+              <h2 className="admin-panel-title">Documents</h2>
             </div>
             <div className="divide-y">
               {documents.length === 0 ? (
-                <div className="px-5 py-6 text-sm text-slate-500">No guideline documents yet.</div>
+                <div className="admin-empty m-4">No guideline documents yet.</div>
               ) : documents.map((doc) => (
                 <button
                   key={doc.id}
                   type="button"
                   onClick={() => setSelectedDocumentId(doc.id)}
-                  className={`w-full px-5 py-4 text-left hover:bg-slate-50 ${doc.id === activeDocumentId ? 'bg-blue-50' : ''}`}
+                  className="w-full px-5 py-4 text-left"
+                  style={doc.id === activeDocumentId ? { background: 'var(--accent-soft)' } : undefined}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-900">{doc.title}</div>
+                    <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{doc.title}</div>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">v{doc.version}</span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>
                     {doc.programName} / {doc.carrierName ?? 'All companies'} / {LOB_LABELS[doc.lineOfBusiness]} / {doc.stateCode}
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">{doc.controlCount} controls</div>
+                  <div className="mt-2 text-xs" style={{ color: 'var(--ink-3)' }}>{doc.controlCount} controls</div>
                 </button>
               ))}
             </div>
@@ -476,12 +478,12 @@ export function UnderwritingControlsAdminPage() {
         </div>
 
         <div className="space-y-5">
-          <section className="rounded-lg border bg-white">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+          <section className="admin-panel">
+            <div className="admin-panel-head flex-wrap">
               <div>
-                <h2 className="text-sm font-semibold text-slate-800">{selectedDocument?.title ?? 'Select a guideline'}</h2>
+                <h2 className="admin-panel-title">{selectedDocument?.title ?? 'Select a guideline'}</h2>
                 {selectedDocument && (
-                  <div className="mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>
                     {selectedDocument.programName} / {selectedDocument.carrierName ?? 'All companies'} / {LOB_LABELS[selectedDocument.lineOfBusiness]} / {selectedDocument.stateCode}
                   </div>
                 )}
@@ -514,7 +516,7 @@ export function UnderwritingControlsAdminPage() {
             </div>
 
             {activeDocumentId && (
-              <div className="border-b bg-slate-50 px-5 py-4">
+              <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
                 <div className="grid gap-3 lg:grid-cols-4">
                   <select
                     value={controlForm.itemType}
@@ -557,7 +559,7 @@ export function UnderwritingControlsAdminPage() {
                     className={inputCls}
                     placeholder="Source citation"
                   />
-                  <div className="flex items-center gap-4 rounded border border-slate-300 bg-white px-3 py-2 text-sm">
+                  <div className="admin-muted-panel flex items-center gap-4 px-3 py-2 text-sm">
                     <label className="inline-flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -579,7 +581,7 @@ export function UnderwritingControlsAdminPage() {
                 <textarea
                   value={controlForm.description ?? ''}
                   onChange={(e) => setControlForm((f) => ({ ...f, description: e.target.value }))}
-                  className={`${inputCls} mt-3`}
+                  className={`${textareaCls} mt-3`}
                   rows={2}
                   placeholder="Description"
                 />
@@ -600,7 +602,7 @@ export function UnderwritingControlsAdminPage() {
                     type="button"
                     onClick={submitControl}
                     disabled={saveControl.isPending || !controlForm.ruleKey.trim() || !controlForm.label.trim()}
-                    className="inline-flex items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    className="sd-btn primary"
                   >
                     <Save className="h-4 w-4" />
                     {editingControlId ? 'Save Control' : 'Add Proposed'}
@@ -612,7 +614,7 @@ export function UnderwritingControlsAdminPage() {
             {loadingControls ? (
               <LoadingSpinner />
             ) : controls.length === 0 ? (
-              <div className="px-5 py-8 text-sm text-slate-500">No controls for this guideline yet.</div>
+              <div className="admin-empty m-4">No controls for this guideline yet.</div>
             ) : (
               <div className="divide-y">
                 {controls.map((control) => (
@@ -670,27 +672,27 @@ export function UnderwritingControlsAdminPage() {
             )}
           </section>
 
-          <section className="rounded-lg border bg-white">
-            <div className="border-b px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-800">Recent Activity</h2>
+          <section className="admin-panel">
+            <div className="admin-panel-head">
+              <h2 className="admin-panel-title">Recent Activity</h2>
             </div>
             {auditLog.length === 0 ? (
-              <div className="px-5 py-6 text-sm text-slate-500">No activity recorded for this guideline.</div>
+              <div className="admin-empty m-4">No activity recorded for this guideline.</div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="sd-table">
                 <thead>
-                  <tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-3">Action</th>
-                    <th className="px-4 py-3">Notes</th>
-                    <th className="px-4 py-3">When</th>
+                  <tr>
+                    <th>Action</th>
+                    <th>Notes</th>
+                    <th>When</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {auditLog.slice(0, 12).map((row) => (
                     <tr key={row.id}>
-                      <td className="px-4 py-3 font-medium text-slate-800">{row.action}</td>
-                      <td className="px-4 py-3 text-slate-600">{row.notes ?? '-'}</td>
-                      <td className="px-4 py-3 text-slate-500">{new Date(row.createdAt).toLocaleString()}</td>
+                      <td className="primary-cell">{row.action}</td>
+                      <td>{row.notes ?? '-'}</td>
+                      <td>{new Date(row.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>

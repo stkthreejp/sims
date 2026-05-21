@@ -150,6 +150,7 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | Legal requirements | Page | `/admin/legal-requirements` | Needs tweaking | Large admin workflow with extensive old styling. | High |
 | Role permissions | Page | `/admin/role-permissions` | Good | Utility admin pass aligned permission matrix shell, headers, save actions, category rows, and footer note to SIMS token styling. | Low |
 | Task types admin | Page | `/admin/task-types` | Good | Utility admin pass aligned create/edit form, buttons, inputs, table, empty state, and icon actions to SIMS token styling. | Low |
+| Underwriting controls admin | Page | `/admin/underwriting-controls` | Good | Aligned guideline scope, document list, control editor, control cards, and recent activity surfaces to the dashboard-style SIMS soft panel, field, table, and button treatment. | Low |
 | Workflows admin | Page | `/admin/workflows` | Needs tweaking | Old workflow admin styling. | Medium |
 | Login | Page | `/login` | Never updated | Old auth card styling; should be aligned with SIMS brand guide. | Medium |
 
@@ -195,3 +196,4 @@ This first chart is a code-informed starting point. It should be confirmed and c
 | 2026-05-16 | Codex | Document library pass | Aligned the document library actions, filters, search, template cards, status pills, empty state, and icon actions with SIMS patterns; verified existing real backend wiring for template list, delete, Word import handoff, and editor navigation. Type check passed. |
 | 2026-05-16 | Codex | Shared documents insured wiring | Added backend support for insured-level document attachments and cleaned visible loading/upload metadata text in the shared DocumentsSection; insured document types remain Correspondence and Other. |
 | 2026-05-20 | Codex | Admin utility batch | Aligned Admin Jobs, Database Status, Escalation Rules, Holiday Calendar, Role Permissions, and Task Types with SIMS panel, button, field, table, empty-state, and icon-action styling; production frontend build passed. |
+| 2026-05-21 | Codex | Admin underwriting controls pass | Matched Underwriting Controls admin surfaces to the dashboard-style soft card treatment, replacing raw Tailwind borders/buttons/fields on the main panels, editor, document list, empty states, and recent activity table; production frontend build passed. |
