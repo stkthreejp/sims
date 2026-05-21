@@ -98,6 +98,105 @@ public class UnderwritingGuidelineControlService : IUnderwritingGuidelineControl
         return Result<UnderwritingGuidelineDocumentDto>.Success(MapDocument(doc));
     }
 
+    public async Task<Result<UnderwritingGuidelineDocumentDto>> UpdateDocumentAsync(Guid guidelineDocumentId, CreateUnderwritingGuidelineDocumentRequest request, Guid userId, CancellationToken ct = default)
+    {
+        var doc = await _db.Set<UnderwritingGuidelineDocument>()
+            .Include(d => d.Program)
+            .Include(d => d.Carrier)
+            .Include(d => d.Controls)
+            .SingleOrDefaultAsync(d => d.Id == guidelineDocumentId, ct);
+        if (doc is null)
+            return Result<UnderwritingGuidelineDocumentDto>.Failure("DOCUMENT_NOT_FOUND", "Guideline document was not found.");
+
+        ProgramConfiguration? program = null;
+        var programName = request.ProgramName;
+        var carrierId = request.CarrierId;
+        var lineOfBusiness = request.LineOfBusiness;
+        var stateCode = request.StateCode;
+
+        if (request.ProgramId.HasValue)
+        {
+            program = await _db.Set<ProgramConfiguration>()
+                .SingleOrDefaultAsync(p => p.Id == request.ProgramId.Value, ct);
+            if (program is null)
+                return Result<UnderwritingGuidelineDocumentDto>.Failure("PROGRAM_NOT_FOUND", "Program was not found.");
+            if (!program.IsActive)
+                return Result<UnderwritingGuidelineDocumentDto>.Failure("PROGRAM_INACTIVE", "Program is inactive.");
+
+            programName = program.Name;
+        }
+
+        var validation = ValidateScope(programName, stateCode);
+        if (validation is not null)
+            return Result<UnderwritingGuidelineDocumentDto>.Failure(validation.Value.Code, validation.Value.Message);
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+            return Result<UnderwritingGuidelineDocumentDto>.Failure("TITLE_REQUIRED", "Guideline title is required.");
+
+        if (carrierId.HasValue && !await _db.Set<Carrier>().AnyAsync(c => c.Id == carrierId.Value, ct))
+            return Result<UnderwritingGuidelineDocumentDto>.Failure("CARRIER_NOT_FOUND", "Company was not found.");
+
+        var before = Snapshot(doc);
+        var normalizedProgram = programName.Trim();
+        var normalizedState = NormalizeStateCode(stateCode);
+
+        doc.ProgramId = program?.Id;
+        doc.Program = program;
+        doc.ProgramName = normalizedProgram;
+        doc.CarrierId = carrierId;
+        doc.LineOfBusiness = lineOfBusiness;
+        doc.StateCode = normalizedState;
+        doc.Title = request.Title.Trim();
+        doc.SourceFileName = TrimToNull(request.SourceFileName);
+        doc.SourceBlobName = TrimToNull(request.SourceBlobName);
+        doc.Notes = TrimToNull(request.Notes);
+
+        foreach (var control in doc.Controls)
+        {
+            control.ProgramId = doc.ProgramId;
+            control.Program = program;
+            control.ProgramName = doc.ProgramName;
+            control.CarrierId = doc.CarrierId;
+            control.LineOfBusiness = doc.LineOfBusiness;
+            control.StateCode = doc.StateCode;
+        }
+
+        AddAudit(doc.Id, null, "DocumentEdited", userId, request.Notes, before, Snapshot(doc));
+        await _db.SaveChangesAsync(ct);
+
+        doc.Carrier = carrierId.HasValue
+            ? await _db.Set<Carrier>().FindAsync([carrierId.Value], ct)
+            : null;
+
+        return Result<UnderwritingGuidelineDocumentDto>.Success(MapDocument(doc));
+    }
+
+    public async Task<Result> DeleteDocumentAsync(Guid guidelineDocumentId, Guid userId, CancellationToken ct = default)
+    {
+        var doc = await _db.Set<UnderwritingGuidelineDocument>()
+            .Include(d => d.Controls)
+            .SingleOrDefaultAsync(d => d.Id == guidelineDocumentId, ct);
+        if (doc is null)
+            return Result.Failure("DOCUMENT_NOT_FOUND", "Guideline document was not found.");
+
+        if (doc.Controls.Any(c => c.Status == UnderwritingControlStatus.Published))
+            return Result.Failure("DOCUMENT_HAS_PUBLISHED_CONTROLS", "Guideline documents with published controls cannot be deleted. Retire the published controls first.");
+
+        var now = DateTime.UtcNow;
+        var before = Snapshot(doc);
+        doc.IsDeleted = true;
+        doc.DeletedAt = now;
+        foreach (var control in doc.Controls)
+        {
+            control.IsDeleted = true;
+            control.DeletedAt = now;
+        }
+
+        AddAudit(doc.Id, null, "DocumentDeleted", userId, null, before, null);
+        await _db.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
     public async Task<IReadOnlyList<UnderwritingGuidelineControlDto>> GetControlsAsync(Guid guidelineDocumentId, CancellationToken ct = default)
     {
         var controls = await _db.Set<UnderwritingGuidelineControl>()

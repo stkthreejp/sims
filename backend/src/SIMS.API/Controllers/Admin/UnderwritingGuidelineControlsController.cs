@@ -29,6 +29,20 @@ public class UnderwritingGuidelineControlsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPut("documents/{documentId:guid}")]
+    public async Task<IActionResult> UpdateDocument(Guid documentId, [FromBody] CreateUnderwritingGuidelineDocumentRequest request, CancellationToken ct)
+    {
+        var result = await _service.UpdateDocumentAsync(documentId, request, UserId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpDelete("documents/{documentId:guid}")]
+    public async Task<IActionResult> DeleteDocument(Guid documentId, CancellationToken ct)
+    {
+        var result = await _service.DeleteDocumentAsync(documentId, UserId, ct);
+        return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpGet("documents/{documentId:guid}/controls")]
     public async Task<IActionResult> GetControls(Guid documentId, CancellationToken ct)
         => Ok(await _service.GetControlsAsync(documentId, ct));
@@ -81,4 +95,3 @@ public class UnderwritingGuidelineControlsController : ControllerBase
     public async Task<IActionResult> GetAuditLog([FromQuery] Guid? documentId, [FromQuery] Guid? controlId, CancellationToken ct)
         => Ok(await _service.GetAuditLogAsync(documentId, controlId, ct));
 }
-

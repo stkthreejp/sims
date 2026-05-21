@@ -19,6 +19,12 @@ export const underwritingGuidelinesApi = {
   createDocument: (data: CreateUnderwritingGuidelineDocumentRequest) =>
     apiClient.post<UnderwritingGuidelineDocument>('/admin/underwriting-guidelines/documents', data).then((r) => r.data),
 
+  updateDocument: (documentId: string, data: CreateUnderwritingGuidelineDocumentRequest) =>
+    apiClient.put<UnderwritingGuidelineDocument>(`/admin/underwriting-guidelines/documents/${documentId}`, data).then((r) => r.data),
+
+  deleteDocument: (documentId: string) =>
+    apiClient.delete(`/admin/underwriting-guidelines/documents/${documentId}`),
+
   proposeFromAttachment: (data: AiGuidelineControlProposalFromAttachmentRequest) =>
     apiClient.post<AiGuidelineControlProposalResult>('/admin/ai-guideline-control-proposals/from-attachment', data).then((r) => r.data),
 

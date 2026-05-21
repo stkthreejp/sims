@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { Archive, Check, FileSearch, Plus, Rocket, Save, ShieldAlert, X } from 'lucide-react'
+import { Archive, Check, FileSearch, Pencil, Plus, Rocket, Save, ShieldAlert, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { attachmentsApi } from '@/api/attachments.api'
 import { carriersApi } from '@/api/carriers.api'
@@ -79,6 +79,7 @@ export function UnderwritingControlsAdminPage() {
   const qc = useQueryClient()
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
   const [documentForm, setDocumentForm] = useState<CreateUnderwritingGuidelineDocumentRequest>(emptyDocument)
+  const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null)
   const [controlForm, setControlForm] = useState<CreateUnderwritingGuidelineControlRequest>(emptyControl)
   const [editingControlId, setEditingControlId] = useState<string | null>(null)
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
@@ -128,14 +129,31 @@ export function UnderwritingControlsAdminPage() {
   }, [controls])
 
   const createDocument = useMutation({
-    mutationFn: underwritingGuidelinesApi.createDocument,
+    mutationFn: (payload: CreateUnderwritingGuidelineDocumentRequest) => editingDocumentId
+      ? underwritingGuidelinesApi.updateDocument(editingDocumentId, payload)
+      : underwritingGuidelinesApi.createDocument(payload),
     onSuccess: (doc) => {
-      toast.success('Guideline document created')
-      setDocumentForm(emptyDocument)
+      toast.success(editingDocumentId ? 'Guideline document updated' : 'Guideline document created')
+      resetDocumentForm()
       setSelectedDocumentId(doc.id)
       qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'documents'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'controls', doc.id] })
+      qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'audit-log', doc.id] })
     },
-    onError: (err) => toast.error(getApiErrorMessage(err, 'Guideline document could not be created')),
+    onError: (err) => toast.error(getApiErrorMessage(err, editingDocumentId ? 'Guideline document could not be updated' : 'Guideline document could not be created')),
+  })
+
+  const deleteDocument = useMutation({
+    mutationFn: underwritingGuidelinesApi.deleteDocument,
+    onSuccess: (_result, documentId) => {
+      toast.success('Guideline document deleted')
+      if (selectedDocumentId === documentId) setSelectedDocumentId(null)
+      if (editingDocumentId === documentId) resetDocumentForm()
+      qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'documents'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'controls', documentId] })
+      qc.invalidateQueries({ queryKey: ['admin', 'underwriting-guidelines', 'audit-log', documentId] })
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Guideline document could not be deleted')),
   })
 
   const proposeFromAttachment = useMutation({
@@ -153,7 +171,7 @@ export function UnderwritingControlsAdminPage() {
     onSuccess: (result) => {
       toast.success(`AI proposed ${result.controls.length} controls`)
       setSelectedAttachmentId('')
-      setDocumentForm(emptyDocument)
+      resetDocumentForm()
       setSelectedDocumentId(result.document.id)
       invalidateControls(result.document.id)
     },
@@ -205,6 +223,34 @@ export function UnderwritingControlsAdminPage() {
       carrierId: documentForm.carrierId || null,
       stateCode: documentForm.stateCode || 'ALL',
     })
+  }
+
+  function resetDocumentForm() {
+    setDocumentForm(emptyDocument)
+    setEditingDocumentId(null)
+    setSelectedAttachmentId('')
+  }
+
+  function editDocument(doc: UnderwritingGuidelineDocument) {
+    setEditingDocumentId(doc.id)
+    setSelectedDocumentId(doc.id)
+    setSelectedAttachmentId('')
+    setDocumentForm({
+      programId: doc.programId,
+      programName: doc.programName,
+      carrierId: doc.carrierId,
+      lineOfBusiness: doc.lineOfBusiness,
+      stateCode: doc.stateCode,
+      title: doc.title,
+      sourceFileName: doc.sourceFileName ?? '',
+      sourceBlobName: doc.sourceBlobName ?? '',
+      notes: doc.notes ?? '',
+    })
+  }
+
+  function requestDeleteDocument(doc: UnderwritingGuidelineDocument) {
+    if (!confirm(`Delete ${doc.title}? Draft, AI suggested, approved, and rejected controls in this guideline will be removed.`)) return
+    deleteDocument.mutate(doc.id)
   }
 
   function submitAttachmentProposal() {
@@ -271,6 +317,11 @@ export function UnderwritingControlsAdminPage() {
             <div className="flex items-center gap-2 border-b px-5 py-4">
               <FileSearch className="h-4 w-4 text-slate-500" />
               <h2 className="text-sm font-semibold text-slate-800">Guideline Scope</h2>
+              {editingDocumentId && (
+                <button type="button" onClick={resetDocumentForm} className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-700">
+                  Cancel edit
+                </button>
+              )}
             </div>
             <div className="space-y-3 p-5">
               <select
@@ -336,6 +387,12 @@ export function UnderwritingControlsAdminPage() {
                 className={inputCls}
                 placeholder="Source file name"
               />
+              <input
+                value={documentForm.sourceBlobName ?? ''}
+                onChange={(e) => setDocumentForm((f) => ({ ...f, sourceBlobName: e.target.value }))}
+                className={inputCls}
+                placeholder="Source blob path"
+              />
               <textarea
                 value={documentForm.notes ?? ''}
                 onChange={(e) => setDocumentForm((f) => ({ ...f, notes: e.target.value }))}
@@ -350,7 +407,7 @@ export function UnderwritingControlsAdminPage() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" />
-                Create Guideline
+                {editingDocumentId ? 'Save Guideline' : 'Create Guideline'}
               </button>
               <div className="border-t pt-3">
                 <div className="grid gap-3">
@@ -429,6 +486,24 @@ export function UnderwritingControlsAdminPage() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
+                {selectedDocument && (
+                  <>
+                    <button type="button" onClick={() => editDocument(selectedDocument)} className={iconBtnCls}>
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit Guideline
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => requestDeleteDocument(selectedDocument)}
+                      disabled={deleteDocument.isPending || controls.some((control) => control.status === 'Published')}
+                      className={iconBtnCls}
+                      title={controls.some((control) => control.status === 'Published') ? 'Retire published controls before deleting this guideline.' : 'Delete guideline'}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </>
+                )}
                 {(['AiSuggested', 'Draft', 'Approved', 'Published'] as UnderwritingControlStatus[]).map((status) => (
                   <span key={status} className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}>
                     {statusLabel(status)} {groupedCounts[status] ?? 0}
