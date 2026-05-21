@@ -4404,6 +4404,10 @@ namespace SIMS.Infrastructure.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ApiKey")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<DateTime?>("LastChangedAt")
                         .HasColumnType("timestamp with time zone");
 

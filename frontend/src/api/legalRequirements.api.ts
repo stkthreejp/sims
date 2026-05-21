@@ -39,6 +39,7 @@ export interface LegalTrackedSource {
   name: string
   sourceType: string
   url: string | null
+  hasApiKey: boolean
   isEnabled: boolean
   scanCadence: string
   lastCheckedAt: string | null
@@ -53,6 +54,7 @@ export type LegalTrackedSourceInput = {
   name: string
   sourceType: string
   url: string | null
+  apiKey: string | null
   isEnabled: boolean
   scanCadence: string
   notes: string | null

@@ -15,6 +15,7 @@ public class LegalTrackedSourceConfiguration : IEntityTypeConfiguration<LegalTra
         builder.Property(s => s.Name).IsRequired().HasMaxLength(160);
         builder.Property(s => s.SourceType).IsRequired().HasMaxLength(80);
         builder.Property(s => s.Url).HasMaxLength(1000);
+        builder.Property(s => s.ApiKey).HasMaxLength(1000);
         builder.Property(s => s.ScanCadence).IsRequired().HasMaxLength(40);
         builder.Property(s => s.LastStatus).IsRequired().HasMaxLength(40);
         builder.Property(s => s.LastErrorMessage).HasMaxLength(2000);

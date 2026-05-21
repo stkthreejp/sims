@@ -6,6 +6,7 @@ public class LegalTrackedSource : BaseEntity
     public string Name { get; set; } = string.Empty;
     public string SourceType { get; set; } = string.Empty;
     public string? Url { get; set; }
+    public string? ApiKey { get; set; }
     public bool IsEnabled { get; set; } = true;
     public string ScanCadence { get; set; } = "Manual";
     public DateTime? LastCheckedAt { get; set; }

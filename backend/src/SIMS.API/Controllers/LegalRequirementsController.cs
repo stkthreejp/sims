@@ -122,6 +122,7 @@ public class LegalRequirementsController : ControllerBase
                 s.Name,
                 s.SourceType,
                 s.Url,
+                !string.IsNullOrWhiteSpace(s.ApiKey),
                 s.IsEnabled,
                 s.ScanCadence,
                 s.LastCheckedAt,
@@ -159,6 +160,7 @@ public class LegalRequirementsController : ControllerBase
             Name = name,
             SourceType = sourceType,
             Url = TrimToNull(dto.Url),
+            ApiKey = TrimToNull(dto.ApiKey),
             IsEnabled = dto.IsEnabled,
             ScanCadence = dto.ScanCadence.Trim(),
             LastStatus = "NotChecked",
@@ -199,6 +201,9 @@ public class LegalRequirementsController : ControllerBase
         source.Name = name;
         source.SourceType = sourceType;
         source.Url = TrimToNull(dto.Url);
+        var apiKey = TrimToNull(dto.ApiKey);
+        if (apiKey != null)
+            source.ApiKey = apiKey;
         source.IsEnabled = dto.IsEnabled;
         source.ScanCadence = dto.ScanCadence.Trim();
         source.Notes = TrimToNull(dto.Notes);
@@ -737,6 +742,7 @@ public class LegalRequirementsController : ControllerBase
             source.Name,
             source.SourceType,
             source.Url,
+            !string.IsNullOrWhiteSpace(source.ApiKey),
             source.IsEnabled,
             source.ScanCadence,
             source.LastCheckedAt,
@@ -784,6 +790,7 @@ public sealed record LegalTrackedSourceDto(
     string Name,
     string SourceType,
     string? Url,
+    bool HasApiKey,
     bool IsEnabled,
     string ScanCadence,
     DateTime? LastCheckedAt,
@@ -797,6 +804,7 @@ public sealed record LegalTrackedSourceUpsertDto(
     string Name,
     string SourceType,
     string? Url,
+    string? ApiKey,
     bool IsEnabled,
     string ScanCadence,
     string? Notes);

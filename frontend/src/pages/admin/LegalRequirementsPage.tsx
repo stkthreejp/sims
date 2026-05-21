@@ -378,6 +378,7 @@ function SourceEditorModal({
   const [name, setName] = useState(source === 'new' ? '' : source.name)
   const [sourceType, setSourceType] = useState(source === 'new' ? 'Statute/Regulation' : source.sourceType)
   const [url, setUrl] = useState(source === 'new' ? '' : source.url ?? '')
+  const [apiKey, setApiKey] = useState('')
   const [scanCadence, setScanCadence] = useState(source === 'new' ? 'Monthly' : source.scanCadence)
   const [isEnabled, setIsEnabled] = useState(source === 'new' ? true : source.isEnabled)
   const [notes, setNotes] = useState(source === 'new' ? '' : source.notes ?? '')
@@ -390,6 +391,7 @@ function SourceEditorModal({
       name,
       sourceType,
       url: url.trim() || null,
+      apiKey: apiKey.trim() || null,
       isEnabled,
       scanCadence,
       notes: notes.trim() || null,
@@ -448,6 +450,18 @@ function SourceEditorModal({
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://"
+              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
+            API Key
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder={source !== 'new' && source.hasApiKey ? 'Saved key configured' : undefined}
+              maxLength={1000}
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </label>
