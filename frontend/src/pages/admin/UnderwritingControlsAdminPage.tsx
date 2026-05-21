@@ -85,6 +85,7 @@ export function UnderwritingControlsAdminPage() {
   const [editingControlId, setEditingControlId] = useState<string | null>(null)
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
   const [selectedAttachmentId, setSelectedAttachmentId] = useState('')
+  const [aiJsonInput, setAiJsonInput] = useState('')
 
   const { data: documents = [], isLoading: loadingDocuments } = useQuery({
     queryKey: ['admin', 'underwriting-guidelines', 'documents'],
@@ -196,6 +197,19 @@ export function UnderwritingControlsAdminPage() {
     onError: (err) => toast.error(getApiErrorMessage(err, 'Control could not be saved')),
   })
 
+  const importAiJson = useMutation({
+    mutationFn: (parsedControls: CreateUnderwritingGuidelineControlRequest[]) => {
+      if (!activeDocumentId) throw new Error('Select a guideline document first')
+      return underwritingGuidelinesApi.addProposedControls(activeDocumentId, { controls: parsedControls })
+    },
+    onSuccess: (saved) => {
+      toast.success(`Imported ${saved.length} proposed controls`)
+      setAiJsonInput('')
+      invalidateControls(activeDocumentId)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'AI JSON controls could not be imported')),
+  })
+
   const decideControl = useMutation({
     mutationFn: ({ control, action }: { control: UnderwritingGuidelineControl; action: 'approve' | 'reject' | 'publish' | 'retire' }) => {
       const notes = decisionNotes[control.id]
@@ -270,6 +284,14 @@ export function UnderwritingControlsAdminPage() {
       changeNotes: editingControlId ? 'Admin UI edit' : undefined,
     }
     saveControl.mutate(payload)
+  }
+
+  function submitAiJsonImport() {
+    try {
+      importAiJson.mutate(parseAiControlJson(aiJsonInput))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'AI JSON could not be parsed')
+    }
   }
 
   function editControl(control: UnderwritingGuidelineControl) {
@@ -613,6 +635,29 @@ export function UnderwritingControlsAdminPage() {
                     {editingControlId ? 'Save Control' : 'Add Proposed'}
                   </button>
                 </div>
+                <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-white p-3">
+                  <textarea
+                    value={aiJsonInput}
+                    onChange={(e) => setAiJsonInput(e.target.value)}
+                    className={textareaCls}
+                    rows={5}
+                    placeholder="Paste AI controls JSON"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs text-slate-500">
+                      Imports controls into the selected guideline for review.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={submitAiJsonImport}
+                      disabled={importAiJson.isPending || !aiJsonInput.trim()}
+                      className="sd-btn outline"
+                    >
+                      <FileSearch className="h-4 w-4" />
+                      {importAiJson.isPending ? 'Importing...' : 'Import AI JSON'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -726,6 +771,52 @@ function isSupportedGuidelineAttachment(attachment: Attachment) {
     fileName.endsWith('.txt') ||
     contentType === 'application/pdf' ||
     contentType.startsWith('text/')
+}
+
+function parseAiControlJson(raw: string): CreateUnderwritingGuidelineControlRequest[] {
+  const parsed = JSON.parse(raw)
+  const parsedControls = Array.isArray(parsed) ? parsed : parsed?.controls
+  if (!Array.isArray(parsedControls) || parsedControls.length === 0)
+    throw new Error('Paste JSON with a non-empty controls array.')
+
+  return parsedControls.map((control, index) => {
+    if (!ITEM_TYPES.includes(control.itemType))
+      throw new Error(`Control ${index + 1} has an invalid itemType.`)
+    if (!STAGES.includes(control.stage))
+      throw new Error(`Control ${index + 1} has an invalid stage.`)
+    if (!SEVERITIES.includes(control.severity))
+      throw new Error(`Control ${index + 1} has an invalid severity.`)
+    if (typeof control.ruleKey !== 'string' || !control.ruleKey.trim())
+      throw new Error(`Control ${index + 1} is missing ruleKey.`)
+    if (typeof control.label !== 'string' || !control.label.trim())
+      throw new Error(`Control ${index + 1} is missing label.`)
+
+    return {
+      itemType: control.itemType,
+      stage: control.stage,
+      severity: control.severity,
+      ruleKey: control.ruleKey.trim(),
+      label: control.label.trim(),
+      description: stringOrNull(control.description),
+      conditionJson: normalizeImportedCondition(control.conditionJson),
+      isBlocking: Boolean(control.isBlocking),
+      overrideAllowed: control.overrideAllowed !== false,
+      overridePermission: stringOrNull(control.overridePermission) ?? 'underwriting.clearance.override',
+      sourceCitation: stringOrNull(control.sourceCitation),
+      aiConfidence: typeof control.aiConfidence === 'number' ? control.aiConfidence : null,
+      sortOrder: typeof control.sortOrder === 'number' && control.sortOrder > 0 ? control.sortOrder : (index + 1) * 10,
+    }
+  })
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function normalizeImportedCondition(value: unknown): string | null {
+  if (value == null || value === '') return null
+  if (typeof value === 'string') return value.trim() ? value.trim() : null
+  return JSON.stringify(value)
 }
 
 function itemTypeLabel(value: UnderwritingControlItemType) {
