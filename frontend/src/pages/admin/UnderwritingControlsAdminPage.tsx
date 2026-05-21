@@ -170,6 +170,7 @@ export function UnderwritingControlsAdminPage() {
     }),
     onSuccess: (result) => {
       toast.success(`AI proposed ${result.controls.length} controls`)
+      result.warnings.slice(1).forEach((warning) => toast.warning(warning))
       setSelectedAttachmentId('')
       resetDocumentForm()
       setSelectedDocumentId(result.document.id)

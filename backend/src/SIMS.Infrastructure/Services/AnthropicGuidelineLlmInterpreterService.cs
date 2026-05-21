@@ -59,7 +59,10 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
             Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ??
             _configuration["Anthropic:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            _logger.LogWarning("Anthropic guideline interpretation skipped because ANTHROPIC_API_KEY is not configured.");
             return [];
+        }
 
         var modelId = await ResolveModelIdAsync(ct);
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/messages");
@@ -84,7 +87,8 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
         using var response = await _httpClient.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogWarning("Anthropic guideline interpretation failed with status {StatusCode}", response.StatusCode);
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning("Anthropic guideline interpretation failed with status {StatusCode}: {Body}", response.StatusCode, TrimForLog(errorBody));
             return [];
         }
 
@@ -92,15 +96,24 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
         var message = await JsonSerializer.DeserializeAsync<AnthropicMessageResponse>(stream, JsonOptions, ct);
         var text = message?.Content?.FirstOrDefault(c => string.Equals(c.Type, "text", StringComparison.OrdinalIgnoreCase))?.Text;
         if (string.IsNullOrWhiteSpace(text))
+        {
+            _logger.LogWarning("Anthropic guideline interpretation returned no text content.");
             return [];
+        }
 
         var payloadJson = ExtractJson(text);
         if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            _logger.LogWarning("Anthropic guideline interpretation returned text without a JSON object.");
             return [];
+        }
 
-        var payload = JsonSerializer.Deserialize<AiGuidelineControlPayload>(payloadJson, JsonOptions);
+        var payload = ParsePayload(payloadJson);
         if (payload?.Controls is null || payload.Controls.Count == 0)
+        {
+            _logger.LogWarning("Anthropic guideline interpretation returned no controls.");
             return [];
+        }
 
         var controls = new List<CreateUnderwritingGuidelineControlRequest>();
         var sortOrder = 10;
@@ -115,6 +128,86 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
         }
 
         return controls;
+    }
+
+    private static AiGuidelineControlPayload? ParsePayload(string payloadJson)
+    {
+        using var document = JsonDocument.Parse(payloadJson);
+        if (!document.RootElement.TryGetProperty("controls", out var controlsElement) || controlsElement.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var controls = new List<AiGuidelineControlItem>();
+        foreach (var element in controlsElement.EnumerateArray())
+        {
+            controls.Add(new AiGuidelineControlItem(
+                ReadString(element, "itemType"),
+                ReadString(element, "stage"),
+                ReadString(element, "severity"),
+                ReadString(element, "ruleKey"),
+                ReadString(element, "label"),
+                ReadString(element, "description"),
+                ReadConditionJson(element),
+                ReadBool(element, "isBlocking"),
+                ReadBool(element, "overrideAllowed", defaultValue: true),
+                ReadString(element, "overridePermission"),
+                ReadString(element, "sourceCitation"),
+                ReadDecimal(element, "aiConfidence"),
+                ReadInt(element, "sortOrder")));
+        }
+
+        return new AiGuidelineControlPayload(controls);
+    }
+
+    private static string? ReadString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return null;
+
+        return property.ValueKind == JsonValueKind.String ? property.GetString() : property.GetRawText();
+    }
+
+    private static string? ReadConditionJson(JsonElement element)
+    {
+        if (!element.TryGetProperty("conditionJson", out var property) || property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return null;
+
+        return property.ValueKind == JsonValueKind.String ? property.GetString() : property.GetRawText();
+    }
+
+    private static bool ReadBool(JsonElement element, string propertyName, bool defaultValue = false)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+            return defaultValue;
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(property.GetString(), out var parsed) => parsed,
+            _ => defaultValue
+        };
+    }
+
+    private static decimal? ReadDecimal(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+            return null;
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out var value))
+            return value;
+
+        return property.ValueKind == JsonValueKind.String && decimal.TryParse(property.GetString(), out var parsed) ? parsed : null;
+    }
+
+    private static int ReadInt(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+            return 0;
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var value))
+            return value;
+
+        return property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out var parsed) ? parsed : 0;
     }
 
     private async Task<string> ResolveModelIdAsync(CancellationToken ct)
@@ -228,6 +321,9 @@ public class AnthropicGuidelineLlmInterpreterService : IAiGuidelineLlmInterprete
         var end = trimmed.LastIndexOf('}');
         return start >= 0 && end > start ? trimmed[start..(end + 1)] : null;
     }
+
+    private static string TrimForLog(string value) =>
+        value.Length <= 500 ? value : value[..500];
 
     private const string SystemPrompt = """
         You interpret insurance underwriting guideline text into SIMS proposed underwriting controls.

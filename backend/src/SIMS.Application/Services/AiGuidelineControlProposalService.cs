@@ -102,7 +102,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         if (string.IsNullOrWhiteSpace(request.GuidelineText))
             return Result<AiGuidelineControlProposalResult>.Failure("GUIDELINE_TEXT_REQUIRED", "Guideline text is required.");
 
-        var (controls, usedLlm) = await ExtractControlsAsync(request.GuidelineText, ct);
+        var (controls, usedLlm, fallbackReason) = await ExtractControlsAsync(request.GuidelineText, ct);
         if (controls.Count == 0)
             return Result<AiGuidelineControlProposalResult>.Failure("NO_CONTROLS_PROPOSED", "No proposed controls were found in the guideline text.");
 
@@ -122,9 +122,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         return Result<AiGuidelineControlProposalResult>.Success(new AiGuidelineControlProposalResult(
             document.Value,
             proposed.Value,
-            usedLlm
-                ? ["LLM interpreted guideline controls require human review in Admin > UW Controls before publishing."]
-                : ["AI proposed controls require human review in Admin > UW Controls before publishing."]));
+            BuildWarnings(usedLlm, fallbackReason)));
     }
 
     private async Task<string> ExtractAttachmentTextAsync(Attachment attachment, byte[] content, CancellationToken ct)
@@ -265,7 +263,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         return controls;
     }
 
-    private async Task<(List<CreateUnderwritingGuidelineControlRequest> Controls, bool UsedLlm)> ExtractControlsAsync(string text, CancellationToken ct)
+    private async Task<(List<CreateUnderwritingGuidelineControlRequest> Controls, bool UsedLlm, string? FallbackReason)> ExtractControlsAsync(string text, CancellationToken ct)
     {
         if (_llmInterpreter is not null)
         {
@@ -273,15 +271,34 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
             {
                 var llmControls = await _llmInterpreter.InterpretAsync(text, ct);
                 if (llmControls.Count > 0)
-                    return (llmControls.ToList(), true);
+                    return (llmControls.ToList(), true, null);
+
+                _logger?.LogWarning("AI guideline LLM interpretation returned no controls; falling back to pattern parser.");
+                return (ExtractControls(text), false, "LLM returned no controls, so SIMS used the fallback pattern parser.");
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is HttpRequestException || ex is JsonException || ex is TaskCanceledException)
             {
                 _logger?.LogWarning(ex, "AI guideline LLM interpretation failed; falling back to pattern parser.");
+                return (ExtractControls(text), false, "LLM interpretation failed, so SIMS used the fallback pattern parser.");
             }
         }
 
-        return (ExtractControls(text), false);
+        return (ExtractControls(text), false, "LLM interpretation is not configured, so SIMS used the fallback pattern parser.");
+    }
+
+    private static IReadOnlyList<string> BuildWarnings(bool usedLlm, string? fallbackReason)
+    {
+        var warnings = new List<string>
+        {
+            usedLlm
+                ? "LLM interpreted guideline controls require human review in Admin > UW Controls before publishing."
+                : "AI proposed controls require human review in Admin > UW Controls before publishing."
+        };
+
+        if (!string.IsNullOrWhiteSpace(fallbackReason))
+            warnings.Add(fallbackReason);
+
+        return warnings;
     }
 
     private static void AddControl(List<CreateUnderwritingGuidelineControlRequest> controls, CreateUnderwritingGuidelineControlRequest control)
