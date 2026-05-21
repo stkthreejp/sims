@@ -35,6 +35,18 @@ const ITEM_TYPES: UnderwritingControlItemType[] = ['AppetiteRule', 'ReferralTrig
 const STAGES: UnderwritingControlStage[] = ['Submission', 'Quote', 'Bind', 'Issue', 'PostBind', 'Renewal']
 const SEVERITIES: UnderwritingControlSeverity[] = ['Informational', 'Warning', 'ReferralRequired', 'HardBlock']
 const REVIEW_STATUSES: Array<UnderwritingControlStatus | 'All'> = ['All', 'AiSuggested', 'Draft', 'Approved', 'Published', 'Rejected', 'Retired']
+const CONDITION_OPERATORS = ['>', '>=', '<', '<=', '==', '!='] as const
+const CONDITION_FIELDS = [
+  { key: 'largestSingleItemValue', label: 'Largest single item value', kind: 'currency' },
+  { key: 'totalInsuredValue', label: 'Total insured value', kind: 'currency' },
+  { key: 'premiumAmount', label: 'Premium amount', kind: 'currency' },
+  { key: 'totalPremium', label: 'Total premium', kind: 'currency' },
+  { key: 'lossRatio', label: 'Loss ratio', kind: 'percent' },
+  { key: 'driverCount', label: 'Driver count', kind: 'number' },
+  { key: 'vehicleCount', label: 'Vehicle count', kind: 'number' },
+  { key: 'isFilingState', label: 'Filing state', kind: 'boolean' },
+] as const
+const DEFAULT_CONDITION = JSON.stringify({ field: 'totalInsuredValue', operator: '>', value: 0 })
 
 const STATUS_STYLES: Record<UnderwritingControlStatus, string> = {
   AiSuggested: 'bg-sky-50 text-sky-700',
@@ -48,6 +60,13 @@ const STATUS_STYLES: Record<UnderwritingControlStatus, string> = {
 const inputCls = 'sims-input'
 const textareaCls = 'sims-textarea'
 const iconBtnCls = 'sd-btn outline sm'
+type ConditionOperator = typeof CONDITION_OPERATORS[number]
+type ConditionFieldKey = typeof CONDITION_FIELDS[number]['key']
+type ConditionField = typeof CONDITION_FIELDS[number]
+type ParsedCondition =
+  | { mode: 'always' }
+  | { mode: 'builder'; field: ConditionField; operator: ConditionOperator; value: string }
+  | { mode: 'unsupported'; raw: string; reason: string }
 
 const emptyDocument: CreateUnderwritingGuidelineDocumentRequest = {
   programId: null,
@@ -158,6 +177,7 @@ export function UnderwritingControlsAdminPage() {
 
   const selectedControls = visibleControls.filter((control) => selectedControlIds.includes(control.id))
   const selectableVisibleControls = visibleControls.filter((control) => control.status !== 'Published' && control.status !== 'Retired')
+  const parsedCondition = parseControlCondition(controlForm.conditionJson)
 
   const createDocument = useMutation({
     mutationFn: (payload: CreateUnderwritingGuidelineDocumentRequest) => editingDocumentId
@@ -388,6 +408,33 @@ export function UnderwritingControlsAdminPage() {
   function cancelControlEdit() {
     setEditingControlId(null)
     setControlForm(emptyControl)
+  }
+
+  function setAlwaysApplies() {
+    setControlForm((f) => ({ ...f, conditionJson: '' }))
+  }
+
+  function setConditionalApplies() {
+    setControlForm((f) => ({ ...f, conditionJson: parsedCondition.mode === 'builder' ? f.conditionJson : DEFAULT_CONDITION }))
+  }
+
+  function updateCondition(partial: Partial<{ field: ConditionFieldKey; operator: ConditionOperator; value: string }>) {
+    const current = parsedCondition.mode === 'builder'
+      ? parsedCondition
+      : parseControlCondition(DEFAULT_CONDITION)
+    if (current.mode !== 'builder') return
+    const fieldKey = partial.field ?? current.field.key
+    const field = getConditionField(fieldKey)
+    const operator = field.kind === 'boolean'
+      ? (partial.operator === '!=' ? '!=' : (partial.operator ?? current.operator) === '!=' ? '!=' : '==')
+      : partial.operator ?? current.operator
+    const value = partial.field && field.kind === 'boolean'
+      ? '1'
+      : partial.value ?? current.value
+    setControlForm((f) => ({
+      ...f,
+      conditionJson: buildControlCondition(field, operator, value),
+    }))
   }
 
   function toggleControlSelection(controlId: string) {
@@ -753,12 +800,84 @@ export function UnderwritingControlsAdminPage() {
                   placeholder="Description"
                 />
                 <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_220px_auto]">
-                  <input
-                    value={controlForm.conditionJson ?? ''}
-                    onChange={(e) => setControlForm((f) => ({ ...f, conditionJson: e.target.value }))}
-                    className={inputCls}
-                    placeholder='Condition JSON, optional'
-                  />
+                  <div className="rounded-md border border-slate-200 bg-white p-3">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-slate-700">
+                      <span className="font-medium text-slate-900">Applies when</span>
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          checked={parsedCondition.mode === 'always'}
+                          onChange={setAlwaysApplies}
+                        />
+                        Always
+                      </label>
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          checked={parsedCondition.mode !== 'always'}
+                          onChange={setConditionalApplies}
+                        />
+                        Field matches value
+                      </label>
+                    </div>
+                    {parsedCondition.mode === 'builder' && (
+                      <>
+                        <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_130px_150px]">
+                          <select
+                            value={parsedCondition.field.key}
+                            onChange={(e) => updateCondition({ field: e.target.value as ConditionFieldKey })}
+                            className={inputCls}
+                          >
+                            {CONDITION_FIELDS.map((field) => (
+                              <option key={field.key} value={field.key}>{field.label}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={parsedCondition.operator}
+                            onChange={(e) => updateCondition({ operator: e.target.value as ConditionOperator })}
+                            className={inputCls}
+                          >
+                            {(parsedCondition.field.kind === 'boolean' ? (['==', '!='] as ConditionOperator[]) : CONDITION_OPERATORS).map((operator) => (
+                              <option key={operator} value={operator}>{operatorLabel(operator)}</option>
+                            ))}
+                          </select>
+                          {parsedCondition.field.kind === 'boolean' ? (
+                            <select
+                              value={parsedCondition.value === '0' ? '0' : '1'}
+                              onChange={(e) => updateCondition({ value: e.target.value })}
+                              className={inputCls}
+                            >
+                              <option value="1">Yes</option>
+                              <option value="0">No</option>
+                            </select>
+                          ) : (
+                            <input
+                              type="number"
+                              min="0"
+                              step={parsedCondition.field.kind === 'percent' ? '0.01' : '1'}
+                              value={parsedCondition.value}
+                              onChange={(e) => updateCondition({ value: e.target.value })}
+                              className={inputCls}
+                              placeholder={parsedCondition.field.kind === 'percent' ? 'Percent' : 'Value'}
+                            />
+                          )}
+                        </div>
+                        <div className="mt-2 text-xs text-slate-500">{describeControlCondition(parsedCondition)}</div>
+                      </>
+                    )}
+                    {parsedCondition.mode === 'unsupported' && (
+                      <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        {parsedCondition.reason}. This rule needs field mapping before it can be checked automatically.
+                        <button
+                          type="button"
+                          onClick={() => setControlForm((f) => ({ ...f, conditionJson: DEFAULT_CONDITION }))}
+                          className="ml-2 font-medium"
+                        >
+                          Use builder
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <input
                     value={controlForm.overridePermission ?? ''}
                     onChange={(e) => setControlForm((f) => ({ ...f, overridePermission: e.target.value }))}
@@ -1005,6 +1124,88 @@ function normalizeImportedCondition(value: unknown): string | null {
   if (value == null || value === '') return null
   if (typeof value === 'string') return value.trim() ? value.trim() : null
   return JSON.stringify(value)
+}
+
+function getConditionField(key: string): ConditionField {
+  return CONDITION_FIELDS.find((field) => field.key === key) ?? CONDITION_FIELDS[1]
+}
+
+function parseControlCondition(conditionJson?: string | null): ParsedCondition {
+  if (!conditionJson?.trim()) return { mode: 'always' }
+
+  try {
+    const parsed = JSON.parse(conditionJson)
+    const fieldKey = typeof parsed.field === 'string' ? parsed.field : ''
+    const field = CONDITION_FIELDS.find((option) => option.key === fieldKey)
+    if (!field) return { mode: 'unsupported', raw: conditionJson, reason: fieldKey ? `Unsupported field "${fieldKey}"` : 'Missing field' }
+
+    const operator = normalizeConditionOperator(parsed.operator)
+    if (!operator) return { mode: 'unsupported', raw: conditionJson, reason: 'Unsupported comparison' }
+
+    const value = displayConditionValue(field, parsed.value)
+    return { mode: 'builder', field, operator, value }
+  } catch {
+    return { mode: 'unsupported', raw: conditionJson, reason: 'Invalid condition format' }
+  }
+}
+
+function normalizeConditionOperator(value: unknown): ConditionOperator | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  if (CONDITION_OPERATORS.includes(normalized as ConditionOperator)) return normalized as ConditionOperator
+  return {
+    greaterThan: '>',
+    greaterThanOrEqual: '>=',
+    lessThan: '<',
+    lessThanOrEqual: '<=',
+    equals: '==',
+    '=': '==',
+    notEquals: '!=',
+  }[normalized] as ConditionOperator | undefined ?? null
+}
+
+function displayConditionValue(field: ConditionField, value: unknown) {
+  const numericValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value)
+      : 0
+
+  if (field.kind === 'boolean') return numericValue === 0 ? '0' : '1'
+  if (field.kind === 'percent') return Number.isFinite(numericValue) ? String(numericValue * 100) : '0'
+  return Number.isFinite(numericValue) ? String(numericValue) : '0'
+}
+
+function buildControlCondition(field: ConditionField, operator: ConditionOperator, value: string) {
+  const numericValue = Number(value) || 0
+  const storedValue = field.kind === 'percent'
+    ? numericValue / 100
+    : field.kind === 'boolean'
+      ? (value === '0' ? 0 : 1)
+      : numericValue
+  return JSON.stringify({ field: field.key, operator, value: storedValue })
+}
+
+function describeControlCondition(condition: Extract<ParsedCondition, { mode: 'builder' }>) {
+  const rawValue = condition.field.kind === 'boolean'
+    ? (condition.value === '0' ? 'No' : 'Yes')
+    : condition.field.kind === 'percent'
+      ? `${condition.value || 0}%`
+      : condition.field.kind === 'currency'
+        ? Number(condition.value || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+        : condition.value || 0
+  return `Applies when ${condition.field.label} ${operatorLabel(condition.operator).toLowerCase()} ${rawValue}.`
+}
+
+function operatorLabel(operator: ConditionOperator) {
+  return {
+    '>': '>',
+    '>=': '>=',
+    '<': '<',
+    '<=': '<=',
+    '==': 'is',
+    '!=': 'is not',
+  }[operator]
 }
 
 function itemTypeLabel(value: UnderwritingControlItemType) {
