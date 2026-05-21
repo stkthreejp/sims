@@ -146,7 +146,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
 
         if (LossRunsRegex().IsMatch(text))
         {
-            controls.Add(new CreateUnderwritingGuidelineControlRequest(
+            AddControl(controls, new CreateUnderwritingGuidelineControlRequest(
                 UnderwritingControlItemType.DocumentChecklistItem,
                 UnderwritingControlStage.Submission,
                 UnderwritingControlSeverity.Warning,
@@ -166,7 +166,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         if (SignedApplicationRegex().IsMatch(text))
         {
             var requiredBeforeBind = RequiredBeforeBindRegex().IsMatch(text);
-            controls.Add(new CreateUnderwritingGuidelineControlRequest(
+            AddControl(controls, new CreateUnderwritingGuidelineControlRequest(
                 UnderwritingControlItemType.DocumentChecklistItem,
                 requiredBeforeBind ? UnderwritingControlStage.Bind : UnderwritingControlStage.Submission,
                 requiredBeforeBind ? UnderwritingControlSeverity.HardBlock : UnderwritingControlSeverity.Warning,
@@ -189,7 +189,7 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
         if (pieceThreshold.Success)
         {
             var amount = ParseAmount(pieceThreshold.Groups["amount"].Value);
-            controls.Add(new CreateUnderwritingGuidelineControlRequest(
+            AddControl(controls, new CreateUnderwritingGuidelineControlRequest(
                 UnderwritingControlItemType.ReferralTrigger,
                 UnderwritingControlStage.Quote,
                 UnderwritingControlSeverity.ReferralRequired,
@@ -203,9 +203,68 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
                 SourceCitation(text, pieceThreshold.Value),
                 0.84m,
                 sortOrder));
+            sortOrder += 10;
+        }
+
+        var totalInsuredValueThreshold = TotalInsuredValueThresholdRegex().Match(text);
+        if (totalInsuredValueThreshold.Success)
+        {
+            var amount = ParseAmount(totalInsuredValueThreshold.Groups["amount"].Value);
+            AddControl(controls, new CreateUnderwritingGuidelineControlRequest(
+                UnderwritingControlItemType.ReferralTrigger,
+                UnderwritingControlStage.Quote,
+                UnderwritingControlSeverity.ReferralRequired,
+                $"total-insured-value-over-{AmountKey(amount)}",
+                $"Total insured value over {FormatAmount(amount)}",
+                "Guideline requires referral review when total insured value exceeds the threshold.",
+                JsonSerializer.Serialize(new { field = "totalInsuredValue", @operator = ">", value = amount }),
+                false,
+                true,
+                AppPermissions.UnderwritingClearanceOverride,
+                SourceCitation(text, totalInsuredValueThreshold.Value),
+                0.84m,
+                sortOrder));
+            sortOrder += 10;
+        }
+
+        foreach (var line in RequirementLines(text))
+        {
+            if (KnownSpecialRequirementRegex().IsMatch(line))
+                continue;
+
+            var label = CleanRequirementLabel(line);
+            if (string.IsNullOrWhiteSpace(label))
+                continue;
+
+            var requiredBeforeBind = RequiredBeforeBindRegex().IsMatch(line);
+            AddControl(controls, new CreateUnderwritingGuidelineControlRequest(
+                UnderwritingControlItemType.DocumentChecklistItem,
+                requiredBeforeBind ? UnderwritingControlStage.Bind : UnderwritingControlStage.Submission,
+                requiredBeforeBind ? UnderwritingControlSeverity.HardBlock : UnderwritingControlSeverity.Warning,
+                Slug(label),
+                label,
+                requiredBeforeBind
+                    ? $"Guideline states {label.ToLowerInvariant()} is required before bind."
+                    : $"Guideline requires {label.ToLowerInvariant()} for underwriting review.",
+                null,
+                requiredBeforeBind,
+                true,
+                AppPermissions.UnderwritingClearanceOverride,
+                SourceCitation(text, line),
+                requiredBeforeBind ? 0.82m : 0.76m,
+                sortOrder));
+            sortOrder += 10;
         }
 
         return controls;
+    }
+
+    private static void AddControl(List<CreateUnderwritingGuidelineControlRequest> controls, CreateUnderwritingGuidelineControlRequest control)
+    {
+        if (controls.Any(existing => existing.RuleKey.Equals(control.RuleKey, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        controls.Add(control);
     }
 
     private static int ParseAmount(string raw) =>
@@ -213,6 +272,33 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
 
     private static string FormatAmount(int amount) =>
         amount >= 1_000_000 ? $"${amount / 1_000_000}M" : $"${amount / 1000}K";
+
+    private static string AmountKey(int amount) =>
+        amount >= 1_000_000 ? $"{amount / 1_000_000}m" : $"{amount / 1000}k";
+
+    private static IEnumerable<string> RequirementLines(string text)
+    {
+        foreach (var rawLine in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            var match = RequirementLineRegex().Match(line);
+            if (match.Success)
+                yield return match.Groups["label"].Value.Trim();
+        }
+    }
+
+    private static string CleanRequirementLabel(string line)
+    {
+        var label = BulletPrefixRegex().Replace(line, string.Empty).Trim();
+        label = TrailingRequirementPhraseRegex().Replace(label, string.Empty).Trim();
+        return label.Trim(' ', '.', ':', ';');
+    }
+
+    private static string Slug(string value)
+    {
+        var slug = SlugInvalidRegex().Replace(value.ToLowerInvariant(), "-").Trim('-');
+        return SlugCollapseRegex().Replace(slug, "-");
+    }
 
     private static bool IsPdf(Attachment attachment) =>
         attachment.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
@@ -251,6 +337,27 @@ public partial class AiGuidelineControlProposalService : IAiGuidelineControlProp
 
     [GeneratedRegex(@"single\s+piece.{0,80}(over|exceeds?|greater\s+than)\s+\$?(?<amount>\d{1,3}(?:,\d{3})+|\d{5,})", RegexOptions.IgnoreCase)]
     private static partial Regex PieceThresholdRegex();
+
+    [GeneratedRegex(@"total\s+(insured\s+value|tiv).{0,80}(over|exceeds?|greater\s+than)\s+\$?(?<amount>\d{1,3}(?:,\d{3})+|\d{5,})", RegexOptions.IgnoreCase)]
+    private static partial Regex TotalInsuredValueThresholdRegex();
+
+    [GeneratedRegex(@"^\s*(?:[-*]|\d+[.)])?\s*(?<label>.+?)\s+(?:is\s+|are\s+)?(?:required|must\s+be\s+provided|must\s+be\s+submitted|must\s+accompany|shall\s+be\s+provided)(?:\b|\.|;)", RegexOptions.IgnoreCase)]
+    private static partial Regex RequirementLineRegex();
+
+    [GeneratedRegex(@"(loss\s+runs?|signed\s+application|referral)", RegexOptions.IgnoreCase)]
+    private static partial Regex KnownSpecialRequirementRegex();
+
+    [GeneratedRegex(@"^\s*(?:[-*]|\d+[.)])\s*")]
+    private static partial Regex BulletPrefixRegex();
+
+    [GeneratedRegex(@"\s+(?:is\s+|are\s+)?(?:required|must\s+be\s+provided|must\s+be\s+submitted|must\s+accompany|shall\s+be\s+provided).*$", RegexOptions.IgnoreCase)]
+    private static partial Regex TrailingRequirementPhraseRegex();
+
+    [GeneratedRegex(@"[^a-z0-9]+")]
+    private static partial Regex SlugInvalidRegex();
+
+    [GeneratedRegex(@"-+")]
+    private static partial Regex SlugCollapseRegex();
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRegex();

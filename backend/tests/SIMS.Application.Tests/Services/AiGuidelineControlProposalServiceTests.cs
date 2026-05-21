@@ -199,6 +199,47 @@ public class AiGuidelineControlProposalServiceTests
     }
 
     [Fact]
+    public async Task ProposeFromTextAsync_CreatesSeparateControlsFromGuidelineRequirementLines()
+    {
+        await using var db = CreateDb();
+        var service = new AiGuidelineControlProposalService(new UnderwritingGuidelineControlService(db));
+
+        var result = await service.ProposeFromTextAsync(new AiGuidelineControlProposalRequest(
+            Document: new CreateUnderwritingGuidelineDocumentRequest(
+                ProgramName: "Lloyds GL",
+                CarrierId: null,
+                LineOfBusiness: PolicyLineOfBusiness.GeneralLiability,
+                StateCode: "ALL",
+                Title: "Lloyds GL Guidelines",
+                SourceFileName: "UW Guidelines GL Only.pdf",
+                SourceBlobName: "carrier-guidelines/UW Guidelines GL Only.pdf",
+                Notes: null),
+            GuidelineText: """
+                Submission requirements:
+                - Completed ACORD 125 application is required.
+                - Contractor supplemental application is required.
+                - Five years currently valued loss runs are required.
+                - Signed application is required prior to bind.
+                - Referral required when total insured value exceeds $1,000,000.
+                """), Guid.NewGuid());
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(5, result.Value!.Controls.Count);
+        Assert.Contains(result.Value.Controls, c => c.RuleKey == "completed-acord-125-application");
+        Assert.Contains(result.Value.Controls, c => c.RuleKey == "contractor-supplemental-application");
+        Assert.Contains(result.Value.Controls, c => c.RuleKey == "five-year-loss-runs");
+        Assert.Contains(result.Value.Controls, c => c.RuleKey == "signed-application" && c.Stage == UnderwritingControlStage.Bind && c.IsBlocking);
+
+        var tivReferral = result.Value.Controls.Single(c => c.RuleKey == "total-insured-value-over-1m");
+        Assert.Equal(UnderwritingControlItemType.ReferralTrigger, tivReferral.ItemType);
+        using var condition = JsonDocument.Parse(tivReferral.ConditionJson!);
+        Assert.Equal("totalInsuredValue", condition.RootElement.GetProperty("field").GetString());
+        Assert.Equal(">", condition.RootElement.GetProperty("operator").GetString());
+        Assert.Equal(1000000, condition.RootElement.GetProperty("value").GetInt32());
+    }
+
+    [Fact]
     public async Task ProposeFromTextAsync_RequiresGuidelineText()
     {
         var guidelineService = new UnderwritingGuidelineControlService(CreateDb());
