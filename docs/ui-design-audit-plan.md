@@ -57,7 +57,7 @@ Use this checklist during the visual pass:
 
 - Page anatomy follows the guide: app shell, page head, optional metrics, main content.
 - Page spacing and density match the guide.
-- Cards use SIMS surface, border, radius, and subtle elevation style.
+- Cards and panels should match the dashboard-style SIMS surface treatment: white `var(--surface)` background, soft `var(--line)` or `var(--line-2)` border, `var(--r-xl)` outer radius for major panels, and `var(--shadow-sm)` subtle elevation. Admin/configuration pages should not use raw dark Tailwind borders such as `border-slate-300` or plain `border bg-white rounded-lg` when a SIMS panel/card pattern is appropriate.
 - Tables use compact density, token colors, proper headers, hover states, and tabular numeric alignment.
 - Buttons use the SIMS hierarchy: primary, outline, ghost, danger, small variants where appropriate.
 - Statuses use pills/badges instead of ad hoc colored labels.
