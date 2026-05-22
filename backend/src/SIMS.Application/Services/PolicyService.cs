@@ -645,6 +645,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyTransactionDto>.Failure("INVALID_STATUS", "Only active policies can be endorsed.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "starting an endorsement");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         var txnNumber = await GenerateTransactionNumberAsync();
         var txn = new PolicyTransaction
@@ -697,6 +700,9 @@ public class PolicyService : IPolicyService
         if (txn == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Endorsement not found.");
         if (txn.TransactionType != TransactionType.Endorsement)
             return Result<PolicyTransactionDto>.Failure("INVALID_TYPE", "Transaction is not an endorsement.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(txn.Policy.BoundQuoteId, "issuing an endorsement");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         if (dto.EffectiveDate.HasValue) txn.EffectiveDate = dto.EffectiveDate.Value;
         if (dto.PremiumChange.HasValue)
@@ -756,6 +762,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<QuoteDto>.Failure("INVALID_STATUS", "Only active policies can be renewed.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "starting a renewal");
+        if (!postBindGate.IsSuccess)
+            return Result<QuoteDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         var quoteService = (IQuoteService)_sp.GetService(typeof(IQuoteService))!;
         var source = policy.BoundQuote;
@@ -823,6 +832,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can be cancelled.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "cancelling this policy");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
         if (string.IsNullOrWhiteSpace(dto.Reason))
             return Result<PolicyDto>.Failure("REASON_REQUIRED", "Cancellation reason is required.");
         if (dto.CancelledDate < policy.EffectiveDate || dto.CancelledDate > policy.ExpirationDate)
@@ -909,6 +921,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyTransactionDto>.Failure("INVALID_STATUS", "Only active policies can be cancelled.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "issuing a cancellation notice");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         var reason = CancellationReasonLibrary.GetByCode(dto.ReasonCode);
         if (reason == null)
@@ -1017,6 +1032,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can complete a cancellation.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "completing a cancellation");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         var transaction = policy.Transactions.FirstOrDefault(t => t.Id == transactionId && !t.IsDeleted);
         if (transaction == null)
@@ -1071,6 +1089,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Cancelled)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only cancelled policies can be reinstated.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "reinstating this policy");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
         if (string.IsNullOrWhiteSpace(dto.Reason))
             return Result<PolicyDto>.Failure("REASON_REQUIRED", "Reinstatement reason is required.");
         if (dto.ReinstatedDate < policy.EffectiveDate || dto.ReinstatedDate > policy.ExpirationDate)
@@ -1146,6 +1167,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyTransactionDto>.Failure("INVALID_STATUS", "Only active policies can be rewritten.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "starting a rewrite");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
         if (string.IsNullOrWhiteSpace(dto.Reason))
             return Result<PolicyTransactionDto>.Failure("REASON_REQUIRED", "Rewrite reason is required.");
         if (dto.EffectiveDate < policy.EffectiveDate || dto.EffectiveDate > policy.ExpirationDate)
@@ -1242,6 +1266,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can complete a rewrite.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "completing a rewrite");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         var transaction = policy.Transactions.FirstOrDefault(t => t.Id == transactionId && !t.IsDeleted);
         if (transaction == null)
@@ -1315,6 +1342,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can be non-renewed.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "issuing a non-renewal notice");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         if (dto.NoticeRequirementDays <= 0)
             return Result<PolicyDto>.Failure("INVALID_NOTICE_DAYS", "Notice requirement days must be greater than zero.");
@@ -1417,6 +1447,9 @@ public class PolicyService : IPolicyService
         if (policy == null) return Result<PolicyDto>.Failure("NOT_FOUND", "Policy not found.");
         if (policy.Status != PolicyStatus.Active)
             return Result<PolicyDto>.Failure("INVALID_STATUS", "Only active policies can complete a non-renewal.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "completing a non-renewal");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
 
         var transaction = policy.Transactions.FirstOrDefault(t => t.Id == transactionId && !t.IsDeleted);
         if (transaction == null)
@@ -1887,5 +1920,27 @@ public class PolicyService : IPolicyService
         var labels = items.Take(3).Select(i => i.Label);
         var suffix = items.Count > 3 ? $" and {items.Count - 3} more" : "";
         return $"Complete required issue documents before issuing this policy: {string.Join(", ", labels)}{suffix}.";
+    }
+
+    private async Task<Result> EnsurePostBindRequirementsCompleteAsync(Guid quoteId, string action)
+    {
+        var checklist = (IQuoteChecklistService?)_sp.GetService(typeof(IQuoteChecklistService));
+        if (checklist == null)
+            return Result.Success();
+
+        var postBindItems = await checklist.GetForQuoteAsync(quoteId, [UnderwritingControlStage.PostBind]);
+        if (!postBindItems.IsSuccess)
+            return Result.Failure(postBindItems.ErrorCode ?? "POST_BIND_REQUIREMENTS_ERROR", postBindItems.ErrorMessage ?? "Unable to load post-bind requirements.");
+
+        var incompleteRequiredItems = postBindItems.Value!
+            .Where(i => i.IsBlocker && !i.IsCompleted)
+            .ToList();
+
+        if (incompleteRequiredItems.Count == 0)
+            return Result.Success();
+
+        var labels = incompleteRequiredItems.Take(3).Select(i => i.Label);
+        var suffix = incompleteRequiredItems.Count > 3 ? $" and {incompleteRequiredItems.Count - 3} more" : "";
+        return Result.Failure("POST_BIND_REQUIREMENTS_INCOMPLETE", $"Complete required post-bind items before {action}: {string.Join(", ", labels)}{suffix}.");
     }
 }

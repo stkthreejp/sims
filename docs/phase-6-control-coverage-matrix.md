@@ -175,8 +175,14 @@ Status values:
 - Passed selected program identity from Reports UI to the report API so users can drill into one umbrella product at a time.
 - Preserved the all-program view as the default and kept unassigned totals visible there.
 
+## Twenty-First Implemented Slice
+
+- Added a shared post-bind activity gate for required PostBind checklist items.
+- Blocked endorsements, endorsement issue, renewals, cancellation notices/direct cancellations, rewrites, non-renewals, reinstatements, and transaction completions while required PostBind items remain incomplete.
+- Returned the blocking PostBind item names in the error message so users know what must be completed before continuing policy activity.
+
 ## Immediate Next Slice
 
-1. Add a post-bind action gate if the business wants required PostBind documents to stop a later completion/closeout task.
-2. Add a user-facing explanation surface on bind/issue action buttons if blocked tasks need more inline guidance.
-3. Add program filtering to additional production/accounting reports as those reports become program-aware.
+1. Add a user-facing explanation surface on bind/issue/policy action buttons if blocked tasks need more inline guidance.
+2. Add program filtering to additional production/accounting reports as those reports become program-aware.
+3. Review whether PostBind completion needs a dedicated dashboard/work queue for follow-up ownership.

@@ -152,7 +152,7 @@ export function PolicyDetailPage() {
       setActionModal(null)
       toast.success('Endorsement transaction added')
     },
-    onError: () => toast.error('Endorsement could not be added'),
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Endorsement could not be added'),
   })
 
   const issueCancellationNoticeMutation = useMutation({

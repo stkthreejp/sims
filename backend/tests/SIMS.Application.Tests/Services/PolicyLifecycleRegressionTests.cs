@@ -735,6 +735,37 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task AddEndorsement_BlocksWhenRequiredPostBindDocumentsAreIncomplete()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        db.Add(new QuoteChecklistItem
+        {
+            QuoteId = fixture.Quote.Id,
+            Stage = UnderwritingControlStage.PostBind,
+            TriggerKey = "guideline:post-bind-sl-filing",
+            Label = "Surplus lines filing completed",
+            IsBlocker = true,
+            IsCompleted = false,
+            SortOrder = 1,
+        });
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), checklist: CreateQuoteChecklistService(db));
+
+        var result = await policyService.AddEndorsementAsync(fixture.Policy.Id, new CreateEndorsementDto
+        {
+            EffectiveDate = new DateOnly(2026, 6, 1),
+            PremiumChange = 125m,
+            EndorsementDescription = "Add scheduled equipment",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("POST_BIND_REQUIREMENTS_INCOMPLETE", result.ErrorCode);
+        Assert.Contains("Surplus lines filing completed", result.ErrorMessage);
+        Assert.Empty(await db.Set<PolicyTransaction>().ToListAsync());
+    }
+
+    [Fact]
     public async Task PolicyTransactionArtifacts_ReturnsDocumentsInvoicesAndCommunications()
     {
         await using var db = CreateDb();
