@@ -275,6 +275,9 @@ export function PolicyDetailPage() {
     ? 3
     : daysRemaining <= 45 ? 2 : 1
   const canVoidTestBind = isAdmin && policy.status === 'Active' && !policy.issuedDate && policy.insuredName.toLowerCase().includes('test')
+  const issueChecklist = policyChecklist.filter((item) => item.stage === 'Issue')
+  const postBindChecklist = policyChecklist.filter((item) => item.stage === 'PostBind')
+  const postBindBlockedReason = formatRequiredChecklistBlockers(postBindChecklist, 'post-bind')
 
   return (
     <div className="space-y-5 p-6">
@@ -305,13 +308,17 @@ export function PolicyDetailPage() {
           {policy.status === 'Active' && canEndorsePolicies && (
             <>
               <button
-                onClick={() => setActionModal('rewrite')}
+                onClick={() => !postBindBlockedReason && setActionModal('rewrite')}
+                disabled={!!postBindBlockedReason}
+                title={postBindBlockedReason ?? 'Start a rewrite transaction'}
                 className="sd-btn outline"
               >
                 <FileText className="h-3.5 w-3.5" /> Rewrite
               </button>
               <button
-                onClick={() => setActionModal('endorse')}
+                onClick={() => !postBindBlockedReason && setActionModal('endorse')}
+                disabled={!!postBindBlockedReason}
+                title={postBindBlockedReason ?? 'Start an endorsement transaction'}
                 className="sd-btn primary"
               >
                 <FileSignature className="h-3.5 w-3.5" /> Endorse
@@ -321,13 +328,17 @@ export function PolicyDetailPage() {
           {policy.status === 'Active' && canCancelPolicies && (
             <>
               <button
-                onClick={() => setActionModal('nonRenew')}
+                onClick={() => !postBindBlockedReason && setActionModal('nonRenew')}
+                disabled={!!postBindBlockedReason}
+                title={postBindBlockedReason ?? 'Issue a non-renewal notice'}
                 className="sd-btn outline"
               >
                 <FileX2 className="h-3.5 w-3.5" /> Non-Renew
               </button>
               <button
-                onClick={() => setActionModal('cancel')}
+                onClick={() => !postBindBlockedReason && setActionModal('cancel')}
+                disabled={!!postBindBlockedReason}
+                title={postBindBlockedReason ?? 'Start cancellation'}
                 className="sd-btn danger"
               >
                 <Ban className="h-3.5 w-3.5" /> Cancel
@@ -336,7 +347,9 @@ export function PolicyDetailPage() {
           )}
           {policy.status === 'Cancelled' && canCancelPolicies && (
             <button
-              onClick={() => setActionModal('reinstate')}
+              onClick={() => !postBindBlockedReason && setActionModal('reinstate')}
+              disabled={!!postBindBlockedReason}
+              title={postBindBlockedReason ?? 'Reinstate this policy'}
               className="sd-btn primary"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Reinstate
@@ -357,6 +370,16 @@ export function PolicyDetailPage() {
           )}
         </div>
       </div>
+
+      {postBindBlockedReason && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div className="font-semibold">Policy activity is blocked</div>
+            <div>{postBindBlockedReason}</div>
+          </div>
+        </div>
+      )}
 
       <div className="grid overflow-hidden rounded-xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
         {POLICY_STAGES.map((stage, index) => {
@@ -537,7 +560,7 @@ export function PolicyDetailPage() {
       <PolicyIssuancePanel
         packet={issuancePacket}
         canIssue={canIssuePolicies && policy.status === 'Active' && !policy.issuedDate}
-        checklist={policyChecklist.filter((item) => item.stage === 'Issue')}
+        checklist={issueChecklist}
         canManageChecklist={canManageUnderwriting}
         checklistSaving={togglePolicyChecklistMutation.isPending}
         onToggleChecklist={(itemId, completed) => togglePolicyChecklistMutation.mutate({ itemId, completed })}
@@ -576,6 +599,7 @@ export function PolicyDetailPage() {
                   canUploadProof={canUploadAttachments}
                   canCompleteCancellation={canCancelPolicies}
                   canCompleteRewrite={canEndorsePolicies}
+                  postBindBlockedReason={postBindBlockedReason}
                 />
               ))}
             </tbody>
@@ -705,7 +729,7 @@ export function PolicyDetailPage() {
       <div>
         <PolicyDocumentChecklistPanel
           title="Post-bind document checklist"
-          items={policyChecklist.filter((item) => item.stage === 'PostBind')}
+          items={postBindChecklist}
           canManage={canManageUnderwriting}
           saving={togglePolicyChecklistMutation.isPending}
           onToggle={(itemId, completed) => togglePolicyChecklistMutation.mutate({ itemId, completed })}
@@ -729,6 +753,15 @@ function PolicyMetric({ label, value, helper, hero = false }: { label: string; v
 function formatDate(value: string | null) {
   if (!value) return '-'
   return new Date(value).toLocaleDateString()
+}
+
+function formatRequiredChecklistBlockers(items: QuoteChecklistItem[], stageLabel: string) {
+  const incompleteRequiredItems = items.filter((item) => item.isBlocker && !item.isCompleted)
+  if (incompleteRequiredItems.length === 0) return null
+
+  const labels = incompleteRequiredItems.slice(0, 3).map((item) => item.label)
+  const suffix = incompleteRequiredItems.length > 3 ? ` and ${incompleteRequiredItems.length - 3} more` : ''
+  return `Complete required ${stageLabel} item${incompleteRequiredItems.length === 1 ? '' : 's'}: ${labels.join(', ')}${suffix}.`
 }
 
 function PolicyDocumentChecklistPanel({
@@ -817,8 +850,11 @@ function PolicyIssuancePanel({
   const hasOpenRequiredReferrals = openRequiredReferrals.length > 0
   const ready = includedForms.length > 0 && (packet?.isReady ?? false)
   const issued = packet?.isIssued
+  const issueChecklistBlockedReason = formatRequiredChecklistBlockers(checklist, 'issue')
   const actionBlockedReason = !canIssue
     ? 'You do not have permission to issue policies.'
+    : issueChecklistBlockedReason
+      ? issueChecklistBlockedReason
     : hasOpenRequiredReferrals
       ? `${openRequiredReferrals.length} required underwriting referral${openRequiredReferrals.length === 1 ? '' : 's'} open.`
     : includedForms.length === 0
@@ -836,7 +872,7 @@ function PolicyIssuancePanel({
             {issued
               ? `Issued ${packet?.issuedDate ? new Date(packet.issuedDate).toLocaleDateString() : ''}`
                 : ready && !hasOpenRequiredReferrals
-                ? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready. Preview, then issue.`
+                ? issueChecklistBlockedReason ?? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready. Preview, then issue.`
                 : hasOpenRequiredReferrals
                   ? 'Required underwriting referrals must be resolved before issue'
                 : includedForms.length > 0
@@ -851,7 +887,7 @@ function PolicyIssuancePanel({
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <button
-              disabled={!canIssue || !ready || hasOpenRequiredReferrals || previewing}
+              disabled={!canIssue || !!issueChecklistBlockedReason || !ready || hasOpenRequiredReferrals || previewing}
               onClick={onPreview}
               className="sd-btn outline"
               title={actionBlockedReason ?? 'Generate a draft packet PDF for review'}
@@ -859,7 +895,7 @@ function PolicyIssuancePanel({
               <FileText className="h-3.5 w-3.5" /> {previewing ? 'Generating...' : 'Preview packet'}
             </button>
             <button
-              disabled={!canIssue || !ready || hasOpenRequiredReferrals || issuing}
+              disabled={!canIssue || !!issueChecklistBlockedReason || !ready || hasOpenRequiredReferrals || issuing}
               onClick={onIssue}
               className="sd-btn primary"
               title={actionBlockedReason ?? 'File the final policy packet and mark this policy issued'}
@@ -957,12 +993,14 @@ function TransactionRows({
   canUploadProof,
   canCompleteCancellation,
   canCompleteRewrite,
+  postBindBlockedReason,
 }: {
   transaction: PolicyTransaction
   policyDocumentEntityId: string
   canUploadProof: boolean
   canCompleteCancellation: boolean
   canCompleteRewrite: boolean
+  postBindBlockedReason: string | null
 }) {
   const [expanded, setExpanded] = useState(false)
   const qc = useQueryClient()
@@ -1027,16 +1065,18 @@ function TransactionRows({
               <button
                 type="button"
                 className="sd-btn outline sm"
-                disabled={completePending}
+                disabled={completePending || !!postBindBlockedReason}
+                title={postBindBlockedReason ?? `Complete the ${canCompleteNonRenewal ? 'non-renewal' : 'cancellation'} once the effective date has passed`}
                 onClick={(event) => {
                   event.stopPropagation()
-                  if (canCompleteNonRenewal) {
+                  if (postBindBlockedReason) {
+                    return
+                  } else if (canCompleteNonRenewal) {
                     completeNonRenewal.mutate()
                   } else {
                     completeCancellation.mutate()
                   }
                 }}
-                title={`Complete the ${canCompleteNonRenewal ? 'non-renewal' : 'cancellation'} once the effective date has passed`}
               >
                 <Check className="h-3.5 w-3.5" /> Complete
               </button>
@@ -1050,6 +1090,7 @@ function TransactionRows({
           policyDocumentEntityId={policyDocumentEntityId}
           canUploadProof={canUploadProof && proofUploadApplies}
           canCompleteRewrite={canCompleteRewrite}
+          postBindBlockedReason={postBindBlockedReason}
         />
       )}
       {expanded && !artifacts && (
@@ -1066,11 +1107,13 @@ function TransactionArtifactDetails({
   policyDocumentEntityId,
   canUploadProof,
   canCompleteRewrite,
+  postBindBlockedReason,
 }: {
   artifacts: Awaited<ReturnType<typeof policiesApi.getTransactionArtifacts>>
   policyDocumentEntityId: string
   canUploadProof: boolean
   canCompleteRewrite: boolean
+  postBindBlockedReason: string | null
 }) {
   const qc = useQueryClient()
   const [activeSection, setActiveSection] = useState('Versions')
@@ -1245,9 +1288,10 @@ function TransactionArtifactDetails({
           {activeSection === 'Rewrite' && (
             <RewriteSummary
               transaction={transaction}
-              canComplete={canCompleteRewrite}
+              canComplete={canCompleteRewrite && !postBindBlockedReason}
+              completeBlockedReason={postBindBlockedReason}
               completing={completeRewrite.isPending}
-              onComplete={() => completeRewrite.mutate()}
+              onComplete={() => !postBindBlockedReason && completeRewrite.mutate()}
             />
           )}
 
@@ -1446,11 +1490,13 @@ function ReinstatementSummary({
 function RewriteSummary({
   transaction,
   canComplete = false,
+  completeBlockedReason,
   completing = false,
   onComplete,
 }: {
   transaction: PolicyTransaction
   canComplete?: boolean
+  completeBlockedReason?: string | null
   completing?: boolean
   onComplete?: () => void
 }) {
@@ -1469,13 +1515,13 @@ function RewriteSummary({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[transaction.status]}`}>{POLICY_TRANSACTION_STATUS_LABELS[transaction.status]}</span>
-            {canComplete && !isComplete && onComplete && (
+            {(canComplete || completeBlockedReason) && !isComplete && onComplete && (
               <button
                 type="button"
                 className="sd-btn primary xs"
-                disabled={completing}
+                disabled={completing || !!completeBlockedReason}
                 onClick={onComplete}
-                title="Complete after the replacement quote is bound"
+                title={completeBlockedReason ?? 'Complete after the replacement quote is bound'}
               >
                 <Check className="h-3.5 w-3.5" /> {completing ? 'Completing...' : 'Complete'}
               </button>

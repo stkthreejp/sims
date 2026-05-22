@@ -11,7 +11,7 @@ import { quotesApi } from '@/api/quotes.api'
 import { submissionsApi } from '@/api/submissions.api'
 import { policyFormsApi } from '@/api/policyForms.api'
 import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
-import { LOB_LABELS, type CommissionOverrideRequest, type PolicyFormType, type PolicyLineOfBusiness, type QuotePolicyFormSelection, type QuotePolicyFormSelectionUpsert, type QuoteStatus } from '@/types/quote.types'
+import { LOB_LABELS, type CommissionOverrideRequest, type PolicyFormType, type PolicyLineOfBusiness, type QuoteChecklistItem, type QuotePolicyFormSelection, type QuotePolicyFormSelectionUpsert, type QuoteStatus } from '@/types/quote.types'
 import { QuoteAutoSafetyPanel } from '@/components/quotes/QuoteAutoSafetyPanel'
 import { QuoteRatingPanel } from '@/components/quotes/QuoteRatingPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -57,6 +57,12 @@ function fmt(n: number | null | undefined) {
 function fmtFull(n: number | null | undefined) {
   if (n == null) return '—'
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatRequiredChecklistBlockers(items: QuoteChecklistItem[], stageLabel: string) {
+  const labels = items.slice(0, 3).map((item) => item.label)
+  const suffix = items.length > 3 ? ` and ${items.length - 3} more` : ''
+  return `Complete required ${stageLabel} item${items.length === 1 ? '' : 's'}: ${labels.join(', ')}${suffix}.`
 }
 
 function parseLineInputs(inputs: string): Record<string, unknown> | null {
@@ -144,9 +150,9 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function Btn({ children, onClick, variant = 'ghost', disabled, className = '', type = 'button' }: {
+function Btn({ children, onClick, variant = 'ghost', disabled, className = '', type = 'button', title }: {
   children: React.ReactNode; onClick?: () => void; variant?: 'ghost' | 'outline' | 'primary' | 'danger'
-  disabled?: boolean; className?: string; type?: 'button' | 'submit'
+  disabled?: boolean; className?: string; type?: 'button' | 'submit'; title?: string | null
 }) {
   const cls: Record<string, string> = {
     ghost:   'sd-btn ghost sm',
@@ -155,7 +161,7 @@ function Btn({ children, onClick, variant = 'ghost', disabled, className = '', t
     danger:  'sd-btn danger sm',
   }
   return (
-    <button type={type} disabled={disabled} onClick={onClick} className={`${cls[variant]} ${className}`}>
+    <button type={type} disabled={disabled} onClick={onClick} title={title ?? undefined} className={`${cls[variant]} ${className}`}>
       {children}
     </button>
   )
@@ -1191,7 +1197,7 @@ export function QuoteDetailPage() {
   const isAutoPhysicalDamage = quote.lineOfBusiness === 'AutoPhysicalDamage'
   const isGeneralLiability = quote.lineOfBusiness === 'GeneralLiability'
   const isAuto = AUTO_LOBS.has(quote.lineOfBusiness)
-  const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted).length
+  const openBlockers = checklist.filter((i) => i.isBlocker && !i.isCompleted)
   const openRequiredReferrals = referralSummary?.referrals.filter((referral) => referral.required && referral.status === 'Open').length ?? 0
   const includedPolicyFormCount = policyForms.filter((form) => form.isIncluded).length
   const hasSelectedPolicyForms = includedPolicyFormCount > 0
@@ -1235,8 +1241,8 @@ export function QuoteDetailPage() {
           ? 'Select policy forms before binding.'
           : openRequiredReferrals > 0
             ? `${openRequiredReferrals} required underwriting referral${openRequiredReferrals !== 1 ? 's' : ''} open.`
-            : openBlockers > 0
-              ? `${openBlockers} checklist item${openBlockers !== 1 ? 's' : ''} remaining.`
+            : openBlockers.length > 0
+              ? formatRequiredChecklistBlockers(openBlockers, 'bind')
               : null
   const canBind = bindUnavailableReason == null
   const showBindAction = quote.status !== 'Bound' && quote.status !== 'Declined' && quote.status !== 'Cancelled' && quote.status !== 'Expired'
@@ -1334,7 +1340,7 @@ export function QuoteDetailPage() {
               </Btn>
             )}
             {showBindAction && (
-              <Btn variant="primary" disabled={!canBind} onClick={() => canBind && setShowBind(true)}>
+              <Btn variant="primary" disabled={!canBind} title={bindUnavailableReason ?? 'Bind this quote'} onClick={() => canBind && setShowBind(true)}>
                 <CheckCircle2 className="h-3.5 w-3.5" /> Bind quote
               </Btn>
             )}
@@ -1914,6 +1920,7 @@ export function QuoteDetailPage() {
                 <p className="mb-4 text-xs text-white/70">{bindUnavailableReason ?? `${formatDate(quote.effectiveDate)} effective`}</p>
                 <button
                   disabled={!canBind}
+                  title={bindUnavailableReason ?? 'Bind this quote'}
                   onClick={() => canBind && setShowBind(true)}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-white py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-60"
                 >

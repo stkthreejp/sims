@@ -181,8 +181,14 @@ Status values:
 - Blocked endorsements, endorsement issue, renewals, cancellation notices/direct cancellations, rewrites, non-renewals, reinstatements, and transaction completions while required PostBind items remain incomplete.
 - Returned the blocking PostBind item names in the error message so users know what must be completed before continuing policy activity.
 
+## Twenty-Second Implemented Slice
+
+- Added clearer blocked-action explanations to bind, issue, and policy activity controls.
+- Showed named required checklist blockers directly on disabled bind/issue/action buttons instead of only after the user clicks.
+- Added a policy activity warning banner when required PostBind items are still incomplete.
+
 ## Immediate Next Slice
 
-1. Add a user-facing explanation surface on bind/issue/policy action buttons if blocked tasks need more inline guidance.
-2. Add program filtering to additional production/accounting reports as those reports become program-aware.
-3. Review whether PostBind completion needs a dedicated dashboard/work queue for follow-up ownership.
+1. Add program filtering to additional production/accounting reports as those reports become program-aware.
+2. Review whether PostBind completion needs a dedicated dashboard/work queue for follow-up ownership.
+3. Add broader frontend regression coverage once a frontend test runner is introduced.
