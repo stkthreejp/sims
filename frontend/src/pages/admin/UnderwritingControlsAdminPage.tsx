@@ -35,7 +35,8 @@ const ITEM_TYPES: UnderwritingControlItemType[] = ['AppetiteRule', 'ReferralTrig
 const STAGES: UnderwritingControlStage[] = ['Submission', 'Quote', 'Bind', 'Issue', 'PostBind', 'Renewal']
 const SEVERITIES: UnderwritingControlSeverity[] = ['Informational', 'Warning', 'ReferralRequired', 'HardBlock']
 const REVIEW_STATUSES: Array<UnderwritingControlStatus | 'All'> = ['All', 'AiSuggested', 'Draft', 'Approved', 'Published', 'Rejected', 'Retired']
-const CONDITION_OPERATORS = ['>', '>=', '<', '<=', '==', '!='] as const
+const CONDITION_OPERATORS = ['>', '>=', '<', '<=', '==', '!=', 'contains', 'notContains'] as const
+const NUMERIC_CONDITION_OPERATORS: ConditionOperator[] = ['>', '>=', '<', '<=', '==', '!=']
 const CONDITION_FIELDS = [
   { key: 'largestSingleItemValue', label: 'Largest single item value', kind: 'currency' },
   { key: 'totalInsuredValue', label: 'Total insured value', kind: 'currency' },
@@ -61,6 +62,24 @@ const CONDITION_FIELDS = [
   { key: 'glClassificationCount', label: 'GL classification count', kind: 'number' },
   { key: 'glTotalExposure', label: 'GL total exposure', kind: 'currency' },
   { key: 'glMaxClassExposure', label: 'GL largest class exposure', kind: 'currency' },
+  { key: 'glHasUnsupportedClassCode', label: 'GL has unsupported class code', kind: 'boolean' },
+  { key: 'glClassCodes', label: 'GL class codes', kind: 'text' },
+  { key: 'glScheduleCreditPercent', label: 'GL schedule credit', kind: 'percent-whole' },
+  { key: 'glLoggingRevenuePercent', label: 'GL logging revenue', kind: 'percent-whole' },
+  { key: 'glManagementExperienceYears', label: 'GL management experience years', kind: 'number' },
+  { key: 'glLargestSingleLossAmount', label: 'GL largest single loss', kind: 'currency' },
+  { key: 'glFuelStorageOverMax', label: 'GL fuel storage over max allowable', kind: 'boolean' },
+  { key: 'glLogRoadBuildingOverAllowed', label: 'GL log road building exceeds allowed percent', kind: 'boolean' },
+  { key: 'glGradingExcavationOverAllowed', label: 'GL grading/excavation exceeds allowed percent', kind: 'boolean' },
+  { key: 'glAircraftOrDroneOps', label: 'GL aircraft/drone operations', kind: 'boolean' },
+  { key: 'glExplosivesUsed', label: 'GL explosives used', kind: 'boolean' },
+  { key: 'glNonMechanizedLogging', label: 'GL non-mechanized logging', kind: 'boolean' },
+  { key: 'glBankruptcyOrReceivership', label: 'GL bankruptcy or receivership', kind: 'boolean' },
+  { key: 'glHerbicidePesticideApplication', label: 'GL herbicide/pesticide application', kind: 'boolean' },
+  { key: 'glCraneUseOutsideAllowed', label: 'GL crane use outside allowed operations', kind: 'boolean' },
+  { key: 'glEquipmentRentalToOthers', label: 'GL equipment rental/leasing to others', kind: 'boolean' },
+  { key: 'glThirdPartyEquipmentRepair', label: 'GL third-party equipment repair/service', kind: 'boolean' },
+  { key: 'glRightOfWayClearing', label: 'GL right-of-way clearing/maintenance', kind: 'boolean' },
 ] as const
 const DEFAULT_CONDITION = JSON.stringify({ field: 'totalInsuredValue', operator: '>', value: 0 })
 
@@ -441,11 +460,15 @@ export function UnderwritingControlsAdminPage() {
     if (current.mode !== 'builder') return
     const fieldKey = partial.field ?? current.field.key
     const field = getConditionField(fieldKey)
-    const operator = field.kind === 'boolean'
+    const operator = field.kind === 'text'
+      ? (partial.operator === 'notContains' ? 'notContains' : 'contains')
+      : field.kind === 'boolean'
       ? (partial.operator === '!=' ? '!=' : (partial.operator ?? current.operator) === '!=' ? '!=' : '==')
       : partial.operator ?? current.operator
     const value = partial.field && field.kind === 'boolean'
       ? '1'
+      : partial.field && field.kind === 'text'
+        ? ''
       : partial.value ?? current.value
     setControlForm((f) => ({
       ...f,
@@ -853,7 +876,11 @@ export function UnderwritingControlsAdminPage() {
                             onChange={(e) => updateCondition({ operator: e.target.value as ConditionOperator })}
                             className={inputCls}
                           >
-                            {(parsedCondition.field.kind === 'boolean' ? (['==', '!='] as ConditionOperator[]) : CONDITION_OPERATORS).map((operator) => (
+                            {(parsedCondition.field.kind === 'text'
+                              ? (['contains', 'notContains'] as ConditionOperator[])
+                              : parsedCondition.field.kind === 'boolean'
+                                ? (['==', '!='] as ConditionOperator[])
+                                : NUMERIC_CONDITION_OPERATORS).map((operator) => (
                               <option key={operator} value={operator}>{operatorLabel(operator)}</option>
                             ))}
                           </select>
@@ -866,6 +893,13 @@ export function UnderwritingControlsAdminPage() {
                               <option value="1">Yes</option>
                               <option value="0">No</option>
                             </select>
+                          ) : parsedCondition.field.kind === 'text' ? (
+                            <input
+                              value={parsedCondition.value}
+                              onChange={(e) => updateCondition({ value: e.target.value })}
+                              className={inputCls}
+                              placeholder="Class code"
+                            />
                           ) : (
                             <input
                               type="number"
@@ -874,7 +908,7 @@ export function UnderwritingControlsAdminPage() {
                               value={parsedCondition.value}
                               onChange={(e) => updateCondition({ value: e.target.value })}
                               className={inputCls}
-                              placeholder={parsedCondition.field.kind === 'percent' ? 'Percent' : 'Value'}
+                              placeholder={parsedCondition.field.kind === 'percent' || parsedCondition.field.kind === 'percent-whole' ? 'Percent' : 'Value'}
                             />
                           )}
                         </div>
@@ -1177,10 +1211,13 @@ function normalizeConditionOperator(value: unknown): ConditionOperator | null {
     equals: '==',
     '=': '==',
     notEquals: '!=',
+    contains: 'contains',
+    notContains: 'notContains',
   }[normalized] as ConditionOperator | undefined ?? null
 }
 
 function displayConditionValue(field: ConditionField, value: unknown) {
+  if (field.kind === 'text') return typeof value === 'string' ? value : ''
   const numericValue = typeof value === 'number'
     ? value
     : typeof value === 'string'
@@ -1189,10 +1226,14 @@ function displayConditionValue(field: ConditionField, value: unknown) {
 
   if (field.kind === 'boolean') return numericValue === 0 ? '0' : '1'
   if (field.kind === 'percent') return Number.isFinite(numericValue) ? String(numericValue * 100) : '0'
+  if (field.kind === 'percent-whole') return Number.isFinite(numericValue) ? String(numericValue) : '0'
   return Number.isFinite(numericValue) ? String(numericValue) : '0'
 }
 
 function buildControlCondition(field: ConditionField, operator: ConditionOperator, value: string) {
+  if (field.kind === 'text') {
+    return JSON.stringify({ field: field.key, operator, value })
+  }
   const numericValue = Number(value) || 0
   const storedValue = field.kind === 'percent'
     ? numericValue / 100
@@ -1205,8 +1246,12 @@ function buildControlCondition(field: ConditionField, operator: ConditionOperato
 function describeControlCondition(condition: Extract<ParsedCondition, { mode: 'builder' }>) {
   const rawValue = condition.field.kind === 'boolean'
     ? (condition.value === '0' ? 'No' : 'Yes')
+    : condition.field.kind === 'text'
+      ? condition.value || '-'
     : condition.field.kind === 'percent'
       ? `${condition.value || 0}%`
+      : condition.field.kind === 'percent-whole'
+        ? `${condition.value || 0}%`
       : condition.field.kind === 'currency'
         ? Number(condition.value || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
         : condition.value || 0
@@ -1221,6 +1266,8 @@ function operatorLabel(operator: ConditionOperator) {
     '<=': '<=',
     '==': 'is',
     '!=': 'is not',
+    contains: 'contains',
+    notContains: 'does not contain',
   }[operator]
 }
 

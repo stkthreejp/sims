@@ -82,6 +82,8 @@ Allowed operators:
 - `<=`
 - `==`
 - `!=`
+- `contains` (only for supported text/list fields such as `glClassCodes`)
+- `notContains` (only for supported text/list fields such as `glClassCodes`)
 
 If the guideline needs a field SIMS does not support, do not invent a field. Set `conditionJson` to `null` and start the description with `Needs SIMS field: <plain English field name>.`
 
@@ -115,10 +117,43 @@ These are the only fields SIMS can currently check automatically for underwritin
 | `glClassificationCount` | GL classification count | Count of GL classification/exposure rows on the submission. | Whole number. | More than one GL class; missing classifications. |
 | `glTotalExposure` | GL total exposure | Sum of GL classification exposure values across active GL class rows. | Number in dollars or units as captured, no commas. | Total payroll/sales/exposure threshold. |
 | `glMaxClassExposure` | GL largest class exposure | Largest single GL classification exposure value. | Number in dollars or units as captured, no commas. | Any one class exposure exceeds threshold. |
+| `glClassCodes` | GL class codes | GL class codes from active submission GL classification rows. | String class code with `contains` or `notContains`. | Specific eligible or prohibited class code checks. |
+| `glHasUnsupportedClassCode` | GL has unsupported class code | Whether any submitted GL class code is outside the Longleaf-supported class code list. | `1` for yes, `0` for no. | Only listed GL class codes are eligible. |
+| `glScheduleCreditPercent` | GL schedule credit | Schedule credit percent derived from the rater schedule modifier. A 0.80 modifier is stored as 20. | Whole percent number. | Schedule credit over 20%. |
+| `glLoggingRevenuePercent` | GL logging revenue | Percent of revenue from eligible logging operations, entered on the UW review sheet. | Whole percent number. | Logging revenue below 80%. |
+| `glManagementExperienceYears` | GL management experience years | Years of logging management experience, entered on the UW review sheet or sourced from years in business when applicable. | Number of years. | Management experience below 3 years. |
+| `glLargestSingleLossAmount` | GL largest single loss | Largest single loss amount entered on the UW review sheet. | Number in dollars, no commas. | Single loss over $75K. |
+| `glFuelStorageOverMax` | GL fuel storage over max allowable | UW review yes/no indicating fuel storage exceeds the guideline maximum. | `1` for yes, `0` for no. | Fuel storage over maximum allowable amount. |
+| `glLogRoadBuildingOverAllowed` | GL log road building exceeds allowed percent | UW review yes/no indicating log road building exceeds the guideline allowance. | `1` for yes, `0` for no. | Log road building over allowed percent. |
+| `glGradingExcavationOverAllowed` | GL grading/excavation exceeds allowed percent | UW review yes/no indicating grading or excavation exceeds the guideline allowance. | `1` for yes, `0` for no. | Grading/excavation over allowed percent. |
+| `glAircraftOrDroneOps` | GL aircraft/drone operations | UW review yes/no indicating aircraft, helicopter, airlift, or drone operations. | `1` for yes, `0` for no. | Aircraft, helicopter, airlift, or drone operations prohibited. |
+| `glExplosivesUsed` | GL explosives used | UW review yes/no indicating use of explosives. | `1` for yes, `0` for no. | Explosives prohibited. |
+| `glNonMechanizedLogging` | GL non-mechanized logging | UW review yes/no indicating non-mechanized logging operations. | `1` for yes, `0` for no. | Non-mechanized logging prohibited. |
+| `glBankruptcyOrReceivership` | GL bankruptcy or receivership | UW review yes/no indicating bankruptcy or receivership. | `1` for yes, `0` for no. | Bankruptcy/receivership prohibited. |
+| `glHerbicidePesticideApplication` | GL herbicide/pesticide application | UW review yes/no indicating herbicide or pesticide application. | `1` for yes, `0` for no. | Herbicide/pesticide application referral. |
+| `glCraneUseOutsideAllowed` | GL crane use outside allowed operations | UW review yes/no indicating crane use beyond loading/unloading trailers. | `1` for yes, `0` for no. | Crane use referral. |
+| `glEquipmentRentalToOthers` | GL equipment rental/leasing to others | UW review yes/no indicating equipment rental or leasing to others. | `1` for yes, `0` for no. | Equipment rental/leasing referral. |
+| `glThirdPartyEquipmentRepair` | GL third-party equipment repair/service | UW review yes/no indicating service or repair of equipment not owned by the insured. | `1` for yes, `0` for no. | Third-party equipment repair referral. |
+| `glRightOfWayClearing` | GL right-of-way clearing/maintenance | UW review yes/no indicating right-of-way clearing or maintenance. | `1` for yes, `0` for no. | Right-of-way clearing referral. |
 
 Do not use unsupported field names such as `glAggregateLimit`, `generalLiabilityAggregate`, `buildingLimit`, `propertyLimit`, `payroll`, `sales`, `classCode`, `territory`, or `yearsInBusiness` unless they are added to this catalog in the future.
 
-GL class codes are captured in SIMS, but the current condition engine does not yet support text/list comparisons. For guideline rules such as "class code 94007 is prohibited" or "refer class 91581," set `conditionJson` to `null` and start `description` with `Needs SIMS field: GL class code matching.`
+GL class codes support these text/list operators:
+
+- `contains`
+- `notContains`
+
+For a guideline that says only the listed GL class codes are eligible, use:
+
+```json
+{ "field": "glHasUnsupportedClassCode", "operator": "==", "value": 1 }
+```
+
+For a specific class code referral or prohibition, use:
+
+```json
+{ "field": "glClassCodes", "operator": "contains", "value": "94007" }
+```
 
 ## Missing Measurable Guidance
 

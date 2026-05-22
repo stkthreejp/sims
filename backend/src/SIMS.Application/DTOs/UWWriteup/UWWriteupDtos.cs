@@ -60,6 +60,21 @@ public class IMWriteupPayload
     public bool ReferralBurningExposure { get; set; }
     public bool ReferralPayrollChangeOver25 { get; set; }
     public bool ReferralSubcontractorControls { get; set; }
+    public decimal? GlLoggingRevenuePercent { get; set; }
+    public decimal? GlManagementExperienceYears { get; set; }
+    public decimal? GlLargestSingleLossAmount { get; set; }
+    public bool GlFuelStorageOverMax { get; set; }
+    public bool GlLogRoadBuildingOverAllowed { get; set; }
+    public bool GlGradingExcavationOverAllowed { get; set; }
+    public bool GlAircraftOrDroneOps { get; set; }
+    public bool GlExplosivesUsed { get; set; }
+    public bool GlNonMechanizedLogging { get; set; }
+    public bool GlBankruptcyOrReceivership { get; set; }
+    public bool GlHerbicidePesticideApplication { get; set; }
+    public bool GlCraneUseOutsideAllowed { get; set; }
+    public bool GlEquipmentRentalToOthers { get; set; }
+    public bool GlThirdPartyEquipmentRepair { get; set; }
+    public bool GlRightOfWayClearing { get; set; }
     public string? LossSynopsis { get; set; }
     public string? LossesOver50kDescription { get; set; }
     public string? CabAlertsNotes { get; set; }
@@ -151,6 +166,8 @@ public class UWWriteupDto
     // Auto-computed referral triggers (can be overridden in payload)
     public bool AutoReferralPieceOver500k { get; set; }
     public bool AutoReferralTivOver2mil { get; set; }
+    public decimal? ScheduleModifier { get; set; }
+    public decimal ScheduleCreditPercent { get; set; }
 
     // The stored payload (manual/narrative fields)
     public IMWriteupPayload Payload { get; set; } = new();

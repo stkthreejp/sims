@@ -4,6 +4,7 @@ using SIMS.Application.DTOs.UWWriteup;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
+using SIMS.Domain.Entities.Rating;
 using SIMS.Infrastructure.Data;
 
 namespace SIMS.Infrastructure.Services;
@@ -179,6 +180,14 @@ public class UWWriteupService : IUWWriteupService
         var insured = sub.Insured;
         var payload = JsonSerializer.Deserialize<IMWriteupPayload>(writeup.PayloadJson, _json) ?? new();
         var equipment = await ComputeEquipmentSummaryAsync(quoteId, ct);
+        var scheduleModifier = await _db.Set<QuoteRatingSnapshot>()
+            .Where(s => s.QuoteId == quoteId && !s.IsDeleted)
+            .OrderByDescending(s => s.RatedAt)
+            .Select(s => (decimal?)s.ScheduleModifier)
+            .FirstOrDefaultAsync(ct);
+        var scheduleCreditPercent = scheduleModifier is < 1m
+            ? Math.Round((1m - scheduleModifier.Value) * 100m, 2)
+            : 0m;
 
         // Determine New vs Renewal — has a prior bound quote on same insured+LOB?
         var hasPriorPolicy = await _db.Quotes
@@ -235,6 +244,8 @@ public class UWWriteupService : IUWWriteupService
             Equipment = equipment,
             AutoReferralPieceOver500k = equipment.LargestUnitTiv > 500_000m,
             AutoReferralTivOver2mil = equipment.TotalTiv > 2_000_000m,
+            ScheduleModifier = scheduleModifier,
+            ScheduleCreditPercent = scheduleCreditPercent,
 
             Payload = payload,
             Conditions = writeup.Conditions

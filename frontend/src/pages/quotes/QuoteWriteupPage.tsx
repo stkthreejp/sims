@@ -124,6 +124,36 @@ function ShortText({
   )
 }
 
+function NumericField({
+  label,
+  value,
+  onChange,
+  readOnly,
+  suffix,
+}: {
+  label: string
+  value?: number | null
+  onChange: (value: number | null) => void
+  readOnly: boolean
+  suffix?: string
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <div className="mt-1 flex items-center gap-2">
+        <input
+          type="number"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+          readOnly={readOnly}
+          className="sims-input"
+        />
+        {suffix && <span className="text-sm text-slate-500">{suffix}</span>}
+      </div>
+    </label>
+  )
+}
+
 export default function QuoteWriteupPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const qc = useQueryClient()
@@ -343,7 +373,7 @@ export default function QuoteWriteupPage() {
           )}
           {isGeneralLiability && (
             <>
-              <ReferralCheckbox label="UW credit > 20%" value={!!payload.referralGlUwCreditOver20} onChange={(v) => patchPayload({ referralGlUwCreditOver20: v })} readOnly={isReadOnly} />
+              <ReferralCheckbox label="UW credit > 20%" autoChecked={writeup.scheduleCreditPercent > 20} value={!!payload.referralGlUwCreditOver20 || writeup.scheduleCreditPercent > 20} onChange={(v) => patchPayload({ referralGlUwCreditOver20: v })} readOnly={isReadOnly} />
               <ReferralCheckbox label="Logging revenue below threshold" value={!!payload.referralGlRevenueBelowThreshold} onChange={(v) => patchPayload({ referralGlRevenueBelowThreshold: v })} readOnly={isReadOnly} />
               <ReferralCheckbox label="Sawmill / lumberyard operations" value={!!payload.referralSawmillOps} onChange={(v) => patchPayload({ referralSawmillOps: v })} readOnly={isReadOnly} />
               <ReferralCheckbox label="Residential work" value={!!payload.referralResidentialWork} onChange={(v) => patchPayload({ referralResidentialWork: v })} readOnly={isReadOnly} />
@@ -365,6 +395,34 @@ export default function QuoteWriteupPage() {
           </div>
         </div>
       </Section>
+
+      {isGeneralLiability && (
+        <Section title="GL Eligibility & Referral Facts">
+          <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            Schedule credit from rater: <span className="font-semibold">{writeup.scheduleCreditPercent.toFixed(2)}%</span>
+            {writeup.scheduleModifier != null && <span className="text-slate-400"> (modifier {writeup.scheduleModifier.toFixed(2)})</span>}
+          </div>
+          <div className="grid grid-cols-3 gap-3 max-[900px]:grid-cols-1">
+            <NumericField label="Logging revenue" value={payload.glLoggingRevenuePercent} onChange={(v) => patchPayload({ glLoggingRevenuePercent: v })} readOnly={isReadOnly} suffix="%" />
+            <NumericField label="Management experience" value={payload.glManagementExperienceYears} onChange={(v) => patchPayload({ glManagementExperienceYears: v })} readOnly={isReadOnly} suffix="years" />
+            <NumericField label="Largest single loss" value={payload.glLargestSingleLossAmount} onChange={(v) => patchPayload({ glLargestSingleLossAmount: v })} readOnly={isReadOnly} />
+          </div>
+          <div className="grid grid-cols-2 gap-2 max-[700px]:grid-cols-1">
+            <ReferralCheckbox label="Fuel storage over max allowable" value={!!payload.glFuelStorageOverMax} onChange={(v) => patchPayload({ glFuelStorageOverMax: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Log road building exceeds allowed percent" value={!!payload.glLogRoadBuildingOverAllowed} onChange={(v) => patchPayload({ glLogRoadBuildingOverAllowed: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Grading/excavation exceeds allowed percent" value={!!payload.glGradingExcavationOverAllowed} onChange={(v) => patchPayload({ glGradingExcavationOverAllowed: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Aircraft/drone operations" value={!!payload.glAircraftOrDroneOps} onChange={(v) => patchPayload({ glAircraftOrDroneOps: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Explosives used" value={!!payload.glExplosivesUsed} onChange={(v) => patchPayload({ glExplosivesUsed: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Non-mechanized logging" value={!!payload.glNonMechanizedLogging} onChange={(v) => patchPayload({ glNonMechanizedLogging: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Bankruptcy or receivership" value={!!payload.glBankruptcyOrReceivership} onChange={(v) => patchPayload({ glBankruptcyOrReceivership: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Herbicide/pesticide application" value={!!payload.glHerbicidePesticideApplication} onChange={(v) => patchPayload({ glHerbicidePesticideApplication: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Crane use outside allowed operations" value={!!payload.glCraneUseOutsideAllowed} onChange={(v) => patchPayload({ glCraneUseOutsideAllowed: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Equipment rental/leasing to others" value={!!payload.glEquipmentRentalToOthers} onChange={(v) => patchPayload({ glEquipmentRentalToOthers: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Third-party equipment repair/service" value={!!payload.glThirdPartyEquipmentRepair} onChange={(v) => patchPayload({ glThirdPartyEquipmentRepair: v })} readOnly={isReadOnly} />
+            <ReferralCheckbox label="Right-of-way clearing/maintenance" value={!!payload.glRightOfWayClearing} onChange={(v) => patchPayload({ glRightOfWayClearing: v })} readOnly={isReadOnly} />
+          </div>
+        </Section>
+      )}
 
       {/* Losses */}
       <Section title="Losses">

@@ -2,8 +2,10 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Underwriting;
+using SIMS.Application.DTOs.UWWriteup;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 
 namespace SIMS.Application.Services;
@@ -31,6 +33,7 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             .Include(q => q.Submission).ThenInclude(s => s.GLCoverages)
             .Include(q => q.Submission).ThenInclude(s => s.GLClassifications)
             .Include(q => q.Submission).ThenInclude(s => s.LossYears).ThenInclude(y => y.Claims)
+            .Include(q => q.UWWriteup)
             .AsSplitQuery()
             .FirstOrDefaultAsync(q => q.Id == quoteId && !q.IsDeleted, ct);
 
@@ -45,7 +48,8 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             StagesFor(stage),
             ct);
 
-        var context = BuildQuoteContext(quote);
+        var scheduleModifier = await LatestScheduleModifierAsync(quote.Id, ct);
+        var context = BuildQuoteContext(quote, scheduleModifier);
         var results = new List<UnderwritingControlEnforcementResult>();
         foreach (var control in controls)
             results.Add(await UpsertResultAsync(control, UnderwritingControlTargetType.Quote, quoteId, stage, context, ct));
@@ -64,7 +68,7 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             .Include(p => p.Submission).ThenInclude(s => s.GLCoverages)
             .Include(p => p.Submission).ThenInclude(s => s.GLClassifications)
             .Include(p => p.Submission).ThenInclude(s => s.LossYears).ThenInclude(y => y.Claims)
-            .Include(p => p.BoundQuote)
+            .Include(p => p.BoundQuote).ThenInclude(q => q!.UWWriteup)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == policyId && !p.IsDeleted, ct);
 
@@ -79,7 +83,10 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             StagesFor(stage),
             ct);
 
-        var context = BuildPolicyContext(policy);
+        var scheduleModifier = policy.BoundQuote is null
+            ? null
+            : await LatestScheduleModifierAsync(policy.BoundQuote.Id, ct);
+        var context = BuildPolicyContext(policy, scheduleModifier);
         var results = new List<UnderwritingControlEnforcementResult>();
         foreach (var control in controls)
             results.Add(await UpsertResultAsync(control, UnderwritingControlTargetType.Policy, policyId, stage, context, ct));
@@ -216,13 +223,23 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
         if (rule is null || string.IsNullOrWhiteSpace(rule.Field) || string.IsNullOrWhiteSpace(rule.Operator))
             return new ControlEvaluation(UnderwritingControlEvaluationStatus.UnknownField, $"{control.Label} has an incomplete condition.");
 
-        if (!context.Values.TryGetValue(rule.Field, out var actual))
-            return new ControlEvaluation(UnderwritingControlEvaluationStatus.UnknownField, $"{control.Label} references unsupported field '{rule.Field}'.");
+        if (context.Values.TryGetValue(rule.Field, out var actual))
+        {
+            var applies = Compare(actual, rule.Operator, rule.Value);
+            return applies
+                ? new ControlEvaluation(StatusForAppliedControl(control), $"{control.Label} applies.")
+                : new ControlEvaluation(UnderwritingControlEvaluationStatus.NotApplicable, $"{control.Label} does not apply.");
+        }
 
-        var applies = Compare(actual, rule.Operator, rule.Value);
-        return applies
-            ? new ControlEvaluation(StatusForAppliedControl(control), $"{control.Label} applies.")
-            : new ControlEvaluation(UnderwritingControlEvaluationStatus.NotApplicable, $"{control.Label} does not apply.");
+        if (context.TextValues.TryGetValue(rule.Field, out var textValues))
+        {
+            var applies = CompareTextList(textValues, rule.Operator, rule.Value);
+            return applies
+                ? new ControlEvaluation(StatusForAppliedControl(control), $"{control.Label} applies.")
+                : new ControlEvaluation(UnderwritingControlEvaluationStatus.NotApplicable, $"{control.Label} does not apply.");
+        }
+
+        return new ControlEvaluation(UnderwritingControlEvaluationStatus.UnknownField, $"{control.Label} references unsupported field '{rule.Field}'.");
     }
 
     private static UnderwritingControlEvaluationStatus StatusForAppliedControl(UnderwritingGuidelineControl control)
@@ -253,6 +270,22 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
         };
     }
 
+    private static bool CompareTextList(IReadOnlyCollection<string> actual, string op, JsonElement expected)
+    {
+        var expectedText = expected.ValueKind == JsonValueKind.String
+            ? expected.GetString()
+            : expected.ToString();
+        if (string.IsNullOrWhiteSpace(expectedText))
+            return false;
+
+        return op.Trim() switch
+        {
+            "contains" => actual.Contains(expectedText, StringComparer.OrdinalIgnoreCase),
+            "notContains" => !actual.Contains(expectedText, StringComparer.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
+
     private static bool TryGetDecimal(JsonElement element, out decimal value)
     {
         if (element.ValueKind == JsonValueKind.Number)
@@ -264,7 +297,29 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
         return false;
     }
 
-    private static ControlEvaluationContext BuildQuoteContext(Quote quote)
+    private static IMWriteupPayload? ParseWriteupPayload(string? payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+            return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<IMWriteupPayload>(payloadJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<decimal?> LatestScheduleModifierAsync(Guid quoteId, CancellationToken ct)
+        => await _db.Set<QuoteRatingSnapshot>()
+            .Where(s => s.QuoteId == quoteId && !s.IsDeleted)
+            .OrderByDescending(s => s.RatedAt)
+            .Select(s => (decimal?)s.ScheduleModifier)
+            .FirstOrDefaultAsync(ct);
+
+    private static ControlEvaluationContext BuildQuoteContext(Quote quote, decimal? scheduleModifier)
     {
         var submission = quote.Submission;
         return BuildContext(
@@ -272,10 +327,12 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             quote.TotalPremium,
             quote.IsFilingState,
             quote.LineOfBusiness,
-            submission);
+            submission,
+            quote.UWWriteup?.PayloadJson,
+            scheduleModifier);
     }
 
-    private static ControlEvaluationContext BuildPolicyContext(Policy policy)
+    private static ControlEvaluationContext BuildPolicyContext(Policy policy, decimal? scheduleModifier)
     {
         var quote = policy.BoundQuote;
         return BuildContext(
@@ -283,7 +340,9 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             policy.TotalPremium,
             quote?.IsFilingState ?? false,
             policy.LineOfBusiness,
-            policy.Submission);
+            policy.Submission,
+            quote?.UWWriteup?.PayloadJson,
+            scheduleModifier);
     }
 
     private static ControlEvaluationContext BuildContext(
@@ -291,7 +350,9 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
         decimal totalPremium,
         bool isFilingState,
         PolicyLineOfBusiness lineOfBusiness,
-        Submission submission)
+        Submission submission,
+        string? writeupPayloadJson,
+        decimal? scheduleModifier)
     {
         var totalInsuredValue = submission.Equipment.Where(e => !e.IsDeleted).Sum(e => e.Value ?? 0m);
         var largestSingleItemValue = submission.Equipment.Where(e => !e.IsDeleted).Select(e => e.Value ?? 0m).DefaultIfEmpty(0m).Max();
@@ -307,6 +368,20 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             .Sum(c => c.Paid + c.Reserved);
         var lossPremium = submission.LossYears.Where(y => !y.IsDeleted).Sum(y => y.PremiumAmount);
         var lossRatio = lossPremium > 0 ? Math.Round(lossPaidReserved / lossPremium, 4) : 0m;
+
+        var glClassCodes = glClassifications
+            .Select(c => c.ClassCode)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c!.Trim())
+            .ToList();
+        var supportedClassCodes = new HashSet<string>(
+            ["97111", "99793", "43822", "49451", "61226", "61224", "91581", "91590", "94007", "95410", "58873", "59738"],
+            StringComparer.OrdinalIgnoreCase);
+        var glHasUnsupportedClassCode = glClassCodes.Any(c => !supportedClassCodes.Contains(c));
+        var scheduleCreditPercent = scheduleModifier is < 1m
+            ? Math.Round((1m - scheduleModifier.Value) * 100m, 2)
+            : 0m;
+        var writeupPayload = ParseWriteupPayload(writeupPayloadJson);
 
         var values = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
         {
@@ -333,7 +408,29 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             ["glIncludeTria"] = glCoverages?.IncludeTria == true ? 1m : 0m,
             ["glClassificationCount"] = glClassifications.Count,
             ["glTotalExposure"] = glTotalExposure,
-            ["glMaxClassExposure"] = glMaxClassExposure
+            ["glMaxClassExposure"] = glMaxClassExposure,
+            ["glHasUnsupportedClassCode"] = glHasUnsupportedClassCode ? 1m : 0m,
+            ["glScheduleCreditPercent"] = scheduleCreditPercent,
+            ["glLoggingRevenuePercent"] = writeupPayload?.GlLoggingRevenuePercent ?? 0m,
+            ["glManagementExperienceYears"] = writeupPayload?.GlManagementExperienceYears ?? submission.Insured.YearsInBusiness ?? 0m,
+            ["glLargestSingleLossAmount"] = writeupPayload?.GlLargestSingleLossAmount ?? 0m,
+            ["glFuelStorageOverMax"] = writeupPayload?.GlFuelStorageOverMax == true ? 1m : 0m,
+            ["glLogRoadBuildingOverAllowed"] = writeupPayload?.GlLogRoadBuildingOverAllowed == true ? 1m : 0m,
+            ["glGradingExcavationOverAllowed"] = writeupPayload?.GlGradingExcavationOverAllowed == true ? 1m : 0m,
+            ["glAircraftOrDroneOps"] = writeupPayload?.GlAircraftOrDroneOps == true ? 1m : 0m,
+            ["glExplosivesUsed"] = writeupPayload?.GlExplosivesUsed == true ? 1m : 0m,
+            ["glNonMechanizedLogging"] = writeupPayload?.GlNonMechanizedLogging == true ? 1m : 0m,
+            ["glBankruptcyOrReceivership"] = writeupPayload?.GlBankruptcyOrReceivership == true ? 1m : 0m,
+            ["glHerbicidePesticideApplication"] = writeupPayload?.GlHerbicidePesticideApplication == true ? 1m : 0m,
+            ["glCraneUseOutsideAllowed"] = writeupPayload?.GlCraneUseOutsideAllowed == true ? 1m : 0m,
+            ["glEquipmentRentalToOthers"] = writeupPayload?.GlEquipmentRentalToOthers == true ? 1m : 0m,
+            ["glThirdPartyEquipmentRepair"] = writeupPayload?.GlThirdPartyEquipmentRepair == true ? 1m : 0m,
+            ["glRightOfWayClearing"] = writeupPayload?.GlRightOfWayClearing == true ? 1m : 0m
+        };
+
+        var textValues = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["glClassCodes"] = glClassCodes
         };
 
         var snapshot = new
@@ -362,11 +459,29 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             glClassificationCount = glClassifications.Count,
             glTotalExposure,
             glMaxClassExposure,
+            glClassCodes,
+            glHasUnsupportedClassCode,
+            glScheduleCreditPercent = scheduleCreditPercent,
+            glLoggingRevenuePercent = writeupPayload?.GlLoggingRevenuePercent ?? 0m,
+            glManagementExperienceYears = writeupPayload?.GlManagementExperienceYears ?? submission.Insured.YearsInBusiness ?? 0m,
+            glLargestSingleLossAmount = writeupPayload?.GlLargestSingleLossAmount ?? 0m,
+            glFuelStorageOverMax = writeupPayload?.GlFuelStorageOverMax == true,
+            glLogRoadBuildingOverAllowed = writeupPayload?.GlLogRoadBuildingOverAllowed == true,
+            glGradingExcavationOverAllowed = writeupPayload?.GlGradingExcavationOverAllowed == true,
+            glAircraftOrDroneOps = writeupPayload?.GlAircraftOrDroneOps == true,
+            glExplosivesUsed = writeupPayload?.GlExplosivesUsed == true,
+            glNonMechanizedLogging = writeupPayload?.GlNonMechanizedLogging == true,
+            glBankruptcyOrReceivership = writeupPayload?.GlBankruptcyOrReceivership == true,
+            glHerbicidePesticideApplication = writeupPayload?.GlHerbicidePesticideApplication == true,
+            glCraneUseOutsideAllowed = writeupPayload?.GlCraneUseOutsideAllowed == true,
+            glEquipmentRentalToOthers = writeupPayload?.GlEquipmentRentalToOthers == true,
+            glThirdPartyEquipmentRepair = writeupPayload?.GlThirdPartyEquipmentRepair == true,
+            glRightOfWayClearing = writeupPayload?.GlRightOfWayClearing == true,
             lineOfBusiness = lineOfBusiness.ToString(),
             state = NormalizeState(submission.Insured.State)
         };
 
-        return new ControlEvaluationContext(values, snapshot);
+        return new ControlEvaluationContext(values, textValues, snapshot);
     }
 
     private static IReadOnlyList<UnderwritingControlStage> StagesFor(UnderwritingControlStage stage) =>
@@ -402,7 +517,10 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             result.OverriddenAt,
             result.OverrideReason);
 
-    private sealed record ControlEvaluationContext(IReadOnlyDictionary<string, decimal> Values, object Snapshot);
+    private sealed record ControlEvaluationContext(
+        IReadOnlyDictionary<string, decimal> Values,
+        IReadOnlyDictionary<string, IReadOnlyCollection<string>> TextValues,
+        object Snapshot);
     private sealed record ControlEvaluation(UnderwritingControlEvaluationStatus Status, string Message);
     private sealed record ConditionRule(string Field, string Operator, JsonElement Value);
 }

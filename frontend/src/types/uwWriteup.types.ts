@@ -42,6 +42,21 @@ export interface IMWriteupPayload {
   referralBurningExposure?: boolean
   referralPayrollChangeOver25?: boolean
   referralSubcontractorControls?: boolean
+  glLoggingRevenuePercent?: number | null
+  glManagementExperienceYears?: number | null
+  glLargestSingleLossAmount?: number | null
+  glFuelStorageOverMax?: boolean
+  glLogRoadBuildingOverAllowed?: boolean
+  glGradingExcavationOverAllowed?: boolean
+  glAircraftOrDroneOps?: boolean
+  glExplosivesUsed?: boolean
+  glNonMechanizedLogging?: boolean
+  glBankruptcyOrReceivership?: boolean
+  glHerbicidePesticideApplication?: boolean
+  glCraneUseOutsideAllowed?: boolean
+  glEquipmentRentalToOthers?: boolean
+  glThirdPartyEquipmentRepair?: boolean
+  glRightOfWayClearing?: boolean
   lossSynopsis?: string
   lossesOver50kDescription?: string
   cabAlertsNotes?: string
@@ -124,6 +139,8 @@ export interface UWWriteupDto {
   equipment: EquipmentSummary
   autoReferralPieceOver500k: boolean
   autoReferralTivOver2mil: boolean
+  scheduleModifier?: number | null
+  scheduleCreditPercent: number
 
   payload: IMWriteupPayload
   conditions: WriteupCondition[]
