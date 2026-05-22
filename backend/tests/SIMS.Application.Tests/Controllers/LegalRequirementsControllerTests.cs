@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using SIMS.API.Controllers;
 using SIMS.API.Services;
 using SIMS.Domain.Entities;
@@ -146,6 +147,38 @@ public class LegalRequirementsControllerTests
         Assert.Contains("with_federal=true", handler.RequestUri);
     }
 
+    [Fact]
+    public async Task ScanSource_ReturnsFailedRunWhenOpenLawsFails()
+    {
+        await using var db = CreateDbContext();
+        var source = new LegalTrackedSource
+        {
+            State = "TX",
+            Name = "OpenLaws TX",
+            SourceType = "OpenLaw API",
+            Url = "https://api.openlaws.test",
+            ApiKey = "openlaws-test-key",
+            IsEnabled = true,
+            ScanCadence = "Manual",
+            LastStatus = "NotChecked"
+        };
+        db.LegalTrackedSources.Add(source);
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, new FailingOpenLawsClient());
+
+        var result = await controller.ScanSource(source.Id);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var run = Assert.IsType<LegalSourceScanRunDto>(ok.Value);
+        Assert.Equal("Failed", run.Status);
+        Assert.Equal("OpenLaws returned 401 Unauthorized: Invalid token", run.ErrorMessage);
+
+        var savedSource = await db.LegalTrackedSources.SingleAsync();
+        Assert.Equal("Failed", savedSource.LastStatus);
+        Assert.Equal("OpenLaws returned 401 Unauthorized: Invalid token", savedSource.LastErrorMessage);
+    }
+
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -157,7 +190,7 @@ public class LegalRequirementsControllerTests
 
     private static LegalRequirementsController CreateController(ApplicationDbContext db, IOpenLawsClient client)
     {
-        return new LegalRequirementsController(db, client)
+        return new LegalRequirementsController(db, client, NullLogger<LegalRequirementsController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -181,6 +214,14 @@ public class LegalRequirementsControllerTests
         {
             Requests.Add(request);
             return Task.FromResult(results ?? []);
+        }
+    }
+
+    private sealed class FailingOpenLawsClient : IOpenLawsClient
+    {
+        public Task<IReadOnlyList<OpenLawsSearchResult>> SearchAsync(OpenLawsSearchRequest request, CancellationToken cancellationToken)
+        {
+            throw new OpenLawsException("OpenLaws returned 401 Unauthorized: Invalid token");
         }
     }
 

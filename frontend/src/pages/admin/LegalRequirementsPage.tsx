@@ -100,11 +100,15 @@ export function LegalRequirementsPage() {
   const scanSourceMutation = useMutation({
     mutationFn: legalRequirementsApi.scanSource,
     onSuccess: (run) => {
-      toast.success(`${run.sourceName} checked`)
+      if (run.status.toLowerCase() === 'failed') {
+        toast.error(run.errorMessage || `${run.sourceName} check failed`)
+      } else {
+        toast.success(`${run.sourceName} checked`)
+      }
       invalidateLegalQueries(queryClient)
-      setActiveTab('sources')
+      setActiveTab(run.status.toLowerCase() === 'failed' ? 'scans' : 'sources')
     },
-    onError: () => toast.error('Source could not be checked'),
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Source could not be checked')),
   })
   const saveSourceMutation = useMutation({
     mutationFn: ({ source, input }: { source: LegalTrackedSource | 'new'; input: LegalTrackedSourceInput }) =>
@@ -654,7 +658,10 @@ function ScanPanel({
                       <div className="font-medium text-slate-800">{run.sourceName}</div>
                       <div className="text-xs text-slate-500">{run.sourceType}</div>
                     </td>
-                    <td className="px-3 py-2"><StatusPill status={run.status} /></td>
+                    <td className="px-3 py-2">
+                      <StatusPill status={run.status} />
+                      {run.errorMessage && <div className="mt-2 max-w-sm leading-5 text-xs text-red-600">{run.errorMessage}</div>}
+                    </td>
                     <td className="px-3 py-2">{run.resultsFound.toLocaleString()}</td>
                     <td className="px-3 py-2">{run.possibleChanges.toLocaleString()}</td>
                     <td className="px-3 py-2 text-slate-600">{formatDate(run.startedAt)}</td>

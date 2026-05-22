@@ -17,11 +17,13 @@ public class LegalRequirementsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IOpenLawsClient _openLawsClient;
+    private readonly ILogger<LegalRequirementsController> _logger;
 
-    public LegalRequirementsController(ApplicationDbContext db, IOpenLawsClient openLawsClient)
+    public LegalRequirementsController(ApplicationDbContext db, IOpenLawsClient openLawsClient, ILogger<LegalRequirementsController> logger)
     {
         _db = db;
         _openLawsClient = openLawsClient;
+        _logger = logger;
     }
 
     private Guid? CurrentUserId => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
@@ -337,6 +339,7 @@ public class LegalRequirementsController : ControllerBase
         }
         catch (Exception ex) when (ex is OpenLawsException or HttpRequestException or TaskCanceledException)
         {
+            _logger.LogWarning(ex, "OpenLaws scan failed for source {SourceId} ({SourceName})", source.Id, source.Name);
             run.Status = "Failed";
             run.CompletedAt = DateTime.UtcNow;
             run.ErrorMessage = ex.Message;
