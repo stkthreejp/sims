@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SIMS.API.Services;
 using SIMS.Domain.Entities;
 using SIMS.Infrastructure.Data;
 using System.Net;
@@ -15,10 +16,12 @@ namespace SIMS.API.Controllers;
 public class LegalRequirementsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IOpenLawsClient _openLawsClient;
 
-    public LegalRequirementsController(ApplicationDbContext db)
+    public LegalRequirementsController(ApplicationDbContext db, IOpenLawsClient openLawsClient)
     {
         _db = db;
+        _openLawsClient = openLawsClient;
     }
 
     private Guid? CurrentUserId => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
@@ -223,6 +226,10 @@ public class LegalRequirementsController : ControllerBase
         if (!source.IsEnabled)
             return BadRequest(new { errorMessage = "Tracked source is disabled." });
 
+        if (source.SourceType.Equals("OpenLaw API", StringComparison.OrdinalIgnoreCase) ||
+            source.SourceType.Equals("OpenLaws API", StringComparison.OrdinalIgnoreCase))
+            return await ScanOpenLawsSource(source);
+
         var now = DateTime.UtcNow;
         var run = new LegalSourceScanRun
         {
@@ -242,6 +249,101 @@ public class LegalRequirementsController : ControllerBase
         source.LastErrorMessage = null;
 
         _db.LegalSourceScanRuns.Add(run);
+        await _db.SaveChangesAsync();
+
+        return Ok(new LegalSourceScanRunDto(
+            run.Id,
+            run.SourceName,
+            run.SourceType,
+            run.Status,
+            run.StartedAt,
+            run.CompletedAt,
+            run.ResultsFound,
+            run.PossibleChanges,
+            run.ErrorMessage,
+            run.StartedByName));
+    }
+
+    private async Task<ActionResult<LegalSourceScanRunDto>> ScanOpenLawsSource(LegalTrackedSource source)
+    {
+        if (string.IsNullOrWhiteSpace(source.ApiKey))
+            return BadRequest(new { errorMessage = "OpenLaws API key is required before this source can be checked." });
+
+        var now = DateTime.UtcNow;
+        var run = new LegalSourceScanRun
+        {
+            SourceName = source.Name,
+            SourceType = source.SourceType,
+            Status = "Completed",
+            StartedAt = now,
+            StartedById = CurrentUserId,
+            StartedByName = CurrentUserName
+        };
+
+        _db.LegalSourceScanRuns.Add(run);
+        source.LastCheckedAt = now;
+
+        try
+        {
+            var jurisdictions = await OpenLawsJurisdictionsAsync(source.State);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var findings = new List<LegalSourceScanResult>();
+
+            foreach (var jurisdiction in jurisdictions)
+            {
+                foreach (var scanQuery in OpenLawsScanQueries())
+                {
+                    var results = await _openLawsClient.SearchAsync(
+                        new OpenLawsSearchRequest(
+                            source.Url ?? "https://api.openlaws.us",
+                            source.ApiKey,
+                            jurisdiction,
+                            scanQuery.Query,
+                            source.State == "All" ? 3 : 5),
+                        HttpContext.RequestAborted);
+
+                    foreach (var result in results)
+                    {
+                        var key = $"{result.Jurisdiction}|{result.LawKey}|{result.Path}";
+                        if (!seen.Add(key))
+                            continue;
+
+                        findings.Add(new LegalSourceScanResult
+                        {
+                            ScanRun = run,
+                            State = result.Jurisdiction,
+                            Category = scanQuery.Category,
+                            Topic = Truncate(result.DisplayName, 160),
+                            MatchStatus = "PossibleChange",
+                            SourceUrl = Truncate(result.WebUrl ?? string.Empty, 1000),
+                            SourceCitation = Truncate(OpenLawsCitation(result), 300),
+                            SourceText = result.Text,
+                            SuggestedRequirementText = result.Text,
+                            ConfidenceScore = 0.65m,
+                            ReviewStatus = "Pending"
+                        });
+                    }
+                }
+            }
+
+            _db.LegalSourceScanResults.AddRange(findings);
+            run.ResultsFound = findings.Count;
+            run.PossibleChanges = findings.Count;
+            run.CompletedAt = DateTime.UtcNow;
+            source.LastStatus = "Completed";
+            source.LastErrorMessage = null;
+            if (findings.Count > 0)
+                source.LastChangedAt = run.CompletedAt;
+        }
+        catch (Exception ex) when (ex is OpenLawsException or HttpRequestException or TaskCanceledException)
+        {
+            run.Status = "Failed";
+            run.CompletedAt = DateTime.UtcNow;
+            run.ErrorMessage = ex.Message;
+            source.LastStatus = "Failed";
+            source.LastErrorMessage = ex.Message;
+        }
+
         await _db.SaveChangesAsync();
 
         return Ok(new LegalSourceScanRunDto(
@@ -680,6 +782,37 @@ public class LegalRequirementsController : ControllerBase
         return (max ?? 0) + 1;
     }
 
+    private async Task<IReadOnlyList<string>> OpenLawsJurisdictionsAsync(string sourceState)
+    {
+        if (!sourceState.Equals("All", StringComparison.OrdinalIgnoreCase))
+            return [sourceState.ToUpperInvariant()];
+
+        return await _db.LegalRequirementSections
+            .AsNoTracking()
+            .Select(r => r.State)
+            .Where(s => s != "All")
+            .Distinct()
+            .OrderBy(s => s)
+            .ToListAsync();
+    }
+
+    private static IReadOnlyList<OpenLawsScanQuery> OpenLawsScanQueries() =>
+    [
+        new("commercial insurance cancellation notice", "NOTICE REQUIREMENTS"),
+        new("commercial insurance nonrenewal notice", "NOTICE REQUIREMENTS")
+    ];
+
+    private static string OpenLawsCitation(OpenLawsSearchResult result)
+    {
+        var identifier = string.IsNullOrWhiteSpace(result.Identifier) ? result.Path : result.Identifier;
+        return string.IsNullOrWhiteSpace(identifier)
+            ? result.LawKey
+            : $"{result.LawKey} {identifier}".Trim();
+    }
+
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength];
+
     private static bool RequirementTextEquals(string left, string right)
     {
         return string.Equals(NormalizeWhitespace(left), NormalizeWhitespace(right), StringComparison.Ordinal);
@@ -751,6 +884,8 @@ public class LegalRequirementsController : ControllerBase
             source.LastErrorMessage,
             source.Notes);
     }
+
+    private sealed record OpenLawsScanQuery(string Query, string Category);
 }
 
 public sealed record LegalRequirementSectionDto(

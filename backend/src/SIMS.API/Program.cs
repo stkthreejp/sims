@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using SIMS.API.Configuration;
 using SIMS.API.Middleware;
+using SIMS.API.Services;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -19,6 +20,9 @@ Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
 
 // Infrastructure (EF Core, Identity, services)
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IOpenLawsClient, OpenLawsClient>();
+builder.Services.AddHttpClient("openlaws", c => c.Timeout = TimeSpan.FromSeconds(
+    int.TryParse(builder.Configuration["HttpClients:OpenLawsTimeoutSeconds"], out var openLawsTimeout) ? openLawsTimeout : 30));
 
 // Controllers
 builder.Services.AddControllers()
