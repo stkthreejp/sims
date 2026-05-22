@@ -1087,7 +1087,7 @@ export function QuoteDetailPage() {
   const { data: enforcementSummary } = useQuery({
     queryKey: ['underwriting-control-enforcement', 'Quote', quoteId],
     queryFn: () => underwritingGuidelinesApi.getEnforcementResults('Quote', quoteId!),
-    enabled: !!quoteId && canManageUnderwriting,
+    enabled: !!quoteId,
   })
 
   const { data: checklist = [] } = useQuery({

@@ -10,7 +10,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/underwriting/control-enforcement")]
-[Authorize(Policy = AppPermissions.UnderwritingManage)]
+[Authorize]
 public class UnderwritingControlEnforcementController : ControllerBase
 {
     private readonly IUnderwritingControlEnforcementService _enforcement;

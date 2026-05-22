@@ -156,8 +156,14 @@ Status values:
 - Grouped invoice totals through policy transaction to policy program, with an Unassigned bucket for older or non-program policies.
 - Added Reports navigation for Invoice Totals by Program with gross premium, fees, total billed, commission, agent paid, and net retained.
 
+## Eighteenth Implemented Slice
+
+- Allowed authenticated quote and policy users to read published underwriting control enforcement results when a bind or issue task is blocked.
+- Kept blocker override restricted to the existing `underwriting.clearance.override` permission.
+- Removed the frontend `underwriting.manage` gate from quote/policy enforcement panels so blocked users can see what must be resolved.
+
 ## Immediate Next Slice
 
-1. Decide whether non-admin bind/issue users should see published enforcement results without `underwriting.manage`.
-2. Add enforcement behavior for required issue/post-bind document checklist blockers if the business wants those to stop issue automatically.
-3. Add program filters to accounting/reporting pages if users need to drill into one program at a time.
+1. Add enforcement behavior for required issue/post-bind document checklist blockers if the business wants those to stop issue automatically.
+2. Add program filters to accounting/reporting pages if users need to drill into one program at a time.
+3. Add a user-facing explanation surface on bind/issue action buttons if blocked tasks need more inline guidance.

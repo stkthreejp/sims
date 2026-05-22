@@ -117,7 +117,7 @@ export function PolicyDetailPage() {
   const { data: enforcementSummary } = useQuery({
     queryKey: ['underwriting-control-enforcement', 'Policy', id],
     queryFn: () => underwritingGuidelinesApi.getEnforcementResults('Policy', id!),
-    enabled: !!id && canManageUnderwriting,
+    enabled: !!id,
   })
 
   const { data: cancellationGuidance } = useQuery({
