@@ -297,66 +297,66 @@ function SourcePanel({
       {sources.length === 0 ? (
         <EmptyPanel text="No tracked sources match the current filters." />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3">State</th>
-                <th className="px-4 py-3">Source</th>
-                <th className="px-4 py-3">Cadence</th>
-                <th className="px-4 py-3">Last Checked</th>
-                <th className="px-4 py-3">Last Changed</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {sources.map((source) => {
-                const scanning = scanningSourceId === source.id
-                return (
-                  <tr key={source.id} className="align-top">
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{source.state}</td>
-                    <td className="min-w-[280px] px-4 py-3">
-                      <div className="font-medium text-slate-800">{source.name}</div>
-                      <div className="mt-1 text-xs text-slate-500">{source.sourceType}</div>
-                      {source.notes && <div className="mt-2 max-w-xl leading-5 text-slate-600">{source.notes}</div>}
-                      {source.url && <div className="mt-2 break-all text-xs text-blue-700">{source.url}</div>}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{source.scanCadence}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastCheckedAt ? formatDate(source.lastCheckedAt) : '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{source.lastChangedAt ? formatDate(source.lastChangedAt) : '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <StatusPill status={source.isEnabled ? source.lastStatus : 'Disabled'} />
-                      {source.lastErrorMessage && <div className="mt-2 max-w-xs text-xs text-red-600">{source.lastErrorMessage}</div>}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(source)}
-                          className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onScan(source.id)}
-                          disabled={!source.isEnabled || scanningSourceId !== null}
-                          className="inline-flex items-center gap-2 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
-                          Check
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="divide-y">
+          {sources.map((source) => {
+            const scanning = scanningSourceId === source.id
+            return (
+              <div key={source.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_260px_150px]">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{source.state}</span>
+                    <span className="font-medium text-slate-900">{source.name}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">{source.sourceType}</div>
+                  {source.notes && <div className="mt-2 max-w-3xl leading-5 text-slate-600">{source.notes}</div>}
+                  {source.url && <div className="mt-2 max-w-3xl break-words text-xs text-blue-700">{source.url}</div>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-1">
+                  <SourceMeta label="Cadence" value={source.scanCadence} />
+                  <SourceMeta label="Last Checked" value={source.lastCheckedAt ? formatDate(source.lastCheckedAt) : '-'} />
+                  <SourceMeta label="Last Changed" value={source.lastChangedAt ? formatDate(source.lastChangedAt) : '-'} />
+                </div>
+
+                <div className="flex items-start justify-between gap-3 lg:flex-col">
+                  <div>
+                    <StatusPill status={source.isEnabled ? source.lastStatus : 'Disabled'} />
+                    {source.lastErrorMessage && <div className="mt-2 max-w-xs text-xs text-red-600">{source.lastErrorMessage}</div>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(source)}
+                      className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onScan(source.id)}
+                      disabled={!source.isEnabled || scanningSourceId !== null}
+                      className="inline-flex items-center gap-2 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
+                      Check
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
+    </div>
+  )
+}
+
+function SourceMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-slate-700">{value}</div>
     </div>
   )
 }
