@@ -861,58 +861,69 @@ export function UnderwritingControlsAdminPage() {
                     </div>
                     {parsedCondition.mode === 'builder' && (
                       <>
-                        <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_130px_150px]">
-                          <select
-                            value={parsedCondition.field.key}
-                            onChange={(e) => updateCondition({ field: e.target.value as ConditionFieldKey })}
-                            className={inputCls}
-                          >
-                            {CONDITION_FIELDS.map((field) => (
-                              <option key={field.key} value={field.key}>{field.label}</option>
-                            ))}
-                          </select>
-                          <select
-                            value={parsedCondition.operator}
-                            onChange={(e) => updateCondition({ operator: e.target.value as ConditionOperator })}
-                            className={inputCls}
-                          >
-                            {(parsedCondition.field.kind === 'text'
-                              ? (['contains', 'notContains'] as ConditionOperator[])
-                              : parsedCondition.field.kind === 'boolean'
-                                ? (['==', '!='] as ConditionOperator[])
-                                : NUMERIC_CONDITION_OPERATORS).map((operator) => (
-                              <option key={operator} value={operator}>{operatorLabel(operator)}</option>
-                            ))}
-                          </select>
-                          {parsedCondition.field.kind === 'boolean' ? (
+                        <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(280px,1fr)_180px_180px]">
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-slate-600">Field</span>
                             <select
-                              value={parsedCondition.value === '0' ? '0' : '1'}
-                              onChange={(e) => updateCondition({ value: e.target.value })}
+                              value={parsedCondition.field.key}
+                              onChange={(e) => updateCondition({ field: e.target.value as ConditionFieldKey })}
                               className={inputCls}
                             >
-                              <option value="1">Yes</option>
-                              <option value="0">No</option>
+                              {CONDITION_FIELDS.map((field) => (
+                                <option key={field.key} value={field.key}>{field.label}</option>
+                              ))}
                             </select>
-                          ) : parsedCondition.field.kind === 'text' ? (
-                            <input
-                              value={parsedCondition.value}
-                              onChange={(e) => updateCondition({ value: e.target.value })}
+                          </label>
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-slate-600">Comparison</span>
+                            <select
+                              value={parsedCondition.operator}
+                              onChange={(e) => updateCondition({ operator: e.target.value as ConditionOperator })}
                               className={inputCls}
-                              placeholder="Class code"
-                            />
-                          ) : (
-                            <input
-                              type="number"
-                              min="0"
-                              step={parsedCondition.field.kind === 'percent' ? '0.01' : '1'}
-                              value={parsedCondition.value}
-                              onChange={(e) => updateCondition({ value: e.target.value })}
-                              className={inputCls}
-                              placeholder={parsedCondition.field.kind === 'percent' || parsedCondition.field.kind === 'percent-whole' ? 'Percent' : 'Value'}
-                            />
-                          )}
+                            >
+                              {(parsedCondition.field.kind === 'text'
+                                ? (['contains', 'notContains'] as ConditionOperator[])
+                                : parsedCondition.field.kind === 'boolean'
+                                  ? (['==', '!='] as ConditionOperator[])
+                                  : NUMERIC_CONDITION_OPERATORS).map((operator) => (
+                                <option key={operator} value={operator}>{operatorLabel(operator)}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="mb-1 block text-xs font-medium text-slate-600">Value</span>
+                            {parsedCondition.field.kind === 'boolean' ? (
+                              <select
+                                value={parsedCondition.value === '0' ? '0' : '1'}
+                                onChange={(e) => updateCondition({ value: e.target.value })}
+                                className={inputCls}
+                              >
+                                <option value="1">Yes</option>
+                                <option value="0">No</option>
+                              </select>
+                            ) : parsedCondition.field.kind === 'text' ? (
+                              <input
+                                value={parsedCondition.value}
+                                onChange={(e) => updateCondition({ value: e.target.value })}
+                                className={inputCls}
+                                placeholder="Class code"
+                              />
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                step={parsedCondition.field.kind === 'percent' ? '0.01' : '1'}
+                                value={parsedCondition.value}
+                                onChange={(e) => updateCondition({ value: e.target.value })}
+                                className={inputCls}
+                                placeholder={parsedCondition.field.kind === 'percent' || parsedCondition.field.kind === 'percent-whole' ? 'Percent' : 'Value'}
+                              />
+                            )}
+                          </label>
                         </div>
-                        <div className="mt-2 text-xs text-slate-500">{describeControlCondition(parsedCondition)}</div>
+                        <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
+                          {describeControlCondition(parsedCondition)}
+                        </div>
                       </>
                     )}
                     {parsedCondition.mode === 'unsupported' && (
