@@ -425,6 +425,21 @@ public class PolicyService : IPolicyService
                 return Result<PolicyDto>.Failure("UNDERWRITING_CONTROL_BLOCKED", BuildControlBlockMessage("issuing", controlSummary.BlockingResults));
         }
 
+        var checklist = (IQuoteChecklistService?)_sp.GetService(typeof(IQuoteChecklistService));
+        if (checklist != null)
+        {
+            var issueDocuments = await checklist.GetForQuoteAsync(policy.BoundQuoteId, [UnderwritingControlStage.Issue]);
+            if (!issueDocuments.IsSuccess)
+                return Result<PolicyDto>.Failure(issueDocuments.ErrorCode ?? "REQUIRED_DOCUMENTS_ERROR", issueDocuments.ErrorMessage ?? "Unable to load required issue documents.");
+
+            var incompleteRequiredDocuments = issueDocuments.Value!
+                .Where(i => i.IsBlocker && !i.IsCompleted)
+                .ToList();
+
+            if (incompleteRequiredDocuments.Count > 0)
+                return Result<PolicyDto>.Failure("REQUIRED_DOCUMENTS_INCOMPLETE", BuildRequiredDocumentsMessage(incompleteRequiredDocuments));
+        }
+
         var packet = await GetIssuancePacketAsync(policyId, access);
         if (!packet.IsSuccess)
             return Result<PolicyDto>.Failure(packet.ErrorCode ?? "ISSUANCE_PACKET_ERROR", packet.ErrorMessage ?? "Unable to load issuance packet.");
@@ -1865,5 +1880,12 @@ public class PolicyService : IPolicyService
         var labels = blockers.Take(3).Select(b => b.Label);
         var suffix = blockers.Count > 3 ? $" and {blockers.Count - 3} more" : "";
         return $"Resolve published underwriting control blockers before {action}: {string.Join(", ", labels)}{suffix}.";
+    }
+
+    private static string BuildRequiredDocumentsMessage(IReadOnlyList<QuoteChecklistItemDto> items)
+    {
+        var labels = items.Take(3).Select(i => i.Label);
+        var suffix = items.Count > 3 ? $" and {items.Count - 3} more" : "";
+        return $"Complete required issue documents before issuing this policy: {string.Join(", ", labels)}{suffix}.";
     }
 }

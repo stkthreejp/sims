@@ -162,8 +162,15 @@ Status values:
 - Kept blocker override restricted to the existing `underwriting.clearance.override` permission.
 - Removed the frontend `underwriting.manage` gate from quote/policy enforcement panels so blocked users can see what must be resolved.
 
+## Nineteenth Implemented Slice
+
+- Blocked policy issue when required Issue-stage document checklist items are incomplete.
+- Stopped issue before policy packet assembly/filing so incomplete required documents cannot produce an issued policy.
+- Added policy issue error handling that refreshes the document checklist and shows the required document blocker message.
+- Left PostBind document items visible but not issue-blocking until a dedicated post-bind action gate exists.
+
 ## Immediate Next Slice
 
-1. Add enforcement behavior for required issue/post-bind document checklist blockers if the business wants those to stop issue automatically.
-2. Add program filters to accounting/reporting pages if users need to drill into one program at a time.
+1. Add program filters to accounting/reporting pages if users need to drill into one program at a time.
+2. Add a post-bind action gate if the business wants required PostBind documents to stop a later completion/closeout task.
 3. Add a user-facing explanation surface on bind/issue action buttons if blocked tasks need more inline guidance.

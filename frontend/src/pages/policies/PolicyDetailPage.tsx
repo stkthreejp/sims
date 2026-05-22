@@ -214,6 +214,11 @@ export function PolicyDetailPage() {
         toast.error(e?.response?.data?.errorMessage ?? 'Published underwriting controls are blocking issue.')
         return
       }
+      if (e?.response?.data?.errorCode === 'REQUIRED_DOCUMENTS_INCOMPLETE') {
+        qc.invalidateQueries({ queryKey: ['quote-checklist', policy?.boundQuoteId, 'policy-documents'] })
+        toast.error(e?.response?.data?.errorMessage ?? 'Complete required issue documents before issuing.')
+        return
+      }
       toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be issued')
     },
   })

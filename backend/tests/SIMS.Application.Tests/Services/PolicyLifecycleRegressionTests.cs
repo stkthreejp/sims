@@ -576,6 +576,41 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task IssuePolicy_BlocksWhenRequiredIssueDocumentsAreIncomplete()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        await SeedReadyPolicyFormsAsync(db, fixture.Quote);
+        db.Add(new QuoteChecklistItem
+        {
+            QuoteId = fixture.Quote.Id,
+            Stage = UnderwritingControlStage.Issue,
+            TriggerKey = "guideline:issue-subjectivities",
+            Label = "Subjectivities satisfied",
+            IsBlocker = true,
+            IsCompleted = false,
+            SortOrder = 1,
+        });
+        await db.SaveChangesAsync();
+        var assembly = new RecordingPolicyAssemblyService();
+        var policyService = CreatePolicyService(
+            db,
+            new RecordingInvoicingService(),
+            assembly: assembly,
+            checklist: CreateQuoteChecklistService(db));
+
+        var result = await policyService.IssueAsync(fixture.Policy.Id, new IssuePolicyDto
+        {
+            IssuedDate = new DateOnly(2026, 1, 5),
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("REQUIRED_DOCUMENTS_INCOMPLETE", result.ErrorCode);
+        Assert.Contains("Subjectivities satisfied", result.ErrorMessage);
+        Assert.False(assembly.WasCalled);
+    }
+
+    [Fact]
     public async Task IssuePolicy_CompletesNewBusinessTransaction()
     {
         await using var db = CreateDb();
@@ -1938,7 +1973,8 @@ public class PolicyLifecycleRegressionTests
         RecordingPolicyAssemblyService? assembly = null,
         IQuoteService? quoteService = null,
         RecordingWorkflowEngineService? workflow = null,
-        IDocumentGenerationService? documentGeneration = null)
+        IDocumentGenerationService? documentGeneration = null,
+        IQuoteChecklistService? checklist = null)
     {
         assembly ??= new RecordingPolicyAssemblyService();
         quoteService ??= new RecordingQuoteService(db);
@@ -1950,6 +1986,7 @@ public class PolicyLifecycleRegressionTests
             .AddSingleton<IDocumentGenerationService>(documentGeneration ?? new RecordingDocumentGenerationService(db))
             .AddSingleton<IUnderwritingReferralService>(new UnderwritingReferralService(db))
             .AddSingleton<IUnderwritingControlEnforcementService>(new UnderwritingControlEnforcementService(db))
+            .AddSingleton(checklist ?? new NoOpQuoteChecklistService())
             .AddSingleton(quoteService)
             .BuildServiceProvider();
 
