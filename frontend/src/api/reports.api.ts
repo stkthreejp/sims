@@ -28,5 +28,5 @@ export const getCommissionSummary = (months = 12): Promise<CommissionSummary> =>
 export const getInvoiceTotalsByPolicyTransaction = (): Promise<InvoiceTotalsByPolicyTransaction> =>
   apiClient.get(`${BASE}/accounting/invoice-totals-by-policy-transaction`).then(r => r.data)
 
-export const getInvoiceTotalsByProgram = (): Promise<InvoiceTotalsByProgram> =>
-  apiClient.get(`${BASE}/accounting/invoice-totals-by-program`).then(r => r.data)
+export const getInvoiceTotalsByProgram = (programId?: string | null): Promise<InvoiceTotalsByProgram> =>
+  apiClient.get(`${BASE}/accounting/invoice-totals-by-program`, { params: programId ? { programId } : {} }).then(r => r.data)

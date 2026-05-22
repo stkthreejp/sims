@@ -100,4 +100,9 @@ export interface InvoiceTotalsByProgramRow {
 
 export interface InvoiceTotalsByProgram {
   rows: InvoiceTotalsByProgramRow[]
+  availablePrograms: Array<{
+    id: string
+    name: string
+    code: string
+  }>
 }

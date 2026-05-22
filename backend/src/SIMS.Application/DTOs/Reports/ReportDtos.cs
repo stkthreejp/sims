@@ -87,7 +87,14 @@ public record InvoiceTotalsByPolicyTransactionRowDto(
 );
 
 public record InvoiceTotalsByProgramDto(
-    IReadOnlyList<InvoiceTotalsByProgramRowDto> Rows
+    IReadOnlyList<InvoiceTotalsByProgramRowDto> Rows,
+    IReadOnlyList<InvoiceTotalsByProgramOptionDto> AvailablePrograms
+);
+
+public record InvoiceTotalsByProgramOptionDto(
+    Guid Id,
+    string Name,
+    string Code
 );
 
 public record InvoiceTotalsByProgramRowDto(

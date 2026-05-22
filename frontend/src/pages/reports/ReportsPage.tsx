@@ -353,19 +353,44 @@ function InvoiceTotalsByPolicyTransactionReport() {
 }
 
 function InvoiceTotalsByProgramReport() {
+  const [params, setParams] = useSearchParams()
+  const selectedProgramId = params.get('programId') ?? ''
   const { data, isLoading, error } = useQuery<InvoiceTotalsByProgram>({
-    queryKey: ['report', 'invoice-totals-by-program'],
-    queryFn: getInvoiceTotalsByProgram,
+    queryKey: ['report', 'invoice-totals-by-program', selectedProgramId || null],
+    queryFn: () => getInvoiceTotalsByProgram(selectedProgramId || null),
   })
 
   const totalAmount = data?.rows.reduce((sum, row) => sum + row.totalAmount, 0) ?? 0
   const totalNetRetained = data?.rows.reduce((sum, row) => sum + row.netRetained, 0) ?? 0
   const totalInvoices = data?.rows.reduce((sum, row) => sum + row.invoiceCount, 0) ?? 0
 
+  function selectProgram(programId: string) {
+    const next = new URLSearchParams(params)
+    if (programId) next.set('programId', programId)
+    else next.delete('programId')
+    setParams(next)
+  }
+
   return (
     <ReportShell title="Invoice Totals by Program" isLoading={isLoading} error={error as Error}>
       {data && (
         <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--ink-3)' }}>
+              Program
+              <select
+                value={selectedProgramId}
+                onChange={(e) => selectProgram(e.target.value)}
+                style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '6px 9px', minWidth: 180, color: 'var(--ink)', background: 'var(--surface)' }}
+              >
+                <option value="">All programs</option>
+                {(data.availablePrograms ?? []).map(program => (
+                  <option key={program.id} value={program.id}>{program.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
             <KpiCard label="Programs" value={data.rows.length.toLocaleString()} />
             <KpiCard label="Invoices" value={totalInvoices.toLocaleString()} />

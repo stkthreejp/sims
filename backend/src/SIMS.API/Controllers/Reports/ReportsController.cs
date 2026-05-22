@@ -39,6 +39,7 @@ public class ReportsController : ControllerBase
         => Ok(await _svc.GetInvoiceTotalsByPolicyTransactionAsync(ct));
 
     [HttpGet("accounting/invoice-totals-by-program")]
-    public async Task<IActionResult> GetInvoiceTotalsByProgram(CancellationToken ct)
-        => Ok(await _svc.GetInvoiceTotalsByProgramAsync(ct));
+    public async Task<IActionResult> GetInvoiceTotalsByProgram(
+        [FromQuery] Guid? programId, CancellationToken ct)
+        => Ok(await _svc.GetInvoiceTotalsByProgramAsync(programId, ct));
 }

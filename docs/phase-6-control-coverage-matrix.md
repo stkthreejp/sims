@@ -169,8 +169,14 @@ Status values:
 - Added policy issue error handling that refreshes the document checklist and shows the required document blocker message.
 - Left PostBind document items visible but not issue-blocking until a dedicated post-bind action gate exists.
 
+## Twentieth Implemented Slice
+
+- Added a program filter to the Invoice Totals by Program accounting report.
+- Passed selected program identity from Reports UI to the report API so users can drill into one umbrella product at a time.
+- Preserved the all-program view as the default and kept unassigned totals visible there.
+
 ## Immediate Next Slice
 
-1. Add program filters to accounting/reporting pages if users need to drill into one program at a time.
-2. Add a post-bind action gate if the business wants required PostBind documents to stop a later completion/closeout task.
-3. Add a user-facing explanation surface on bind/issue action buttons if blocked tasks need more inline guidance.
+1. Add a post-bind action gate if the business wants required PostBind documents to stop a later completion/closeout task.
+2. Add a user-facing explanation surface on bind/issue action buttons if blocked tasks need more inline guidance.
+3. Add program filtering to additional production/accounting reports as those reports become program-aware.

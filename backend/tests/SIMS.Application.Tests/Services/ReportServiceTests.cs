@@ -64,6 +64,38 @@ public class ReportServiceTests
         Assert.Equal(330m, unassignedRow.TotalAmount);
     }
 
+    [Fact]
+    public async Task GetInvoiceTotalsByProgramAsync_FiltersToSelectedProgram()
+    {
+        await using var db = CreateDb();
+        var longleaf = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var shuttleBee = new ProgramConfiguration { Name = "ShuttleBee", Code = "SHUTTLEBEE", IsActive = true };
+        db.AddRange(longleaf, shuttleBee);
+
+        var longleafPolicy = PolicyFor(longleaf.Id);
+        var shuttleBeePolicy = PolicyFor(shuttleBee.Id);
+        var longleafTxn = TransactionFor(longleafPolicy);
+        var shuttleBeeTxn = TransactionFor(shuttleBeePolicy);
+
+        db.AddRange(
+            longleafPolicy,
+            shuttleBeePolicy,
+            longleafTxn,
+            shuttleBeeTxn,
+            InvoiceFor(longleafTxn.Id, "INV-LL-1", 1000m, 100m, 1100m, 150m, 50m),
+            InvoiceFor(shuttleBeeTxn.Id, "INV-SB-1", 500m, 50m, 550m, 75m, 25m));
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetInvoiceTotalsByProgramAsync(longleaf.Id);
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(longleaf.Id, row.ProgramId);
+        Assert.Equal("Longleaf", row.ProgramName);
+        Assert.Equal(1100m, row.TotalAmount);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),
