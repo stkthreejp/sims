@@ -111,6 +111,45 @@ public class LegalRequirementsControllerTests
     }
 
     [Fact]
+    public async Task ScanSource_ConvertsStateNameToOpenLawsJurisdictionKey()
+    {
+        await using var db = CreateDbContext();
+        var source = new LegalTrackedSource
+        {
+            State = "Texas",
+            Name = "OpenLaws Texas",
+            SourceType = "OpenLaw API",
+            Url = "https://api.openlaws.test",
+            ApiKey = "openlaws-test-key",
+            IsEnabled = true,
+            ScanCadence = "Manual",
+            LastStatus = "NotChecked"
+        };
+        db.LegalTrackedSources.Add(source);
+        await db.SaveChangesAsync();
+
+        var client = new FakeOpenLawsClient(new[]
+        {
+            new OpenLawsSearchResult(
+                "TX",
+                "TX-INS",
+                "section_551_105",
+                "Section 551.105: Commercial cancellation notice",
+                "551.105",
+                "https://openlaws.test/tx/551_105",
+                "Cancellation notice text from OpenLaws.")
+        });
+        var controller = CreateController(db, client);
+
+        await controller.ScanSource(source.Id);
+
+        Assert.All(client.Requests, request => Assert.Equal("TX", request.Jurisdiction));
+
+        var scanResult = await db.LegalSourceScanResults.SingleAsync();
+        Assert.Equal("Texas", scanResult.State);
+    }
+
+    [Fact]
     public async Task OpenLawsClient_MapsSnakeCaseSearchResults()
     {
         var handler = new CaptureHandler("""

@@ -299,7 +299,7 @@ public class LegalRequirementsController : ControllerBase
                         new OpenLawsSearchRequest(
                             source.Url ?? "https://api.openlaws.us",
                             source.ApiKey,
-                            jurisdiction,
+                            jurisdiction.Key,
                             scanQuery.Query,
                             source.State == "All" ? 3 : 5),
                         HttpContext.RequestAborted);
@@ -313,7 +313,7 @@ public class LegalRequirementsController : ControllerBase
                         findings.Add(new LegalSourceScanResult
                         {
                             ScanRun = run,
-                            State = result.Jurisdiction,
+                            State = jurisdiction.State,
                             Category = scanQuery.Category,
                             Topic = Truncate(result.DisplayName, 160),
                             MatchStatus = "PossibleChange",
@@ -785,19 +785,90 @@ public class LegalRequirementsController : ControllerBase
         return (max ?? 0) + 1;
     }
 
-    private async Task<IReadOnlyList<string>> OpenLawsJurisdictionsAsync(string sourceState)
+    private async Task<IReadOnlyList<OpenLawsJurisdiction>> OpenLawsJurisdictionsAsync(string sourceState)
     {
         if (!sourceState.Equals("All", StringComparison.OrdinalIgnoreCase))
-            return [sourceState.ToUpperInvariant()];
+            return [new OpenLawsJurisdiction(sourceState, ToOpenLawsJurisdictionKey(sourceState))];
 
-        return await _db.LegalRequirementSections
+        var states = await _db.LegalRequirementSections
             .AsNoTracking()
             .Select(r => r.State)
             .Where(s => s != "All")
             .Distinct()
             .OrderBy(s => s)
             .ToListAsync();
+
+        return states
+            .Select(state => new OpenLawsJurisdiction(state, ToOpenLawsJurisdictionKey(state)))
+            .ToList();
     }
+
+    private static string ToOpenLawsJurisdictionKey(string state)
+    {
+        var trimmed = state.Trim();
+        if (Regex.IsMatch(trimmed, "^[A-Za-z]{2,3}$"))
+            return trimmed.ToUpperInvariant();
+
+        if (StateAbbreviations.TryGetValue(trimmed, out var abbreviation))
+            return abbreviation;
+
+        throw new OpenLawsException($"State '{state}' could not be mapped to an OpenLaws jurisdiction key.");
+    }
+
+    private static readonly Dictionary<string, string> StateAbbreviations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Alabama"] = "AL",
+        ["Alaska"] = "AK",
+        ["Arizona"] = "AZ",
+        ["Arkansas"] = "AR",
+        ["California"] = "CA",
+        ["Colorado"] = "CO",
+        ["Connecticut"] = "CT",
+        ["Delaware"] = "DE",
+        ["District of Columbia"] = "DC",
+        ["Florida"] = "FL",
+        ["Georgia"] = "GA",
+        ["Hawaii"] = "HI",
+        ["Idaho"] = "ID",
+        ["Illinois"] = "IL",
+        ["Indiana"] = "IN",
+        ["Iowa"] = "IA",
+        ["Kansas"] = "KS",
+        ["Kentucky"] = "KY",
+        ["Louisiana"] = "LA",
+        ["Maine"] = "ME",
+        ["Maryland"] = "MD",
+        ["Massachusetts"] = "MA",
+        ["Michigan"] = "MI",
+        ["Minnesota"] = "MN",
+        ["Mississippi"] = "MS",
+        ["Missouri"] = "MO",
+        ["Montana"] = "MT",
+        ["Nebraska"] = "NE",
+        ["Nevada"] = "NV",
+        ["New Hampshire"] = "NH",
+        ["New Jersey"] = "NJ",
+        ["New Mexico"] = "NM",
+        ["New York"] = "NY",
+        ["North Carolina"] = "NC",
+        ["North Dakota"] = "ND",
+        ["Ohio"] = "OH",
+        ["Oklahoma"] = "OK",
+        ["Oregon"] = "OR",
+        ["Pennsylvania"] = "PA",
+        ["Rhode Island"] = "RI",
+        ["South Carolina"] = "SC",
+        ["South Dakota"] = "SD",
+        ["Tennessee"] = "TN",
+        ["Texas"] = "TX",
+        ["Utah"] = "UT",
+        ["Vermont"] = "VT",
+        ["Virginia"] = "VA",
+        ["Washington"] = "WA",
+        ["West Virginia"] = "WV",
+        ["Wisconsin"] = "WI",
+        ["Wyoming"] = "WY"
+    };
 
     private static IReadOnlyList<OpenLawsScanQuery> OpenLawsScanQueries() =>
     [
@@ -889,6 +960,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     private sealed record OpenLawsScanQuery(string Query, string Category);
+    private sealed record OpenLawsJurisdiction(string State, string Key);
 }
 
 public sealed record LegalRequirementSectionDto(
