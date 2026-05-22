@@ -527,33 +527,30 @@ function RequirementTable({ sections }: { sections: LegalRequirementSection[] })
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <th className="px-4 py-3">State</th>
-            <th className="px-4 py-3">Action</th>
-            <th className="px-4 py-3">Category</th>
-            <th className="px-4 py-3">Topic</th>
-            <th className="px-4 py-3">Requirement</th>
-            <th className="px-4 py-3">Citations</th>
-            <th className="px-4 py-3">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {sections.map((section) => (
-            <tr key={section.id} className="align-top">
-              <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{section.state}</td>
-              <td className="whitespace-nowrap px-4 py-3 text-slate-700">{cleanAction(section.action)}</td>
-              <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{cleanLabel(section.category)}</td>
-              <td className="min-w-[180px] px-4 py-3 text-slate-700">{section.topic}</td>
-              <td className="min-w-[420px] px-4 py-3 leading-6 text-slate-700">{section.requirementText}</td>
-              <td className="min-w-[220px] px-4 py-3"><CitationList citations={section.citations} /></td>
-              <td className="whitespace-nowrap px-4 py-3"><StatusPill status={section.reviewStatus} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="divide-y">
+      {sections.map((section) => (
+        <div key={section.id} className="px-4 py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{section.state}</span>
+            <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{cleanAction(section.action)}</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{cleanLabel(section.category)}</span>
+            <StatusPill status={section.reviewStatus} />
+          </div>
+
+          <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900">{section.topic}</div>
+              <div className="mt-2 max-w-4xl whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{section.requirementText}</div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Citations</div>
+              <div className="mt-2">
+                <CitationList citations={section.citations} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
