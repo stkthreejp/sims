@@ -42,6 +42,10 @@ public sealed class OpenLawsClient(IHttpClientFactory httpClientFactory) : IOpen
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound &&
+                body.Contains("No matching Divisions for that search.", StringComparison.OrdinalIgnoreCase))
+                return [];
+
             throw new OpenLawsException($"OpenLaws returned {(int)response.StatusCode} {response.ReasonPhrase}: {TrimErrorBody(body)}");
         }
 

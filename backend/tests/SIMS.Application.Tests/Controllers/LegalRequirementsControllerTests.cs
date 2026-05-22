@@ -187,6 +187,21 @@ public class LegalRequirementsControllerTests
     }
 
     [Fact]
+    public async Task OpenLawsClient_TreatsNoMatchingDivisionsAsEmptyResults()
+    {
+        var handler = new CaptureHandler(
+            """{"status":404,"title":"No matching Divisions for that search."}""",
+            System.Net.HttpStatusCode.NotFound);
+        var client = new OpenLawsClient(new FakeHttpClientFactory(handler));
+
+        var results = await client.SearchAsync(
+            new OpenLawsSearchRequest("https://api.openlaws.test", "secret-key", "TX", "unlikely phrase", 5),
+            CancellationToken.None);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
     public async Task ScanSource_ReturnsFailedRunWhenOpenLawsFails()
     {
         await using var db = CreateDbContext();
@@ -269,7 +284,7 @@ public class LegalRequirementsControllerTests
         public HttpClient CreateClient(string name) => new(handler);
     }
 
-    private sealed class CaptureHandler(string responseBody) : HttpMessageHandler
+    private sealed class CaptureHandler(string responseBody, System.Net.HttpStatusCode statusCode = System.Net.HttpStatusCode.OK) : HttpMessageHandler
     {
         public string RequestUri { get; private set; } = string.Empty;
         public string? AuthorizationScheme { get; private set; }
@@ -281,7 +296,7 @@ public class LegalRequirementsControllerTests
             AuthorizationScheme = request.Headers.Authorization?.Scheme;
             AuthorizationParameter = request.Headers.Authorization?.Parameter;
 
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            return Task.FromResult(new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
             });
