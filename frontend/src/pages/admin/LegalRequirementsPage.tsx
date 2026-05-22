@@ -405,7 +405,7 @@ function SourceEditorModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-      <form onSubmit={submit} className="w-full max-w-2xl rounded border bg-white shadow-xl">
+      <form onSubmit={submit} className="flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col rounded border bg-white shadow-xl">
         <div className="flex items-center justify-between gap-4 border-b px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-900">{source === 'new' ? 'Add Source' : 'Edit Source'}</h2>
           <button type="button" onClick={onClose} className="rounded p-2 text-slate-500 hover:bg-slate-100" aria-label="Close">
@@ -413,7 +413,7 @@ function SourceEditorModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 overflow-y-auto p-5 md:grid-cols-2">
           <label className="block text-sm font-medium text-slate-700">
             State
             <select
@@ -469,6 +469,9 @@ function SourceEditorModal({
               maxLength={1000}
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
+            {source !== 'new' && source.hasApiKey && (
+              <span className="mt-1 block text-xs font-normal text-slate-500">A saved key is already configured. Enter a new key only if you want to replace it.</span>
+            )}
           </label>
 
           <label className="block text-sm font-medium text-slate-700">
