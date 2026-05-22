@@ -69,19 +69,10 @@ Use `conditionJson: null` for unconditional controls, checklist requirements, an
 For conditional referrals/blockers, use an object with exactly `field`, `operator`, and `value`:
 
 ```json
-{ "field": "lossRatio", "operator": ">", "value": 50 }
+{ "field": "lossRatio", "operator": ">", "value": 0.5 }
 ```
 
-Allowed condition fields:
-
-- `largestSingleItemValue`
-- `totalInsuredValue`
-- `premiumAmount`
-- `totalPremium`
-- `lossRatio`
-- `driverCount`
-- `vehicleCount`
-- `isFilingState`
+Allowed condition fields are listed in the SIMS measurable field catalog below. Only use fields from that catalog.
 
 Allowed operators:
 
@@ -92,7 +83,58 @@ Allowed operators:
 - `==`
 - `!=`
 
-If the guideline needs a field SIMS does not support, do not invent a field. Set `conditionJson` to `null` and mention the missing field in `description` or `sourceCitation`.
+If the guideline needs a field SIMS does not support, do not invent a field. Set `conditionJson` to `null` and start the description with `Needs SIMS field: <plain English field name>.`
+
+## SIMS Measurable Field Catalog
+
+These are the only fields SIMS can currently check automatically for underwriting guideline enforcement.
+
+| Field | Admin label | Meaning | Value format | Good matches |
+| --- | --- | --- | --- | --- |
+| `largestSingleItemValue` | Largest single item value | Highest scheduled equipment/item value on the submission. | Number in dollars, no commas. | Single item over $500K; any one piece exceeds threshold. |
+| `totalInsuredValue` | Total insured value | Sum of scheduled equipment/item values on the submission. | Number in dollars, no commas. | TIV over $2M; total scheduled value exceeds threshold. |
+| `premiumAmount` | Premium amount | Base premium for the quote or policy being evaluated. | Number in dollars, no commas. | Premium threshold based on base premium. |
+| `totalPremium` | Total premium | Total quote or policy premium including applicable fees/taxes where SIMS stores total premium. | Number in dollars, no commas. | Total premium exceeds authority threshold. |
+| `lossRatio` | Loss ratio | Paid plus reserved losses divided by loss history premium. SIMS stores this as a decimal. | Decimal, not percent. Use `0.55` for 55%. | Loss ratio over 50%; unacceptable loss experience ratio. |
+| `driverCount` | Driver count | Count of active/non-deleted drivers on the submission. | Whole number. | More than 10 drivers; fleet driver threshold. |
+| `vehicleCount` | Vehicle count | Count of active/non-deleted vehicles on the submission. | Whole number. | More than 20 vehicles; fleet size threshold. |
+| `isFilingState` | Filing state | Whether the quote/policy is in a filing state. | `1` for yes, `0` for no. | Filing state referrals or restrictions. |
+
+Do not use unsupported field names such as `glAggregateLimit`, `generalLiabilityAggregate`, `buildingLimit`, `propertyLimit`, `payroll`, `sales`, `classCode`, `territory`, or `yearsInBusiness` unless they are added to this catalog in the future.
+
+## Missing Measurable Guidance
+
+Some guideline requirements are real underwriting rules, but SIMS does not yet store the needed value as a measurable field. Keep those controls reviewable, but do not make up `conditionJson`.
+
+When a measurable field is missing:
+
+- Set `conditionJson` to `null`.
+- Start `description` with `Needs SIMS field: <field name>.`
+- Keep the rest of `description` in plain English.
+- Keep the original guideline wording in `sourceCitation`.
+- Use `severity` and `isBlocking` based on what the guideline says, even though enforcement will be manual until SIMS adds the field.
+
+Example:
+
+```json
+{
+  "itemType": "AuthorityLimit",
+  "stage": "Quote",
+  "severity": "ReferralRequired",
+  "ruleKey": "gl-aggregate-over-2m",
+  "label": "GL aggregate over $2M",
+  "description": "Needs SIMS field: GL aggregate limit. Guideline requires referral when the general liability aggregate limit exceeds $2,000,000.",
+  "conditionJson": null,
+  "isBlocking": false,
+  "overrideAllowed": true,
+  "overridePermission": "underwriting.clearance.override",
+  "sourceCitation": "Max GL aggregate limit is $2M.",
+  "aiConfidence": 0.82,
+  "sortOrder": 30
+}
+```
+
+Only map to an existing field when the meaning is clearly the same. For example, do not map GL aggregate limit to `totalInsuredValue`; those are different underwriting facts.
 
 ## Control Guidance
 
@@ -121,7 +163,8 @@ Return JSON only using the exact schema and allowed values from this spec:
 For conditionJson:
 - use null for unconditional controls
 - use { "field": "...", "operator": "...", "value": ... } only with documented SIMS fields
-- if a needed field is missing, do not invent one; set conditionJson to null and mention the missing field in description or sourceCitation
+- if a needed field is missing, do not invent one; set conditionJson to null and start description with "Needs SIMS field: ..."
+- do not map similar-looking but different concepts; for example, GL aggregate limit is not total insured value
 
 Prefer clear, actionable controls. Skip vague prose that does not create a reviewable requirement, blocker, referral, authority limit, appetite rule, or checklist item.
 ```

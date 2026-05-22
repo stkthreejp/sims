@@ -226,18 +226,44 @@ Allowed `operator` values:
 
 Current enforceable `field` values:
 
-- `largestSingleItemValue`
-- `totalInsuredValue`
-- `premiumAmount`
-- `totalPremium`
-- `lossRatio`
-- `driverCount`
-- `vehicleCount`
-- `isFilingState` (`1` for true, `0` for false)
+| Field | Admin label | Meaning | Value format | Good matches |
+| --- | --- | --- | --- | --- |
+| `largestSingleItemValue` | Largest single item value | Highest scheduled equipment/item value on the submission. | Number in dollars, no commas. | Single item over $500K; any one piece exceeds threshold. |
+| `totalInsuredValue` | Total insured value | Sum of scheduled equipment/item values on the submission. | Number in dollars, no commas. | TIV over $2M; total scheduled value exceeds threshold. |
+| `premiumAmount` | Premium amount | Base premium for the quote or policy being evaluated. | Number in dollars, no commas. | Premium threshold based on base premium. |
+| `totalPremium` | Total premium | Total quote or policy premium including applicable fees/taxes where SIMS stores total premium. | Number in dollars, no commas. | Total premium exceeds authority threshold. |
+| `lossRatio` | Loss ratio | Paid plus reserved losses divided by loss history premium. SIMS stores this as a decimal. | Decimal, not percent. Use `0.55` for 55%. | Loss ratio over 50%; unacceptable loss experience ratio. |
+| `driverCount` | Driver count | Count of active/non-deleted drivers on the submission. | Whole number. | More than 10 drivers; fleet driver threshold. |
+| `vehicleCount` | Vehicle count | Count of active/non-deleted vehicles on the submission. | Whole number. | More than 20 vehicles; fleet size threshold. |
+| `isFilingState` | Filing state | Whether the quote/policy is in a filing state. | `1` for yes, `0` for no. | Filing state referrals or restrictions. |
+
+Do not use unsupported field names such as `glAggregateLimit`, `generalLiabilityAggregate`, `buildingLimit`, `propertyLimit`, `payroll`, `sales`, `classCode`, `territory`, or `yearsInBusiness` unless they are added to this catalog in the future.
+
+Only map to an existing field when the meaning is clearly the same. Do not map similar-looking but different concepts. For example, GL aggregate limit is not total insured value.
 
 For unconditional blockers, use `conditionJson: null`.
 
-For conditional blockers or referrals, use only the documented field/operator/value schema above. If the field needed by the guideline is not listed, do not invent one. Flag the missing measurable field in `description` or `sourceCitation` so a human can decide whether SIMS needs a new measurable field before publishing.
+For conditional blockers or referrals, use only the documented field/operator/value schema above. If the field needed by the guideline is not listed, do not invent one. Set `conditionJson: null` and start `description` with `Needs SIMS field: <plain English field name>.` A human can then decide whether SIMS needs a new measurable field before publishing.
+
+Example missing measurable:
+
+```json
+{
+  "itemType": "AuthorityLimit",
+  "stage": "Quote",
+  "severity": "ReferralRequired",
+  "ruleKey": "gl-aggregate-over-2m",
+  "label": "GL aggregate over $2M",
+  "description": "Needs SIMS field: GL aggregate limit. Guideline requires referral when the general liability aggregate limit exceeds $2,000,000.",
+  "conditionJson": null,
+  "isBlocking": false,
+  "overrideAllowed": true,
+  "overridePermission": "underwriting.clearance.override",
+  "sourceCitation": "Max GL aggregate limit is $2M.",
+  "aiConfidence": 0.82,
+  "sortOrder": 30
+}
+```
 
 ## Rule Key Guidance
 
