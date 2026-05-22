@@ -45,6 +45,22 @@ const CONDITION_FIELDS = [
   { key: 'driverCount', label: 'Driver count', kind: 'number' },
   { key: 'vehicleCount', label: 'Vehicle count', kind: 'number' },
   { key: 'isFilingState', label: 'Filing state', kind: 'boolean' },
+  { key: 'glGeneralAggregate', label: 'GL general aggregate', kind: 'currency' },
+  { key: 'glProductsCompletedOps', label: 'GL products/completed ops aggregate', kind: 'currency' },
+  { key: 'glEachOccurrence', label: 'GL each occurrence limit', kind: 'currency' },
+  { key: 'glPersonalAndAdvertisingInjury', label: 'GL personal & advertising injury', kind: 'currency' },
+  { key: 'glDamageToRentedPremises', label: 'GL damage to rented premises', kind: 'currency' },
+  { key: 'glMedicalExpense', label: 'GL medical expense limit', kind: 'currency' },
+  { key: 'glTotalSubcontractorCost', label: 'GL total subcontractor cost', kind: 'currency' },
+  { key: 'glAdditionalInsuredCount', label: 'GL additional insured count', kind: 'number' },
+  { key: 'glBlanketAdditionalInsured', label: 'GL blanket additional insured', kind: 'boolean' },
+  { key: 'glWaiverOfSubrogationCount', label: 'GL waiver of subrogation count', kind: 'number' },
+  { key: 'glBlanketWaiverOfSubrogation', label: 'GL blanket waiver of subrogation', kind: 'boolean' },
+  { key: 'glPrimaryNonContributory', label: 'GL primary & non-contributory', kind: 'boolean' },
+  { key: 'glIncludeTria', label: 'GL TRIA included', kind: 'boolean' },
+  { key: 'glClassificationCount', label: 'GL classification count', kind: 'number' },
+  { key: 'glTotalExposure', label: 'GL total exposure', kind: 'currency' },
+  { key: 'glMaxClassExposure', label: 'GL largest class exposure', kind: 'currency' },
 ] as const
 const DEFAULT_CONDITION = JSON.stringify({ field: 'totalInsuredValue', operator: '>', value: 0 })
 

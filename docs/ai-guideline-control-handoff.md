@@ -236,10 +236,28 @@ Current enforceable `field` values:
 | `driverCount` | Driver count | Count of active/non-deleted drivers on the submission. | Whole number. | More than 10 drivers; fleet driver threshold. |
 | `vehicleCount` | Vehicle count | Count of active/non-deleted vehicles on the submission. | Whole number. | More than 20 vehicles; fleet size threshold. |
 | `isFilingState` | Filing state | Whether the quote/policy is in a filing state. | `1` for yes, `0` for no. | Filing state referrals or restrictions. |
+| `glGeneralAggregate` | GL general aggregate | General liability general aggregate limit captured on the submission GL coverages. | Number in dollars, no commas. | GL aggregate over $2M; max general aggregate limit. |
+| `glProductsCompletedOps` | GL products/completed ops aggregate | Products/completed operations aggregate limit captured on the submission GL coverages. | Number in dollars, no commas. | Products/completed ops limit over threshold. |
+| `glEachOccurrence` | GL each occurrence limit | Each occurrence limit captured on the submission GL coverages. | Number in dollars, no commas. | Occurrence limit exceeds authority. |
+| `glPersonalAndAdvertisingInjury` | GL personal & advertising injury | Personal and advertising injury limit captured on the submission GL coverages. | Number in dollars, no commas. | Personal and advertising injury limit threshold. |
+| `glDamageToRentedPremises` | GL damage to rented premises | Damage to rented premises limit captured on the submission GL coverages. | Number in dollars, no commas. | Damage to premises rented to you limit threshold. |
+| `glMedicalExpense` | GL medical expense limit | Medical expense limit captured on the submission GL coverages. | Number in dollars, no commas. | Medical expense limit over $10K. |
+| `glTotalSubcontractorCost` | GL total subcontractor cost | Total subcontractor cost captured on the submission GL coverages. | Number in dollars, no commas. | Subcontractor cost exceeds threshold. |
+| `glAdditionalInsuredCount` | GL additional insured count | Count of individual additional insured endorsements on GL. | Whole number. | More than 5 scheduled additional insureds. |
+| `glBlanketAdditionalInsured` | GL blanket additional insured | Whether blanket additional insured applies on GL. | `1` for yes, `0` for no. | Blanket AI requested; blanket AI not allowed. |
+| `glWaiverOfSubrogationCount` | GL waiver of subrogation count | Count of individual waiver of subrogation endorsements on GL. | Whole number. | More than 5 scheduled WOS endorsements. |
+| `glBlanketWaiverOfSubrogation` | GL blanket waiver of subrogation | Whether blanket waiver of subrogation applies on GL. | `1` for yes, `0` for no. | Blanket WOS requested; blanket WOS not allowed. |
+| `glPrimaryNonContributory` | GL primary & non-contributory | Whether primary and non-contributory wording applies on GL. | `1` for yes, `0` for no. | PNC requested; PNC not allowed. |
+| `glIncludeTria` | GL TRIA included | Whether TRIA is included on GL. | `1` for yes, `0` for no. | TRIA included or excluded requirement. |
+| `glClassificationCount` | GL classification count | Count of GL classification/exposure rows on the submission. | Whole number. | More than one GL class; missing classifications. |
+| `glTotalExposure` | GL total exposure | Sum of GL classification exposure values across active GL class rows. | Number in dollars or units as captured, no commas. | Total payroll/sales/exposure threshold. |
+| `glMaxClassExposure` | GL largest class exposure | Largest single GL classification exposure value. | Number in dollars or units as captured, no commas. | Any one class exposure exceeds threshold. |
 
 Do not use unsupported field names such as `glAggregateLimit`, `generalLiabilityAggregate`, `buildingLimit`, `propertyLimit`, `payroll`, `sales`, `classCode`, `territory`, or `yearsInBusiness` unless they are added to this catalog in the future.
 
 Only map to an existing field when the meaning is clearly the same. Do not map similar-looking but different concepts. For example, GL aggregate limit is not total insured value.
+
+GL class codes are captured in SIMS, but the current condition engine does not yet support text/list comparisons. For guideline rules such as "class code 94007 is prohibited" or "refer class 91581," set `conditionJson` to `null` and start `description` with `Needs SIMS field: GL class code matching.`
 
 For unconditional blockers, use `conditionJson: null`.
 

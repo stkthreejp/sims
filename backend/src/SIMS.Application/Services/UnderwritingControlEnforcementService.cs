@@ -28,6 +28,8 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             .Include(q => q.Submission).ThenInclude(s => s.Equipment)
             .Include(q => q.Submission).ThenInclude(s => s.Vehicles)
             .Include(q => q.Submission).ThenInclude(s => s.Drivers)
+            .Include(q => q.Submission).ThenInclude(s => s.GLCoverages)
+            .Include(q => q.Submission).ThenInclude(s => s.GLClassifications)
             .Include(q => q.Submission).ThenInclude(s => s.LossYears).ThenInclude(y => y.Claims)
             .AsSplitQuery()
             .FirstOrDefaultAsync(q => q.Id == quoteId && !q.IsDeleted, ct);
@@ -59,6 +61,8 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             .Include(p => p.Submission).ThenInclude(s => s.Equipment)
             .Include(p => p.Submission).ThenInclude(s => s.Vehicles)
             .Include(p => p.Submission).ThenInclude(s => s.Drivers)
+            .Include(p => p.Submission).ThenInclude(s => s.GLCoverages)
+            .Include(p => p.Submission).ThenInclude(s => s.GLClassifications)
             .Include(p => p.Submission).ThenInclude(s => s.LossYears).ThenInclude(y => y.Claims)
             .Include(p => p.BoundQuote)
             .AsSplitQuery()
@@ -293,6 +297,10 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
         var largestSingleItemValue = submission.Equipment.Where(e => !e.IsDeleted).Select(e => e.Value ?? 0m).DefaultIfEmpty(0m).Max();
         var vehicleCount = submission.Vehicles.Count(v => !v.IsDeleted);
         var driverCount = submission.Drivers.Count(d => !d.IsDeleted);
+        var glCoverages = submission.GLCoverages;
+        var glClassifications = submission.GLClassifications.Where(c => !c.IsDeleted).ToList();
+        var glTotalExposure = glClassifications.Sum(c => c.Exposure ?? 0m);
+        var glMaxClassExposure = glClassifications.Select(c => c.Exposure ?? 0m).DefaultIfEmpty(0m).Max();
         var lossPaidReserved = submission.LossYears
             .Where(y => !y.IsDeleted)
             .SelectMany(y => y.Claims.Where(c => !c.IsDeleted))
@@ -309,7 +317,23 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             ["vehicleCount"] = vehicleCount,
             ["driverCount"] = driverCount,
             ["lossRatio"] = lossRatio,
-            ["isFilingState"] = isFilingState ? 1m : 0m
+            ["isFilingState"] = isFilingState ? 1m : 0m,
+            ["glGeneralAggregate"] = glCoverages?.GeneralAggregate ?? 0m,
+            ["glProductsCompletedOps"] = glCoverages?.ProductsCompletedOps ?? 0m,
+            ["glEachOccurrence"] = glCoverages?.EachOccurrence ?? 0m,
+            ["glPersonalAndAdvertisingInjury"] = glCoverages?.PersonalAndAdvInjury ?? 0m,
+            ["glDamageToRentedPremises"] = glCoverages?.DamageToRentedPremises ?? 0m,
+            ["glMedicalExpense"] = glCoverages?.MedicalExpense ?? 0m,
+            ["glTotalSubcontractorCost"] = glCoverages?.TotalSubcontractorCost ?? 0m,
+            ["glAdditionalInsuredCount"] = glCoverages?.AiIndividualCount ?? 0m,
+            ["glBlanketAdditionalInsured"] = glCoverages?.AiBlanket == true ? 1m : 0m,
+            ["glWaiverOfSubrogationCount"] = glCoverages?.WosIndividualCount ?? 0m,
+            ["glBlanketWaiverOfSubrogation"] = glCoverages?.WosBlanket == true ? 1m : 0m,
+            ["glPrimaryNonContributory"] = glCoverages?.PrimaryNonContributory == true ? 1m : 0m,
+            ["glIncludeTria"] = glCoverages?.IncludeTria == true ? 1m : 0m,
+            ["glClassificationCount"] = glClassifications.Count,
+            ["glTotalExposure"] = glTotalExposure,
+            ["glMaxClassExposure"] = glMaxClassExposure
         };
 
         var snapshot = new
@@ -322,6 +346,22 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
             driverCount,
             lossRatio,
             isFilingState,
+            glGeneralAggregate = glCoverages?.GeneralAggregate ?? 0m,
+            glProductsCompletedOps = glCoverages?.ProductsCompletedOps ?? 0m,
+            glEachOccurrence = glCoverages?.EachOccurrence ?? 0m,
+            glPersonalAndAdvertisingInjury = glCoverages?.PersonalAndAdvInjury ?? 0m,
+            glDamageToRentedPremises = glCoverages?.DamageToRentedPremises ?? 0m,
+            glMedicalExpense = glCoverages?.MedicalExpense ?? 0m,
+            glTotalSubcontractorCost = glCoverages?.TotalSubcontractorCost ?? 0m,
+            glAdditionalInsuredCount = glCoverages?.AiIndividualCount ?? 0,
+            glBlanketAdditionalInsured = glCoverages?.AiBlanket == true,
+            glWaiverOfSubrogationCount = glCoverages?.WosIndividualCount ?? 0,
+            glBlanketWaiverOfSubrogation = glCoverages?.WosBlanket == true,
+            glPrimaryNonContributory = glCoverages?.PrimaryNonContributory == true,
+            glIncludeTria = glCoverages?.IncludeTria == true,
+            glClassificationCount = glClassifications.Count,
+            glTotalExposure,
+            glMaxClassExposure,
             lineOfBusiness = lineOfBusiness.ToString(),
             state = NormalizeState(submission.Insured.State)
         };
