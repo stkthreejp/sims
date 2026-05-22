@@ -85,3 +85,20 @@ public record InvoiceTotalsByPolicyTransactionRowDto(
     decimal TotalFees,
     decimal TotalAmount
 );
+
+public record InvoiceTotalsByProgramDto(
+    IReadOnlyList<InvoiceTotalsByProgramRowDto> Rows
+);
+
+public record InvoiceTotalsByProgramRowDto(
+    Guid? ProgramId,
+    string ProgramName,
+    string? ProgramCode,
+    int InvoiceCount,
+    decimal GrossPremium,
+    decimal TotalFees,
+    decimal TotalAmount,
+    decimal CommissionAmount,
+    decimal AgentCommissionAmount,
+    decimal NetRetained
+);

@@ -264,6 +264,40 @@ public class ReportService : IReportService
         return new InvoiceTotalsByPolicyTransactionDto(rows.OrderByDescending(r => r.TotalAmount).ToList());
     }
 
+    public async Task<InvoiceTotalsByProgramDto> GetInvoiceTotalsByProgramAsync(CancellationToken ct = default)
+    {
+        var rows = await (
+            from invoice in Db.Set<Invoice>()
+            where invoice.TenantId == 1 && invoice.Status != "Voided"
+            join txn in Db.Set<PolicyTransaction>() on invoice.PolicyTransactionId equals txn.Id into txnGroup
+            from txn in txnGroup.DefaultIfEmpty()
+            join policy in Db.Set<Policy>() on txn.PolicyId equals policy.Id into policyGroup
+            from policy in policyGroup.DefaultIfEmpty()
+            join program in Db.Set<ProgramConfiguration>() on policy.ProgramId equals program.Id into programGroup
+            from program in programGroup.DefaultIfEmpty()
+            group invoice by new
+            {
+                ProgramId = policy != null ? policy.ProgramId : null,
+                ProgramName = program != null ? program.Name : "Unassigned",
+                ProgramCode = program != null ? program.Code : null
+            }
+            into g
+            select new InvoiceTotalsByProgramRowDto(
+                g.Key.ProgramId,
+                g.Key.ProgramName,
+                g.Key.ProgramCode,
+                g.Count(),
+                g.Sum(i => i.GrossPremium),
+                g.Sum(i => i.TotalFees),
+                g.Sum(i => i.TotalAmount),
+                g.Sum(i => i.CommissionAmount),
+                g.Sum(i => i.AgentCommissionAmount),
+                g.Sum(i => i.CommissionAmount - i.AgentCommissionAmount))
+        ).ToListAsync(ct);
+
+        return new InvoiceTotalsByProgramDto(rows.OrderByDescending(r => r.TotalAmount).ToList());
+    }
+
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)
     {
         decimal Bucket(OpenPayableDto p, int from, int to)

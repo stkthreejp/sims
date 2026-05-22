@@ -84,3 +84,20 @@ export interface InvoiceTotalsByPolicyTransactionRow {
 export interface InvoiceTotalsByPolicyTransaction {
   rows: InvoiceTotalsByPolicyTransactionRow[]
 }
+
+export interface InvoiceTotalsByProgramRow {
+  programId: string | null
+  programName: string
+  programCode: string | null
+  invoiceCount: number
+  grossPremium: number
+  totalFees: number
+  totalAmount: number
+  commissionAmount: number
+  agentCommissionAmount: number
+  netRetained: number
+}
+
+export interface InvoiceTotalsByProgram {
+  rows: InvoiceTotalsByProgramRow[]
+}
