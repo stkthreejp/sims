@@ -115,7 +115,7 @@ export function LegalRequirementsPage() {
       setSourceEditor(null)
       setActiveTab('sources')
     },
-    onError: () => toast.error('Tracked source could not be saved'),
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Tracked source could not be saved')),
   })
 
   if (summaryQuery.isLoading) return <LoadingSpinner />
@@ -386,12 +386,17 @@ function SourceEditorModal({
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
+    const trimmedUrl = url.trim()
+    const trimmedApiKey = apiKey.trim()
+    const urlLooksAbsolute = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmedUrl)
+    const useUrlAsApiKey = sourceType.endsWith('API') && trimmedUrl && !urlLooksAbsolute && !trimmedApiKey
+
     onSave({
       state: stateValue,
       name,
       sourceType,
-      url: url.trim() || null,
-      apiKey: apiKey.trim() || null,
+      url: useUrlAsApiKey ? null : trimmedUrl || null,
+      apiKey: useUrlAsApiKey ? trimmedUrl : trimmedApiKey || null,
       isEnabled,
       scanCadence,
       notes: notes.trim() || null,
@@ -1108,4 +1113,10 @@ function formatDate(value: string) {
 
 function invalidateLegalQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ['legal-requirements'] })
+}
+
+function getApiErrorMessage(e: unknown, fallback: string) {
+  const data = (e as { response?: { data?: { errorMessage?: string; message?: string; title?: string } } })
+    ?.response?.data
+  return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
 }
