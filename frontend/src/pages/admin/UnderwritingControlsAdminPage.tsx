@@ -1025,64 +1025,64 @@ export function UnderwritingControlsAdminPage() {
                 ) : (
                   <div className="divide-y">
                     {visibleControls.map((control) => (
-                  <div key={control.id} className="px-5 py-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 gap-3">
+                      <div key={control.id} className="px-5 py-4">
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+                          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={selectedControlIds.includes(control.id)}
+                              disabled={control.status === 'Published' || control.status === 'Retired'}
+                              onChange={() => toggleControlSelection(control.id)}
+                            />
+                            <div className="min-w-0 max-w-4xl">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-base font-semibold text-slate-900">{control.label}</h3>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[control.status]}`}>{statusLabel(control.status)}</span>
+                                {control.isBlocking && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
+                                    <ShieldAlert className="h-3 w-3" />
+                                    Blocking
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1 text-sm text-slate-500">
+                                {control.ruleKey} / {itemTypeLabel(control.itemType)} / {stageLabel(control.stage)} / {severityLabel(control.severity)}
+                              </div>
+                              {control.description && <p className="mt-3 text-sm leading-6 text-slate-700">{control.description}</p>}
+                              {control.sourceCitation && <div className="mt-3 max-w-4xl text-sm leading-6 text-slate-500">Source: {control.sourceCitation}</div>}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-start gap-2 xl:max-w-[360px] xl:justify-end">
+                            <button type="button" onClick={() => editControl(control)} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                              <Save className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'approve' })} disabled={control.status === 'Approved' || control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                              <Check className="h-3.5 w-3.5" />
+                              Approve
+                            </button>
+                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'reject' })} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                              <X className="h-3.5 w-3.5" />
+                              Reject
+                            </button>
+                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'publish' })} disabled={control.status !== 'Approved'} className={iconBtnCls}>
+                              <Rocket className="h-3.5 w-3.5" />
+                              Publish
+                            </button>
+                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'retire' })} disabled={control.status !== 'Published'} className={iconBtnCls}>
+                              <Archive className="h-3.5 w-3.5" />
+                              Retire
+                            </button>
+                          </div>
+                        </div>
                         <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={selectedControlIds.includes(control.id)}
-                          disabled={control.status === 'Published' || control.status === 'Retired'}
-                          onChange={() => toggleControlSelection(control.id)}
+                          value={decisionNotes[control.id] ?? ''}
+                          onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [control.id]: e.target.value }))}
+                          className={`${inputCls} mt-4`}
+                          placeholder="Decision notes"
                         />
-                        <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-semibold text-slate-900">{control.label}</h3>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[control.status]}`}>{statusLabel(control.status)}</span>
-                          {control.isBlocking && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
-                              <ShieldAlert className="h-3 w-3" />
-                              Blocking
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {control.ruleKey} / {itemTypeLabel(control.itemType)} / {stageLabel(control.stage)} / {severityLabel(control.severity)}
-                        </div>
-                        {control.description && <p className="mt-2 text-sm text-slate-600">{control.description}</p>}
-                        {control.sourceCitation && <div className="mt-2 text-xs text-slate-500">Source: {control.sourceCitation}</div>}
-                        </div>
                       </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <button type="button" onClick={() => editControl(control)} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
-                          <Save className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'approve' })} disabled={control.status === 'Approved' || control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
-                          <Check className="h-3.5 w-3.5" />
-                          Approve
-                        </button>
-                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'reject' })} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
-                          <X className="h-3.5 w-3.5" />
-                          Reject
-                        </button>
-                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'publish' })} disabled={control.status !== 'Approved'} className={iconBtnCls}>
-                          <Rocket className="h-3.5 w-3.5" />
-                          Publish
-                        </button>
-                        <button type="button" onClick={() => decideControl.mutate({ control, action: 'retire' })} disabled={control.status !== 'Published'} className={iconBtnCls}>
-                          <Archive className="h-3.5 w-3.5" />
-                          Retire
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      value={decisionNotes[control.id] ?? ''}
-                      onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [control.id]: e.target.value }))}
-                      className={`${inputCls} mt-3`}
-                      placeholder="Decision notes"
-                    />
-                  </div>
                     ))}
                   </div>
                 )}
