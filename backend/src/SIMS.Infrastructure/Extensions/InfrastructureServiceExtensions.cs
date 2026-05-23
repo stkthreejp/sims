@@ -77,6 +77,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IProgramConfigurationService, ProgramConfigurationService>();
         services.AddScoped<IUnderwritingGuidelineControlService, UnderwritingGuidelineControlService>();
         services.AddScoped<IUnderwritingControlEnforcementService, UnderwritingControlEnforcementService>();
+        services.AddScoped<IAuthorityApprovalService, AuthorityApprovalService>();
         services.AddScoped<IAiGuidelineLlmInterpreterService, AnthropicGuidelineLlmInterpreterService>();
         services.AddScoped<IAiGuidelineControlProposalService, AiGuidelineControlProposalService>();
         services.AddScoped<IPolicyNumberService, PolicyNumberService>();

@@ -35,6 +35,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<UnderwritingGuidelineControl> UnderwritingGuidelineControls => Set<UnderwritingGuidelineControl>();
     public DbSet<UnderwritingGuidelineAuditLog> UnderwritingGuidelineAuditLogs => Set<UnderwritingGuidelineAuditLog>();
     public DbSet<UnderwritingControlEnforcementResult> UnderwritingControlEnforcementResults => Set<UnderwritingControlEnforcementResult>();
+    public DbSet<AuthorityApprovalRequest> AuthorityApprovalRequests => Set<AuthorityApprovalRequest>();
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<Policy> Policies => Set<Policy>();
     public DbSet<PolicyVersion> PolicyVersions => Set<PolicyVersion>();
@@ -189,6 +190,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<UnderwritingGuidelineControl>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineAuditLog>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingControlEnforcementResult>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<AuthorityApprovalRequest>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Quote>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Policy>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyVersion>().HasQueryFilter(e => !e.IsDeleted);

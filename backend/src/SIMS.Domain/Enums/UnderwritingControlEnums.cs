@@ -37,3 +37,20 @@ public enum UnderwritingControlStatus
     Retired = 6
 }
 
+public enum AuthorityApprovalTargetType
+{
+    Submission = 1,
+    Quote = 2,
+    Policy = 3,
+    PolicyTransaction = 4,
+    RatingPlanVersion = 5,
+    AccountingAction = 6
+}
+
+public enum AuthorityApprovalStatus
+{
+    Pending = 1,
+    Approved = 2,
+    Declined = 3,
+    Cancelled = 4
+}

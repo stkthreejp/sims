@@ -199,8 +199,15 @@ Status values:
 - Assigned follow-up ownership to Assistant UW when present, otherwise Underwriter, without creating separate task records yet.
 - Added queue filters for owner, SLA status, due window, and search so signed documents and post-bind subjectivities can be worked by team member and urgency.
 
+## Twenty-Fifth Implemented Slice
+
+- Added the reusable authority approval request spine for Phase 6 closeout.
+- Added `authority_approval_requests` so quotes, policy transactions, rating versions, and accounting actions can share the same pending/approved/declined approval flow.
+- Added `underwriting.authority.approve` as the first authority approval permission and seeded it to Admin.
+- Added an authority approval service that allows users with the required permission, reuses pending requests, and treats approved matching requests as authority to proceed.
+
 ## Immediate Next Slice
 
-1. Add program filtering to additional production/accounting reports as those reports become program-aware.
-2. Decide whether Post-Bind Follow-Up needs true task creation/escalation after the lightweight queue is used in practice.
-3. Add broader frontend regression coverage once a frontend test runner is introduced.
+1. Enforce authority approval on the highest-risk actions instead of only recording request records.
+2. Add one manager queue for pending referrals, pending authority approvals, and post-bind follow-up.
+3. Close Phase 6 with an updated matrix, focused regression tests, and backlog notes for Phase 7.
