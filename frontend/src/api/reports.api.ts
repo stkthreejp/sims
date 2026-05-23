@@ -7,6 +7,7 @@ import type {
   InvoiceTotalsByPolicyTransaction,
   InvoiceTotalsByProgram,
   PostBindFollowUp,
+  ManagerQueue,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -34,3 +35,6 @@ export const getInvoiceTotalsByProgram = (programId?: string | null): Promise<In
 
 export const getPostBindFollowUp = (): Promise<PostBindFollowUp> =>
   apiClient.get(`${BASE}/operations/post-bind-follow-up`).then(r => r.data)
+
+export const getManagerQueue = (): Promise<ManagerQueue> =>
+  apiClient.get(`${BASE}/operations/manager-queue`).then(r => r.data)

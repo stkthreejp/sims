@@ -137,3 +137,30 @@ public record PostBindFollowUpRowDto(
     int OpenRequiredItemCount,
     IReadOnlyList<string> OpenRequiredItems
 );
+
+public record ManagerQueueDto(
+    int PendingReferralCount,
+    int PendingAuthorityApprovalCount,
+    int PostBindFollowUpCount,
+    IReadOnlyList<ManagerQueueRowDto> Rows
+);
+
+public record ManagerQueueRowDto(
+    Guid Id,
+    string WorkType,
+    string Title,
+    string Detail,
+    string Priority,
+    string ReferenceNumber,
+    string? InsuredName,
+    Guid? SubmissionId,
+    Guid? QuoteId,
+    Guid? PolicyId,
+    Guid? OwnerId,
+    string? OwnerName,
+    DateTime CreatedAt,
+    DateOnly? DueDate,
+    int DaysOpen,
+    string SlaStatus,
+    string ActionUrl
+);

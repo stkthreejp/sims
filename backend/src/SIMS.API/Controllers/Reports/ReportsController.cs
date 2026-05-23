@@ -46,4 +46,8 @@ public class ReportsController : ControllerBase
     [HttpGet("operations/post-bind-follow-up")]
     public async Task<IActionResult> GetPostBindFollowUp(CancellationToken ct)
         => Ok(await _svc.GetPostBindFollowUpAsync(ct));
+
+    [HttpGet("operations/manager-queue")]
+    public async Task<IActionResult> GetManagerQueue(CancellationToken ct)
+        => Ok(await _svc.GetManagerQueueAsync(ct));
 }

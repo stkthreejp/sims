@@ -134,3 +134,30 @@ export interface PostBindFollowUpRow {
 export interface PostBindFollowUp {
   rows: PostBindFollowUpRow[]
 }
+
+export interface ManagerQueueRow {
+  id: string
+  workType: 'Referral' | 'AuthorityApproval' | 'PostBind' | string
+  title: string
+  detail: string
+  priority: string
+  referenceNumber: string
+  insuredName: string | null
+  submissionId: string | null
+  quoteId: string | null
+  policyId: string | null
+  ownerId: string | null
+  ownerName: string | null
+  createdAt: string
+  dueDate: string | null
+  daysOpen: number
+  slaStatus: string
+  actionUrl: string
+}
+
+export interface ManagerQueue {
+  pendingReferralCount: number
+  pendingAuthorityApprovalCount: number
+  postBindFollowUpCount: number
+  rows: ManagerQueueRow[]
+}

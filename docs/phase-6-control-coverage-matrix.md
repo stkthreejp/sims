@@ -213,7 +213,13 @@ Status values:
 - Let rating managers reach the promotion approval gate while still requiring `rating.admin` or an approved authority request before promotion mutates rating data.
 - Let approved accounting void requests satisfy the existing prior-period admin guard so approvals are operational, not just audit notes.
 
+## Twenty-Seventh Implemented Slice
+
+- Added a unified Reports > Operations > Manager Queue for open referrals, pending authority approvals, and post-bind follow-up.
+- Backed the queue with `GET /api/v1/reports/operations/manager-queue` using existing referral, authority approval, and checklist data instead of creating a second task system.
+- Added queue counts, SLA status, owner, work type, detail, and action links back to the underlying submission, quote, policy, or rating version.
+- Preserved the dedicated Post-Bind Follow-Up report for deeper signed-document and subjectivity filtering.
+
 ## Immediate Next Slice
 
-1. Add one manager queue for pending referrals, pending authority approvals, and post-bind follow-up.
-2. Close Phase 6 with an updated matrix, focused regression tests, and backlog notes for Phase 7.
+1. Close Phase 6 with an updated matrix, focused regression tests, and backlog notes for Phase 7.

@@ -383,12 +383,150 @@ public class ReportService : IReportService
         return new PostBindFollowUpDto(rows);
     }
 
+    public async Task<ManagerQueueDto> GetManagerQueueAsync(CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var rows = new List<ManagerQueueRowDto>();
+
+        var referrals = await Db.Set<UnderwritingReferral>()
+            .Include(r => r.Submission).ThenInclude(s => s.Insured)
+            .Include(r => r.Submission).ThenInclude(s => s.AssistantUW)
+            .Include(r => r.Submission).ThenInclude(s => s.Underwriter)
+            .Include(r => r.Quote)
+            .Where(r => r.Status == UnderwritingReferralStatus.Open)
+            .ToListAsync(ct);
+
+        rows.AddRange(referrals.Select(r =>
+        {
+            var owner = r.Submission.AssistantUW ?? r.Submission.Underwriter;
+            var dueDate = DateOnly.FromDateTime(r.RequestedAt).AddDays(r.Required ? 2 : 5);
+            var daysUntilDue = dueDate.DayNumber - today.DayNumber;
+            return new ManagerQueueRowDto(
+                r.Id,
+                "Referral",
+                r.ReferralType,
+                r.Reason,
+                r.Required ? "Required" : "Standard",
+                r.Quote?.QuoteNumber ?? r.Submission.SubmissionNumber,
+                r.Submission.Insured.DisplayName,
+                r.SubmissionId,
+                r.QuoteId,
+                null,
+                owner.Id,
+                DisplayName(owner),
+                r.RequestedAt,
+                dueDate,
+                Math.Max(0, today.DayNumber - DateOnly.FromDateTime(r.RequestedAt).DayNumber),
+                SlaStatusFor(daysUntilDue),
+                $"/submissions/{r.SubmissionId}");
+        }));
+
+        var approvals = await Db.Set<AuthorityApprovalRequest>()
+            .Include(a => a.AssignedToUser)
+            .Where(a => a.Status == AuthorityApprovalStatus.Pending)
+            .ToListAsync(ct);
+
+        var quoteTargets = approvals
+            .Where(a => a.TargetType == AuthorityApprovalTargetType.Quote)
+            .Select(a => a.TargetId)
+            .Distinct()
+            .ToList();
+        var quotes = await Db.Set<Quote>()
+            .Include(q => q.Submission).ThenInclude(s => s.Insured)
+            .Where(q => quoteTargets.Contains(q.Id))
+            .ToDictionaryAsync(q => q.Id, ct);
+
+        var policyTargets = approvals
+            .Where(a => a.TargetType == AuthorityApprovalTargetType.Policy)
+            .Select(a => a.TargetId)
+            .Distinct()
+            .ToList();
+        var policies = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Where(p => policyTargets.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, ct);
+
+        rows.AddRange(approvals.Select(a =>
+        {
+            quotes.TryGetValue(a.TargetId, out var quote);
+            policies.TryGetValue(a.TargetId, out var policy);
+            var dueDate = a.DueAt.HasValue ? DateOnly.FromDateTime(a.DueAt.Value) : DateOnly.FromDateTime(a.RequestedAt).AddDays(2);
+            var daysUntilDue = dueDate.DayNumber - today.DayNumber;
+            return new ManagerQueueRowDto(
+                a.Id,
+                "AuthorityApproval",
+                a.ActionLabel,
+                a.Reason,
+                "Authority",
+                quote?.QuoteNumber ?? policy?.PolicyNumber ?? a.ApprovalType,
+                quote?.Submission.Insured.DisplayName ?? policy?.Submission.Insured.DisplayName,
+                quote?.SubmissionId ?? policy?.SubmissionId,
+                quote?.Id,
+                policy?.Id,
+                a.AssignedToUserId,
+                DisplayName(a.AssignedToUser),
+                a.RequestedAt,
+                dueDate,
+                Math.Max(0, today.DayNumber - DateOnly.FromDateTime(a.RequestedAt).DayNumber),
+                SlaStatusFor(daysUntilDue),
+                ActionUrlFor(a, quote, policy));
+        }));
+
+        var postBind = await GetPostBindFollowUpAsync(ct);
+        rows.AddRange(postBind.Rows.Select(r =>
+        {
+            var createdAt = r.IssuedDate?.ToDateTime(TimeOnly.MinValue) ?? r.BoundDate.ToDateTime(TimeOnly.MinValue);
+            return new ManagerQueueRowDto(
+                r.PolicyId,
+                "PostBind",
+                "Post-bind follow-up",
+                string.Join("; ", r.OpenRequiredItems),
+                "Required",
+                r.PolicyNumber,
+                r.InsuredName,
+                null,
+                r.BoundQuoteId,
+                r.PolicyId,
+                r.OwnerId,
+                r.OwnerName,
+                createdAt,
+                r.DueDate,
+                r.DaysSinceBind,
+                r.SlaStatus,
+                $"/policies/{r.PolicyId}");
+        }));
+
+        return new ManagerQueueDto(
+            referrals.Count,
+            approvals.Count,
+            postBind.Rows.Count,
+            rows
+                .OrderBy(r => r.DueDate ?? DateOnly.MaxValue)
+                .ThenByDescending(r => r.Priority == "Required" || r.Priority == "Authority")
+                .ThenBy(r => r.WorkType)
+                .ToList());
+    }
+
     private static string SlaStatusFor(int daysUntilDue)
     {
         if (daysUntilDue < 0) return "Overdue";
         if (daysUntilDue == 0) return "DueToday";
         if (daysUntilDue <= 3) return "DueSoon";
         return "OnTrack";
+    }
+
+    private static string? DisplayName(User? user)
+    {
+        if (user == null) return null;
+        return string.IsNullOrWhiteSpace(user.FullName) ? user.Email : user.FullName;
+    }
+
+    private static string ActionUrlFor(AuthorityApprovalRequest approval, Quote? quote, Policy? policy)
+    {
+        if (quote != null) return $"/quotes/{quote.Id}";
+        if (policy != null) return $"/policies/{policy.Id}";
+        if (approval.TargetType == AuthorityApprovalTargetType.RatingPlanVersion) return $"/admin/rating/versions/{approval.TargetId}";
+        return "/reports?r=manager-queue";
     }
 
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)

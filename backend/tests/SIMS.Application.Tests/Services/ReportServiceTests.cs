@@ -277,6 +277,142 @@ public class ReportServiceTests
         Assert.Equal("Overdue", row.SlaStatus);
     }
 
+    [Fact]
+    public async Task GetManagerQueueAsync_ReturnsPendingReferralsAuthorityApprovalsAndPostBindFollowUp()
+    {
+        await using var db = CreateDb();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var manager = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Morgan",
+            LastName = "Manager",
+            UserName = "morgan@example.com",
+            Email = "morgan@example.com"
+        };
+        var requester = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Casey",
+            LastName = "Requester",
+            UserName = "casey@example.com",
+            Email = "casey@example.com"
+        };
+        var insured = new Insured
+        {
+            InsuredType = InsuredType.Commercial,
+            CompanyName = "Queue Timber",
+            State = "GA"
+        };
+        var submission = new Submission
+        {
+            SubmissionNumber = "SUB-Q",
+            Insured = insured,
+            InsuredId = insured.Id,
+            UnderwriterId = manager.Id,
+            Underwriter = manager,
+            CreatedById = requester.Id,
+            CreatedBy = requester
+        };
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-1",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            CarrierId = Guid.NewGuid(),
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = today.AddDays(30),
+            ExpirationDate = today.AddDays(395),
+            CreatedById = requester.Id,
+            CreatedBy = requester
+        };
+        var policy = PolicyFor(null);
+        policy.PolicyNumber = "POL-Q";
+        policy.BoundQuoteId = quote.Id;
+        policy.BoundDate = today.AddDays(-9);
+        policy.IssuedDate = today.AddDays(-8);
+        policy.Submission = submission;
+        policy.SubmissionId = submission.Id;
+        policy.Carrier = new Carrier { Name = "Queue Carrier" };
+
+        db.AddRange(
+            manager,
+            requester,
+            insured,
+            submission,
+            quote,
+            policy,
+            new UnderwritingReferral
+            {
+                Submission = submission,
+                SubmissionId = submission.Id,
+                Quote = quote,
+                QuoteId = quote.Id,
+                ReferralType = "LargeLoss",
+                Required = true,
+                Reason = "Large prior loss requires review.",
+                RequestedById = requester.Id,
+                RequestedBy = requester,
+                RequestedAt = DateTime.UtcNow.AddDays(-2)
+            },
+            new AuthorityApprovalRequest
+            {
+                TargetType = AuthorityApprovalTargetType.Quote,
+                TargetId = quote.Id,
+                ActionCode = "quote.commission-override",
+                ActionLabel = "Commission override",
+                RequiredPermission = "underwriting.authority.approve",
+                ApprovalType = "CommissionOverride",
+                Reason = "Commission override requires approval.",
+                RequestedById = requester.Id,
+                RequestedBy = requester,
+                AssignedToUserId = manager.Id,
+                AssignedToUser = manager,
+                DueAt = DateTime.UtcNow.AddDays(1)
+            },
+            new QuoteChecklistItem
+            {
+                QuoteId = quote.Id,
+                Stage = UnderwritingControlStage.PostBind,
+                Label = "Signed subjectivities returned",
+                IsBlocker = true,
+                IsCompleted = false
+            });
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetManagerQueueAsync();
+
+        Assert.Equal(3, result.Rows.Count);
+        Assert.Equal(1, result.PendingReferralCount);
+        Assert.Equal(1, result.PendingAuthorityApprovalCount);
+        Assert.Equal(1, result.PostBindFollowUpCount);
+
+        var referral = Assert.Single(result.Rows, r => r.WorkType == "Referral");
+        Assert.Equal(submission.Id, referral.SubmissionId);
+        Assert.Equal(quote.Id, referral.QuoteId);
+        Assert.Equal("Queue Timber", referral.InsuredName);
+        Assert.Equal("LargeLoss", referral.Title);
+        Assert.Contains("Large prior loss", referral.Detail);
+        Assert.Equal("Required", referral.Priority);
+        Assert.Equal($"/submissions/{submission.Id}", referral.ActionUrl);
+
+        var approval = Assert.Single(result.Rows, r => r.WorkType == "AuthorityApproval");
+        Assert.Equal(quote.Id, approval.QuoteId);
+        Assert.Equal("Commission override", approval.Title);
+        Assert.Equal(manager.Id, approval.OwnerId);
+        Assert.Equal("Morgan Manager", approval.OwnerName);
+        Assert.Equal("DueSoon", approval.SlaStatus);
+
+        var postBind = Assert.Single(result.Rows, r => r.WorkType == "PostBind");
+        Assert.Equal(policy.Id, postBind.PolicyId);
+        Assert.Equal("POL-Q", postBind.ReferenceNumber);
+        Assert.Equal("Overdue", postBind.SlaStatus);
+        Assert.Equal($"/policies/{policy.Id}", postBind.ActionUrl);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),
