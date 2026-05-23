@@ -1,4 +1,4 @@
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   getTrustReconciliation,
@@ -8,6 +8,7 @@ import {
   getCommissionSummary,
   getInvoiceTotalsByPolicyTransaction,
   getInvoiceTotalsByProgram,
+  getPostBindFollowUp,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
@@ -16,6 +17,7 @@ import type {
   CommissionSummary,
   InvoiceTotalsByPolicyTransaction,
   InvoiceTotalsByProgram,
+  PostBindFollowUp,
   AgingBucket,
   AgingRow,
   BrokerArRow,
@@ -29,6 +31,11 @@ function fmt(n: number) {
 
 function fmtMonth(year: number, month: number) {
   return new Date(year, month - 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
+}
+
+function fmtDate(value?: string | null) {
+  if (!value) return '-'
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -435,6 +442,75 @@ function InvoiceTotalsByProgramReport() {
   )
 }
 
+function PostBindFollowUpReport() {
+  const { data, isLoading, error } = useQuery<PostBindFollowUp>({
+    queryKey: ['report', 'post-bind-follow-up'],
+    queryFn: getPostBindFollowUp,
+  })
+
+  const openItems = data?.rows.reduce((sum, row) => sum + row.openRequiredItemCount, 0) ?? 0
+  const oldestAge = data?.rows.reduce((max, row) => Math.max(max, row.daysSinceBind), 0) ?? 0
+
+  return (
+    <ReportShell title="Post-Bind Follow-Up" isLoading={isLoading} error={error as Error}>
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Policies" value={data.rows.length.toLocaleString()} />
+            <KpiCard label="Open Items" value={openItems.toLocaleString()} highlight={openItems > 0 ? 'warn' : undefined} />
+            <KpiCard label="Oldest Bind Age" value={`${oldestAge} days`} highlight={oldestAge > 14 ? 'bad' : oldestAge > 7 ? 'warn' : undefined} />
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Policy', 'Insured', 'Program', 'Carrier / LOB', 'State', 'Bound', 'Issued', 'Age', 'Open Items'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: h === 'Age' ? 'right' : 'left' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map(row => (
+                  <tr key={row.policyId} style={{ borderBottom: '1px solid var(--line)', verticalAlign: 'top' }}>
+                    <td style={tdStyle}>
+                      <Link to={`/policies/${row.policyId}`} style={{ color: 'var(--accent-ink)', fontWeight: 600, textDecoration: 'none' }}>
+                        {row.policyNumber}
+                      </Link>
+                    </td>
+                    <td style={tdStyle}>{row.insuredName || '-'}</td>
+                    <td style={tdStyle}>
+                      <div>{row.programName ?? 'Unassigned'}</div>
+                      {row.programCode && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.programCode}</div>}
+                    </td>
+                    <td style={tdStyle}>
+                      <div>{row.carrierName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.lineOfBusiness}</div>
+                    </td>
+                    <td style={tdStyle}>{row.state ?? '-'}</td>
+                    <td style={tdStyle}>{fmtDate(row.boundDate)}</td>
+                    <td style={tdStyle}>{fmtDate(row.issuedDate)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.daysSinceBind}d</td>
+                    <td style={{ ...tdStyle, minWidth: 220 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{row.openRequiredItemCount} required</div>
+                      {row.openRequiredItems.map(item => (
+                        <div key={item} style={{ color: 'var(--ink-3)', marginBottom: 2 }}>{item}</div>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+                {data.rows.length === 0 && (
+                  <tr><td colSpan={9} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No post-bind follow-up items</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 function ComingSoon({ title }: { title: string }) {
   return (
     <ReportShell title={title}>
@@ -448,6 +524,12 @@ function ComingSoon({ title }: { title: string }) {
 // ── Sidebar config ──────────────────────────────────────────────────────────
 
 const REPORT_CATEGORIES = [
+  {
+    label: 'Operations',
+    reports: [
+      { id: 'post-bind-follow-up', label: 'Post-Bind Follow-Up' },
+    ],
+  },
   {
     label: 'Accounting',
     reports: [
@@ -491,6 +573,7 @@ function renderReport(id: string) {
     case 'commission-summary':     return <CommissionSummaryReport />
     case 'invoice-totals-by-program': return <InvoiceTotalsByProgramReport />
     case 'invoice-totals-by-transaction': return <InvoiceTotalsByPolicyTransactionReport />
+    case 'post-bind-follow-up':    return <PostBindFollowUpReport />
     default:                       return null
   }
 }

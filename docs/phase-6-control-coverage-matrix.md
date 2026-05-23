@@ -187,8 +187,14 @@ Status values:
 - Showed named required checklist blockers directly on disabled bind/issue/action buttons instead of only after the user clicks.
 - Added a policy activity warning banner when required PostBind items are still incomplete.
 
+## Twenty-Third Implemented Slice
+
+- Added a lightweight Reports > Operations > Post-Bind Follow-Up queue for active policies with incomplete required PostBind checklist items.
+- Included policy, insured, program, carrier, line, state, bind/issue age, and missing item names so signed documents and quote subjectivity follow-up can be worked from one place.
+- Backed the queue with `GET /api/v1/reports/operations/post-bind-follow-up` under the existing report permission surface.
+
 ## Immediate Next Slice
 
 1. Add program filtering to additional production/accounting reports as those reports become program-aware.
-2. Review whether PostBind completion needs a dedicated dashboard/work queue for follow-up ownership.
+2. Decide whether the Post-Bind Follow-Up queue needs owner, due-date, or SLA filters after users work the first version.
 3. Add broader frontend regression coverage once a frontend test runner is introduced.

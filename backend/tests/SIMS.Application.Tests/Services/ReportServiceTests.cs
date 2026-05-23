@@ -96,6 +96,115 @@ public class ReportServiceTests
         Assert.Equal(1100m, row.TotalAmount);
     }
 
+    [Fact]
+    public async Task GetPostBindFollowUpAsync_ReturnsActivePoliciesWithIncompleteRequiredPostBindItems()
+    {
+        await using var db = CreateDb();
+        var quoteId = Guid.NewGuid();
+        var ignoredQuoteId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "Great American" };
+        var insured = new Insured
+        {
+            InsuredType = InsuredType.Commercial,
+            CompanyName = "Acme Transit",
+            State = "TX"
+        };
+        var submission = new Submission
+        {
+            SubmissionNumber = "SUB-1",
+            Insured = insured,
+            InsuredId = insured.Id,
+            UnderwriterId = Guid.NewGuid(),
+            CreatedById = Guid.NewGuid()
+        };
+        var policy = PolicyFor(program.Id);
+        policy.PolicyNumber = "POL-1";
+        policy.BoundQuoteId = quoteId;
+        policy.BoundDate = today.AddDays(-8);
+        policy.IssuedDate = today.AddDays(-3);
+        policy.Carrier = carrier;
+        policy.CarrierId = carrier.Id;
+        policy.Program = program;
+        policy.Submission = submission;
+        policy.SubmissionId = submission.Id;
+
+        var cancelledPolicy = PolicyFor(program.Id);
+        cancelledPolicy.BoundQuoteId = ignoredQuoteId;
+        cancelledPolicy.Status = PolicyStatus.Cancelled;
+
+        db.AddRange(
+            program,
+            carrier,
+            insured,
+            submission,
+            policy,
+            cancelledPolicy,
+            new QuoteChecklistItem
+            {
+                QuoteId = quoteId,
+                Stage = UnderwritingControlStage.PostBind,
+                Label = "Signed subjectivities returned",
+                IsBlocker = true,
+                IsCompleted = false,
+                SortOrder = 1
+            },
+            new QuoteChecklistItem
+            {
+                QuoteId = quoteId,
+                Stage = UnderwritingControlStage.PostBind,
+                Label = "Signed policy forms received",
+                IsBlocker = true,
+                IsCompleted = false,
+                SortOrder = 2
+            },
+            new QuoteChecklistItem
+            {
+                QuoteId = quoteId,
+                Stage = UnderwritingControlStage.PostBind,
+                Label = "Completed item",
+                IsBlocker = true,
+                IsCompleted = true
+            },
+            new QuoteChecklistItem
+            {
+                QuoteId = quoteId,
+                Stage = UnderwritingControlStage.Bind,
+                Label = "Wrong stage",
+                IsBlocker = true,
+                IsCompleted = false
+            },
+            new QuoteChecklistItem
+            {
+                QuoteId = ignoredQuoteId,
+                Stage = UnderwritingControlStage.PostBind,
+                Label = "Cancelled policy item",
+                IsBlocker = true,
+                IsCompleted = false
+            });
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetPostBindFollowUpAsync();
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(policy.Id, row.PolicyId);
+        Assert.Equal("POL-1", row.PolicyNumber);
+        Assert.Equal("Acme Transit", row.InsuredName);
+        Assert.Equal("Great American", row.CarrierName);
+        Assert.Equal(PolicyLineOfBusiness.InlandMarine, row.LineOfBusiness);
+        Assert.Equal(program.Id, row.ProgramId);
+        Assert.Equal("Longleaf", row.ProgramName);
+        Assert.Equal("LONGLEAF", row.ProgramCode);
+        Assert.Equal("TX", row.State);
+        Assert.Equal(8, row.DaysSinceBind);
+        Assert.Equal(3, row.DaysSinceIssue);
+        Assert.Equal(2, row.OpenRequiredItemCount);
+        Assert.Equal(new[] { "Signed subjectivities returned", "Signed policy forms received" }, row.OpenRequiredItems);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),

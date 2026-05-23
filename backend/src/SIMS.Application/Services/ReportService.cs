@@ -4,6 +4,7 @@ using SIMS.Application.DTOs.Reports;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Enums;
 
 namespace SIMS.Application.Services;
 
@@ -303,6 +304,65 @@ public class ReportService : IReportService
         ).ToListAsync(ct);
 
         return new InvoiceTotalsByProgramDto(rows.OrderByDescending(r => r.TotalAmount).ToList(), availablePrograms);
+    }
+
+    public async Task<PostBindFollowUpDto> GetPostBindFollowUpAsync(CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var openItems = await Db.Set<QuoteChecklistItem>()
+            .Where(i => !i.IsDeleted
+                        && i.Stage == UnderwritingControlStage.PostBind
+                        && i.IsBlocker
+                        && !i.IsCompleted)
+            .OrderBy(i => i.SortOrder)
+            .ThenBy(i => i.Label)
+            .ToListAsync(ct);
+
+        if (openItems.Count == 0)
+            return new PostBindFollowUpDto(Array.Empty<PostBindFollowUpRowDto>());
+
+        var quoteIds = openItems.Select(i => i.QuoteId).Distinct().ToList();
+        var policies = await Db.Set<Policy>()
+            .Include(p => p.Submission)
+                .ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.Program)
+            .Where(p => !p.IsDeleted
+                        && p.Status == PolicyStatus.Active
+                        && quoteIds.Contains(p.BoundQuoteId))
+            .ToListAsync(ct);
+
+        var itemsByQuote = openItems
+            .GroupBy(i => i.QuoteId)
+            .ToDictionary(g => g.Key, g => g.Select(i => i.Label).ToList());
+
+        var rows = policies
+            .Select(p =>
+            {
+                var items = itemsByQuote[p.BoundQuoteId];
+                return new PostBindFollowUpRowDto(
+                    p.Id,
+                    p.PolicyNumber,
+                    p.BoundQuoteId,
+                    p.Submission.Insured.DisplayName,
+                    p.Carrier.Name,
+                    p.LineOfBusiness,
+                    p.ProgramId,
+                    p.Program?.Name,
+                    p.Program?.Code,
+                    p.Submission.Insured.State,
+                    p.BoundDate,
+                    p.IssuedDate,
+                    Math.Max(0, today.DayNumber - p.BoundDate.DayNumber),
+                    p.IssuedDate.HasValue ? Math.Max(0, today.DayNumber - p.IssuedDate.Value.DayNumber) : null,
+                    items.Count,
+                    items);
+            })
+            .OrderByDescending(r => r.DaysSinceBind)
+            .ThenBy(r => r.PolicyNumber)
+            .ToList();
+
+        return new PostBindFollowUpDto(rows);
     }
 
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)

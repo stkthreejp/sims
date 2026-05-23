@@ -6,6 +6,7 @@ import type {
   CommissionSummary,
   InvoiceTotalsByPolicyTransaction,
   InvoiceTotalsByProgram,
+  PostBindFollowUp,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -30,3 +31,6 @@ export const getInvoiceTotalsByPolicyTransaction = (): Promise<InvoiceTotalsByPo
 
 export const getInvoiceTotalsByProgram = (programId?: string | null): Promise<InvoiceTotalsByProgram> =>
   apiClient.get(`${BASE}/accounting/invoice-totals-by-program`, { params: programId ? { programId } : {} }).then(r => r.data)
+
+export const getPostBindFollowUp = (): Promise<PostBindFollowUp> =>
+  apiClient.get(`${BASE}/operations/post-bind-follow-up`).then(r => r.data)

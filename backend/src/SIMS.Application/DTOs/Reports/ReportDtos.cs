@@ -109,3 +109,26 @@ public record InvoiceTotalsByProgramRowDto(
     decimal AgentCommissionAmount,
     decimal NetRetained
 );
+
+public record PostBindFollowUpDto(
+    IReadOnlyList<PostBindFollowUpRowDto> Rows
+);
+
+public record PostBindFollowUpRowDto(
+    Guid PolicyId,
+    string PolicyNumber,
+    Guid BoundQuoteId,
+    string InsuredName,
+    string CarrierName,
+    PolicyLineOfBusiness LineOfBusiness,
+    Guid? ProgramId,
+    string? ProgramName,
+    string? ProgramCode,
+    string? State,
+    DateOnly BoundDate,
+    DateOnly? IssuedDate,
+    int DaysSinceBind,
+    int? DaysSinceIssue,
+    int OpenRequiredItemCount,
+    IReadOnlyList<string> OpenRequiredItems
+);

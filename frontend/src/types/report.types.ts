@@ -106,3 +106,26 @@ export interface InvoiceTotalsByProgram {
     code: string
   }>
 }
+
+export interface PostBindFollowUpRow {
+  policyId: string
+  policyNumber: string
+  boundQuoteId: string
+  insuredName: string
+  carrierName: string
+  lineOfBusiness: string
+  programId: string | null
+  programName: string | null
+  programCode: string | null
+  state: string | null
+  boundDate: string
+  issuedDate: string | null
+  daysSinceBind: number
+  daysSinceIssue: number | null
+  openRequiredItemCount: number
+  openRequiredItems: string[]
+}
+
+export interface PostBindFollowUp {
+  rows: PostBindFollowUpRow[]
+}

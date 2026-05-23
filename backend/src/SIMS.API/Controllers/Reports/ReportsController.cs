@@ -42,4 +42,8 @@ public class ReportsController : ControllerBase
     public async Task<IActionResult> GetInvoiceTotalsByProgram(
         [FromQuery] Guid? programId, CancellationToken ct)
         => Ok(await _svc.GetInvoiceTotalsByProgramAsync(programId, ct));
+
+    [HttpGet("operations/post-bind-follow-up")]
+    public async Task<IActionResult> GetPostBindFollowUp(CancellationToken ct)
+        => Ok(await _svc.GetPostBindFollowUpAsync(ct));
 }
