@@ -12,7 +12,7 @@ Status values:
 | Area | Action | Endpoint | Current Permission | Transaction Status Check | Approval / Referral Check | Authority Check | Phase 6 Next Step |
 |---|---|---|---|---|---|---|---|
 | Quote | Bind quote | `POST /api/v1/quotes/{id}/bind` | Partial: authenticated route, no explicit bind policy on controller | Partial: service validates quote/bind state | Partial: blocked clearance now stops bind | Missing | Add appetite/referral/authority gate before bind. |
-| Quote | Commission override | `POST /api/v1/quotes/{id}/commission-override` | Present: `underwriting.manage` | N/A | Missing | Missing | Require authority or approval for out-of-standard commission changes. |
+| Quote | Commission override | `POST /api/v1/quotes/{id}/commission-override` | Present: `underwriting.manage` | N/A | Present: creates/reuses an authority approval request when needed | Present: requires `underwriting.authority.approve` or approved request | Done for reusable authority gate; refine thresholds in Program Configuration. |
 | Quote | Rate quote | `POST /api/v1/quotes/{id}/rate` | Partial: authenticated route | N/A | Missing | Partial: rating eligibility rules exist, authority not formal | Feed rating warnings into appetite/referral records. |
 | Quote | Shadow rate | `POST /api/v1/quotes/{id}/shadow-rate` | Present: `underwriting.manage` | N/A | Missing | Missing | Keep advisory; no blocking authority needed unless promoted into production rating. |
 | Policy | Issue policy | `POST /api/v1/policies/{id}/issue` | Present: `policies.issue` | Present: service-level issuance checks | Missing | Missing | Block issue for open required referrals or missing authority approvals. |
@@ -27,11 +27,11 @@ Status values:
 | Policy | Non-renew | `POST /api/v1/policies/{id}/non-renew` | Present: `policies.cancel` | Present: notice transaction workflow | Missing | Missing | Add non-renewal authority and referral visibility. |
 | Policy | Complete non-renewal | `POST /api/v1/policies/{id}/non-renewals/{txnId}/complete` | Present: `policies.cancel` | Present: transaction workflow checks | Missing | Missing | Require authority/referral resolution before final non-renewal status. |
 | Policy | Void test bind | `POST /api/v1/policies/{id}/void-test-bind` | Present: admin role | Partial: test-bind protections in service | Missing | Partial: admin-only | Keep admin-only; add approval history if used outside test cleanup. |
-| Rating | Promote rating plan version | `POST /api/v1/rating-plan-versions/{id}/promote` | Present: rating admin controller policy | Partial: maker/checker and impact-preview checks | Missing | Partial: maker/checker only | Convert promotion gate into reusable approval/authority record. |
-| Accounting | Void receipt | `POST /api/v1/billing/void/receipts/{id}` | Present: `accounting.manage` | N/A | Missing | Partial: prior-day requires admin | Add sensitive accounting authority and approval record. |
-| Accounting | Void cash application | `POST /api/v1/billing/void/cash-applications/{id}` | Present: `accounting.manage` | N/A | Missing | Partial: prior-day requires admin | Add sensitive accounting authority and approval record. |
-| Accounting | Void invoice | `POST /api/v1/billing/void/invoices/{id}` | Present: `accounting.manage` | N/A | Missing | Missing | Add sensitive accounting authority and approval record. |
-| Accounting | Void disbursement | `POST /api/v1/billing/void/disbursements/{id}` | Present: `accounting.manage` | N/A | Missing | Partial: prior-day requires admin | Add sensitive accounting authority and approval record. |
+| Rating | Promote rating plan version | `POST /api/v1/rating-plan-versions/{id}/promote` | Present: `rating.manage` can reach approval gate | Partial: maker/checker and impact-preview checks | Present: creates/reuses authority approval request when promoter lacks rating admin | Present: requires `rating.admin` or approved request | Done for reusable authority gate. |
+| Accounting | Void receipt | `POST /api/v1/billing/void/receipts/{id}` | Present: `accounting.manage` | N/A | Present: creates/reuses authority approval request when needed | Present: requires `accounting.admin` or approved request | Done for reusable authority gate. |
+| Accounting | Void cash application | `POST /api/v1/billing/void/cash-applications/{id}` | Present: `accounting.manage` | N/A | Present: creates/reuses authority approval request when needed | Present: requires `accounting.admin` or approved request | Done for reusable authority gate. |
+| Accounting | Void invoice | `POST /api/v1/billing/void/invoices/{id}` | Present: `accounting.manage` | N/A | Present: creates/reuses authority approval request when needed | Present: requires `accounting.admin` or approved request | Done for reusable authority gate. |
+| Accounting | Void disbursement | `POST /api/v1/billing/void/disbursements/{id}` | Present: `accounting.manage` | N/A | Present: creates/reuses authority approval request when needed | Present: requires `accounting.admin` or approved request | Done for reusable authority gate. |
 | UW writeup | Submit writeup | `POST /api/v1/quotes/{quoteId}/writeup/submit` | Partial: authenticated route | N/A | Partial: referral flags stored in payload | Missing | Convert referral flags into referral decision records. |
 | UW writeup | Approve writeup | `POST /api/v1/quotes/{quoteId}/writeup/approve` | Present: `underwriting.manage` | N/A | Partial: writeup approval only | Missing | Link approval to referral/authority records where applicable. |
 
@@ -206,8 +206,14 @@ Status values:
 - Added `underwriting.authority.approve` as the first authority approval permission and seeded it to Admin.
 - Added an authority approval service that allows users with the required permission, reuses pending requests, and treats approved matching requests as authority to proceed.
 
+## Twenty-Sixth Implemented Slice
+
+- Enforced authority approval on commission overrides, rating plan promotion, and sensitive accounting voids.
+- Returned a shared `AUTHORITY_APPROVAL_REQUIRED` response when a user can start the action but lacks the elevated authority to complete it.
+- Let rating managers reach the promotion approval gate while still requiring `rating.admin` or an approved authority request before promotion mutates rating data.
+- Let approved accounting void requests satisfy the existing prior-period admin guard so approvals are operational, not just audit notes.
+
 ## Immediate Next Slice
 
-1. Enforce authority approval on the highest-risk actions instead of only recording request records.
-2. Add one manager queue for pending referrals, pending authority approvals, and post-bind follow-up.
-3. Close Phase 6 with an updated matrix, focused regression tests, and backlog notes for Phase 7.
+1. Add one manager queue for pending referrals, pending authority approvals, and post-bind follow-up.
+2. Close Phase 6 with an updated matrix, focused regression tests, and backlog notes for Phase 7.

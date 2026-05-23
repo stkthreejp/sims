@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.DTOs.Rating;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Rating;
@@ -27,13 +28,15 @@ public class RatingPlanVersionsController : ControllerBase
     };
 
     private readonly ICarrierRatingAssignmentService _assignmentSvc;
+    private readonly IAuthorityApprovalService _authorityApproval;
     private readonly ApplicationDbContext _db;
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    public RatingPlanVersionsController(ICarrierRatingAssignmentService assignmentSvc, ApplicationDbContext db)
+    public RatingPlanVersionsController(ICarrierRatingAssignmentService assignmentSvc, ApplicationDbContext db, IAuthorityApprovalService authorityApproval)
     {
         _assignmentSvc = assignmentSvc;
         _db = db;
+        _authorityApproval = authorityApproval;
     }
 
     // ─── Picker (used by CarrierDetailPage assignment modal) ─────────────────
@@ -150,7 +153,7 @@ public class RatingPlanVersionsController : ControllerBase
     // ─── Promote ─────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/promote")]
-    [Authorize(Policy = AppPermissions.RatingAdmin)]
+    [Authorize(Policy = AppPermissions.RatingManage)]
     public async Task<IActionResult> Promote(Guid id, CancellationToken ct)
     {
         var version = await _db.RatingPlanVersions
@@ -189,6 +192,23 @@ public class RatingPlanVersionsController : ControllerBase
 
         if (laterActive)
             return Conflict(new { ErrorCode = "TIME_TRAVEL", ErrorMessage = "Another active version exists with a later effective date. Retire it first." });
+
+        var authority = await _authorityApproval.EvaluateAsync(
+            new AuthorityApprovalEvaluationRequest(
+                AuthorityApprovalTargetType.RatingPlanVersion,
+                id,
+                "rating-plan-version.promote",
+                "Rating plan promotion",
+                AppPermissions.RatingAdmin,
+                "RatingPromotion",
+                "Rating plan promotion requires rating admin approval.",
+                null,
+                null),
+            User.PermissionNames(),
+            currentUserId,
+            ct);
+        if (!authority.Allowed)
+            return StatusCode(403, new { ErrorCode = "AUTHORITY_APPROVAL_REQUIRED", ErrorMessage = authority.Message, authority.ApprovalRequestId });
 
         // Expire the current active version (if any)
         var currentActive = await _db.RatingPlanVersions.FirstOrDefaultAsync(

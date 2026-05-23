@@ -15,6 +15,12 @@ public static class ClaimsPrincipalSecurityExtensions
         user.HasPermission(AppPermissions.AdminSystemManage) ||
         user.HasPermission(AppPermissions.UnderwritingManage);
 
-    private static bool HasPermission(this ClaimsPrincipal user, string permission) =>
+    public static IReadOnlyCollection<string> PermissionNames(this ClaimsPrincipal user) =>
+        user.Claims
+            .Where(c => c.Type == "permission")
+            .Select(c => c.Value)
+            .ToArray();
+
+    public static bool HasPermission(this ClaimsPrincipal user, string permission) =>
         user.HasClaim("permission", permission);
 }

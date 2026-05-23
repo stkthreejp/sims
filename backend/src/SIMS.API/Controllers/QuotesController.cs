@@ -1,6 +1,8 @@
 using SIMS.Application.Common;
+using SIMS.Application.DTOs.Underwriting;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -18,10 +20,11 @@ public class QuotesController : ControllerBase
     private readonly IFmcsaSafetyService _fmcsaSafety;
     private readonly IAutoSafetyReportService _autoSafetyReport;
     private readonly IQuotePolicyFormSelectionService _quotePolicyForms;
+    private readonly IAuthorityApprovalService _authorityApproval;
 
     public QuotesController(IQuoteService quoteService, IRatingEngineService ratingEngine,
         IShadowRatingService shadowRating, IFmcsaSafetyService fmcsaSafety, IAutoSafetyReportService autoSafetyReport,
-        IQuotePolicyFormSelectionService quotePolicyForms)
+        IQuotePolicyFormSelectionService quotePolicyForms, IAuthorityApprovalService authorityApproval)
     {
         _quoteService = quoteService;
         _ratingEngine = ratingEngine;
@@ -29,6 +32,7 @@ public class QuotesController : ControllerBase
         _fmcsaSafety = fmcsaSafety;
         _autoSafetyReport = autoSafetyReport;
         _quotePolicyForms = quotePolicyForms;
+        _authorityApproval = authorityApproval;
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -157,8 +161,25 @@ public class QuotesController : ControllerBase
 
     [HttpPost("{id:guid}/commission-override")]
     [Authorize(Policy = AppPermissions.UnderwritingManage)]
-    public async Task<IActionResult> CommissionOverride(Guid id, [FromBody] CommissionOverrideRequest req)
+    public async Task<IActionResult> CommissionOverride(Guid id, [FromBody] CommissionOverrideRequest req, CancellationToken ct)
     {
+        var authority = await _authorityApproval.EvaluateAsync(
+            new AuthorityApprovalEvaluationRequest(
+                AuthorityApprovalTargetType.Quote,
+                id,
+                "quote.commission-override",
+                "Commission override",
+                AppPermissions.UnderwritingAuthorityApprove,
+                "CommissionOverride",
+                "Commission override requires underwriting authority approval.",
+                null,
+                null),
+            User.PermissionNames(),
+            CurrentUserId,
+            ct);
+        if (!authority.Allowed)
+            return StatusCode(403, new { ErrorCode = "AUTHORITY_APPROVAL_REQUIRED", ErrorMessage = authority.Message, authority.ApprovalRequestId });
+
         var result = await _quoteService.ApplyCommissionOverrideAsync(id, req, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
