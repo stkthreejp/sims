@@ -205,6 +205,78 @@ public class ReportServiceTests
         Assert.Equal(new[] { "Signed subjectivities returned", "Signed policy forms received" }, row.OpenRequiredItems);
     }
 
+    [Fact]
+    public async Task GetPostBindFollowUpAsync_AddsOwnerDueDateAndSlaStatusForFiltering()
+    {
+        await using var db = CreateDb();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var assistant = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Casey",
+            LastName = "Assistant",
+            UserName = "casey@example.com",
+            Email = "casey@example.com"
+        };
+        var underwriter = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Jordan",
+            LastName = "Underwriter",
+            UserName = "jordan@example.com",
+            Email = "jordan@example.com"
+        };
+        var submission = new Submission
+        {
+            SubmissionNumber = "SUB-2",
+            Insured = new Insured
+            {
+                InsuredType = InsuredType.Commercial,
+                CompanyName = "Late Forms LLC",
+                State = "FL"
+            },
+            UnderwriterId = underwriter.Id,
+            Underwriter = underwriter,
+            AssistantUWId = assistant.Id,
+            AssistantUW = assistant,
+            CreatedById = underwriter.Id,
+            CreatedBy = underwriter
+        };
+        var policy = PolicyFor(null);
+        policy.PolicyNumber = "POL-LATE";
+        policy.BoundDate = today.AddDays(-10);
+        policy.IssuedDate = today.AddDays(-8);
+        policy.Submission = submission;
+        policy.SubmissionId = submission.Id;
+        policy.Carrier = new Carrier { Name = "Follow-Up Carrier" };
+
+        db.AddRange(
+            assistant,
+            underwriter,
+            submission,
+            policy,
+            new QuoteChecklistItem
+            {
+                QuoteId = policy.BoundQuoteId,
+                Stage = UnderwritingControlStage.PostBind,
+                Label = "Signed policy forms received",
+                IsBlocker = true,
+                IsCompleted = false
+            });
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetPostBindFollowUpAsync();
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(assistant.Id, row.OwnerId);
+        Assert.Equal("Casey Assistant", row.OwnerName);
+        Assert.Equal(today.AddDays(-1), row.DueDate);
+        Assert.Equal(-1, row.DaysUntilDue);
+        Assert.Equal("Overdue", row.SlaStatus);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),

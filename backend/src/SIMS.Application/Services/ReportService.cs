@@ -332,6 +332,15 @@ public class ReportService : IReportService
                         && quoteIds.Contains(p.BoundQuoteId))
             .ToListAsync(ct);
 
+        var ownerIds = policies
+            .Select(p => p.Submission.AssistantUWId ?? p.Submission.UnderwriterId)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+        var users = await Db.Set<User>()
+            .Where(u => ownerIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, ct);
+
         var itemsByQuote = openItems
             .GroupBy(i => i.QuoteId)
             .ToDictionary(g => g.Key, g => g.Select(i => i.Label).ToList());
@@ -340,6 +349,10 @@ public class ReportService : IReportService
             .Select(p =>
             {
                 var items = itemsByQuote[p.BoundQuoteId];
+                var ownerId = p.Submission.AssistantUWId ?? p.Submission.UnderwriterId;
+                users.TryGetValue(ownerId, out var owner);
+                var dueDate = (p.IssuedDate ?? p.BoundDate).AddDays(7);
+                var daysUntilDue = dueDate.DayNumber - today.DayNumber;
                 return new PostBindFollowUpRowDto(
                     p.Id,
                     p.PolicyNumber,
@@ -355,6 +368,11 @@ public class ReportService : IReportService
                     p.IssuedDate,
                     Math.Max(0, today.DayNumber - p.BoundDate.DayNumber),
                     p.IssuedDate.HasValue ? Math.Max(0, today.DayNumber - p.IssuedDate.Value.DayNumber) : null,
+                    ownerId == Guid.Empty ? null : ownerId,
+                    string.IsNullOrWhiteSpace(owner?.FullName) ? owner?.Email : owner.FullName,
+                    dueDate,
+                    daysUntilDue,
+                    SlaStatusFor(daysUntilDue),
                     items.Count,
                     items);
             })
@@ -363,6 +381,14 @@ public class ReportService : IReportService
             .ToList();
 
         return new PostBindFollowUpDto(rows);
+    }
+
+    private static string SlaStatusFor(int daysUntilDue)
+    {
+        if (daysUntilDue < 0) return "Overdue";
+        if (daysUntilDue == 0) return "DueToday";
+        if (daysUntilDue <= 3) return "DueSoon";
+        return "OnTrack";
     }
 
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)

@@ -1,4 +1,5 @@
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   getTrustReconciliation,
@@ -443,42 +444,101 @@ function InvoiceTotalsByProgramReport() {
 }
 
 function PostBindFollowUpReport() {
+  const [ownerFilter, setOwnerFilter] = useState('')
+  const [slaFilter, setSlaFilter] = useState('')
+  const [dueFilter, setDueFilter] = useState('')
+  const [search, setSearch] = useState('')
   const { data, isLoading, error } = useQuery<PostBindFollowUp>({
     queryKey: ['report', 'post-bind-follow-up'],
     queryFn: getPostBindFollowUp,
   })
 
-  const openItems = data?.rows.reduce((sum, row) => sum + row.openRequiredItemCount, 0) ?? 0
-  const oldestAge = data?.rows.reduce((max, row) => Math.max(max, row.daysSinceBind), 0) ?? 0
+  const rows = data?.rows ?? []
+  const owners = Array.from(
+    new Map(rows.filter(row => row.ownerId).map(row => [row.ownerId!, row.ownerName ?? 'Unassigned'])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]))
+  const filteredRows = rows.filter(row => {
+    if (ownerFilter && row.ownerId !== ownerFilter) return false
+    if (slaFilter && row.slaStatus !== slaFilter) return false
+    if (dueFilter === 'overdue' && row.daysUntilDue >= 0) return false
+    if (dueFilter === 'next7' && (row.daysUntilDue < 0 || row.daysUntilDue > 7)) return false
+    if (dueFilter === 'later' && row.daysUntilDue <= 7) return false
+    if (search) {
+      const query = search.toLowerCase()
+      const target = `${row.policyNumber} ${row.insuredName} ${row.programName ?? ''} ${row.carrierName} ${row.lineOfBusiness} ${row.state ?? ''} ${row.ownerName ?? ''} ${row.openRequiredItems.join(' ')}`.toLowerCase()
+      if (!target.includes(query)) return false
+    }
+    return true
+  })
+
+  const openItems = filteredRows.reduce((sum, row) => sum + row.openRequiredItemCount, 0)
+  const oldestAge = filteredRows.reduce((max, row) => Math.max(max, row.daysSinceBind), 0)
+  const hasFilters = ownerFilter || slaFilter || dueFilter || search
 
   return (
     <ReportShell title="Post-Bind Follow-Up" isLoading={isLoading} error={error as Error}>
       {data && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <KpiCard label="Policies" value={data.rows.length.toLocaleString()} />
+            <KpiCard label="Policies" value={filteredRows.length.toLocaleString()} sub={`${rows.length.toLocaleString()} total`} />
             <KpiCard label="Open Items" value={openItems.toLocaleString()} highlight={openItems > 0 ? 'warn' : undefined} />
             <KpiCard label="Oldest Bind Age" value={`${oldestAge} days`} highlight={oldestAge > 14 ? 'bad' : oldestAge > 7 ? 'warn' : undefined} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search policies, insureds, items..."
+              style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', minWidth: 240, fontSize: 12.5, color: 'var(--ink)', background: 'var(--surface)' }}
+            />
+            <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} style={filterStyle}>
+              <option value="">All owners</option>
+              {owners.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+            <select value={slaFilter} onChange={(e) => setSlaFilter(e.target.value)} style={filterStyle}>
+              <option value="">All SLA</option>
+              <option value="Overdue">Overdue</option>
+              <option value="DueToday">Due today</option>
+              <option value="DueSoon">Due soon</option>
+              <option value="OnTrack">On track</option>
+            </select>
+            <select value={dueFilter} onChange={(e) => setDueFilter(e.target.value)} style={filterStyle}>
+              <option value="">All due dates</option>
+              <option value="overdue">Overdue</option>
+              <option value="next7">Next 7 days</option>
+              <option value="later">Later</option>
+            </select>
+            {hasFilters && (
+              <button
+                onClick={() => { setOwnerFilter(''); setSlaFilter(''); setDueFilter(''); setSearch('') }}
+                style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontSize: 12.5, color: 'var(--ink-3)', background: 'var(--surface)', cursor: 'pointer' }}
+              >
+                Clear filters
+              </button>
+            )}
           </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                  {['Policy', 'Insured', 'Program', 'Carrier / LOB', 'State', 'Bound', 'Issued', 'Age', 'Open Items'].map(h => (
+                  {['Policy', 'Insured', 'Owner', 'Program', 'Carrier / LOB', 'State', 'Bound', 'Due', 'SLA', 'Open Items'].map(h => (
                     <th key={h} style={{ ...thStyle, textAlign: h === 'Age' ? 'right' : 'left' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {data.rows.map(row => (
+                {filteredRows.map(row => (
                   <tr key={row.policyId} style={{ borderBottom: '1px solid var(--line)', verticalAlign: 'top' }}>
                     <td style={tdStyle}>
                       <Link to={`/policies/${row.policyId}`} style={{ color: 'var(--accent-ink)', fontWeight: 600, textDecoration: 'none' }}>
                         {row.policyNumber}
                       </Link>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.daysSinceBind}d since bind</div>
                     </td>
                     <td style={tdStyle}>{row.insuredName || '-'}</td>
+                    <td style={tdStyle}>{row.ownerName ?? 'Unassigned'}</td>
                     <td style={tdStyle}>
                       <div>{row.programName ?? 'Unassigned'}</div>
                       {row.programCode && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.programCode}</div>}
@@ -489,8 +549,13 @@ function PostBindFollowUpReport() {
                     </td>
                     <td style={tdStyle}>{row.state ?? '-'}</td>
                     <td style={tdStyle}>{fmtDate(row.boundDate)}</td>
-                    <td style={tdStyle}>{fmtDate(row.issuedDate)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.daysSinceBind}d</td>
+                    <td style={tdStyle}>
+                      <div>{fmtDate(row.dueDate)}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.daysUntilDue < 0 ? `${Math.abs(row.daysUntilDue)}d late` : row.daysUntilDue === 0 ? 'Today' : `${row.daysUntilDue}d left`}</div>
+                    </td>
+                    <td style={tdStyle}>
+                      <SlaBadge status={row.slaStatus} />
+                    </td>
                     <td style={{ ...tdStyle, minWidth: 220 }}>
                       <div style={{ fontWeight: 600, marginBottom: 4 }}>{row.openRequiredItemCount} required</div>
                       {row.openRequiredItems.map(item => (
@@ -499,8 +564,8 @@ function PostBindFollowUpReport() {
                     </td>
                   </tr>
                 ))}
-                {data.rows.length === 0 && (
-                  <tr><td colSpan={9} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No post-bind follow-up items</td></tr>
+                {filteredRows.length === 0 && (
+                  <tr><td colSpan={10} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No post-bind follow-up items</td></tr>
                 )}
               </tbody>
             </table>
@@ -508,6 +573,27 @@ function PostBindFollowUpReport() {
         </>
       )}
     </ReportShell>
+  )
+}
+
+const filterStyle: React.CSSProperties = {
+  border: '1px solid var(--line)',
+  borderRadius: 'var(--r-sm)',
+  padding: '7px 9px',
+  minWidth: 140,
+  fontSize: 12.5,
+  color: 'var(--ink)',
+  background: 'var(--surface)',
+}
+
+function SlaBadge({ status }: { status: string }) {
+  const label = status === 'DueToday' ? 'Due today' : status === 'DueSoon' ? 'Due soon' : status === 'OnTrack' ? 'On track' : status
+  const bg = status === 'Overdue' ? 'var(--red-soft, #fef2f2)' : status === 'DueToday' || status === 'DueSoon' ? 'var(--yellow-soft, #fefce8)' : 'var(--green-soft, #f0fdf4)'
+  const color = status === 'Overdue' ? 'var(--red, #b91c1c)' : status === 'DueToday' || status === 'DueSoon' ? '#8a5a00' : '#166534'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--r-sm)', padding: '3px 7px', fontSize: 11, fontWeight: 700, background: bg, color }}>
+      {label}
+    </span>
   )
 }
 

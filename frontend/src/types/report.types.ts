@@ -122,6 +122,11 @@ export interface PostBindFollowUpRow {
   issuedDate: string | null
   daysSinceBind: number
   daysSinceIssue: number | null
+  ownerId: string | null
+  ownerName: string | null
+  dueDate: string
+  daysUntilDue: number
+  slaStatus: string
   openRequiredItemCount: number
   openRequiredItems: string[]
 }

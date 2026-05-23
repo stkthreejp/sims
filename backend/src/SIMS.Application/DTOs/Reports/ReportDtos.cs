@@ -129,6 +129,11 @@ public record PostBindFollowUpRowDto(
     DateOnly? IssuedDate,
     int DaysSinceBind,
     int? DaysSinceIssue,
+    Guid? OwnerId,
+    string? OwnerName,
+    DateOnly DueDate,
+    int DaysUntilDue,
+    string SlaStatus,
     int OpenRequiredItemCount,
     IReadOnlyList<string> OpenRequiredItems
 );

@@ -193,8 +193,14 @@ Status values:
 - Included policy, insured, program, carrier, line, state, bind/issue age, and missing item names so signed documents and quote subjectivity follow-up can be worked from one place.
 - Backed the queue with `GET /api/v1/reports/operations/post-bind-follow-up` under the existing report permission surface.
 
+## Twenty-Fourth Implemented Slice
+
+- Added computed owner, due date, days-until-due, and SLA status to the Post-Bind Follow-Up queue.
+- Assigned follow-up ownership to Assistant UW when present, otherwise Underwriter, without creating separate task records yet.
+- Added queue filters for owner, SLA status, due window, and search so signed documents and post-bind subjectivities can be worked by team member and urgency.
+
 ## Immediate Next Slice
 
 1. Add program filtering to additional production/accounting reports as those reports become program-aware.
-2. Decide whether the Post-Bind Follow-Up queue needs owner, due-date, or SLA filters after users work the first version.
+2. Decide whether Post-Bind Follow-Up needs true task creation/escalation after the lightweight queue is used in practice.
 3. Add broader frontend regression coverage once a frontend test runner is introduced.
