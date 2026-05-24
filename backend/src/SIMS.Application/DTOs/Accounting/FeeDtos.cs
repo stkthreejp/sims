@@ -29,6 +29,7 @@ public record FeeRuleVersionDto(
     string FeeCode,
     string FeeDisplayName,
     Guid? ProgramConfigurationId,
+    string? ProgramName,
     Guid? CarrierId,
     int? CompanyId,
     int? ProducerId,

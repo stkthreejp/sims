@@ -48,6 +48,7 @@ public class FeeAdminService : IFeeAdminService
     {
         var versions = await Db.Set<FeeRuleVersion>()
             .Include(v => v.FeeDefinition)
+            .Include(v => v.ProgramConfiguration)
             .Include(v => v.PremiumBrackets)
             .Where(v => v.FeeDefinitionId == feeDefinitionId)
             .OrderByDescending(v => v.EffectiveDate)
@@ -63,6 +64,7 @@ public class FeeAdminService : IFeeAdminService
     {
         var version = await Db.Set<FeeRuleVersion>()
             .Include(v => v.FeeDefinition)
+            .Include(v => v.ProgramConfiguration)
             .Include(v => v.PremiumBrackets)
             .FirstOrDefaultAsync(v => v.Id == id, ct);
 
@@ -93,6 +95,8 @@ public class FeeAdminService : IFeeAdminService
         await Db.SaveChangesAsync(ct);
 
         await Db.Entry(version).Reference(v => v.FeeDefinition).LoadAsync(ct);
+        if (version.ProgramConfigurationId.HasValue)
+            await Db.Entry(version).Reference(v => v.ProgramConfiguration).LoadAsync(ct);
         var nonTaxableMap = await GetNonTaxableMapAsync([version.FeeDefinitionId], ct);
         return Result<FeeRuleVersionDto>.Success(MapVersion(version, nonTaxableMap));
     }
@@ -121,6 +125,8 @@ public class FeeAdminService : IFeeAdminService
         await Db.SaveChangesAsync(ct);
 
         await Db.Entry(newVersion).Reference(v => v.FeeDefinition).LoadAsync(ct);
+        if (newVersion.ProgramConfigurationId.HasValue)
+            await Db.Entry(newVersion).Reference(v => v.ProgramConfiguration).LoadAsync(ct);
         var nonTaxableMap = await GetNonTaxableMapAsync([newVersion.FeeDefinitionId], ct);
         return Result<FeeRuleVersionDto>.Success(MapVersion(newVersion, nonTaxableMap));
     }
@@ -192,6 +198,7 @@ public class FeeAdminService : IFeeAdminService
             FeeCode: v.FeeDefinition?.Code ?? string.Empty,
             FeeDisplayName: v.FeeDefinition?.DisplayName ?? string.Empty,
             ProgramConfigurationId: v.ProgramConfigurationId,
+            ProgramName: v.ProgramConfiguration?.Name,
             CarrierId: v.CarrierId,
             CompanyId: v.CompanyId,
             ProducerId: v.ProducerId,

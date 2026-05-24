@@ -622,6 +622,7 @@ export function FeesAdminPage() {
                           <td className={`px-6 py-3 ${sup ? 'line-through' : 'text-gray-900 font-medium'}`}>{v.effectiveDate}</td>
                           <td className="px-6 py-3 text-gray-500">{v.disabledDate ?? <span className="text-green-600">Active</span>}</td>
                           <td className="px-6 py-3 text-gray-500">{[
+                            v.programName ?? (v.programConfigurationId ? programs.find(program => program.id === v.programConfigurationId)?.name ?? 'Program' : null),
                             v.carrierId ? carriers.find(c => c.id === v.carrierId)?.name ?? 'Carrier' : null,
                             v.stateCode,
                             v.lineOfBusiness ? LOB_LABELS[v.lineOfBusiness as PolicyLineOfBusiness] ?? v.lineOfBusiness : null,

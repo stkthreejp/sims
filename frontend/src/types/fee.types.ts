@@ -39,6 +39,7 @@ export interface FeeRuleVersion {
   feeCode: string
   feeDisplayName: string
   programConfigurationId: string | null
+  programName: string | null
   carrierId: string | null
   companyId: number | null
   producerId: number | null
