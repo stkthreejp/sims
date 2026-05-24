@@ -92,11 +92,12 @@ public class PolicyFormsController : ControllerBase
 
     [HttpGet("packages")]
     public async Task<IActionResult> GetPackages(
+        [FromQuery] Guid? programConfigurationId = null,
         [FromQuery] Guid? carrierId = null,
         [FromQuery] PolicyLineOfBusiness? lineOfBusiness = null,
         [FromQuery] string? state = null,
         [FromQuery] bool includeInactive = false)
-        => Ok(await _service.GetPackagesAsync(carrierId, lineOfBusiness, state, includeInactive));
+        => Ok(await _service.GetPackagesAsync(programConfigurationId, carrierId, lineOfBusiness, state, includeInactive));
 
     [HttpGet("packages/{id:guid}")]
     public async Task<IActionResult> GetPackage(Guid id)

@@ -67,6 +67,8 @@ public class DocumentTagDto
 public class PolicyPackageConfigurationDto
 {
     public Guid Id { get; set; }
+    public Guid? ProgramConfigurationId { get; set; }
+    public string? ProgramName { get; set; }
     public Guid CarrierId { get; set; }
     public string CarrierName { get; set; } = string.Empty;
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
@@ -79,6 +81,7 @@ public class PolicyPackageConfigurationDto
 
 public class PolicyPackageConfigurationUpsertDto
 {
+    public Guid? ProgramConfigurationId { get; set; }
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public string State { get; set; } = string.Empty;

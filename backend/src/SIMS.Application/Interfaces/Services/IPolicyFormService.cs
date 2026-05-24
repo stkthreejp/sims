@@ -17,7 +17,7 @@ public interface IPolicyFormService
     Task<Result<IReadOnlyList<PolicyFormFieldMappingDto>>> ReplaceMappingsAsync(Guid templateId, IReadOnlyList<PolicyFormFieldMappingUpsertDto> mappings);
     Task<IReadOnlyList<DocumentTagDto>> GetDocumentTagsAsync();
 
-    Task<IReadOnlyList<PolicyPackageConfigurationDto>> GetPackagesAsync(Guid? carrierId = null, PolicyLineOfBusiness? lineOfBusiness = null, string? state = null, bool includeInactive = false);
+    Task<IReadOnlyList<PolicyPackageConfigurationDto>> GetPackagesAsync(Guid? programConfigurationId = null, Guid? carrierId = null, PolicyLineOfBusiness? lineOfBusiness = null, string? state = null, bool includeInactive = false);
     Task<Result<PolicyPackageConfigurationDto>> GetPackageAsync(Guid id);
     Task<Result<PolicyPackageConfigurationDto>> CreatePackageAsync(PolicyPackageConfigurationUpsertDto dto);
     Task<Result<PolicyPackageConfigurationDto>> UpdatePackageAsync(Guid id, PolicyPackageConfigurationUpsertDto dto);

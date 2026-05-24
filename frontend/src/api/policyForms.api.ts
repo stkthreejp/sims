@@ -45,7 +45,7 @@ export const policyFormsApi = {
   deleteTemplate: (id: string) =>
     apiClient.delete(`/policy-forms/templates/${id}`),
 
-  getPackages: (params?: { carrierId?: string; lineOfBusiness?: PolicyLineOfBusiness; state?: string; includeInactive?: boolean }) =>
+  getPackages: (params?: { programConfigurationId?: string; carrierId?: string; lineOfBusiness?: PolicyLineOfBusiness; state?: string; includeInactive?: boolean }) =>
     apiClient.get<PolicyPackageConfiguration[]>('/policy-forms/packages', { params }).then((r) => r.data),
 
   createPackage: (data: PolicyPackageConfigurationUpsert) =>

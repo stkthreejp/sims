@@ -4,6 +4,7 @@ import { Check, Download, FileText, PackagePlus, Play, Plus, Settings, Trash2, U
 import { toast } from 'sonner'
 import { policyFormsApi } from '@/api/policyForms.api'
 import { carriersApi } from '@/api/carriers.api'
+import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { policiesApi } from '@/api/policies.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
@@ -99,6 +100,7 @@ const emptyTemplate = {
 }
 
 const emptyPackage = {
+  programConfigurationId: '',
   carrierId: '',
   lineOfBusiness: 'InlandMarine' as PolicyLineOfBusiness,
   state: '',
@@ -196,6 +198,11 @@ export function PolicyFormsAdminPage() {
     queryFn: () => carriersApi.getAll(true),
   })
 
+  const { data: programs = [] } = useQuery({
+    queryKey: ['admin', 'program-configurations', 'active'],
+    queryFn: () => programConfigurationsApi.getAll(false),
+  })
+
   const { data: tags = [] } = useQuery({
     queryKey: ['policy-form-tags'],
     queryFn: policyFormsApi.getTags,
@@ -212,10 +219,11 @@ export function PolicyFormsAdminPage() {
 
   const packageTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates])
   const derivedPackageName = useMemo(() => {
+    const programName = programs.find((program) => program.id === packageForm.programConfigurationId)?.name
     const carrierName = carriers.find((carrier) => carrier.id === packageForm.carrierId)?.name
     if (!carrierName || !packageForm.lineOfBusiness || !packageForm.state) return ''
-    return `${carrierName} - ${LOB_LABELS[packageForm.lineOfBusiness]} - ${packageForm.state}`
-  }, [carriers, packageForm.carrierId, packageForm.lineOfBusiness, packageForm.state])
+    return [programName, carrierName, LOB_LABELS[packageForm.lineOfBusiness], packageForm.state].filter(Boolean).join(' - ')
+  }, [carriers, packageForm.carrierId, packageForm.lineOfBusiness, packageForm.programConfigurationId, packageForm.state, programs])
   const mappingDataPaths = useMemo(() => {
     const nonRepeatingTags = tags.filter((t) => !t.isRepeatable).map((t) => t.tag)
     return nonRepeatingTags.length > 0 ? nonRepeatingTags : DATA_PATH_OPTIONS
@@ -281,6 +289,7 @@ export function PolicyFormsAdminPage() {
   const createPackage = useMutation({
     mutationFn: () => policyFormsApi.createPackage({
       ...packageForm,
+      programConfigurationId: packageForm.programConfigurationId || null,
       name: derivedPackageName,
       state: packageForm.state.toUpperCase(),
     }),
@@ -401,7 +410,7 @@ export function PolicyFormsAdminPage() {
     <div className="p-6 space-y-6 max-w-7xl">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Policy Forms & Packages</h1>
-        <p className="text-sm text-slate-500 mt-1">Set up carrier forms and the policy packets used during issuance.</p>
+        <p className="text-sm text-slate-500 mt-1">Set up Program-aware carrier forms, proposal notices, and policy packets.</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
@@ -510,6 +519,10 @@ export function PolicyFormsAdminPage() {
             <h2 className="text-sm font-semibold text-slate-800">Packages</h2>
           </div>
           <div className="p-4 space-y-3 border-b bg-slate-50">
+            <select value={packageForm.programConfigurationId} onChange={(e) => setPackageForm((f) => ({ ...f, programConfigurationId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
+              <option value="">Any program</option>
+              {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+            </select>
             <select value={packageForm.carrierId} onChange={(e) => setPackageForm((f) => ({ ...f, carrierId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
               <option value="">Select carrier</option>
               {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
@@ -524,7 +537,7 @@ export function PolicyFormsAdminPage() {
               </select>
             </div>
             <div className="border rounded px-2 py-1.5 text-sm bg-white text-slate-700 min-h-9">
-              {derivedPackageName || 'Package name will be Carrier - LOB - State'}
+              {derivedPackageName || 'Package name will be Program - Carrier - LOB - State'}
             </div>
             <button onClick={() => createPackage.mutate()} disabled={createPackage.isPending || !derivedPackageName} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
               <Plus className="h-4 w-4" /> Create package

@@ -191,20 +191,23 @@ public class PolicyFormService : IPolicyFormService
     public Task<IReadOnlyList<DocumentTagDto>> GetDocumentTagsAsync()
         => Task.FromResult<IReadOnlyList<DocumentTagDto>>(DocumentTags);
 
-    public async Task<IReadOnlyList<PolicyPackageConfigurationDto>> GetPackagesAsync(Guid? carrierId = null, PolicyLineOfBusiness? lineOfBusiness = null, string? state = null, bool includeInactive = false)
+    public async Task<IReadOnlyList<PolicyPackageConfigurationDto>> GetPackagesAsync(Guid? programConfigurationId = null, Guid? carrierId = null, PolicyLineOfBusiness? lineOfBusiness = null, string? state = null, bool includeInactive = false)
     {
         var q = Db.Set<PolicyPackageConfiguration>()
+            .Include(p => p.ProgramConfiguration)
             .Include(p => p.Carrier)
             .Include(p => p.Forms).ThenInclude(f => f.PolicyFormTemplate)
             .AsQueryable();
 
+        if (programConfigurationId.HasValue) q = q.Where(p => p.ProgramConfigurationId == programConfigurationId.Value);
         if (carrierId.HasValue) q = q.Where(p => p.CarrierId == carrierId.Value);
         if (lineOfBusiness.HasValue) q = q.Where(p => p.LineOfBusiness == lineOfBusiness.Value);
         if (!string.IsNullOrWhiteSpace(state)) q = q.Where(p => p.State == state.Trim().ToUpper());
         if (!includeInactive) q = q.Where(p => p.IsActive);
 
         var packages = await q
-            .OrderBy(p => p.Carrier.Name)
+            .OrderBy(p => p.ProgramConfiguration == null ? string.Empty : p.ProgramConfiguration.Name)
+            .ThenBy(p => p.Carrier.Name)
             .ThenBy(p => p.LineOfBusiness)
             .ThenBy(p => p.State)
             .ToListAsync();
@@ -215,6 +218,7 @@ public class PolicyFormService : IPolicyFormService
     public async Task<Result<PolicyPackageConfigurationDto>> GetPackageAsync(Guid id)
     {
         var package = await Db.Set<PolicyPackageConfiguration>()
+            .Include(p => p.ProgramConfiguration)
             .Include(p => p.Carrier)
             .Include(p => p.Forms).ThenInclude(f => f.PolicyFormTemplate)
             .FirstOrDefaultAsync(p => p.Id == id);
@@ -347,9 +351,11 @@ public class PolicyFormService : IPolicyFormService
         if (dto.CarrierId == Guid.Empty) return "Carrier is required.";
         if (string.IsNullOrWhiteSpace(dto.State) || dto.State.Trim().Length != 2) return "State must be a two-letter code.";
         if (string.IsNullOrWhiteSpace(dto.Name)) return "Package name is required.";
-        return await Db.Set<Carrier>().AnyAsync(c => c.Id == dto.CarrierId)
-            ? null
-            : "Carrier not found.";
+        if (!await Db.Set<Carrier>().AnyAsync(c => c.Id == dto.CarrierId))
+            return "Carrier not found.";
+        if (dto.ProgramConfigurationId.HasValue && !await Db.Set<ProgramConfiguration>().AnyAsync(p => p.Id == dto.ProgramConfigurationId.Value))
+            return "Program not found.";
+        return null;
     }
 
     private static void ApplyTemplate(PolicyFormTemplate form, PolicyFormTemplateUpsertDto dto)
@@ -369,6 +375,7 @@ public class PolicyFormService : IPolicyFormService
     private static void ApplyPackage(PolicyPackageConfiguration package, PolicyPackageConfigurationUpsertDto dto)
     {
         package.CarrierId = dto.CarrierId;
+        package.ProgramConfigurationId = dto.ProgramConfigurationId;
         package.LineOfBusiness = dto.LineOfBusiness;
         package.State = dto.State.Trim().ToUpper();
         package.Name = dto.Name.Trim();
@@ -490,6 +497,8 @@ public class PolicyFormService : IPolicyFormService
     private static PolicyPackageConfigurationDto MapPackage(PolicyPackageConfiguration p) => new()
     {
         Id = p.Id,
+        ProgramConfigurationId = p.ProgramConfigurationId,
+        ProgramName = p.ProgramConfiguration?.Name,
         CarrierId = p.CarrierId,
         CarrierName = p.Carrier?.Name ?? string.Empty,
         LineOfBusiness = p.LineOfBusiness,

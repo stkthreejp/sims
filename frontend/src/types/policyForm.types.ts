@@ -69,6 +69,8 @@ export interface PolicyPackageForm {
 
 export interface PolicyPackageConfiguration {
   id: string
+  programConfigurationId: string | null
+  programName: string | null
   carrierId: string
   carrierName: string
   lineOfBusiness: PolicyLineOfBusiness
@@ -80,6 +82,7 @@ export interface PolicyPackageConfiguration {
 }
 
 export interface PolicyPackageConfigurationUpsert {
+  programConfigurationId?: string | null
   carrierId: string
   lineOfBusiness: PolicyLineOfBusiness
   state: string

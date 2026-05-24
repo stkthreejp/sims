@@ -14,11 +14,17 @@ public class PolicyPackageConfigurationConfiguration : IEntityTypeConfiguration<
         builder.Property(p => p.State).HasMaxLength(2).IsRequired();
         builder.Property(p => p.Name).HasMaxLength(250).IsRequired();
 
-        builder.HasIndex(p => new { p.CarrierId, p.LineOfBusiness, p.State, p.IsDeleted });
+        builder.HasIndex(p => new { p.ProgramConfigurationId, p.CarrierId, p.LineOfBusiness, p.State, p.IsDeleted })
+            .HasDatabaseName("ix_policy_package_program_lookup");
 
         builder.HasOne(p => p.Carrier)
             .WithMany()
             .HasForeignKey(p => p.CarrierId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.ProgramConfiguration)
+            .WithMany()
+            .HasForeignKey(p => p.ProgramConfigurationId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
