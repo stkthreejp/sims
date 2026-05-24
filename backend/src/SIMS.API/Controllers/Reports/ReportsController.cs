@@ -54,4 +54,8 @@ public class ReportsController : ControllerBase
     [HttpGet("operations/unassigned-program-cleanup")]
     public async Task<IActionResult> GetUnassignedProgramCleanup(CancellationToken ct)
         => Ok(await _svc.GetUnassignedProgramCleanupAsync(ct));
+
+    [HttpGet("operations/authority-approvals")]
+    public async Task<IActionResult> GetAuthorityApprovalActivity(CancellationToken ct)
+        => Ok(await _svc.GetAuthorityApprovalActivityAsync(ct));
 }

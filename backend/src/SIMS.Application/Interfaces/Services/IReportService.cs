@@ -15,4 +15,5 @@ public interface IReportService
     Task<PostBindFollowUpDto> GetPostBindFollowUpAsync(CancellationToken ct = default);
     Task<ManagerQueueDto> GetManagerQueueAsync(CancellationToken ct = default);
     Task<UnassignedProgramCleanupDto> GetUnassignedProgramCleanupAsync(CancellationToken ct = default);
+    Task<AuthorityApprovalActivityDto> GetAuthorityApprovalActivityAsync(CancellationToken ct = default);
 }

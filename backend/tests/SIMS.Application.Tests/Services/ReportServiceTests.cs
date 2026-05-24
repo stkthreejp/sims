@@ -524,6 +524,151 @@ public class ReportServiceTests
         Assert.Equal($"/policies/{activePolicy.Id}", policyRow.ActionUrl);
     }
 
+    [Fact]
+    public async Task GetAuthorityApprovalActivityAsync_SummarizesTurnaroundAndOverrideRequests()
+    {
+        await using var db = CreateDb();
+        var now = DateTime.UtcNow;
+        var requester = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Casey",
+            LastName = "Requester",
+            UserName = "casey@example.com",
+            Email = "casey@example.com"
+        };
+        var approver = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Morgan",
+            LastName = "Approver",
+            UserName = "morgan@example.com",
+            Email = "morgan@example.com"
+        };
+        var carrier = new Carrier { Name = "Authority Carrier" };
+        var insured = new Insured
+        {
+            InsuredType = InsuredType.Commercial,
+            CompanyName = "Authority Timber",
+            State = "AL"
+        };
+        var submission = new Submission
+        {
+            SubmissionNumber = "SUB-AUTH",
+            Insured = insured,
+            InsuredId = insured.Id,
+            UnderwriterId = approver.Id,
+            Underwriter = approver,
+            CreatedById = requester.Id,
+            CreatedBy = requester
+        };
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-AUTH",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = DateOnly.FromDateTime(now).AddDays(10),
+            ExpirationDate = DateOnly.FromDateTime(now).AddDays(375),
+            CreatedById = requester.Id,
+            CreatedBy = requester
+        };
+
+        db.AddRange(
+            requester,
+            approver,
+            carrier,
+            insured,
+            submission,
+            quote,
+            new AuthorityApprovalRequest
+            {
+                TargetType = AuthorityApprovalTargetType.Quote,
+                TargetId = quote.Id,
+                ActionCode = "quote.commission-override",
+                ActionLabel = "Commission override",
+                RequiredPermission = "underwriting.authority.approve",
+                ApprovalType = "CommissionOverride",
+                Reason = "Commission override requires approval.",
+                Status = AuthorityApprovalStatus.Pending,
+                RequestedById = requester.Id,
+                RequestedBy = requester,
+                AssignedToUserId = approver.Id,
+                AssignedToUser = approver,
+                RequestedAt = now.AddHours(-30),
+                DueAt = now.AddHours(-2)
+            },
+            new AuthorityApprovalRequest
+            {
+                TargetType = AuthorityApprovalTargetType.Quote,
+                TargetId = quote.Id,
+                ActionCode = "rating.plan.promote",
+                ActionLabel = "Promote rating plan",
+                RequiredPermission = "rating.admin",
+                ApprovalType = "RatingPromotion",
+                Reason = "Promotion requires manager approval.",
+                Status = AuthorityApprovalStatus.Approved,
+                RequestedById = requester.Id,
+                RequestedBy = requester,
+                DecisionById = approver.Id,
+                DecisionBy = approver,
+                RequestedAt = now.AddHours(-48),
+                DecisionAt = now.AddHours(-24)
+            },
+            new AuthorityApprovalRequest
+            {
+                TargetType = AuthorityApprovalTargetType.Quote,
+                TargetId = quote.Id,
+                ActionCode = "clearance.override",
+                ActionLabel = "Clearance override",
+                RequiredPermission = "underwriting.clearance.override",
+                ApprovalType = "ClearanceOverride",
+                Reason = "Duplicate account requires approval.",
+                Status = AuthorityApprovalStatus.Declined,
+                RequestedById = requester.Id,
+                RequestedBy = requester,
+                DecisionById = approver.Id,
+                DecisionBy = approver,
+                RequestedAt = now.AddHours(-10),
+                DecisionAt = now.AddHours(-4)
+            });
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetAuthorityApprovalActivityAsync();
+
+        Assert.Equal(3, result.Rows.Count);
+        Assert.Equal(1, result.PendingCount);
+        Assert.Equal(1, result.ApprovedCount);
+        Assert.Equal(1, result.DeclinedCount);
+        Assert.Equal(2, result.OverrideCount);
+        Assert.Equal(1, result.OverduePendingCount);
+        Assert.Equal(15m, result.AverageDecisionHours);
+
+        var pendingOverride = Assert.Single(result.Rows, r => r.Status == "Pending");
+        Assert.True(pendingOverride.IsOverride);
+        Assert.Null(pendingOverride.DecisionHours);
+        Assert.Equal(-2, pendingOverride.HoursUntilDue);
+        Assert.Equal("Overdue", pendingOverride.SlaStatus);
+        Assert.Equal("Q-AUTH", pendingOverride.ReferenceNumber);
+        Assert.Equal("Authority Timber", pendingOverride.InsuredName);
+        Assert.Equal("Casey Requester", pendingOverride.RequestedByName);
+        Assert.Equal("Morgan Approver", pendingOverride.OwnerName);
+        Assert.Equal($"/quotes/{quote.Id}", pendingOverride.ActionUrl);
+
+        var approved = Assert.Single(result.Rows, r => r.Status == "Approved");
+        Assert.False(approved.IsOverride);
+        Assert.Equal(24m, approved.DecisionHours);
+
+        var declinedOverride = Assert.Single(result.Rows, r => r.Status == "Declined");
+        Assert.True(declinedOverride.IsOverride);
+        Assert.Equal(6m, declinedOverride.DecisionHours);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),

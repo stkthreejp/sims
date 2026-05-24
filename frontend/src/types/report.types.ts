@@ -184,3 +184,41 @@ export interface UnassignedProgramCleanup {
   activePolicyCount: number
   rows: UnassignedProgramCleanupRow[]
 }
+
+export interface AuthorityApprovalActivityRow {
+  id: string
+  targetType: string
+  targetId: string
+  actionCode: string
+  actionLabel: string
+  approvalType: string
+  isOverride: boolean
+  reason: string
+  status: string
+  referenceNumber: string
+  insuredName: string | null
+  requestedById: string
+  requestedByName: string | null
+  ownerId: string | null
+  ownerName: string | null
+  decisionById: string | null
+  decisionByName: string | null
+  requestedAt: string
+  dueAt: string | null
+  decisionAt: string | null
+  decisionHours: number | null
+  hoursUntilDue: number | null
+  slaStatus: string
+  actionUrl: string
+}
+
+export interface AuthorityApprovalActivity {
+  pendingCount: number
+  approvedCount: number
+  declinedCount: number
+  cancelledCount: number
+  overrideCount: number
+  overduePendingCount: number
+  averageDecisionHours: number | null
+  rows: AuthorityApprovalActivityRow[]
+}

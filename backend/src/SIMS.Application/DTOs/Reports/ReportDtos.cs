@@ -187,3 +187,41 @@ public record UnassignedProgramCleanupRowDto(
     Guid? PolicyId,
     string ActionUrl
 );
+
+public record AuthorityApprovalActivityDto(
+    int PendingCount,
+    int ApprovedCount,
+    int DeclinedCount,
+    int CancelledCount,
+    int OverrideCount,
+    int OverduePendingCount,
+    decimal? AverageDecisionHours,
+    IReadOnlyList<AuthorityApprovalActivityRowDto> Rows
+);
+
+public record AuthorityApprovalActivityRowDto(
+    Guid Id,
+    AuthorityApprovalTargetType TargetType,
+    Guid TargetId,
+    string ActionCode,
+    string ActionLabel,
+    string ApprovalType,
+    bool IsOverride,
+    string Reason,
+    string Status,
+    string ReferenceNumber,
+    string? InsuredName,
+    Guid RequestedById,
+    string? RequestedByName,
+    Guid? OwnerId,
+    string? OwnerName,
+    Guid? DecisionById,
+    string? DecisionByName,
+    DateTime RequestedAt,
+    DateTime? DueAt,
+    DateTime? DecisionAt,
+    decimal? DecisionHours,
+    int? HoursUntilDue,
+    string SlaStatus,
+    string ActionUrl
+);

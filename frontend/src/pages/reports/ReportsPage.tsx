@@ -12,6 +12,7 @@ import {
   getPostBindFollowUp,
   getManagerQueue,
   getUnassignedProgramCleanup,
+  getAuthorityApprovalActivity,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
@@ -23,6 +24,7 @@ import type {
   PostBindFollowUp,
   ManagerQueue,
   UnassignedProgramCleanup,
+  AuthorityApprovalActivity,
   AgingBucket,
   AgingRow,
   BrokerArRow,
@@ -41,6 +43,11 @@ function fmtMonth(year: number, month: number) {
 function fmtDate(value?: string | null) {
   if (!value) return '-'
   return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function fmtDateTime(value?: string | null) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -557,6 +564,130 @@ function ManagerQueueReport() {
   )
 }
 
+function AuthorityApprovalActivityReport() {
+  const [statusFilter, setStatusFilter] = useState('')
+  const [overrideFilter, setOverrideFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const { data, isLoading, error } = useQuery<AuthorityApprovalActivity>({
+    queryKey: ['report', 'authority-approvals'],
+    queryFn: getAuthorityApprovalActivity,
+  })
+
+  const rows = data?.rows ?? []
+  const filteredRows = rows.filter(row => {
+    if (statusFilter && row.status !== statusFilter) return false
+    if (overrideFilter === 'override' && !row.isOverride) return false
+    if (overrideFilter === 'standard' && row.isOverride) return false
+    if (search) {
+      const query = search.toLowerCase()
+      const target = `${row.actionLabel} ${row.approvalType} ${row.reason} ${row.referenceNumber} ${row.insuredName ?? ''} ${row.requestedByName ?? ''} ${row.ownerName ?? ''} ${row.decisionByName ?? ''}`.toLowerCase()
+      if (!target.includes(query)) return false
+    }
+    return true
+  })
+  const hasFilters = statusFilter || overrideFilter || search
+
+  return (
+    <ReportShell title="Authority Approvals" isLoading={isLoading} error={error as Error}>
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Visible Items" value={filteredRows.length.toLocaleString()} sub={`${rows.length.toLocaleString()} total`} />
+            <KpiCard label="Pending" value={data.pendingCount.toLocaleString()} highlight={data.pendingCount > 0 ? 'warn' : undefined} />
+            <KpiCard label="Overdue" value={data.overduePendingCount.toLocaleString()} highlight={data.overduePendingCount > 0 ? 'bad' : undefined} />
+            <KpiCard label="Overrides" value={data.overrideCount.toLocaleString()} highlight={data.overrideCount > 0 ? 'warn' : undefined} />
+            <KpiCard label="Avg Decision" value={data.averageDecisionHours == null ? '-' : `${data.averageDecisionHours}h`} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search approvals..."
+              style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', minWidth: 240, fontSize: 12.5, color: 'var(--ink)', background: 'var(--surface)' }}
+            />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterStyle}>
+              <option value="">All status</option>
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Declined">Declined</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+            <select value={overrideFilter} onChange={(e) => setOverrideFilter(e.target.value)} style={filterStyle}>
+              <option value="">All approvals</option>
+              <option value="override">Overrides</option>
+              <option value="standard">Standard</option>
+            </select>
+            {hasFilters && (
+              <button
+                onClick={() => { setStatusFilter(''); setOverrideFilter(''); setSearch('') }}
+                style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontSize: 12.5, color: 'var(--ink-3)', background: 'var(--surface)', cursor: 'pointer' }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Action', 'Reference', 'Insured', 'Requested', 'Owner', 'Due', 'Decision', 'SLA', 'Reason'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map(row => (
+                  <tr key={row.id} style={{ borderBottom: '1px solid var(--line)', verticalAlign: 'top' }}>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <StatusBadge status={row.status} />
+                        {row.isOverride && <OverrideBadge />}
+                      </div>
+                      <div style={{ fontWeight: 600, marginTop: 6 }}>{row.actionLabel}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.approvalType}</div>
+                    </td>
+                    <td style={tdStyle}>
+                      <Link to={row.actionUrl} style={{ color: 'var(--accent-ink)', fontWeight: 600, textDecoration: 'none' }}>
+                        {row.referenceNumber || row.targetType}
+                      </Link>
+                    </td>
+                    <td style={tdStyle}>{row.insuredName ?? '-'}</td>
+                    <td style={tdStyle}>
+                      <div>{fmtDateTime(row.requestedAt)}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.requestedByName ?? 'Unknown'}</div>
+                    </td>
+                    <td style={tdStyle}>{row.ownerName ?? 'Unassigned'}</td>
+                    <td style={tdStyle}>
+                      <div>{fmtDateTime(row.dueAt)}</div>
+                      {row.hoursUntilDue != null && (
+                        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>
+                          {row.hoursUntilDue < 0 ? `${Math.abs(row.hoursUntilDue)}h late` : `${row.hoursUntilDue}h left`}
+                        </div>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <div>{fmtDateTime(row.decisionAt)}</div>
+                      {row.decisionHours != null && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.decisionHours}h turnaround</div>}
+                      {row.decisionByName && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.decisionByName}</div>}
+                    </td>
+                    <td style={tdStyle}><SlaBadge status={row.slaStatus} /></td>
+                    <td style={{ ...tdStyle, minWidth: 260, color: 'var(--ink-3)' }}>{row.reason || '-'}</td>
+                  </tr>
+                ))}
+                {filteredRows.length === 0 && (
+                  <tr><td colSpan={9} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No authority approval items</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 function UnassignedProgramCleanupReport() {
   const [typeFilter, setTypeFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -815,6 +946,24 @@ function WorkTypeBadge({ type }: { type: string }) {
   )
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const bg = status === 'Pending' ? 'var(--yellow-soft, #fefce8)' : status === 'Declined' || status === 'Cancelled' ? 'var(--red-soft, #fef2f2)' : 'var(--green-soft, #f0fdf4)'
+  const color = status === 'Pending' ? '#8a5a00' : status === 'Declined' || status === 'Cancelled' ? 'var(--red, #b91c1c)' : '#166534'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--r-sm)', padding: '3px 7px', fontSize: 11, fontWeight: 700, background: bg, color }}>
+      {status}
+    </span>
+  )
+}
+
+function OverrideBadge() {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--r-sm)', padding: '3px 7px', fontSize: 11, fontWeight: 700, background: 'var(--surface-2, #f8f9fa)', color: 'var(--ink-3)' }}>
+      Override
+    </span>
+  )
+}
+
 function ComingSoon({ title }: { title: string }) {
   return (
     <ReportShell title={title}>
@@ -832,6 +981,7 @@ const REPORT_CATEGORIES = [
     label: 'Operations',
     reports: [
       { id: 'manager-queue', label: 'Manager Queue' },
+      { id: 'authority-approvals', label: 'Authority Approvals' },
       { id: 'post-bind-follow-up', label: 'Post-Bind Follow-Up' },
       { id: 'unassigned-program-cleanup', label: 'Unassigned Program Cleanup' },
     ],
@@ -880,6 +1030,7 @@ function renderReport(id: string) {
     case 'invoice-totals-by-program': return <InvoiceTotalsByProgramReport />
     case 'invoice-totals-by-transaction': return <InvoiceTotalsByPolicyTransactionReport />
     case 'manager-queue':          return <ManagerQueueReport />
+    case 'authority-approvals':    return <AuthorityApprovalActivityReport />
     case 'post-bind-follow-up':    return <PostBindFollowUpReport />
     case 'unassigned-program-cleanup': return <UnassignedProgramCleanupReport />
     default:                       return null

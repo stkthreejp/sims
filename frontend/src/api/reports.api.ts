@@ -9,6 +9,7 @@ import type {
   PostBindFollowUp,
   ManagerQueue,
   UnassignedProgramCleanup,
+  AuthorityApprovalActivity,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -42,3 +43,6 @@ export const getManagerQueue = (): Promise<ManagerQueue> =>
 
 export const getUnassignedProgramCleanup = (): Promise<UnassignedProgramCleanup> =>
   apiClient.get(`${BASE}/operations/unassigned-program-cleanup`).then(r => r.data)
+
+export const getAuthorityApprovalActivity = (): Promise<AuthorityApprovalActivity> =>
+  apiClient.get(`${BASE}/operations/authority-approvals`).then(r => r.data)

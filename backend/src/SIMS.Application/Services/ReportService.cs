@@ -566,6 +566,112 @@ public class ReportService : IReportService
         return new UnassignedProgramCleanupDto(quotes.Count, policies.Count, rows);
     }
 
+    public async Task<AuthorityApprovalActivityDto> GetAuthorityApprovalActivityAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var approvals = await Db.Set<AuthorityApprovalRequest>()
+            .Include(a => a.RequestedBy)
+            .Include(a => a.AssignedToUser)
+            .Include(a => a.DecisionBy)
+            .OrderByDescending(a => a.RequestedAt)
+            .ToListAsync(ct);
+
+        var quoteIds = approvals
+            .Where(a => a.TargetType == AuthorityApprovalTargetType.Quote)
+            .Select(a => a.TargetId)
+            .Distinct()
+            .ToList();
+        var quotes = await Db.Set<Quote>()
+            .Include(q => q.Submission).ThenInclude(s => s.Insured)
+            .Where(q => quoteIds.Contains(q.Id))
+            .ToDictionaryAsync(q => q.Id, ct);
+
+        var policyIds = approvals
+            .Where(a => a.TargetType == AuthorityApprovalTargetType.Policy)
+            .Select(a => a.TargetId)
+            .Distinct()
+            .ToList();
+        var policies = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Where(p => policyIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, ct);
+
+        var submissionIds = approvals
+            .Where(a => a.TargetType == AuthorityApprovalTargetType.Submission)
+            .Select(a => a.TargetId)
+            .Distinct()
+            .ToList();
+        var submissions = await Db.Set<Submission>()
+            .Include(s => s.Insured)
+            .Where(s => submissionIds.Contains(s.Id))
+            .ToDictionaryAsync(s => s.Id, ct);
+
+        var transactionIds = approvals
+            .Where(a => a.TargetType == AuthorityApprovalTargetType.PolicyTransaction)
+            .Select(a => a.TargetId)
+            .Distinct()
+            .ToList();
+        var transactions = await Db.Set<PolicyTransaction>()
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Insured)
+            .Where(t => transactionIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, ct);
+
+        var rows = approvals.Select(a =>
+        {
+            var target = TargetContextFor(a, quotes, policies, submissions, transactions);
+            var decisionHours = a.DecisionAt.HasValue
+                ? Math.Round((decimal)(a.DecisionAt.Value - a.RequestedAt).TotalHours, 2)
+                : (decimal?)null;
+            var hoursUntilDue = a.DueAt.HasValue
+                ? (int)Math.Round((a.DueAt.Value - now).TotalHours, MidpointRounding.AwayFromZero)
+                : (int?)null;
+
+            return new AuthorityApprovalActivityRowDto(
+                a.Id,
+                a.TargetType,
+                a.TargetId,
+                a.ActionCode,
+                a.ActionLabel,
+                a.ApprovalType,
+                IsOverrideApproval(a),
+                a.Reason,
+                a.Status.ToString(),
+                target.ReferenceNumber,
+                target.InsuredName,
+                a.RequestedById,
+                DisplayName(a.RequestedBy),
+                a.AssignedToUserId,
+                DisplayName(a.AssignedToUser),
+                a.DecisionById,
+                DisplayName(a.DecisionBy),
+                a.RequestedAt,
+                a.DueAt,
+                a.DecisionAt,
+                decisionHours,
+                hoursUntilDue,
+                ApprovalSlaStatusFor(a, now),
+                target.ActionUrl);
+        }).ToList();
+
+        var closedDecisionHours = rows
+            .Where(r => r.DecisionHours.HasValue)
+            .Select(r => r.DecisionHours!.Value)
+            .ToList();
+        var averageDecisionHours = closedDecisionHours.Count == 0
+            ? (decimal?)null
+            : Math.Round(closedDecisionHours.Average(), 2);
+
+        return new AuthorityApprovalActivityDto(
+            rows.Count(r => r.Status == AuthorityApprovalStatus.Pending.ToString()),
+            rows.Count(r => r.Status == AuthorityApprovalStatus.Approved.ToString()),
+            rows.Count(r => r.Status == AuthorityApprovalStatus.Declined.ToString()),
+            rows.Count(r => r.Status == AuthorityApprovalStatus.Cancelled.ToString()),
+            rows.Count(r => r.IsOverride),
+            rows.Count(r => r.Status == AuthorityApprovalStatus.Pending.ToString() && r.DueAt.HasValue && r.DueAt.Value < now),
+            averageDecisionHours,
+            rows);
+    }
+
     private static string SlaStatusFor(int daysUntilDue)
     {
         if (daysUntilDue < 0) return "Overdue";
@@ -573,6 +679,21 @@ public class ReportService : IReportService
         if (daysUntilDue <= 3) return "DueSoon";
         return "OnTrack";
     }
+
+    private static string ApprovalSlaStatusFor(AuthorityApprovalRequest approval, DateTime now)
+    {
+        if (approval.Status != AuthorityApprovalStatus.Pending) return "Closed";
+        if (!approval.DueAt.HasValue) return "Open";
+        var hoursUntilDue = (approval.DueAt.Value - now).TotalHours;
+        if (hoursUntilDue < 0) return "Overdue";
+        if (hoursUntilDue <= 24) return "DueSoon";
+        return "OnTrack";
+    }
+
+    private static bool IsOverrideApproval(AuthorityApprovalRequest approval) =>
+        approval.ActionCode.Contains("override", StringComparison.OrdinalIgnoreCase)
+        || approval.ActionLabel.Contains("override", StringComparison.OrdinalIgnoreCase)
+        || approval.ApprovalType.Contains("override", StringComparison.OrdinalIgnoreCase);
 
     private static string? DisplayName(User? user)
     {
@@ -587,6 +708,33 @@ public class ReportService : IReportService
         if (approval.TargetType == AuthorityApprovalTargetType.RatingPlanVersion) return $"/admin/rating/versions/{approval.TargetId}";
         return "/reports?r=manager-queue";
     }
+
+    private static ApprovalTargetContext TargetContextFor(
+        AuthorityApprovalRequest approval,
+        IReadOnlyDictionary<Guid, Quote> quotes,
+        IReadOnlyDictionary<Guid, Policy> policies,
+        IReadOnlyDictionary<Guid, Submission> submissions,
+        IReadOnlyDictionary<Guid, PolicyTransaction> transactions)
+    {
+        if (approval.TargetType == AuthorityApprovalTargetType.Quote && quotes.TryGetValue(approval.TargetId, out var quote))
+            return new ApprovalTargetContext(quote.QuoteNumber, quote.Submission.Insured.DisplayName, $"/quotes/{quote.Id}");
+
+        if (approval.TargetType == AuthorityApprovalTargetType.Policy && policies.TryGetValue(approval.TargetId, out var policy))
+            return new ApprovalTargetContext(policy.PolicyNumber, policy.Submission.Insured.DisplayName, $"/policies/{policy.Id}");
+
+        if (approval.TargetType == AuthorityApprovalTargetType.Submission && submissions.TryGetValue(approval.TargetId, out var submission))
+            return new ApprovalTargetContext(submission.SubmissionNumber, submission.Insured.DisplayName, $"/submissions/{submission.Id}");
+
+        if (approval.TargetType == AuthorityApprovalTargetType.PolicyTransaction && transactions.TryGetValue(approval.TargetId, out var transaction))
+            return new ApprovalTargetContext(transaction.TransactionNumber, transaction.Policy.Submission.Insured.DisplayName, $"/policies/{transaction.PolicyId}/transactions/{transaction.Id}");
+
+        if (approval.TargetType == AuthorityApprovalTargetType.RatingPlanVersion)
+            return new ApprovalTargetContext(approval.ApprovalType, null, $"/admin/rating/versions/{approval.TargetId}");
+
+        return new ApprovalTargetContext(approval.ApprovalType, null, "/reports?r=authority-approvals");
+    }
+
+    private record ApprovalTargetContext(string ReferenceNumber, string? InsuredName, string ActionUrl);
 
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)
     {
