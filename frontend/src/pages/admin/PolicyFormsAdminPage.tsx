@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Download, FileText, PackagePlus, Play, Plus, Settings, Trash2, Upload } from 'lucide-react'
+import { Check, Download, FileText, PackagePlus, Pencil, Play, Plus, Settings, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { policyFormsApi } from '@/api/policyForms.api'
 import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { policiesApi } from '@/api/policies.api'
+import { documentTemplatesApi } from '@/api/documentTemplates.api'
+import { proposalDocumentsApi } from '@/api/proposalDocuments.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { PolicyListItem } from '@/types/policy.types'
 import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
+import type { ProposalDocumentConfiguration, ProposalDocumentConfigurationUpsert, ProposalDocumentRole } from '@/types/proposalDocument.types'
 
 const FORM_TYPES: PolicyFormType[] = ['Mandatory', 'Conditional', 'AdHoc']
+const PROPOSAL_DOCUMENT_ROLE_LABELS: Record<ProposalDocumentRole, string> = {
+  Proposal: 'Proposal',
+  StateNotice: 'State notice',
+}
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
   'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
@@ -108,6 +115,20 @@ const emptyPackage = {
   isActive: true,
 }
 
+const emptyProposalDocument = (): ProposalDocumentConfigurationUpsert => ({
+  programConfigurationId: '',
+  carrierId: '',
+  lineOfBusiness: 'InlandMarine',
+  state: '',
+  role: 'Proposal',
+  documentTemplateId: '',
+  sequenceOrder: 1,
+  isActive: true,
+  effectiveDate: null,
+  expirationDate: null,
+  notes: '',
+})
+
 function getTriggerField(path: string | undefined) {
   return TRIGGER_FIELDS.find((field) => field.path === path) ?? TRIGGER_FIELDS[0]
 }
@@ -182,6 +203,8 @@ export function PolicyFormsAdminPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [mappingRows, setMappingRows] = useState<PolicyFormFieldMappingUpsert[]>([])
   const [testPolicyId, setTestPolicyId] = useState('')
+  const [proposalDocumentForm, setProposalDocumentForm] = useState<ProposalDocumentConfigurationUpsert>(emptyProposalDocument())
+  const [editingProposalDocumentId, setEditingProposalDocumentId] = useState<string | null>(null)
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ['policy-form-templates'],
@@ -191,6 +214,16 @@ export function PolicyFormsAdminPage() {
   const { data: packages = [], isLoading: loadingPackages } = useQuery({
     queryKey: ['policy-form-packages'],
     queryFn: () => policyFormsApi.getPackages({ includeInactive: true }),
+  })
+
+  const { data: proposalDocuments = [], isLoading: loadingProposalDocuments } = useQuery({
+    queryKey: ['proposal-document-configurations'],
+    queryFn: () => proposalDocumentsApi.getAll(true),
+  })
+
+  const { data: proposalTemplates = [] } = useQuery({
+    queryKey: ['document-templates', 'quote', 'proposal-documents'],
+    queryFn: () => documentTemplatesApi.getAll('Quote', false),
   })
 
   const { data: carriers = [] } = useQuery({
@@ -218,6 +251,7 @@ export function PolicyFormsAdminPage() {
   const policyOptions = policyPage?.items ?? []
 
   const packageTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates])
+  const activeProposalTemplates = useMemo(() => proposalTemplates.filter((template) => template.kind !== 'Email'), [proposalTemplates])
   const derivedPackageName = useMemo(() => {
     const programName = programs.find((program) => program.id === packageForm.programConfigurationId)?.name
     const carrierName = carriers.find((carrier) => carrier.id === packageForm.carrierId)?.name
@@ -339,6 +373,31 @@ export function PolicyFormsAdminPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Field mappings could not be saved'),
   })
 
+  const saveProposalDocument = useMutation({
+    mutationFn: () => {
+      const payload = cleanProposalDocument(proposalDocumentForm)
+      return editingProposalDocumentId
+        ? proposalDocumentsApi.update(editingProposalDocumentId, payload)
+        : proposalDocumentsApi.create(payload)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal-document-configurations'] })
+      setProposalDocumentForm(emptyProposalDocument())
+      setEditingProposalDocumentId(null)
+      toast.success('Proposal document setup saved')
+    },
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Proposal document setup could not be saved')),
+  })
+
+  const deleteProposalDocument = useMutation({
+    mutationFn: proposalDocumentsApi.delete,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['proposal-document-configurations'] })
+      toast.success('Proposal document setup removed')
+    },
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Proposal document setup could not be removed')),
+  })
+
   const selectPackage = (pkg: PolicyPackageConfiguration) => {
     setSelectedPackageId(pkg.id)
     setPackageRows(pkg.forms.map((f) => ({
@@ -357,6 +416,23 @@ export function PolicyFormsAdminPage() {
       dataPath: m.dataPath,
       format: m.format ?? undefined,
     })))
+  }
+
+  const editProposalDocument = (configuration: ProposalDocumentConfiguration) => {
+    setEditingProposalDocumentId(configuration.id)
+    setProposalDocumentForm({
+      programConfigurationId: configuration.programConfigurationId ?? '',
+      carrierId: configuration.carrierId,
+      lineOfBusiness: configuration.lineOfBusiness,
+      state: configuration.state ?? '',
+      role: configuration.role,
+      documentTemplateId: configuration.documentTemplateId,
+      sequenceOrder: configuration.sequenceOrder,
+      isActive: configuration.isActive,
+      effectiveDate: configuration.effectiveDate,
+      expirationDate: configuration.expirationDate,
+      notes: configuration.notes ?? '',
+    })
   }
 
   const addMappingRow = () => {
@@ -404,7 +480,7 @@ export function PolicyFormsAdminPage() {
     }))
   }
 
-  if (loadingTemplates || loadingPackages) return <LoadingSpinner />
+  if (loadingTemplates || loadingPackages || loadingProposalDocuments) return <LoadingSpinner />
 
   return (
     <div className="p-6 space-y-6 max-w-7xl">
@@ -600,6 +676,126 @@ export function PolicyFormsAdminPage() {
         </section>
 
         <section className="bg-white border rounded-lg xl:col-span-3">
+          <div className="px-4 py-3 border-b flex items-center gap-2">
+            <FileText className="h-4 w-4 text-slate-400" />
+            <h2 className="text-sm font-semibold text-slate-800">Proposal Documents</h2>
+          </div>
+          <div className="p-4 grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
+            <div className="border rounded-lg p-3 space-y-3 bg-slate-50">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-800">{editingProposalDocumentId ? 'Edit setup' : 'New setup'}</p>
+                {editingProposalDocumentId && (
+                  <button
+                    type="button"
+                    onClick={() => { setEditingProposalDocumentId(null); setProposalDocumentForm(emptyProposalDocument()) }}
+                    className="text-xs text-slate-500 hover:text-slate-700"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+              <select value={proposalDocumentForm.programConfigurationId ?? ''} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, programConfigurationId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
+                <option value="">Any program</option>
+                {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+              </select>
+              <select value={proposalDocumentForm.carrierId} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, carrierId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
+                <option value="">Select carrier</option>
+                {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <select value={proposalDocumentForm.lineOfBusiness} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="border rounded px-2 py-1.5 text-sm">
+                  {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+                </select>
+                <select value={proposalDocumentForm.state ?? ''} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, state: e.target.value }))} className="border rounded px-2 py-1.5 text-sm">
+                  <option value="">Any state</option>
+                  {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <select value={proposalDocumentForm.role} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, role: e.target.value as ProposalDocumentRole }))} className="border rounded px-2 py-1.5 text-sm">
+                  {Object.entries(PROPOSAL_DOCUMENT_ROLE_LABELS).map(([role, label]) => <option key={role} value={role}>{label}</option>)}
+                </select>
+                <input type="number" min={1} value={proposalDocumentForm.sequenceOrder} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, sequenceOrder: Number(e.target.value) || 1 }))} className="border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <select value={proposalDocumentForm.documentTemplateId} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, documentTemplateId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
+                <option value="">Select quote template</option>
+                {activeProposalTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={proposalDocumentForm.effectiveDate ?? ''} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, effectiveDate: e.target.value || null }))} className="border rounded px-2 py-1.5 text-sm" />
+                <input type="date" value={proposalDocumentForm.expirationDate ?? ''} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, expirationDate: e.target.value || null }))} className="border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <textarea value={proposalDocumentForm.notes ?? ''} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Notes" rows={2} className="w-full border rounded px-2 py-1.5 text-sm" />
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={proposalDocumentForm.isActive} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, isActive: e.target.checked }))} />
+                Active
+              </label>
+              <button
+                onClick={() => saveProposalDocument.mutate()}
+                disabled={saveProposalDocument.isPending || !proposalDocumentForm.carrierId || !proposalDocumentForm.documentTemplateId}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50"
+              >
+                <Check className="h-4 w-4" /> Save setup
+              </button>
+            </div>
+
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-slate-500 border-b bg-slate-50">
+                    <th className="px-4 py-2 font-medium">Scope</th>
+                    <th className="px-4 py-2 font-medium">Role</th>
+                    <th className="px-4 py-2 font-medium">Template</th>
+                    <th className="px-4 py-2 font-medium">Dates</th>
+                    <th className="px-4 py-2 font-medium">Status</th>
+                    <th className="px-4 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {proposalDocuments.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-sm text-slate-400">No proposal document setup yet.</td>
+                    </tr>
+                  ) : (
+                    proposalDocuments.map((configuration) => (
+                      <tr key={configuration.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-800">{configuration.programName ?? 'Any program'}</p>
+                          <p className="text-xs text-slate-500">{configuration.carrierName} / {configuration.lineOfBusinessLabel} / {configuration.state ?? 'Any state'}</p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          <p>{PROPOSAL_DOCUMENT_ROLE_LABELS[configuration.role]}</p>
+                          <p className="text-xs text-slate-400">#{configuration.sequenceOrder}</p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{configuration.documentTemplateName}</td>
+                        <td className="px-4 py-3 text-slate-600">{dateRange(configuration.effectiveDate, configuration.expirationDate)}</td>
+                        <td className="px-4 py-3">
+                          {configuration.isActive ? <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">Active</span> : <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">Inactive</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => editProposalDocument(configuration)} className="sims-icon-btn hover:text-sky-600" title="Edit setup">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { if (confirm('Remove this proposal document setup?')) deleteProposalDocument.mutate(configuration.id) }}
+                              className="sims-icon-btn hover:text-red-600"
+                              title="Remove setup"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white border rounded-lg xl:col-span-3">
           <div className="px-4 py-3 border-b">
             <h2 className="text-sm font-semibold text-slate-800">Approved Tags</h2>
             <p className="text-xs text-slate-500 mt-1">Use these tags in Word, HTML, proposal, email, and application templates.</p>
@@ -790,4 +986,21 @@ function TemplateRow({
 
 function formatPolicyOption(policy: PolicyListItem) {
   return `${policy.policyNumber} - ${policy.insuredName}`
+}
+
+function dateRange(effectiveDate?: string | null, expirationDate?: string | null) {
+  if (!effectiveDate && !expirationDate) return 'Any date'
+  return `${effectiveDate ?? 'Any'} - ${expirationDate ?? 'Open'}`
+}
+
+function cleanProposalDocument(form: ProposalDocumentConfigurationUpsert): ProposalDocumentConfigurationUpsert {
+  return {
+    ...form,
+    programConfigurationId: form.programConfigurationId || null,
+    state: form.state || null,
+    sequenceOrder: Number(form.sequenceOrder) || 1,
+    effectiveDate: form.effectiveDate || null,
+    expirationDate: form.expirationDate || null,
+    notes: form.notes?.trim() ? form.notes.trim() : null,
+  }
 }
