@@ -191,6 +191,7 @@ public class FeeAdminService : IFeeAdminService
             FeeDefinitionId: v.FeeDefinitionId,
             FeeCode: v.FeeDefinition?.Code ?? string.Empty,
             FeeDisplayName: v.FeeDefinition?.DisplayName ?? string.Empty,
+            ProgramConfigurationId: v.ProgramConfigurationId,
             CarrierId: v.CarrierId,
             CompanyId: v.CompanyId,
             ProducerId: v.ProducerId,
@@ -265,6 +266,7 @@ public class FeeAdminService : IFeeAdminService
         var version = new FeeRuleVersion
         {
             FeeDefinitionId = req.FeeDefinitionId,
+            ProgramConfigurationId = req.ProgramConfigurationId,
             CarrierId = req.CarrierId,
             CompanyId = req.CompanyId,
             ProducerId = req.ProducerId,

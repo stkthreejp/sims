@@ -1,3 +1,5 @@
+using SIMS.Domain.Enums;
+
 namespace SIMS.Application.DTOs.Underwriting;
 
 public record ProgramConfigurationDto(
@@ -7,7 +9,39 @@ public record ProgramConfigurationDto(
     bool IsActive,
     string? Notes,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    IReadOnlyList<ProgramCarrierDto> Carriers);
+
+public record ProgramCarrierDto(
+    Guid Id,
+    Guid ProgramConfigurationId,
+    Guid CarrierId,
+    string CarrierName,
+    bool IsActive,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    string? Notes,
+    IReadOnlyList<ProgramCarrierLineOfBusinessDto> LinesOfBusiness);
+
+public record ProgramCarrierLineOfBusinessDto(
+    Guid Id,
+    Guid ProgramCarrierId,
+    PolicyLineOfBusiness LineOfBusiness,
+    string LineOfBusinessLabel,
+    bool IsActive,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    string? Notes,
+    IReadOnlyList<ProgramCarrierLobStateDto> States);
+
+public record ProgramCarrierLobStateDto(
+    Guid Id,
+    Guid ProgramCarrierLineOfBusinessId,
+    string StateCode,
+    bool IsActive,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    string? Notes);
 
 public record CreateProgramConfigurationRequest(
     string Name,
@@ -20,3 +54,28 @@ public record UpdateProgramConfigurationRequest(
     string Code,
     bool IsActive,
     string? Notes);
+
+public record UpsertProgramCarrierRequest(
+    Guid CarrierId,
+    bool IsActive,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    string? Notes);
+
+public record UpsertProgramCarrierLineOfBusinessRequest(
+    PolicyLineOfBusiness LineOfBusiness,
+    bool IsActive,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    string? Notes);
+
+public record UpsertProgramCarrierLobStateRequest(
+    string StateCode,
+    bool IsActive,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    string? Notes);
+
+public record CopyProgramCarrierLobStateRequest(
+    string SourceStateCode,
+    string TargetStateCode);

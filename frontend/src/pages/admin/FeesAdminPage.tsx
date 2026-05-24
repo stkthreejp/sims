@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { feesApi } from '@/api/fees.api'
 import { carriersApi } from '@/api/carriers.api'
 import { premiumChargesApi } from '@/api/premiumCharges.api'
+import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { FeeDefinition, FeeRuleVersion } from '@/types/fee.types'
@@ -29,6 +30,7 @@ type VersionForm = Omit<FeeRuleVersion, 'id' | 'feeCode' | 'feeDisplayName'>
 
 const EMPTY: VersionForm = {
   feeDefinitionId: 0,
+  programConfigurationId: null,
   carrierId: null, companyId: null, producerId: null, lineOfBusiness: null,
   stateCode: null, city: null, licenseType: null,
   effectiveDate: '', disabledDate: null,
@@ -108,6 +110,11 @@ export function FeesAdminPage() {
   const { data: carriers = [] } = useQuery({
     queryKey: ['carriers', 'active'],
     queryFn: () => carriersApi.getAll(true),
+  })
+
+  const { data: programs = [] } = useQuery({
+    queryKey: ['admin', 'program-configurations'],
+    queryFn: () => programConfigurationsApi.getAll(true),
   })
 
   const { data: ledgerAccounts = [] } = useQuery({
@@ -342,6 +349,12 @@ export function FeesAdminPage() {
         {/* Scope */}
         <SectionHeader label="Scope (blank = applies to all)" />
         <div className="grid grid-cols-3 gap-4">
+          <Field label="Program">
+            <select value={form.programConfigurationId ?? ''} onChange={e => set('programConfigurationId', e.target.value || null)} className={selectCls}>
+              <option value="">All Programs</option>
+              {programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
+            </select>
+          </Field>
           <Field label="Carrier">
             <select value={form.carrierId ?? ''} onChange={e => set('carrierId', e.target.value || null)} className={selectCls}>
               <option value="">All Carriers</option>

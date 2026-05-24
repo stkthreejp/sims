@@ -1,5 +1,14 @@
 import { apiClient } from './client'
-import type { ProgramConfiguration, ProgramConfigurationUpsert } from '@/types/programConfiguration.types'
+import type {
+  ProgramCarrier,
+  ProgramCarrierLineOfBusiness,
+  ProgramCarrierLineOfBusinessUpsert,
+  ProgramCarrierLobState,
+  ProgramCarrierLobStateUpsert,
+  ProgramCarrierUpsert,
+  ProgramConfiguration,
+  ProgramConfigurationUpsert,
+} from '@/types/programConfiguration.types'
 
 export const programConfigurationsApi = {
   getAll: (includeInactive = false) =>
@@ -10,4 +19,25 @@ export const programConfigurationsApi = {
 
   update: (id: string, data: ProgramConfigurationUpsert) =>
     apiClient.put<ProgramConfiguration>(`/admin/program-configurations/${id}`, data).then((r) => r.data),
+
+  addCarrier: (programId: string, data: ProgramCarrierUpsert) =>
+    apiClient.post<ProgramCarrier>(`/admin/program-configurations/${programId}/carriers`, data).then((r) => r.data),
+
+  updateCarrier: (programId: string, programCarrierId: string, data: ProgramCarrierUpsert) =>
+    apiClient.put<ProgramCarrier>(`/admin/program-configurations/${programId}/carriers/${programCarrierId}`, data).then((r) => r.data),
+
+  addLineOfBusiness: (programId: string, programCarrierId: string, data: ProgramCarrierLineOfBusinessUpsert) =>
+    apiClient.post<ProgramCarrierLineOfBusiness>(`/admin/program-configurations/${programId}/carriers/${programCarrierId}/lines-of-business`, data).then((r) => r.data),
+
+  updateLineOfBusiness: (programId: string, programCarrierId: string, programCarrierLobId: string, data: ProgramCarrierLineOfBusinessUpsert) =>
+    apiClient.put<ProgramCarrierLineOfBusiness>(`/admin/program-configurations/${programId}/carriers/${programCarrierId}/lines-of-business/${programCarrierLobId}`, data).then((r) => r.data),
+
+  addState: (programId: string, programCarrierId: string, programCarrierLobId: string, data: ProgramCarrierLobStateUpsert) =>
+    apiClient.post<ProgramCarrierLobState>(`/admin/program-configurations/${programId}/carriers/${programCarrierId}/lines-of-business/${programCarrierLobId}/states`, data).then((r) => r.data),
+
+  updateState: (programId: string, programCarrierId: string, programCarrierLobId: string, stateId: string, data: ProgramCarrierLobStateUpsert) =>
+    apiClient.put<ProgramCarrierLobState>(`/admin/program-configurations/${programId}/carriers/${programCarrierId}/lines-of-business/${programCarrierLobId}/states/${stateId}`, data).then((r) => r.data),
+
+  copyState: (programId: string, programCarrierId: string, programCarrierLobId: string, sourceStateCode: string, targetStateCode: string) =>
+    apiClient.post<ProgramCarrierLobState>(`/admin/program-configurations/${programId}/carriers/${programCarrierId}/lines-of-business/${programCarrierLobId}/states/copy`, { sourceStateCode, targetStateCode }).then((r) => r.data),
 }

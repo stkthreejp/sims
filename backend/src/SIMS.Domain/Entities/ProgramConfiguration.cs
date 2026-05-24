@@ -7,6 +7,7 @@ public class ProgramConfiguration : BaseEntity
     public bool IsActive { get; set; } = true;
     public string? Notes { get; set; }
 
+    public ICollection<ProgramCarrier> ProgramCarriers { get; set; } = new List<ProgramCarrier>();
     public ICollection<UnderwritingGuidelineDocument> GuidelineDocuments { get; set; } = new List<UnderwritingGuidelineDocument>();
     public ICollection<UnderwritingGuidelineControl> GuidelineControls { get; set; } = new List<UnderwritingGuidelineControl>();
 }

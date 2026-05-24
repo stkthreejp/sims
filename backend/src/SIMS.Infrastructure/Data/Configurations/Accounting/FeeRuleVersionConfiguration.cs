@@ -36,6 +36,11 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
             .HasForeignKey(x => x.CarrierId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        b.HasOne(x => x.ProgramConfiguration)
+            .WithMany()
+            .HasForeignKey(x => x.ProgramConfigurationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         b.HasOne(x => x.FeeDefinition)
             .WithMany(x => x.RuleVersions)
             .HasForeignKey(x => x.FeeDefinitionId)
@@ -50,5 +55,7 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
             .HasDatabaseName("ix_fee_rule_lookup");
         b.HasIndex(x => new { x.FeeDefinitionId, x.CarrierId, x.LineOfBusiness, x.StateCode, x.EffectiveDate })
             .HasDatabaseName("ix_fee_rule_carrier_lob_lookup");
+        b.HasIndex(x => new { x.FeeDefinitionId, x.ProgramConfigurationId, x.CarrierId, x.LineOfBusiness, x.StateCode, x.EffectiveDate })
+            .HasDatabaseName("ix_fee_rule_program_carrier_lob_lookup");
     }
 }

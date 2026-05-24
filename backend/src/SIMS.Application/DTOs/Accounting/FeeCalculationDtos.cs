@@ -20,7 +20,8 @@ public record PolicyContext(
     bool IsChildLine = false,
     bool IsMultiCarrierPolicy = false,
     bool IsFlatCancellation = false,
-    int StateCount = 1
+    int StateCount = 1,
+    Guid? ProgramConfigurationId = null
 );
 
 public record InvoiceLine(

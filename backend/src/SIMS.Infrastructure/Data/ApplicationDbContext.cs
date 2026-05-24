@@ -31,6 +31,9 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<UnderwritingAppetiteResult> UnderwritingAppetiteResults => Set<UnderwritingAppetiteResult>();
     public DbSet<UnderwritingReferral> UnderwritingReferrals => Set<UnderwritingReferral>();
     public DbSet<ProgramConfiguration> ProgramConfigurations => Set<ProgramConfiguration>();
+    public DbSet<ProgramCarrier> ProgramCarriers => Set<ProgramCarrier>();
+    public DbSet<ProgramCarrierLineOfBusiness> ProgramCarrierLinesOfBusiness => Set<ProgramCarrierLineOfBusiness>();
+    public DbSet<ProgramCarrierLobState> ProgramCarrierLobStates => Set<ProgramCarrierLobState>();
     public DbSet<UnderwritingGuidelineDocument> UnderwritingGuidelineDocuments => Set<UnderwritingGuidelineDocument>();
     public DbSet<UnderwritingGuidelineControl> UnderwritingGuidelineControls => Set<UnderwritingGuidelineControl>();
     public DbSet<UnderwritingGuidelineAuditLog> UnderwritingGuidelineAuditLogs => Set<UnderwritingGuidelineAuditLog>();
@@ -186,6 +189,9 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<UnderwritingAppetiteResult>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingReferral>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ProgramConfiguration>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ProgramCarrier>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ProgramCarrierLineOfBusiness>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<ProgramCarrierLobState>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineDocument>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineControl>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineAuditLog>().HasQueryFilter(e => !e.IsDeleted);

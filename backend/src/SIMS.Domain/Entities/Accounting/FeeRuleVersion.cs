@@ -1,3 +1,5 @@
+using SIMS.Domain.Entities;
+
 namespace SIMS.Domain.Entities.Accounting;
 
 public class FeeRuleVersion
@@ -6,6 +8,7 @@ public class FeeRuleVersion
     public long FeeDefinitionId { get; set; }
 
     // Scope dimensions (null = wildcard)
+    public Guid? ProgramConfigurationId { get; set; }
     public Guid? CarrierId { get; set; }
     public int? CompanyId { get; set; }
     public int? ProducerId { get; set; }
@@ -79,6 +82,7 @@ public class FeeRuleVersion
     public string? Notes { get; set; }
 
     public FeeDefinition FeeDefinition { get; set; } = null!;
+    public ProgramConfiguration? ProgramConfiguration { get; set; }
     public Carrier? Carrier { get; set; }
     public Payee? PayablePayee { get; set; }
     public ICollection<FeePremiumBracket> PremiumBrackets { get; set; } = new List<FeePremiumBracket>();
