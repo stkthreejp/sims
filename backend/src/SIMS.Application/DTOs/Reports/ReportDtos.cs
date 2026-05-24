@@ -164,3 +164,26 @@ public record ManagerQueueRowDto(
     string SlaStatus,
     string ActionUrl
 );
+
+public record UnassignedProgramCleanupDto(
+    int OpenQuoteCount,
+    int ActivePolicyCount,
+    IReadOnlyList<UnassignedProgramCleanupRowDto> Rows
+);
+
+public record UnassignedProgramCleanupRowDto(
+    Guid Id,
+    string RecordType,
+    string ReferenceNumber,
+    string InsuredName,
+    string CarrierName,
+    PolicyLineOfBusiness LineOfBusiness,
+    string? State,
+    string Status,
+    DateOnly EffectiveDate,
+    DateOnly ExpirationDate,
+    Guid? SubmissionId,
+    Guid? QuoteId,
+    Guid? PolicyId,
+    string ActionUrl
+);

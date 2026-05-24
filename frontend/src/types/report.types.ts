@@ -161,3 +161,26 @@ export interface ManagerQueue {
   postBindFollowUpCount: number
   rows: ManagerQueueRow[]
 }
+
+export interface UnassignedProgramCleanupRow {
+  id: string
+  recordType: 'Quote' | 'Policy' | string
+  referenceNumber: string
+  insuredName: string
+  carrierName: string
+  lineOfBusiness: string
+  state: string | null
+  status: string
+  effectiveDate: string
+  expirationDate: string
+  submissionId: string | null
+  quoteId: string | null
+  policyId: string | null
+  actionUrl: string
+}
+
+export interface UnassignedProgramCleanup {
+  openQuoteCount: number
+  activePolicyCount: number
+  rows: UnassignedProgramCleanupRow[]
+}

@@ -413,6 +413,117 @@ public class ReportServiceTests
         Assert.Equal($"/policies/{policy.Id}", postBind.ActionUrl);
     }
 
+    [Fact]
+    public async Task GetUnassignedProgramCleanupAsync_ReturnsOpenQuotesAndActivePoliciesWithoutProgram()
+    {
+        await using var db = CreateDb();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "Cleanup Carrier" };
+        var insured = new Insured
+        {
+            InsuredType = InsuredType.Commercial,
+            CompanyName = "Cleanup Timber",
+            State = "MS"
+        };
+        var submission = new Submission
+        {
+            SubmissionNumber = "SUB-CLEAN",
+            Insured = insured,
+            InsuredId = insured.Id,
+            UnderwriterId = Guid.NewGuid(),
+            CreatedById = Guid.NewGuid()
+        };
+        var openQuote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-CLEAN",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            ProgramId = null,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            Status = QuoteStatus.Quoted,
+            EffectiveDate = today.AddDays(10),
+            ExpirationDate = today.AddDays(375),
+            CreatedById = Guid.NewGuid()
+        };
+        var assignedQuote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-ASSIGNED",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            Program = program,
+            ProgramId = program.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            Status = QuoteStatus.Quoted,
+            EffectiveDate = today.AddDays(10),
+            ExpirationDate = today.AddDays(375),
+            CreatedById = Guid.NewGuid()
+        };
+        var boundQuote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-BOUND",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            ProgramId = null,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            Status = QuoteStatus.Bound,
+            EffectiveDate = today.AddDays(10),
+            ExpirationDate = today.AddDays(375),
+            CreatedById = Guid.NewGuid()
+        };
+        var activePolicy = PolicyFor(null);
+        activePolicy.PolicyNumber = "POL-CLEAN";
+        activePolicy.Submission = submission;
+        activePolicy.SubmissionId = submission.Id;
+        activePolicy.Carrier = carrier;
+        activePolicy.CarrierId = carrier.Id;
+        activePolicy.LineOfBusiness = PolicyLineOfBusiness.InlandMarine;
+        activePolicy.EffectiveDate = today.AddDays(-30);
+        activePolicy.ExpirationDate = today.AddDays(335);
+        var expiredPolicy = PolicyFor(null);
+        expiredPolicy.PolicyNumber = "POL-EXPIRED";
+        expiredPolicy.Submission = submission;
+        expiredPolicy.SubmissionId = submission.Id;
+        expiredPolicy.Carrier = carrier;
+        expiredPolicy.CarrierId = carrier.Id;
+        expiredPolicy.Status = PolicyStatus.Expired;
+
+        db.AddRange(program, carrier, insured, submission, openQuote, assignedQuote, boundQuote, activePolicy, expiredPolicy);
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetUnassignedProgramCleanupAsync();
+
+        Assert.Equal(1, result.OpenQuoteCount);
+        Assert.Equal(1, result.ActivePolicyCount);
+        Assert.Equal(2, result.Rows.Count);
+
+        var quoteRow = Assert.Single(result.Rows, r => r.RecordType == "Quote");
+        Assert.Equal(openQuote.Id, quoteRow.Id);
+        Assert.Equal("Q-CLEAN", quoteRow.ReferenceNumber);
+        Assert.Equal("Cleanup Timber", quoteRow.InsuredName);
+        Assert.Equal("Cleanup Carrier", quoteRow.CarrierName);
+        Assert.Equal("MS", quoteRow.State);
+        Assert.Equal("Quoted", quoteRow.Status);
+        Assert.Equal($"/quotes/{openQuote.Id}", quoteRow.ActionUrl);
+
+        var policyRow = Assert.Single(result.Rows, r => r.RecordType == "Policy");
+        Assert.Equal(activePolicy.Id, policyRow.Id);
+        Assert.Equal("POL-CLEAN", policyRow.ReferenceNumber);
+        Assert.Equal("Active", policyRow.Status);
+        Assert.Equal($"/policies/{activePolicy.Id}", policyRow.ActionUrl);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),

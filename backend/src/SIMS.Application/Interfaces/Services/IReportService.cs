@@ -14,4 +14,5 @@ public interface IReportService
     Task<InvoiceTotalsByProgramDto> GetInvoiceTotalsByProgramAsync(Guid? programId = null, CancellationToken ct = default);
     Task<PostBindFollowUpDto> GetPostBindFollowUpAsync(CancellationToken ct = default);
     Task<ManagerQueueDto> GetManagerQueueAsync(CancellationToken ct = default);
+    Task<UnassignedProgramCleanupDto> GetUnassignedProgramCleanupAsync(CancellationToken ct = default);
 }

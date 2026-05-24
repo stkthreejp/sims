@@ -50,4 +50,8 @@ public class ReportsController : ControllerBase
     [HttpGet("operations/manager-queue")]
     public async Task<IActionResult> GetManagerQueue(CancellationToken ct)
         => Ok(await _svc.GetManagerQueueAsync(ct));
+
+    [HttpGet("operations/unassigned-program-cleanup")]
+    public async Task<IActionResult> GetUnassignedProgramCleanup(CancellationToken ct)
+        => Ok(await _svc.GetUnassignedProgramCleanupAsync(ct));
 }

@@ -507,6 +507,65 @@ public class ReportService : IReportService
                 .ToList());
     }
 
+    public async Task<UnassignedProgramCleanupDto> GetUnassignedProgramCleanupAsync(CancellationToken ct = default)
+    {
+        var openQuoteStatuses = new[] { QuoteStatus.Draft, QuoteStatus.Submitted, QuoteStatus.Quoted };
+
+        var quotes = await Db.Set<Quote>()
+            .Include(q => q.Submission).ThenInclude(s => s.Insured)
+            .Include(q => q.Carrier)
+            .Where(q => !q.IsDeleted
+                        && q.ProgramId == null
+                        && openQuoteStatuses.Contains(q.Status))
+            .ToListAsync(ct);
+
+        var policies = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Where(p => !p.IsDeleted
+                        && p.ProgramId == null
+                        && p.Status == PolicyStatus.Active)
+            .ToListAsync(ct);
+
+        var rows = quotes
+            .Select(q => new UnassignedProgramCleanupRowDto(
+                q.Id,
+                "Quote",
+                q.QuoteNumber,
+                q.Submission.Insured.DisplayName,
+                q.Carrier.Name,
+                q.LineOfBusiness,
+                q.Submission.Insured.State,
+                q.Status.ToString(),
+                q.EffectiveDate,
+                q.ExpirationDate,
+                q.SubmissionId,
+                q.Id,
+                null,
+                $"/quotes/{q.Id}"))
+            .Concat(policies.Select(p => new UnassignedProgramCleanupRowDto(
+                p.Id,
+                "Policy",
+                p.PolicyNumber,
+                p.Submission.Insured.DisplayName,
+                p.Carrier.Name,
+                p.LineOfBusiness,
+                p.Submission.Insured.State,
+                p.Status.ToString(),
+                p.EffectiveDate,
+                p.ExpirationDate,
+                p.SubmissionId,
+                p.BoundQuoteId,
+                p.Id,
+                $"/policies/{p.Id}")))
+            .OrderBy(r => r.EffectiveDate)
+            .ThenBy(r => r.RecordType)
+            .ThenBy(r => r.ReferenceNumber)
+            .ToList();
+
+        return new UnassignedProgramCleanupDto(quotes.Count, policies.Count, rows);
+    }
+
     private static string SlaStatusFor(int daysUntilDue)
     {
         if (daysUntilDue < 0) return "Overdue";

@@ -8,6 +8,7 @@ import type {
   InvoiceTotalsByProgram,
   PostBindFollowUp,
   ManagerQueue,
+  UnassignedProgramCleanup,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -38,3 +39,6 @@ export const getPostBindFollowUp = (): Promise<PostBindFollowUp> =>
 
 export const getManagerQueue = (): Promise<ManagerQueue> =>
   apiClient.get(`${BASE}/operations/manager-queue`).then(r => r.data)
+
+export const getUnassignedProgramCleanup = (): Promise<UnassignedProgramCleanup> =>
+  apiClient.get(`${BASE}/operations/unassigned-program-cleanup`).then(r => r.data)

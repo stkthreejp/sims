@@ -11,6 +11,7 @@ import {
   getInvoiceTotalsByProgram,
   getPostBindFollowUp,
   getManagerQueue,
+  getUnassignedProgramCleanup,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
@@ -21,6 +22,7 @@ import type {
   InvoiceTotalsByProgram,
   PostBindFollowUp,
   ManagerQueue,
+  UnassignedProgramCleanup,
   AgingBucket,
   AgingRow,
   BrokerArRow,
@@ -555,6 +557,99 @@ function ManagerQueueReport() {
   )
 }
 
+function UnassignedProgramCleanupReport() {
+  const [typeFilter, setTypeFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const { data, isLoading, error } = useQuery<UnassignedProgramCleanup>({
+    queryKey: ['report', 'unassigned-program-cleanup'],
+    queryFn: getUnassignedProgramCleanup,
+  })
+
+  const rows = data?.rows ?? []
+  const filteredRows = rows.filter(row => {
+    if (typeFilter && row.recordType !== typeFilter) return false
+    if (search) {
+      const query = search.toLowerCase()
+      const target = `${row.referenceNumber} ${row.insuredName} ${row.carrierName} ${row.lineOfBusiness} ${row.state ?? ''} ${row.status}`.toLowerCase()
+      if (!target.includes(query)) return false
+    }
+    return true
+  })
+  const hasFilters = typeFilter || search
+
+  return (
+    <ReportShell title="Unassigned Program Cleanup" isLoading={isLoading} error={error as Error}>
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Visible Items" value={filteredRows.length.toLocaleString()} sub={`${rows.length.toLocaleString()} total`} />
+            <KpiCard label="Open Quotes" value={data.openQuoteCount.toLocaleString()} highlight={data.openQuoteCount > 0 ? 'warn' : undefined} />
+            <KpiCard label="Active Policies" value={data.activePolicyCount.toLocaleString()} highlight={data.activePolicyCount > 0 ? 'warn' : undefined} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search records..."
+              style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', minWidth: 240, fontSize: 12.5, color: 'var(--ink)', background: 'var(--surface)' }}
+            />
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={filterStyle}>
+              <option value="">All records</option>
+              <option value="Quote">Quotes</option>
+              <option value="Policy">Policies</option>
+            </select>
+            {hasFilters && (
+              <button
+                onClick={() => { setTypeFilter(''); setSearch('') }}
+                style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontSize: 12.5, color: 'var(--ink-3)', background: 'var(--surface)', cursor: 'pointer' }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Type', 'Reference', 'Insured', 'Carrier / LOB', 'State', 'Status', 'Effective', 'Expiration'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map(row => (
+                  <tr key={`${row.recordType}-${row.id}`} style={{ borderBottom: '1px solid var(--line)', verticalAlign: 'top' }}>
+                    <td style={tdStyle}><WorkTypeBadge type={row.recordType} /></td>
+                    <td style={tdStyle}>
+                      <Link to={row.actionUrl} style={{ color: 'var(--accent-ink)', fontWeight: 600, textDecoration: 'none' }}>
+                        {row.referenceNumber || 'Open'}
+                      </Link>
+                    </td>
+                    <td style={tdStyle}>{row.insuredName || '-'}</td>
+                    <td style={tdStyle}>
+                      <div>{row.carrierName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.lineOfBusiness}</div>
+                    </td>
+                    <td style={tdStyle}>{row.state ?? '-'}</td>
+                    <td style={tdStyle}>{row.status}</td>
+                    <td style={tdStyle}>{fmtDate(row.effectiveDate)}</td>
+                    <td style={tdStyle}>{fmtDate(row.expirationDate)}</td>
+                  </tr>
+                ))}
+                {filteredRows.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No unassigned program items</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 function PostBindFollowUpReport() {
   const [ownerFilter, setOwnerFilter] = useState('')
   const [slaFilter, setSlaFilter] = useState('')
@@ -738,6 +833,7 @@ const REPORT_CATEGORIES = [
     reports: [
       { id: 'manager-queue', label: 'Manager Queue' },
       { id: 'post-bind-follow-up', label: 'Post-Bind Follow-Up' },
+      { id: 'unassigned-program-cleanup', label: 'Unassigned Program Cleanup' },
     ],
   },
   {
@@ -785,6 +881,7 @@ function renderReport(id: string) {
     case 'invoice-totals-by-transaction': return <InvoiceTotalsByPolicyTransactionReport />
     case 'manager-queue':          return <ManagerQueueReport />
     case 'post-bind-follow-up':    return <PostBindFollowUpReport />
+    case 'unassigned-program-cleanup': return <UnassignedProgramCleanupReport />
     default:                       return null
   }
 }
