@@ -571,6 +571,7 @@ function ManagerQueueReport() {
 function AuthorityApprovalActivityReport() {
   const [statusFilter, setStatusFilter] = useState('')
   const [overrideFilter, setOverrideFilter] = useState('')
+  const [programFilter, setProgramFilter] = useState('')
   const [search, setSearch] = useState('')
   const { data, isLoading, error } = useQuery<AuthorityApprovalActivity>({
     queryKey: ['report', 'authority-approvals'],
@@ -578,18 +579,22 @@ function AuthorityApprovalActivityReport() {
   })
 
   const rows = data?.rows ?? []
+  const programs = Array.from(
+    new Map(rows.filter(row => row.programId).map(row => [row.programId!, row.programName ?? 'Unassigned'])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]))
   const filteredRows = rows.filter(row => {
     if (statusFilter && row.status !== statusFilter) return false
     if (overrideFilter === 'override' && !row.isOverride) return false
     if (overrideFilter === 'standard' && row.isOverride) return false
+    if (programFilter && row.programId !== programFilter) return false
     if (search) {
       const query = search.toLowerCase()
-      const target = `${row.actionLabel} ${row.approvalType} ${row.reason} ${row.referenceNumber} ${row.insuredName ?? ''} ${row.requestedByName ?? ''} ${row.ownerName ?? ''} ${row.decisionByName ?? ''}`.toLowerCase()
+      const target = `${row.actionLabel} ${row.approvalType} ${row.reason} ${row.referenceNumber} ${row.insuredName ?? ''} ${row.programName ?? ''} ${row.programCode ?? ''} ${row.lineOfBusiness ?? ''} ${row.state ?? ''} ${row.requestedByName ?? ''} ${row.ownerName ?? ''} ${row.decisionByName ?? ''}`.toLowerCase()
       if (!target.includes(query)) return false
     }
     return true
   })
-  const hasFilters = statusFilter || overrideFilter || search
+  const hasFilters = statusFilter || overrideFilter || programFilter || search
 
   return (
     <ReportShell title="Authority Approvals" isLoading={isLoading} error={error as Error}>
@@ -622,9 +627,13 @@ function AuthorityApprovalActivityReport() {
               <option value="override">Overrides</option>
               <option value="standard">Standard</option>
             </select>
+            <select value={programFilter} onChange={(e) => setProgramFilter(e.target.value)} style={filterStyle}>
+              <option value="">All programs</option>
+              {programs.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
             {hasFilters && (
               <button
-                onClick={() => { setStatusFilter(''); setOverrideFilter(''); setSearch('') }}
+                onClick={() => { setStatusFilter(''); setOverrideFilter(''); setProgramFilter(''); setSearch('') }}
                 style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontSize: 12.5, color: 'var(--ink-3)', background: 'var(--surface)', cursor: 'pointer' }}
               >
                 Clear filters
@@ -636,7 +645,7 @@ function AuthorityApprovalActivityReport() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                  {['Action', 'Reference', 'Insured', 'Requested', 'Owner', 'Due', 'Decision', 'SLA', 'Reason'].map(h => (
+                  {['Action', 'Reference', 'Insured', 'Program', 'Requested', 'Owner', 'Due', 'Decision', 'SLA', 'Reason'].map(h => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -658,6 +667,11 @@ function AuthorityApprovalActivityReport() {
                       </Link>
                     </td>
                     <td style={tdStyle}>{row.insuredName ?? '-'}</td>
+                    <td style={tdStyle}>
+                      <div>{row.programName ?? 'Unassigned'}</div>
+                      {row.programCode && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.programCode}</div>}
+                      {(row.lineOfBusiness || row.state) && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{[row.lineOfBusiness, row.state].filter(Boolean).join(' / ')}</div>}
+                    </td>
                     <td style={tdStyle}>
                       <div>{fmtDateTime(row.requestedAt)}</div>
                       <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.requestedByName ?? 'Unknown'}</div>
@@ -681,7 +695,7 @@ function AuthorityApprovalActivityReport() {
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
-                  <tr><td colSpan={9} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No authority approval items</td></tr>
+                  <tr><td colSpan={10} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No authority approval items</td></tr>
                 )}
               </tbody>
             </table>

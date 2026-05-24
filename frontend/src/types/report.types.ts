@@ -197,6 +197,11 @@ export interface AuthorityApprovalActivityRow {
   status: string
   referenceNumber: string
   insuredName: string | null
+  programId: string | null
+  programName: string | null
+  programCode: string | null
+  lineOfBusiness: string | null
+  state: string | null
   requestedById: string
   requestedByName: string | null
   ownerId: string | null

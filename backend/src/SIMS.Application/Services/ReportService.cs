@@ -435,6 +435,7 @@ public class ReportService : IReportService
             .ToList();
         var quotes = await Db.Set<Quote>()
             .Include(q => q.Submission).ThenInclude(s => s.Insured)
+            .Include(q => q.Program)
             .Where(q => quoteTargets.Contains(q.Id))
             .ToDictionaryAsync(q => q.Id, ct);
 
@@ -445,6 +446,7 @@ public class ReportService : IReportService
             .ToList();
         var policies = await Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Program)
             .Where(p => policyTargets.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, ct);
 
@@ -615,6 +617,7 @@ public class ReportService : IReportService
             .ToList();
         var transactions = await Db.Set<PolicyTransaction>()
             .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(t => t.Policy).ThenInclude(p => p.Program)
             .Where(t => transactionIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, ct);
 
@@ -640,6 +643,11 @@ public class ReportService : IReportService
                 a.Status.ToString(),
                 target.ReferenceNumber,
                 target.InsuredName,
+                target.ProgramId,
+                target.ProgramName,
+                target.ProgramCode,
+                target.LineOfBusiness,
+                target.State,
                 a.RequestedById,
                 DisplayName(a.RequestedBy),
                 a.AssignedToUserId,
@@ -847,24 +855,64 @@ public class ReportService : IReportService
         IReadOnlyDictionary<Guid, PolicyTransaction> transactions)
     {
         if (approval.TargetType == AuthorityApprovalTargetType.Quote && quotes.TryGetValue(approval.TargetId, out var quote))
-            return new ApprovalTargetContext(quote.QuoteNumber, quote.Submission.Insured.DisplayName, $"/quotes/{quote.Id}");
+            return new ApprovalTargetContext(
+                quote.QuoteNumber,
+                quote.Submission.Insured.DisplayName,
+                quote.ProgramId,
+                quote.Program?.Name,
+                quote.Program?.Code,
+                quote.LineOfBusiness,
+                quote.Submission.Insured.State,
+                $"/quotes/{quote.Id}");
 
         if (approval.TargetType == AuthorityApprovalTargetType.Policy && policies.TryGetValue(approval.TargetId, out var policy))
-            return new ApprovalTargetContext(policy.PolicyNumber, policy.Submission.Insured.DisplayName, $"/policies/{policy.Id}");
+            return new ApprovalTargetContext(
+                policy.PolicyNumber,
+                policy.Submission.Insured.DisplayName,
+                policy.ProgramId,
+                policy.Program?.Name,
+                policy.Program?.Code,
+                policy.LineOfBusiness,
+                policy.Submission.Insured.State,
+                $"/policies/{policy.Id}");
 
         if (approval.TargetType == AuthorityApprovalTargetType.Submission && submissions.TryGetValue(approval.TargetId, out var submission))
-            return new ApprovalTargetContext(submission.SubmissionNumber, submission.Insured.DisplayName, $"/submissions/{submission.Id}");
+            return new ApprovalTargetContext(
+                submission.SubmissionNumber,
+                submission.Insured.DisplayName,
+                null,
+                null,
+                null,
+                FirstLineOfBusiness(submission.LinesOfBusiness),
+                submission.Insured.State,
+                $"/submissions/{submission.Id}");
 
         if (approval.TargetType == AuthorityApprovalTargetType.PolicyTransaction && transactions.TryGetValue(approval.TargetId, out var transaction))
-            return new ApprovalTargetContext(transaction.TransactionNumber, transaction.Policy.Submission.Insured.DisplayName, $"/policies/{transaction.PolicyId}/transactions/{transaction.Id}");
+            return new ApprovalTargetContext(
+                transaction.TransactionNumber,
+                transaction.Policy.Submission.Insured.DisplayName,
+                transaction.Policy.ProgramId,
+                transaction.Policy.Program?.Name,
+                transaction.Policy.Program?.Code,
+                transaction.Policy.LineOfBusiness,
+                transaction.Policy.Submission.Insured.State,
+                $"/policies/{transaction.PolicyId}/transactions/{transaction.Id}");
 
         if (approval.TargetType == AuthorityApprovalTargetType.RatingPlanVersion)
-            return new ApprovalTargetContext(approval.ApprovalType, null, $"/admin/rating/versions/{approval.TargetId}");
+            return new ApprovalTargetContext(approval.ApprovalType, null, null, null, null, null, null, $"/admin/rating/versions/{approval.TargetId}");
 
-        return new ApprovalTargetContext(approval.ApprovalType, null, "/reports?r=authority-approvals");
+        return new ApprovalTargetContext(approval.ApprovalType, null, null, null, null, null, null, "/reports?r=authority-approvals");
     }
 
-    private record ApprovalTargetContext(string ReferenceNumber, string? InsuredName, string ActionUrl);
+    private record ApprovalTargetContext(
+        string ReferenceNumber,
+        string? InsuredName,
+        Guid? ProgramId,
+        string? ProgramName,
+        string? ProgramCode,
+        PolicyLineOfBusiness? LineOfBusiness,
+        string? State,
+        string ActionUrl);
 
     private static IMWriteupPayload? ParseWriteupPayload(string? payloadJson)
     {

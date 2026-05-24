@@ -529,6 +529,7 @@ public class ReportServiceTests
     {
         await using var db = CreateDb();
         var now = DateTime.UtcNow;
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
         var requester = new User
         {
             Id = Guid.NewGuid(),
@@ -570,6 +571,8 @@ public class ReportServiceTests
             SubmissionId = submission.Id,
             Carrier = carrier,
             CarrierId = carrier.Id,
+            Program = program,
+            ProgramId = program.Id,
             LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
             EffectiveDate = DateOnly.FromDateTime(now).AddDays(10),
             ExpirationDate = DateOnly.FromDateTime(now).AddDays(375),
@@ -578,6 +581,7 @@ public class ReportServiceTests
         };
 
         db.AddRange(
+            program,
             requester,
             approver,
             carrier,
@@ -656,6 +660,11 @@ public class ReportServiceTests
         Assert.Equal("Overdue", pendingOverride.SlaStatus);
         Assert.Equal("Q-AUTH", pendingOverride.ReferenceNumber);
         Assert.Equal("Authority Timber", pendingOverride.InsuredName);
+        Assert.Equal(program.Id, pendingOverride.ProgramId);
+        Assert.Equal("Longleaf", pendingOverride.ProgramName);
+        Assert.Equal("LONGLEAF", pendingOverride.ProgramCode);
+        Assert.Equal(PolicyLineOfBusiness.InlandMarine, pendingOverride.LineOfBusiness);
+        Assert.Equal("AL", pendingOverride.State);
         Assert.Equal("Casey Requester", pendingOverride.RequestedByName);
         Assert.Equal("Morgan Approver", pendingOverride.OwnerName);
         Assert.Equal($"/quotes/{quote.Id}", pendingOverride.ActionUrl);
