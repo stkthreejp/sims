@@ -140,6 +140,98 @@ public class ProgramConfigurationServiceTests
     }
 
     [Fact]
+    public async Task CopyStateAsync_CopiesStateFormsAndProposalNotices()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "Falls Lake", IsActive = true };
+        var formTemplate = new PolicyFormTemplate
+        {
+            FormNumber = "NC-IM-001",
+            Name = "North Carolina Inland Marine Notice",
+            IsActive = true,
+        };
+        var proposalTemplate = new DocumentTemplate
+        {
+            Name = "NC Proposal Notice",
+            EntityType = TemplateEntityType.Quote,
+            Kind = DocumentTemplateKind.Document,
+            HtmlContent = "<p>NC notice</p>",
+            CreatedById = Guid.NewGuid(),
+            IsActive = true,
+        };
+        db.AddRange(program, carrier, formTemplate, proposalTemplate);
+        await db.SaveChangesAsync();
+
+        var service = new ProgramConfigurationService(db);
+        var programCarrier = await service.AddCarrierAsync(program.Id, new UpsertProgramCarrierRequest(carrier.Id, true, new DateOnly(2026, 1, 1), null, null));
+        var lob = await service.AddLineOfBusinessAsync(program.Id, programCarrier.Value!.Id, new UpsertProgramCarrierLineOfBusinessRequest(
+            PolicyLineOfBusiness.InlandMarine,
+            true,
+            new DateOnly(2026, 1, 1),
+            null,
+            "IM setup"));
+        await service.AddStateAsync(program.Id, programCarrier.Value.Id, lob.Value!.Id, new UpsertProgramCarrierLobStateRequest(
+            "NC",
+            true,
+            new DateOnly(2026, 1, 1),
+            null,
+            "North Carolina setup"));
+        var package = new PolicyPackageConfiguration
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            State = "NC",
+            Name = "NC IM Forms",
+            IsActive = true,
+            Forms =
+            [
+                new PolicyPackageForm
+                {
+                    PolicyFormTemplateId = formTemplate.Id,
+                    SequenceOrder = 1,
+                    FormType = PolicyFormType.Mandatory,
+                    Notes = "State notice",
+                },
+            ],
+        };
+        db.AddRange(
+            package,
+            new ProposalDocumentConfiguration
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+                State = "NC",
+                Role = ProposalDocumentRole.StateNotice,
+                DocumentTemplateId = proposalTemplate.Id,
+                SequenceOrder = 1,
+                IsActive = true,
+                Notes = "Attach to NC proposals",
+            });
+        await db.SaveChangesAsync();
+
+        var copy = await service.CopyStateAsync(program.Id, programCarrier.Value.Id, lob.Value.Id, new CopyProgramCarrierLobStateRequest("NC", "SC"));
+
+        Assert.True(copy.IsSuccess);
+        var copiedPackage = await db.Set<PolicyPackageConfiguration>()
+            .Include(p => p.Forms)
+            .SingleOrDefaultAsync(p => p.ProgramConfigurationId == program.Id && p.CarrierId == carrier.Id && p.LineOfBusiness == PolicyLineOfBusiness.InlandMarine && p.State == "SC");
+        Assert.NotNull(copiedPackage);
+        Assert.Equal("SC IM Forms", copiedPackage!.Name);
+        var copiedForm = Assert.Single(copiedPackage.Forms);
+        Assert.Equal(formTemplate.Id, copiedForm.PolicyFormTemplateId);
+        Assert.Equal("State notice", copiedForm.Notes);
+
+        var copiedNotice = await db.Set<ProposalDocumentConfiguration>()
+            .SingleOrDefaultAsync(p => p.ProgramConfigurationId == program.Id && p.CarrierId == carrier.Id && p.LineOfBusiness == PolicyLineOfBusiness.InlandMarine && p.State == "SC");
+        Assert.NotNull(copiedNotice);
+        Assert.Equal(proposalTemplate.Id, copiedNotice!.DocumentTemplateId);
+        Assert.Equal("Attach to NC proposals", copiedNotice.Notes);
+    }
+
+    [Fact]
     public async Task AddLineOfBusinessAsync_SavesBillingModeAndPaymentTerms()
     {
         await using var db = CreateDb();

@@ -348,8 +348,99 @@ public class ProgramConfigurationService : IProgramConfigurationService
 
         _db.Set<ProgramCarrierLobState>().Add(copy);
         await _db.SaveChangesAsync(ct);
+        await CopyStatePolicyPackagesAsync(programId, programCarrierId, source.ProgramCarrierLineOfBusiness.LineOfBusiness, sourceState, targetState, ct);
+        await CopyStateProposalDocumentsAsync(programId, programCarrierId, source.ProgramCarrierLineOfBusiness.LineOfBusiness, sourceState, targetState, ct);
+        await _db.SaveChangesAsync(ct);
 
         return Result<ProgramCarrierLobStateDto>.Success(Map(copy));
+    }
+
+    private async Task CopyStatePolicyPackagesAsync(
+        Guid programId,
+        Guid programCarrierId,
+        PolicyLineOfBusiness lineOfBusiness,
+        string sourceState,
+        string targetState,
+        CancellationToken ct)
+    {
+        var carrierId = await _db.Set<ProgramCarrier>()
+            .Where(c => c.Id == programCarrierId && c.ProgramConfigurationId == programId)
+            .Select(c => c.CarrierId)
+            .SingleAsync(ct);
+        var sourcePackages = await _db.Set<PolicyPackageConfiguration>()
+            .Include(p => p.Forms)
+            .Where(p =>
+                p.ProgramConfigurationId == programId &&
+                p.CarrierId == carrierId &&
+                p.LineOfBusiness == lineOfBusiness &&
+                p.State == sourceState &&
+                !p.IsDeleted)
+            .ToListAsync(ct);
+
+        foreach (var sourcePackage in sourcePackages)
+        {
+            _db.Set<PolicyPackageConfiguration>().Add(new PolicyPackageConfiguration
+            {
+                ProgramConfigurationId = sourcePackage.ProgramConfigurationId,
+                CarrierId = sourcePackage.CarrierId,
+                LineOfBusiness = sourcePackage.LineOfBusiness,
+                State = targetState,
+                Name = ReplaceStateToken(sourcePackage.Name, sourceState, targetState),
+                IsActive = sourcePackage.IsActive,
+                Forms = sourcePackage.Forms
+                    .Where(f => !f.IsDeleted)
+                    .OrderBy(f => f.SequenceOrder)
+                    .Select(f => new PolicyPackageForm
+                    {
+                        PolicyFormTemplateId = f.PolicyFormTemplateId,
+                        SequenceOrder = f.SequenceOrder,
+                        FormType = f.FormType,
+                        TriggerConditionJson = f.TriggerConditionJson,
+                        Notes = f.Notes,
+                    })
+                    .ToList(),
+            });
+        }
+    }
+
+    private async Task CopyStateProposalDocumentsAsync(
+        Guid programId,
+        Guid programCarrierId,
+        PolicyLineOfBusiness lineOfBusiness,
+        string sourceState,
+        string targetState,
+        CancellationToken ct)
+    {
+        var carrierId = await _db.Set<ProgramCarrier>()
+            .Where(c => c.Id == programCarrierId && c.ProgramConfigurationId == programId)
+            .Select(c => c.CarrierId)
+            .SingleAsync(ct);
+        var sourceDocuments = await _db.Set<ProposalDocumentConfiguration>()
+            .Where(p =>
+                p.ProgramConfigurationId == programId &&
+                p.CarrierId == carrierId &&
+                p.LineOfBusiness == lineOfBusiness &&
+                p.State == sourceState &&
+                !p.IsDeleted)
+            .ToListAsync(ct);
+
+        foreach (var sourceDocument in sourceDocuments)
+        {
+            _db.Set<ProposalDocumentConfiguration>().Add(new ProposalDocumentConfiguration
+            {
+                ProgramConfigurationId = sourceDocument.ProgramConfigurationId,
+                CarrierId = sourceDocument.CarrierId,
+                LineOfBusiness = sourceDocument.LineOfBusiness,
+                State = targetState,
+                Role = sourceDocument.Role,
+                DocumentTemplateId = sourceDocument.DocumentTemplateId,
+                SequenceOrder = sourceDocument.SequenceOrder,
+                IsActive = sourceDocument.IsActive,
+                EffectiveDate = sourceDocument.EffectiveDate,
+                ExpirationDate = sourceDocument.ExpirationDate,
+                Notes = sourceDocument.Notes,
+            });
+        }
     }
 
     private async Task<(string Code, string Message)?> ValidateAsync(Guid? existingId, string name, string code, CancellationToken ct)
@@ -369,6 +460,10 @@ public class ProgramConfigurationService : IProgramConfigurationService
     }
 
     private static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();
+    private static string ReplaceStateToken(string name, string sourceState, string targetState) =>
+        string.IsNullOrWhiteSpace(name)
+            ? name
+            : name.Replace(sourceState, targetState, StringComparison.OrdinalIgnoreCase);
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static (string Code, string Message)? ValidateDates(DateOnly effectiveDate, DateOnly? expirationDate) =>
         expirationDate.HasValue && expirationDate.Value < effectiveDate
