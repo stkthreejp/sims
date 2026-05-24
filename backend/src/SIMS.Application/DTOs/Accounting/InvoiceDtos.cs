@@ -17,7 +17,8 @@ public record CreateInvoiceRequest(
     int LocationCount = 1,
     int VehicleCount = 1,
     Guid? PolicyTransactionId = null,
-    Guid? PolicyVersionId = null
+    Guid? PolicyVersionId = null,
+    Guid? ProgramConfigurationId = null
 );
 
 public record InvoiceSummaryDto(

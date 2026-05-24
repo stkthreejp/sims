@@ -490,11 +490,34 @@ export function SubmissionDetailPage() {
     }
   }, [submission, expLob])
 
+  const selectedProgram = programs.find((p) => p.id === quoteForm.programId)
+  const insuredStateCode = insured?.state?.trim().toUpperCase()
+  const configuredProgramCarriers = selectedProgram
+    ? selectedProgram.carriers.filter((programCarrier) =>
+        programCarrier.isActive &&
+        programCarrier.linesOfBusiness.some((lob) =>
+          lob.isActive &&
+          (!insuredStateCode || lob.states.some((state) => state.isActive && state.stateCode === insuredStateCode))
+        )
+      )
+    : []
+  const quoteCarrierOptions = selectedProgram
+    ? configuredProgramCarriers.map((programCarrier) => ({ id: programCarrier.carrierId, name: programCarrier.carrierName }))
+    : carriers
   const selectedCarrier = carriers.find((c) => c.id === quoteForm.carrierId)
+  const selectedProgramCarrier = configuredProgramCarriers.find((programCarrier) => programCarrier.carrierId === quoteForm.carrierId)
   const submissionLobOptions = submission?.linesOfBusiness.length ? submission.linesOfBusiness : ACTIVE_LOBS
-  const availableLobs = selectedCarrier
-    ? selectedCarrier.linesOfBusiness.filter((l) => submissionLobOptions.includes(l))
-    : submissionLobOptions
+  const availableLobs = selectedProgram && selectedProgramCarrier
+    ? selectedProgramCarrier.linesOfBusiness
+        .filter((lob) =>
+          lob.isActive &&
+          submissionLobOptions.includes(lob.lineOfBusiness) &&
+          (!insuredStateCode || lob.states.some((state) => state.isActive && state.stateCode === insuredStateCode))
+        )
+        .map((lob) => lob.lineOfBusiness)
+    : selectedCarrier
+      ? selectedCarrier.linesOfBusiness.filter((l) => submissionLobOptions.includes(l))
+      : submissionLobOptions
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -772,6 +795,8 @@ export function SubmissionDetailPage() {
       const next = { ...prev, [k]: val }
       if (k === 'programId') {
         next.programId = val
+        next.carrierId = ''
+        next.lineOfBusiness = ''
       }
       if (k === 'carrierId') {
         next.lineOfBusiness = ''
@@ -1187,7 +1212,7 @@ export function SubmissionDetailPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
               { label: 'Program', node: <select value={quoteForm.programId} onChange={setQF('programId')} style={inputStyle}><option value="">No program</option>{programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select> },
-              { label: 'Carrier *', node: <select value={quoteForm.carrierId} onChange={setQF('carrierId')} style={inputStyle}><option value="">— Select carrier —</option>{carriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select> },
+              { label: 'Carrier *', node: <select value={quoteForm.carrierId} onChange={setQF('carrierId')} style={inputStyle}><option value="">— Select carrier —</option>{quoteCarrierOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select> },
               { label: 'Line of Business *', node: <select value={quoteForm.lineOfBusiness} onChange={setQF('lineOfBusiness')} disabled={!quoteForm.carrierId} style={inputStyle}><option value="">— Select LOB —</option>{availableLobs.map((l) => <option key={l} value={l}>{getLobLabel(l)}</option>)}</select> },
               { label: 'Effective Date *', node: <input type="date" value={quoteForm.effectiveDate} onChange={setQF('effectiveDate')} style={inputStyle} /> },
               { label: 'Expiration Date *', node: <input type="date" value={quoteForm.expirationDate} onChange={setQF('expirationDate')} style={inputStyle} /> },

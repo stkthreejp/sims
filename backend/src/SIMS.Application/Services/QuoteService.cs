@@ -139,6 +139,7 @@ public class QuoteService : IQuoteService
     public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById)
     {
         var submission = await Db.Set<Submission>()
+            .Include(s => s.Insured)
             .FirstOrDefaultAsync(s => s.Id == dto.SubmissionId && !s.IsDeleted);
         if (submission == null)
             return Result<QuoteDto>.Failure("INVALID_SUBMISSION", "Submission not found.");
@@ -158,6 +159,10 @@ public class QuoteService : IQuoteService
             .FirstOrDefaultAsync(c => c.Id == carrierId && !c.IsDeleted && c.IsActive);
         if (carrier == null)
             return Result<QuoteDto>.Failure("INVALID_CARRIER", "Carrier not found or inactive.");
+
+        var programPathValidation = await ValidateProgramSetupPathAsync(program, carrierId, lineOfBusiness, submission, dto.EffectiveDate);
+        if (programPathValidation is not null)
+            return Result<QuoteDto>.Failure(programPathValidation.Value.Code, programPathValidation.Value.Message);
 
         // Look up commission rates from setup tables
         var asOfDate = dto.EffectiveDate;
@@ -219,7 +224,7 @@ public class QuoteService : IQuoteService
     public async Task<Result<QuoteDto>> UpdateAsync(Guid id, QuoteUpdateDto dto, UserAccessScope access)
     {
         var quote = await Db.Set<Quote>()
-            .Include(qt => qt.Submission)
+            .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
             .Include(qt => qt.Program)
             .Include(qt => qt.Carrier)
             .Where(qt => qt.Id == id && !qt.IsDeleted)
@@ -239,6 +244,15 @@ public class QuoteService : IQuoteService
             if (program == null)
                 return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
         }
+
+        var carrier = await Db.Set<Carrier>()
+            .FirstOrDefaultAsync(c => c.Id == carrierId && !c.IsDeleted && c.IsActive);
+        if (carrier == null)
+            return Result<QuoteDto>.Failure("INVALID_CARRIER", "Carrier not found or inactive.");
+
+        var programPathValidation = await ValidateProgramSetupPathAsync(program, carrierId, lineOfBusiness, quote.Submission, dto.EffectiveDate);
+        if (programPathValidation is not null)
+            return Result<QuoteDto>.Failure(programPathValidation.Value.Code, programPathValidation.Value.Message);
 
         var previousStatus = quote.Status;
         var lobChanged = quote.CarrierId != carrierId || quote.LineOfBusiness != lineOfBusiness;
@@ -446,7 +460,8 @@ public class QuoteService : IQuoteService
             LocationCount: quote.Submission?.Locations?.Count(l => !l.IsDeleted) ?? 1,
             VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
             PolicyTransactionId: transaction.Id,
-            PolicyVersionId: policyVersion.Id
+            PolicyVersionId: policyVersion.Id,
+            ProgramConfigurationId: quote.ProgramId
         );
         var invoiceResult = await invoicing.BindAsync(invoiceReq, access.UserId);
         if (!invoiceResult.IsSuccess)
@@ -492,7 +507,8 @@ public class QuoteService : IQuoteService
             City: null,
             LicenseType: null,
             LocationCount: quote.Submission?.Locations?.Count(l => !l.IsDeleted) ?? 1,
-            VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1);
+            VehicleCount: quote.Submission?.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
+            ProgramConfigurationId: quote.ProgramId);
 
         var calcResult = await feeCalc.CalculateAsync(ctx);
         var lines = calcResult.Lines
@@ -637,6 +653,41 @@ public class QuoteService : IQuoteService
             .IgnoreQueryFilters()
             .CountAsync(t => t.TransactionNumber.StartsWith(prefix));
         return $"{prefix}{(count + 1):D5}";
+    }
+
+    private async Task<(string Code, string Message)?> ValidateProgramSetupPathAsync(
+        ProgramConfiguration? program,
+        Guid carrierId,
+        PolicyLineOfBusiness lineOfBusiness,
+        Submission submission,
+        DateOnly effectiveDate)
+    {
+        if (program is null)
+            return null;
+
+        var stateCode = submission.Insured?.State?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(stateCode) || stateCode.Length != 2)
+            return ("INVALID_PROGRAM_STATE", "Insured state is required to validate the selected program setup.");
+
+        var pathExists = await Db.Set<ProgramCarrierLobState>()
+            .AnyAsync(s =>
+                s.StateCode == stateCode &&
+                s.IsActive &&
+                s.EffectiveDate <= effectiveDate &&
+                (s.ExpirationDate == null || s.ExpirationDate >= effectiveDate) &&
+                s.ProgramCarrierLineOfBusiness.IsActive &&
+                s.ProgramCarrierLineOfBusiness.LineOfBusiness == lineOfBusiness &&
+                s.ProgramCarrierLineOfBusiness.EffectiveDate <= effectiveDate &&
+                (s.ProgramCarrierLineOfBusiness.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ExpirationDate >= effectiveDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsActive &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.CarrierId == carrierId &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.ProgramConfigurationId == program.Id &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.EffectiveDate <= effectiveDate &&
+                (s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate >= effectiveDate));
+
+        return pathExists
+            ? null
+            : ("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and insured state are not active for this program.");
     }
 
     private static string BuildControlBlockMessage(string action, IReadOnlyList<UnderwritingControlEnforcementResultDto> blockers)

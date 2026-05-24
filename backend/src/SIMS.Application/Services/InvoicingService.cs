@@ -31,7 +31,8 @@ public class InvoicingService : IInvoicingService
             req.IsEndorsement, req.IsFilingState,
             req.CarrierId,
             req.CompanyId, req.ProducerId, req.LineOfBusiness,
-            req.City, req.LicenseType, req.LocationCount, req.VehicleCount);
+            req.City, req.LicenseType, req.LocationCount, req.VehicleCount,
+            ProgramConfigurationId: req.ProgramConfigurationId);
 
         var calcResult = await _feeCalc.CalculateAsync(ctx, ct);
 

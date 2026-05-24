@@ -743,7 +743,8 @@ public class PolicyService : IPolicyService
                 LocationCount: submission.Locations?.Count(l => !l.IsDeleted) ?? 1,
                 VehicleCount: submission.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
                 PolicyTransactionId: txn.Id,
-                PolicyVersionId: policyVersion.Id
+                PolicyVersionId: policyVersion.Id,
+                ProgramConfigurationId: quote.ProgramId
             );
             await _invoicing.BindAsync(req, access.UserId);
         }

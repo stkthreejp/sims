@@ -41,6 +41,66 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteCreate_RejectsProgramCarrierLobStatePathThatIsNotConfigured()
+    {
+        await using var db = CreateDb();
+        var fixture = CreateQuoteFixture("Program Path Test");
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        db.AddRange(fixture.User, fixture.Carrier, fixture.Insured, fixture.Submission, program);
+        await db.SaveChangesAsync();
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        var result = await quoteService.CreateAsync(CreateQuoteRequest(fixture, program.Id), fixture.UserId);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task QuoteCreate_AllowsConfiguredProgramCarrierLobStatePath()
+    {
+        await using var db = CreateDb();
+        var fixture = CreateQuoteFixture("Program Path Test");
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        db.AddRange(fixture.User, fixture.Carrier, fixture.Insured, fixture.Submission, program);
+        await db.SaveChangesAsync();
+        db.Add(new ProgramCarrier
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = fixture.Carrier.Id,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            LinesOfBusiness =
+            {
+                new ProgramCarrierLineOfBusiness
+                {
+                    LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+                    IsActive = true,
+                    EffectiveDate = new DateOnly(2026, 1, 1),
+                    States =
+                    {
+                        new ProgramCarrierLobState
+                        {
+                            StateCode = fixture.Insured.State,
+                            IsActive = true,
+                            EffectiveDate = new DateOnly(2026, 1, 1)
+                        }
+                    }
+                }
+            }
+        });
+        await db.SaveChangesAsync();
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        var result = await quoteService.CreateAsync(CreateQuoteRequest(fixture, program.Id), fixture.UserId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(program.Id, result.Value!.ProgramId);
+        Assert.Equal(fixture.Carrier.Id, result.Value.CarrierId);
+        Assert.Equal(PolicyLineOfBusiness.InlandMarine, result.Value.LineOfBusiness);
+    }
+
+    [Fact]
     public async Task QuoteBind_BlocksPublishedHardControl()
     {
         await using var db = CreateDb();
@@ -2038,6 +2098,19 @@ public class PolicyLifecycleRegressionTests
         BoundDate = new DateOnly(2026, 1, 5),
         EffectiveDate = new DateOnly(2026, 1, 5),
         ExpirationDate = new DateOnly(2027, 1, 5),
+    };
+
+    private static QuoteCreateDto CreateQuoteRequest(QuoteFixture fixture, Guid? programId) => new()
+    {
+        SubmissionId = fixture.Submission.Id,
+        ProgramId = programId,
+        CarrierId = fixture.Carrier.Id,
+        LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+        EffectiveDate = new DateOnly(2026, 1, 5),
+        ExpirationDate = new DateOnly(2027, 1, 5),
+        PremiumAmount = 900m,
+        TaxesAndFees = 100m,
+        IsFilingState = true,
     };
 
     private static async Task<QuoteFixture> SeedBindableQuoteAsync(ApplicationDbContext db)
