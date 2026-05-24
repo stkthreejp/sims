@@ -1597,7 +1597,7 @@ public class PolicyLifecycleRegressionTests
             ReinstatedDate = new DateOnly(2026, 7, 15),
             Reason = "Payment received",
             Notes = "Producer confirmed payment.",
-        }, UserAccessScope.All(fixture.UserId));
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
 
         Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
         Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
@@ -1642,6 +1642,63 @@ public class PolicyLifecycleRegressionTests
         var document = Assert.Single(artifacts.Value.Documents);
         Assert.Equal(DocumentType.ReinstatementApproval, document.DocumentType);
         Assert.Equal(transaction.Id, document.PolicyTransactionId);
+    }
+
+    [Fact]
+    public async Task Reinstatement_RequiresAuthorityApproval()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var cancellation = await policyService.CancelAsync(fixture.Policy.Id, new CancelPolicyDto
+        {
+            CancelledDate = new DateOnly(2026, 7, 1),
+            Reason = "Non-payment",
+            Method = "Certified Mail",
+            PremiumChange = 0m,
+            ComplianceChecklist =
+            [
+                new CancellationComplianceChecklistItemDto
+                {
+                    Key = "notice",
+                    Label = "Notice sent",
+                    IsCompleted = true,
+                }
+            ],
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(cancellation.IsSuccess);
+
+        var blocked = await policyService.ReinstateAsync(fixture.Policy.Id, new ReinstatePolicyDto
+        {
+            ReinstatedDate = new DateOnly(2026, 7, 15),
+            Reason = "Payment received",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(blocked.IsSuccess);
+        Assert.Equal("AUTHORITY_APPROVAL_REQUIRED", blocked.ErrorCode);
+        Assert.Equal(PolicyStatus.Cancelled, fixture.Policy.Status);
+        var approval = await db.Set<AuthorityApprovalRequest>().SingleAsync();
+        Assert.Equal(AuthorityApprovalTargetType.Policy, approval.TargetType);
+        Assert.Equal(fixture.Policy.Id, approval.TargetId);
+        Assert.Equal("policy.reinstatement", approval.ActionCode);
+        Assert.Equal("Policy reinstatement", approval.ActionLabel);
+        Assert.Equal("PolicyReinstatement", approval.ApprovalType);
+        Assert.Equal(AuthorityApprovalStatus.Pending, approval.Status);
+        Assert.Contains("reinstatement", approval.Reason, StringComparison.OrdinalIgnoreCase);
+
+        approval.Status = AuthorityApprovalStatus.Approved;
+        approval.DecisionById = Guid.NewGuid();
+        approval.DecisionAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var reinstated = await policyService.ReinstateAsync(fixture.Policy.Id, new ReinstatePolicyDto
+        {
+            ReinstatedDate = new DateOnly(2026, 7, 15),
+            Reason = "Payment received",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(reinstated.IsSuccess, $"{reinstated.ErrorCode}: {reinstated.ErrorMessage}");
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
     }
 
     [Fact]

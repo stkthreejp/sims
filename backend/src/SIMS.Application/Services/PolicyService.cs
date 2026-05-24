@@ -1085,7 +1085,11 @@ public class PolicyService : IPolicyService
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
 
-    public async Task<Result<PolicyDto>> ReinstateAsync(Guid policyId, ReinstatePolicyDto dto, UserAccessScope access)
+    public async Task<Result<PolicyDto>> ReinstateAsync(
+        Guid policyId,
+        ReinstatePolicyDto dto,
+        UserAccessScope access,
+        IReadOnlyCollection<string>? currentUserPermissions = null)
     {
         var db = Db;
         var policy = await db.Set<Policy>()
@@ -1114,6 +1118,9 @@ public class PolicyService : IPolicyService
             && t.Status is not (PolicyTransactionStatus.Declined or PolicyTransactionStatus.Withdrawn or PolicyTransactionStatus.Voided)
             && !t.IsDeleted))
             return Result<PolicyDto>.Failure("REINSTATEMENT_ALREADY_EXISTS", "This policy already has an active reinstatement transaction.");
+        var authorityGate = await EnsureReinstatementAuthorityAsync(policy, dto, access.UserId, currentUserPermissions ?? Array.Empty<string>());
+        if (!authorityGate.IsSuccess)
+            return Result<PolicyDto>.Failure(authorityGate.ErrorCode!, authorityGate.ErrorMessage!);
 
         await using var dbTransaction = await db.Database.BeginTransactionAsync();
 
@@ -1987,6 +1994,43 @@ public class PolicyService : IPolicyService
                     transaction.PremiumChange,
                     transaction.NewTotalPremium,
                     Threshold = LargeEndorsementPremiumChangeThreshold
+                }),
+                null),
+            currentUserPermissions,
+            currentUserId);
+
+        return authority.Allowed
+            ? Result.Success()
+            : Result.Failure("AUTHORITY_APPROVAL_REQUIRED", authority.Message);
+    }
+
+    private async Task<Result> EnsureReinstatementAuthorityAsync(
+        Policy policy,
+        ReinstatePolicyDto dto,
+        Guid currentUserId,
+        IReadOnlyCollection<string> currentUserPermissions)
+    {
+        var authorityApproval = (IAuthorityApprovalService?)_sp.GetService(typeof(IAuthorityApprovalService));
+        if (authorityApproval == null)
+            return Result.Success();
+
+        var authority = await authorityApproval.EvaluateAsync(
+            new AuthorityApprovalEvaluationRequest(
+                AuthorityApprovalTargetType.Policy,
+                policy.Id,
+                "policy.reinstatement",
+                "Policy reinstatement",
+                AppPermissions.UnderwritingAuthorityApprove,
+                "PolicyReinstatement",
+                "Policy reinstatement requires underwriting authority approval.",
+                JsonSerializer.Serialize(new
+                {
+                    PolicyId = policy.Id,
+                    policy.PolicyNumber,
+                    policy.Status,
+                    policy.CancelledDate,
+                    dto.ReinstatedDate,
+                    Reason = dto.Reason.Trim()
                 }),
                 null),
             currentUserPermissions,

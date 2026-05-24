@@ -187,8 +187,12 @@ public class PoliciesController : ControllerBase
     [Authorize(Policy = AppPermissions.PoliciesCancel)]
     public async Task<IActionResult> Reinstate(Guid id, [FromBody] ReinstatePolicyDto dto)
     {
-        var result = await _policies.ReinstateAsync(id, dto, CurrentAccess);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        var result = await _policies.ReinstateAsync(id, dto, CurrentAccess, User.PermissionNames());
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : result.ErrorCode == "AUTHORITY_APPROVAL_REQUIRED"
+                ? StatusCode(StatusCodes.Status403Forbidden, new { result.ErrorCode, result.ErrorMessage })
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpPost("{id:guid}/rewrite")]
