@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Attachments;
 using SIMS.Application.DTOs.OutboundCommunications;
+using SIMS.Application.DTOs.ProposalDocuments;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
@@ -28,6 +29,8 @@ public class ProposalGenerationService : IProposalGenerationService
     private readonly IAttachmentService _attachments;
     private readonly IHtmlToPdfService _htmlToPdf;
     private readonly IOutboundCommunicationService _outboundCommunications;
+    private readonly IProposalDocumentConfigurationService _proposalDocuments;
+    private readonly IDocumentMergeService _merge;
     private readonly string? _mailboxAddress;
 
     public ProposalGenerationService(
@@ -35,12 +38,16 @@ public class ProposalGenerationService : IProposalGenerationService
         IAttachmentService attachments,
         IHtmlToPdfService htmlToPdf,
         IOutboundCommunicationService outboundCommunications,
+        IProposalDocumentConfigurationService proposalDocuments,
+        IDocumentMergeService merge,
         IConfiguration config)
     {
         _db = db;
         _attachments = attachments;
         _htmlToPdf = htmlToPdf;
         _outboundCommunications = outboundCommunications;
+        _proposalDocuments = proposalDocuments;
+        _merge = merge;
         _mailboxAddress = config["GraphApi:MailboxAddress"];
     }
 
@@ -71,6 +78,12 @@ public class ProposalGenerationService : IProposalGenerationService
             .OrderByDescending(s => s.RatedAt)
             .FirstOrDefaultAsync();
 
+        var documentSelection = await _proposalDocuments.ResolveForQuoteAsync(quoteId);
+        if (documentSelection.IsSuccess && documentSelection.Value != null)
+            return await BuildConfiguredProposalHtmlAsync(quote, latestSnapshot, documentSelection.Value);
+        if (documentSelection.ErrorCode != "PROPOSAL_NOT_CONFIGURED")
+            return Result<string>.Failure(documentSelection.ErrorCode ?? "PROPOSAL_DOCUMENT_ERROR", documentSelection.ErrorMessage ?? "Proposal document setup could not be resolved.");
+
         var templateDir = Path.Combine(AppContext.BaseDirectory, "Templates", "Proposals", "LongleafInlandMarine");
         var indexPath = Path.Combine(templateDir, "index.html");
         if (!File.Exists(indexPath))
@@ -84,6 +97,108 @@ public class ProposalGenerationService : IProposalGenerationService
 
         var html = await BuildSelfContainedHtmlAsync(templateDir, proposal, equipment, lossPayees, endorsements, forms);
         return Result<string>.Success(html);
+    }
+
+    private async Task<Result<string>> BuildConfiguredProposalHtmlAsync(
+        Quote quote,
+        QuoteRatingSnapshot? snapshot,
+        ProposalDocumentSelectionDto selection)
+    {
+        var templateIds = selection.Notices
+            .Select(n => n.DocumentTemplateId)
+            .Append(selection.Proposal.DocumentTemplateId)
+            .Distinct()
+            .ToList();
+        var templates = await _db.DocumentTemplates
+            .AsNoTracking()
+            .Where(t => templateIds.Contains(t.Id) && t.IsActive && !t.IsDeleted)
+            .ToDictionaryAsync(t => t.Id);
+
+        if (!templates.TryGetValue(selection.Proposal.DocumentTemplateId, out var proposalTemplate))
+            return Result<string>.Failure("PROPOSAL_TEMPLATE_NOT_FOUND", "The configured proposal template is missing or inactive.");
+
+        var data = BuildConfiguredDocumentData(quote, snapshot);
+        var html = _merge.MergeHtml(proposalTemplate.HtmlContent, data);
+        var notices = new List<string>();
+
+        foreach (var notice in selection.Notices.OrderBy(n => n.SequenceOrder).ThenBy(n => n.DocumentTemplateName))
+        {
+            if (!templates.TryGetValue(notice.DocumentTemplateId, out var noticeTemplate))
+                return Result<string>.Failure("STATE_NOTICE_TEMPLATE_NOT_FOUND", $"The configured state notice template '{notice.DocumentTemplateName}' is missing or inactive.");
+
+            var noticeHtml = _merge.MergeHtml(noticeTemplate.HtmlContent, data);
+            if (!string.IsNullOrWhiteSpace(noticeHtml))
+                notices.Add($"""<section class="proposal-state-notice" style="page-break-before: always;">{noticeHtml}</section>""");
+        }
+
+        return Result<string>.Success(AppendHtmlSections(html, notices));
+    }
+
+    private static DocumentMergeData BuildConfiguredDocumentData(Quote quote, QuoteRatingSnapshot? snapshot)
+    {
+        var data = new DocumentMergeData();
+        var d = data.Values;
+        var insured = quote.Submission.Insured;
+        var carrier = quote.Carrier;
+        var underwriter = quote.Submission.Underwriter;
+        var premium = snapshot?.ManualPremium ?? quote.PremiumAmount;
+        var total = quote.TotalPremium != 0m
+            ? quote.TotalPremium
+            : (snapshot?.GrandTotalPremium ?? premium) + quote.TaxesAndFees;
+
+        d["Quote.QuoteNumber"] = quote.QuoteNumber;
+        d["Quote.PolicyNumber"] = quote.PolicyNumber;
+        d["Quote.EffectiveDate"] = quote.EffectiveDate;
+        d["Quote.ExpirationDate"] = quote.ExpirationDate;
+        d["Quote.PremiumAmount"] = premium;
+        d["Quote.TaxesAndFees"] = quote.TaxesAndFees;
+        d["Quote.TotalPremium"] = total;
+        d["Quote.CoverageDescription"] = quote.CoverageDescription;
+        d["Quote.Deductible"] = quote.Deductible;
+        d["Quote.Limit"] = quote.Limit;
+        d["Quote.LineOfBusiness"] = quote.LineOfBusiness.ToString();
+        d["QuoteNumber"] = quote.QuoteNumber;
+        d["PolicyNumber"] = quote.PolicyNumber ?? string.Empty;
+        d["EffectiveDate"] = quote.EffectiveDate;
+        d["ExpirationDate"] = quote.ExpirationDate;
+        d["TotalPremium"] = total;
+        d["NetPremium"] = premium;
+        d["TaxesAndFees"] = quote.TaxesAndFees;
+        d["LineOfBusiness"] = quote.LineOfBusiness.ToString();
+
+        d["Insured.DisplayName"] = insured.DisplayName;
+        d["Insured.Name"] = insured.DisplayName;
+        d["Insured.CompanyName"] = insured.CompanyName;
+        d["Insured.Dba"] = insured.Dba;
+        d["Insured.AddressLine1"] = insured.AddressLine1;
+        d["Insured.AddressLine2"] = insured.AddressLine2;
+        d["Insured.City"] = insured.City;
+        d["Insured.State"] = insured.State;
+        d["Insured.ZipCode"] = insured.ZipCode;
+        d["Insured.Email"] = insured.Email;
+        d["Insured.Phone"] = insured.Phone;
+        d["InsuredName"] = insured.DisplayName;
+
+        d["Carrier.Name"] = carrier.Name;
+        d["Carrier.Naic"] = carrier.Naic;
+        d["CarrierName"] = carrier.Name;
+
+        d["UnderwriterName"] = underwriter.FullName;
+        d["UnderwriterEmail"] = underwriter.Email;
+
+        return data;
+    }
+
+    private static string AppendHtmlSections(string html, IReadOnlyList<string> sections)
+    {
+        if (sections.Count == 0)
+            return html;
+
+        var appended = string.Join(Environment.NewLine, sections);
+        var bodyClose = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+        return bodyClose >= 0
+            ? html.Insert(bodyClose, Environment.NewLine + appended + Environment.NewLine)
+            : html + Environment.NewLine + appended;
     }
 
     public async Task<Result<GeneratedDocumentDto>> SaveInlandMarineHtmlAsync(Guid quoteId, Guid userId)
