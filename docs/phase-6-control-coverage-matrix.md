@@ -9,6 +9,8 @@ Status values:
 - Missing: the control is not yet enforced.
 - Next: planned Phase 6 work.
 
+Closeout call: Phase 6 is complete as the underwriting-control baseline. Rows that still say Missing or Partial are intentional Phase 7 / hardening candidates unless they are already covered by published blocker controls, required document gates, referral gates, or the reusable authority approval spine.
+
 | Area | Action | Endpoint | Current Permission | Transaction Status Check | Approval / Referral Check | Authority Check | Phase 6 Next Step |
 |---|---|---|---|---|---|---|---|
 | Quote | Bind quote | `POST /api/v1/quotes/{id}/bind` | Partial: authenticated route, no explicit bind policy on controller | Partial: service validates quote/bind state | Partial: blocked clearance now stops bind | Missing | Add appetite/referral/authority gate before bind. |
@@ -220,6 +222,16 @@ Status values:
 - Added queue counts, SLA status, owner, work type, detail, and action links back to the underlying submission, quote, policy, or rating version.
 - Preserved the dedicated Post-Bind Follow-Up report for deeper signed-document and subjectivity filtering.
 
-## Immediate Next Slice
+## Twenty-Eighth Implemented Slice
 
-1. Close Phase 6 with an updated matrix, focused regression tests, and backlog notes for Phase 7.
+- Closed Phase 6 as an operational baseline rather than continuing to slice broad authority-rule depth indefinitely.
+- Documented complete Phase 6 capabilities in the execution plan.
+- Moved remaining broad authority thresholds, transaction artifact polish, backfill, and expanded operational reports to Phase 7 / hardening.
+- Preserved the current matrix as a control-coverage map instead of rewriting remaining gaps as done.
+
+## Phase 7 / Hardening Backlog
+
+1. Add deterministic authority thresholds for quote bind, policy issue, endorsement issue, cancellation completion, reinstatement, rewrite, and non-renewal.
+2. Show all related referrals, authority approvals, checklist blockers, and tasks inline on every policy transaction artifact.
+3. Add reporting for approval turnaround, authority overrides, decline reasons, and clearance overrides.
+4. Backfill old UW writeups conservatively only where the historical decision is clear.

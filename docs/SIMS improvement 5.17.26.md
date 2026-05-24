@@ -760,6 +760,10 @@ Clearance, appetite, referral, and authority checks need a stable place to attac
 Detailed execution plan: `docs/phase-6-underwriting-control-layer-plan.md`.
 Current control coverage matrix: `docs/phase-6-control-coverage-matrix.md`.
 
+### Phase 6 Closeout
+
+Phase 6 is complete as an operational underwriting-control baseline. SIMS now has structured clearance, referral, published-control, checklist, post-bind, authority approval, and manager queue capabilities. Remaining broad authority thresholds, transaction artifact polish, backfill, and expanded control reporting should move to Phase 7 / hardening rather than extending Phase 6 with more slices.
+
 ## Phase 7: Program Configuration
 
 ### Why This Is Needed
