@@ -10,5 +10,6 @@ public interface ICarrierRatingAssignmentService
     Task<Result<CarrierRatingAssignmentDto>> CreateAsync(CarrierRatingAssignmentCreateDto dto, CancellationToken ct = default);
     Task<Result<CarrierRatingAssignmentDto>> UpdateAsync(Guid id, CarrierRatingAssignmentUpdateDto dto, CancellationToken ct = default);
     Task<Result<bool>> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<CarrierRatingAssignmentDto?> GetActiveAssignmentAsync(Guid carrierId, PolicyLineOfBusiness lineOfBusiness, Guid? programConfigurationId = null, CancellationToken ct = default);
     Task<IReadOnlyList<RatingPlanVersionPickerDto>> GetActiveVersionsForLobAsync(PolicyLineOfBusiness lob, CancellationToken ct = default);
 }

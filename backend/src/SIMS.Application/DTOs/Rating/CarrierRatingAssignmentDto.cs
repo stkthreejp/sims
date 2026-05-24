@@ -5,6 +5,8 @@ namespace SIMS.Application.DTOs.Rating;
 public class CarrierRatingAssignmentDto
 {
     public Guid Id { get; set; }
+    public Guid? ProgramConfigurationId { get; set; }
+    public string? ProgramName { get; set; }
     public Guid CarrierId { get; set; }
     public string CarrierName { get; set; } = string.Empty;
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
@@ -17,6 +19,7 @@ public class CarrierRatingAssignmentDto
 
 public class CarrierRatingAssignmentCreateDto
 {
+    public Guid? ProgramConfigurationId { get; set; }
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public Guid RatingPlanVersionId { get; set; }

@@ -2,6 +2,8 @@ import type { PolicyLineOfBusiness } from './quote.types'
 
 export interface CarrierRatingAssignment {
   id: string
+  programConfigurationId: string | null
+  programName: string | null
   carrierId: string
   carrierName: string
   lineOfBusiness: PolicyLineOfBusiness
@@ -13,6 +15,7 @@ export interface CarrierRatingAssignment {
 }
 
 export interface CarrierRatingAssignmentCreate {
+  programConfigurationId?: string | null
   carrierId: string
   lineOfBusiness: PolicyLineOfBusiness
   ratingPlanVersionId: string

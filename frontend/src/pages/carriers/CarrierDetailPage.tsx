@@ -224,7 +224,7 @@ export function CarrierDetailPage() {
   // Rating plan assignment state
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
-  const [ratingForm, setRatingForm] = useState<{ lineOfBusiness: PolicyLineOfBusiness | ''; ratingPlanVersionId: string }>({ lineOfBusiness: '', ratingPlanVersionId: '' })
+  const [ratingForm, setRatingForm] = useState<{ programConfigurationId: string; lineOfBusiness: PolicyLineOfBusiness | ''; ratingPlanVersionId: string }>({ programConfigurationId: '', lineOfBusiness: '', ratingPlanVersionId: '' })
   const [ratingPickerLob, setRatingPickerLob] = useState<PolicyLineOfBusiness | null>(null)
 
   const { data: carrier, isLoading } = useQuery({
@@ -332,6 +332,7 @@ export function CarrierDetailPage() {
 
   const createAssignmentMutation = useMutation({
     mutationFn: () => ratingApi.createAssignment({
+      programConfigurationId: ratingForm.programConfigurationId || null,
       carrierId: id!,
       lineOfBusiness: ratingForm.lineOfBusiness as PolicyLineOfBusiness,
       ratingPlanVersionId: ratingForm.ratingPlanVersionId,
@@ -339,7 +340,7 @@ export function CarrierDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['carrier-rating-assignments', id] })
       setShowRatingModal(false)
-      setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+      setRatingForm({ programConfigurationId: '', lineOfBusiness: '', ratingPlanVersionId: '' })
       setRatingPickerLob(null)
       toast.success('Rating plan assigned')
     },
@@ -352,7 +353,7 @@ export function CarrierDetailPage() {
       qc.invalidateQueries({ queryKey: ['carrier-rating-assignments', id] })
       setShowRatingModal(false)
       setEditingAssignmentId(null)
-      setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+      setRatingForm({ programConfigurationId: '', lineOfBusiness: '', ratingPlanVersionId: '' })
       setRatingPickerLob(null)
       toast.success('Rating plan updated')
     },
@@ -370,14 +371,18 @@ export function CarrierDetailPage() {
 
   const openAddRatingModal = () => {
     setEditingAssignmentId(null)
-    setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+    setRatingForm({ programConfigurationId: '', lineOfBusiness: '', ratingPlanVersionId: '' })
     setRatingPickerLob(null)
     setShowRatingModal(true)
   }
 
   const openEditRatingModal = (assignment: CarrierRatingAssignment) => {
     setEditingAssignmentId(assignment.id)
-    setRatingForm({ lineOfBusiness: assignment.lineOfBusiness, ratingPlanVersionId: assignment.ratingPlanVersionId })
+    setRatingForm({
+      programConfigurationId: assignment.programConfigurationId ?? '',
+      lineOfBusiness: assignment.lineOfBusiness,
+      ratingPlanVersionId: assignment.ratingPlanVersionId,
+    })
     setRatingPickerLob(assignment.lineOfBusiness)
     setShowRatingModal(true)
   }
@@ -385,7 +390,7 @@ export function CarrierDetailPage() {
   const closeRatingModal = () => {
     setShowRatingModal(false)
     setEditingAssignmentId(null)
-    setRatingForm({ lineOfBusiness: '', ratingPlanVersionId: '' })
+    setRatingForm({ programConfigurationId: '', lineOfBusiness: '', ratingPlanVersionId: '' })
     setRatingPickerLob(null)
   }
 
@@ -920,6 +925,7 @@ export function CarrierDetailPage() {
               <thead>
                 <tr className="text-left text-xs text-slate-500 border-b bg-slate-50">
                   <th className="px-4 py-2 font-medium">Line of Business</th>
+                  <th className="px-4 py-2 font-medium">Program</th>
                   <th className="px-4 py-2 font-medium">Plan</th>
                   <th className="px-4 py-2 font-medium">Version</th>
                   <th className="px-4 py-2 font-medium">Effective Date</th>
@@ -930,6 +936,7 @@ export function CarrierDetailPage() {
                 {ratingAssignments.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-slate-700">{a.lineOfBusinessLabel}</td>
+                    <td className="px-4 py-3 text-slate-600">{a.programName ?? 'Any program'}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">{a.planName}</td>
                     <td className="px-4 py-3 text-slate-600">v{a.versionNumber}</td>
                     <td className="px-4 py-3 text-slate-600">{a.effectiveDate}</td>
@@ -1143,12 +1150,25 @@ export function CarrierDetailPage() {
 
             <div className="space-y-3">
               <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Program</label>
+                <select
+                  value={ratingForm.programConfigurationId}
+                  onChange={(e) => setRatingForm({ ...ratingForm, programConfigurationId: e.target.value })}
+                  disabled={!!editingAssignmentId}
+                  className="sims-select disabled:bg-slate-50 disabled:text-slate-500"
+                >
+                  <option value="">Any program</option>
+                  {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
                 <select
                   value={ratingForm.lineOfBusiness}
                   onChange={(e) => {
                     const lob = e.target.value as PolicyLineOfBusiness
-                    setRatingForm({ lineOfBusiness: lob, ratingPlanVersionId: '' })
+                    setRatingForm({ ...ratingForm, lineOfBusiness: lob, ratingPlanVersionId: '' })
                     setRatingPickerLob(lob || null)
                   }}
                   disabled={!!editingAssignmentId}

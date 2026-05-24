@@ -14,8 +14,13 @@ namespace SIMS.Infrastructure.Services;
 public class RatingEngineService : IRatingEngineService
 {
     private readonly ApplicationDbContext _db;
+    private readonly ICarrierRatingAssignmentService _carrierRatingAssignments;
 
-    public RatingEngineService(ApplicationDbContext db) => _db = db;
+    public RatingEngineService(ApplicationDbContext db, ICarrierRatingAssignmentService carrierRatingAssignments)
+    {
+        _db = db;
+        _carrierRatingAssignments = carrierRatingAssignments;
+    }
 
     public async Task<Result<RatingResultDto>> RateAsync(Guid quoteId, RateQuoteRequest request, Guid ratedById)
     {
@@ -40,21 +45,21 @@ public class RatingEngineService : IRatingEngineService
         if (quote is null)
             return Result<RatingResultDto>.Failure("NOT_FOUND", "Quote not found.");
 
-        var assignment = await _db.CarrierRatingAssignments
-            .Include(a => a.RatingPlanVersion)
-                .ThenInclude(v => v.RatingPlan)
-            .Include(a => a.RatingPlanVersion)
-                .ThenInclude(v => v.FactorTables)
-                    .ThenInclude(ft => ft.Rows)
-            .Include(a => a.RatingPlanVersion)
-                .ThenInclude(v => v.EligibilityRules)
-                    .ThenInclude(er => er.EquipmentType)
-            .FirstOrDefaultAsync(a => a.CarrierId == quote.CarrierId && a.LineOfBusiness == quote.LineOfBusiness);
+        var assignment = await _carrierRatingAssignments.GetActiveAssignmentAsync(quote.CarrierId, quote.LineOfBusiness, quote.ProgramId);
 
         if (assignment is null)
             return Result<RatingResultDto>.Failure("NO_RATING_PLAN", "No rating plan assigned for this carrier and line of business.");
 
-        var version = assignment.RatingPlanVersion;
+        var version = await _db.RatingPlanVersions
+            .Include(v => v.RatingPlan)
+            .Include(v => v.FactorTables)
+                .ThenInclude(ft => ft.Rows)
+            .Include(v => v.EligibilityRules)
+                .ThenInclude(er => er.EquipmentType)
+            .FirstOrDefaultAsync(v => v.Id == assignment.RatingPlanVersionId);
+        if (version is null)
+            return Result<RatingResultDto>.Failure("NO_RATING_PLAN", "No rating plan assigned for this carrier and line of business.");
+
         var formulaKey = version.RatingPlan.FormulaKey;
 
         var modifier = Math.Clamp(request.ScheduleModifier, version.ScheduleMin, version.ScheduleMax);

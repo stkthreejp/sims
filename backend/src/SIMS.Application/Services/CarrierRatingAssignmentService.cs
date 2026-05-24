@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Rating;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 
@@ -34,6 +35,7 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
     {
         var query = Db.Set<CarrierRatingAssignment>()
             .Where(a => !a.IsDeleted)
+            .Include(a => a.ProgramConfiguration)
             .Include(a => a.Carrier)
             .Include(a => a.RatingPlanVersion)
                 .ThenInclude(v => v.RatingPlan)
@@ -44,6 +46,7 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
 
         var rows = await query
             .OrderBy(a => a.Carrier.Name)
+            .ThenBy(a => a.ProgramConfiguration == null ? string.Empty : a.ProgramConfiguration.Name)
             .ThenBy(a => a.LineOfBusiness)
             .ToListAsync(ct);
 
@@ -73,15 +76,28 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
             return Result<CarrierRatingAssignmentDto>.Failure("LOB_MISMATCH",
                 $"Rating plan version is for {version.RatingPlan.LineOfBusiness}, not {dto.LineOfBusiness}.");
 
+        ProgramConfiguration? program = null;
+        if (dto.ProgramConfigurationId.HasValue)
+        {
+            program = await db.Set<ProgramConfiguration>()
+                .FirstOrDefaultAsync(p => p.Id == dto.ProgramConfigurationId.Value && p.IsActive, ct);
+            if (program == null)
+                return Result<CarrierRatingAssignmentDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+        }
+
         var exists = await db.Set<CarrierRatingAssignment>()
-            .AnyAsync(a => a.CarrierId == dto.CarrierId && a.LineOfBusiness == dto.LineOfBusiness && !a.IsDeleted, ct);
+            .AnyAsync(a => a.ProgramConfigurationId == dto.ProgramConfigurationId
+                && a.CarrierId == dto.CarrierId
+                && a.LineOfBusiness == dto.LineOfBusiness
+                && !a.IsDeleted, ct);
 
         if (exists)
             return Result<CarrierRatingAssignmentDto>.Failure("DUPLICATE",
-                "This carrier already has a rating plan assigned for that line of business.");
+                "This carrier already has a rating plan assigned for that program and line of business.");
 
         var assignment = new CarrierRatingAssignment
         {
+            ProgramConfigurationId = dto.ProgramConfigurationId,
             CarrierId = dto.CarrierId,
             LineOfBusiness = dto.LineOfBusiness,
             RatingPlanVersionId = dto.RatingPlanVersionId,
@@ -90,6 +106,7 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
         db.Set<CarrierRatingAssignment>().Add(assignment);
         await db.SaveChangesAsync(ct);
 
+        assignment.ProgramConfiguration = program;
         assignment.Carrier = carrier;
         assignment.RatingPlanVersion = version;
 
@@ -155,6 +172,27 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
         return Result<bool>.Success(true);
     }
 
+    public async Task<CarrierRatingAssignmentDto?> GetActiveAssignmentAsync(
+        Guid carrierId,
+        PolicyLineOfBusiness lineOfBusiness,
+        Guid? programConfigurationId = null,
+        CancellationToken ct = default)
+    {
+        var assignment = await Db.Set<CarrierRatingAssignment>()
+            .Where(a => !a.IsDeleted
+                && a.CarrierId == carrierId
+                && a.LineOfBusiness == lineOfBusiness
+                && (a.ProgramConfigurationId == programConfigurationId || a.ProgramConfigurationId == null))
+            .Include(a => a.ProgramConfiguration)
+            .Include(a => a.Carrier)
+            .Include(a => a.RatingPlanVersion)
+                .ThenInclude(v => v.RatingPlan)
+            .OrderByDescending(a => a.ProgramConfigurationId == programConfigurationId ? 1 : 0)
+            .FirstOrDefaultAsync(ct);
+
+        return assignment == null ? null : ToDto(assignment);
+    }
+
     public async Task<IReadOnlyList<RatingPlanVersionPickerDto>> GetActiveVersionsForLobAsync(
         PolicyLineOfBusiness lob, CancellationToken ct = default)
     {
@@ -178,6 +216,8 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
     private static CarrierRatingAssignmentDto ToDto(CarrierRatingAssignment a) => new()
     {
         Id = a.Id,
+        ProgramConfigurationId = a.ProgramConfigurationId,
+        ProgramName = a.ProgramConfiguration?.Name,
         CarrierId = a.CarrierId,
         CarrierName = a.Carrier.Name,
         LineOfBusiness = a.LineOfBusiness,

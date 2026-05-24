@@ -14,8 +14,13 @@ namespace SIMS.Infrastructure.Services;
 public class ShadowRatingService : IShadowRatingService
 {
     private readonly ApplicationDbContext _db;
+    private readonly ICarrierRatingAssignmentService _carrierRatingAssignments;
 
-    public ShadowRatingService(ApplicationDbContext db) => _db = db;
+    public ShadowRatingService(ApplicationDbContext db, ICarrierRatingAssignmentService carrierRatingAssignments)
+    {
+        _db = db;
+        _carrierRatingAssignments = carrierRatingAssignments;
+    }
 
     public async Task<Result<ShadowRatingResultDto>> ShadowRateAsync(Guid quoteId, RateQuoteRequest request, Guid ratedById)
     {
@@ -28,19 +33,20 @@ public class ShadowRatingService : IShadowRatingService
         if (quote is null)
             return Result<ShadowRatingResultDto>.Failure("NOT_FOUND", "Quote not found.");
 
-        var assignment = await _db.CarrierRatingAssignments
-            .Include(a => a.RatingPlanVersion)
-                .ThenInclude(v => v.FactorTables)
-                    .ThenInclude(ft => ft.Rows)
-            .Include(a => a.RatingPlanVersion)
-                .ThenInclude(v => v.EligibilityRules)
-                    .ThenInclude(er => er.EquipmentType)
-            .FirstOrDefaultAsync(a => a.CarrierId == quote.CarrierId && a.LineOfBusiness == quote.LineOfBusiness);
+        var assignment = await _carrierRatingAssignments.GetActiveAssignmentAsync(quote.CarrierId, quote.LineOfBusiness, quote.ProgramId);
 
         if (assignment is null)
             return Result<ShadowRatingResultDto>.Failure("NO_RATING_PLAN", "No rating plan assigned for this carrier and line of business.");
 
-        var version = assignment.RatingPlanVersion;
+        var version = await _db.RatingPlanVersions
+            .Include(v => v.FactorTables)
+                .ThenInclude(ft => ft.Rows)
+            .Include(v => v.EligibilityRules)
+                .ThenInclude(er => er.EquipmentType)
+            .FirstOrDefaultAsync(v => v.Id == assignment.RatingPlanVersionId);
+        if (version is null)
+            return Result<ShadowRatingResultDto>.Failure("NO_RATING_PLAN", "No rating plan assigned for this carrier and line of business.");
+
         var modifier = Math.Clamp(request.ScheduleModifier, version.ScheduleMin, version.ScheduleMax);
 
         if (modifier != 1.0m && string.IsNullOrWhiteSpace(request.ScheduleModifierReason))
