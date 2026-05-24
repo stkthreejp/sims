@@ -11,6 +11,7 @@ import type {
   UnassignedProgramCleanup,
   AuthorityApprovalActivity,
   DeclineReasonReport,
+  ClearanceOverrideReport,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -50,3 +51,6 @@ export const getAuthorityApprovalActivity = (): Promise<AuthorityApprovalActivit
 
 export const getDeclineReasonReport = (): Promise<DeclineReasonReport> =>
   apiClient.get(`${BASE}/operations/decline-reasons`).then(r => r.data)
+
+export const getClearanceOverrideReport = (): Promise<ClearanceOverrideReport> =>
+  apiClient.get(`${BASE}/operations/clearance-overrides`).then(r => r.data)

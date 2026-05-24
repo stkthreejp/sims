@@ -256,3 +256,39 @@ public record DeclineReasonRowDto(
     DateTime DeclinedAt,
     string ActionUrl
 );
+
+public record ClearanceOverrideReportDto(
+    int TotalOverrides,
+    int BlockedOverrideCount,
+    int WarningOverrideCount,
+    IReadOnlyList<ClearanceOverrideSummaryDto> CheckTypes,
+    IReadOnlyList<ClearanceOverrideRowDto> Rows
+);
+
+public record ClearanceOverrideSummaryDto(
+    UnderwritingClearanceCheckType CheckType,
+    int Count
+);
+
+public record ClearanceOverrideRowDto(
+    Guid Id,
+    Guid SubmissionId,
+    string SubmissionNumber,
+    string InsuredName,
+    Guid? ProgramId,
+    string? ProgramName,
+    string? ProgramCode,
+    string? State,
+    PolicyLineOfBusiness? LineOfBusiness,
+    UnderwritingClearanceCheckType CheckType,
+    UnderwritingClearanceStatus Status,
+    Guid? MatchedRecordId,
+    string? MatchedRecordLabel,
+    string Explanation,
+    Guid? OverriddenById,
+    string? OverriddenByName,
+    DateTime? OverriddenAt,
+    string OverrideReason,
+    DateTime ReviewedAt,
+    string ActionUrl
+);

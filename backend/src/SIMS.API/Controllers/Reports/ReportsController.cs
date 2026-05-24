@@ -62,4 +62,8 @@ public class ReportsController : ControllerBase
     [HttpGet("operations/decline-reasons")]
     public async Task<IActionResult> GetDeclineReasonReport(CancellationToken ct)
         => Ok(await _svc.GetDeclineReasonReportAsync(ct));
+
+    [HttpGet("operations/clearance-overrides")]
+    public async Task<IActionResult> GetClearanceOverrideReport(CancellationToken ct)
+        => Ok(await _svc.GetClearanceOverrideReportAsync(ct));
 }

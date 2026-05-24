@@ -17,4 +17,5 @@ public interface IReportService
     Task<UnassignedProgramCleanupDto> GetUnassignedProgramCleanupAsync(CancellationToken ct = default);
     Task<AuthorityApprovalActivityDto> GetAuthorityApprovalActivityAsync(CancellationToken ct = default);
     Task<DeclineReasonReportDto> GetDeclineReasonReportAsync(CancellationToken ct = default);
+    Task<ClearanceOverrideReportDto> GetClearanceOverrideReportAsync(CancellationToken ct = default);
 }

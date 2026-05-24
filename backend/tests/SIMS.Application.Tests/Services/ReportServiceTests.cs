@@ -819,6 +819,128 @@ public class ReportServiceTests
         Assert.DoesNotContain(result.Rows, r => r.QuoteId == approvedWriteup.Id);
     }
 
+    [Fact]
+    public async Task GetClearanceOverrideReportAsync_ReturnsOnlyOverriddenClearanceResults()
+    {
+        await using var db = CreateDb();
+        var now = DateTime.UtcNow;
+        var reviewer = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Riley",
+            LastName = "Reviewer",
+            UserName = "riley@example.com",
+            Email = "riley@example.com"
+        };
+        var overrider = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Morgan",
+            LastName = "Override",
+            UserName = "morgan@example.com",
+            Email = "morgan@example.com"
+        };
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "Clearance Carrier" };
+        var insured = new Insured
+        {
+            InsuredType = InsuredType.Commercial,
+            CompanyName = "Clearance Timber",
+            State = "NC"
+        };
+        var submission = new Submission
+        {
+            SubmissionNumber = "SUB-CLEAR",
+            Insured = insured,
+            InsuredId = insured.Id,
+            UnderwriterId = reviewer.Id,
+            Underwriter = reviewer,
+            CreatedById = reviewer.Id,
+            CreatedBy = reviewer,
+            LinesOfBusiness = """["InlandMarine"]"""
+        };
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-CLEAR",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            Program = program,
+            ProgramId = program.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            Status = QuoteStatus.Quoted,
+            EffectiveDate = new DateOnly(2026, 7, 1),
+            ExpirationDate = new DateOnly(2027, 7, 1),
+            CreatedById = reviewer.Id,
+            CreatedBy = reviewer
+        };
+        var overridden = new UnderwritingClearanceResult
+        {
+            Submission = submission,
+            SubmissionId = submission.Id,
+            CheckType = UnderwritingClearanceCheckType.ActivePolicyOverlap,
+            Status = UnderwritingClearanceStatus.Blocked,
+            MatchedRecordId = Guid.NewGuid(),
+            MatchedRecordLabel = "POL-123",
+            Explanation = "Active policy overlaps the requested term.",
+            ReviewedById = reviewer.Id,
+            ReviewedBy = reviewer,
+            ReviewedAt = now.AddHours(-6),
+            IsOverridden = true,
+            OverriddenById = overrider.Id,
+            OverriddenAt = now.AddHours(-2),
+            OverrideReason = "Replacement policy will cancel before bind."
+        };
+        var notOverridden = new UnderwritingClearanceResult
+        {
+            Submission = submission,
+            SubmissionId = submission.Id,
+            CheckType = UnderwritingClearanceCheckType.DuplicateSubmission,
+            Status = UnderwritingClearanceStatus.Warning,
+            MatchedRecordId = Guid.NewGuid(),
+            MatchedRecordLabel = "SUB-OLD",
+            Explanation = "Potential duplicate submission.",
+            ReviewedById = reviewer.Id,
+            ReviewedBy = reviewer,
+            ReviewedAt = now.AddHours(-5)
+        };
+
+        db.AddRange(reviewer, overrider, program, carrier, insured, submission, quote, overridden, notOverridden);
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetClearanceOverrideReportAsync();
+
+        Assert.Equal(1, result.TotalOverrides);
+        Assert.Equal(1, result.BlockedOverrideCount);
+        Assert.Equal(0, result.WarningOverrideCount);
+        var summary = Assert.Single(result.CheckTypes);
+        Assert.Equal(UnderwritingClearanceCheckType.ActivePolicyOverlap, summary.CheckType);
+        Assert.Equal(1, summary.Count);
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(overridden.Id, row.Id);
+        Assert.Equal(submission.Id, row.SubmissionId);
+        Assert.Equal("SUB-CLEAR", row.SubmissionNumber);
+        Assert.Equal("Clearance Timber", row.InsuredName);
+        Assert.Equal(program.Id, row.ProgramId);
+        Assert.Equal("Longleaf", row.ProgramName);
+        Assert.Equal("LONGLEAF", row.ProgramCode);
+        Assert.Equal("NC", row.State);
+        Assert.Equal(PolicyLineOfBusiness.InlandMarine, row.LineOfBusiness);
+        Assert.Equal(UnderwritingClearanceCheckType.ActivePolicyOverlap, row.CheckType);
+        Assert.Equal(UnderwritingClearanceStatus.Blocked, row.Status);
+        Assert.Equal("POL-123", row.MatchedRecordLabel);
+        Assert.Equal("Replacement policy will cancel before bind.", row.OverrideReason);
+        Assert.Equal(overrider.Id, row.OverriddenById);
+        Assert.Equal("Morgan Override", row.OverriddenByName);
+        Assert.Equal(now.AddHours(-2), row.OverriddenAt);
+        Assert.Equal($"/submissions/{submission.Id}", row.ActionUrl);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),

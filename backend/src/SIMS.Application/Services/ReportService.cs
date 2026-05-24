@@ -729,6 +729,79 @@ public class ReportService : IReportService
             rows);
     }
 
+    public async Task<ClearanceOverrideReportDto> GetClearanceOverrideReportAsync(CancellationToken ct = default)
+    {
+        var overrides = await Db.Set<UnderwritingClearanceResult>()
+            .Include(r => r.Submission).ThenInclude(s => s.Insured)
+            .Where(r => r.IsOverridden)
+            .OrderByDescending(r => r.OverriddenAt ?? r.UpdatedAt)
+            .ToListAsync(ct);
+
+        var submissionIds = overrides.Select(r => r.SubmissionId).Distinct().ToList();
+        var quotes = await Db.Set<Quote>()
+            .Include(q => q.Program)
+            .Where(q => submissionIds.Contains(q.SubmissionId))
+            .ToListAsync(ct);
+        var quoteContexts = quotes
+            .GroupBy(q => q.SubmissionId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(q => q.CreatedAt).First());
+
+        var userIds = overrides
+            .Select(r => r.OverriddenById)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        var users = await Db.Set<User>()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, ct);
+
+        var rows = overrides.Select(r =>
+        {
+            quoteContexts.TryGetValue(r.SubmissionId, out var quote);
+            var lob = quote?.LineOfBusiness ?? FirstLineOfBusiness(r.Submission.LinesOfBusiness);
+            var overriddenBy = r.OverriddenById.HasValue && users.TryGetValue(r.OverriddenById.Value, out var user)
+                ? user
+                : null;
+
+            return new ClearanceOverrideRowDto(
+                r.Id,
+                r.SubmissionId,
+                r.Submission.SubmissionNumber,
+                r.Submission.Insured.DisplayName,
+                quote?.ProgramId,
+                quote?.Program?.Name,
+                quote?.Program?.Code,
+                r.Submission.Insured.State,
+                lob,
+                r.CheckType,
+                r.Status,
+                r.MatchedRecordId,
+                r.MatchedRecordLabel,
+                r.Explanation,
+                r.OverriddenById,
+                DisplayName(overriddenBy),
+                r.OverriddenAt,
+                r.OverrideReason ?? string.Empty,
+                r.ReviewedAt,
+                $"/submissions/{r.SubmissionId}");
+        }).ToList();
+
+        var summaries = rows
+            .GroupBy(r => r.CheckType)
+            .Select(g => new ClearanceOverrideSummaryDto(g.Key, g.Count()))
+            .OrderByDescending(r => r.Count)
+            .ThenBy(r => r.CheckType)
+            .ToList();
+
+        return new ClearanceOverrideReportDto(
+            rows.Count,
+            rows.Count(r => r.Status == UnderwritingClearanceStatus.Blocked),
+            rows.Count(r => r.Status == UnderwritingClearanceStatus.Warning),
+            summaries,
+            rows);
+    }
+
     private static string SlaStatusFor(int daysUntilDue)
     {
         if (daysUntilDue < 0) return "Overdue";
@@ -809,6 +882,27 @@ public class ReportService : IReportService
 
     private static string? FirstNonBlank(params string?[] values) =>
         values.Select(v => v?.Trim()).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+    private static PolicyLineOfBusiness? FirstLineOfBusiness(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        try
+        {
+            var names = JsonSerializer.Deserialize<string[]>(value) ?? [];
+            foreach (var name in names)
+            {
+                if (Enum.TryParse<PolicyLineOfBusiness>(name, out var lob))
+                    return lob;
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
+    }
 
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)
     {

@@ -14,6 +14,7 @@ import {
   getUnassignedProgramCleanup,
   getAuthorityApprovalActivity,
   getDeclineReasonReport,
+  getClearanceOverrideReport,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
@@ -27,6 +28,7 @@ import type {
   UnassignedProgramCleanup,
   AuthorityApprovalActivity,
   DeclineReasonReport,
+  ClearanceOverrideReport,
   AgingBucket,
   AgingRow,
   BrokerArRow,
@@ -814,6 +816,138 @@ function DeclineReasonReportView() {
   )
 }
 
+function ClearanceOverrideReportView() {
+  const [checkFilter, setCheckFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const { data, isLoading, error } = useQuery<ClearanceOverrideReport>({
+    queryKey: ['report', 'clearance-overrides'],
+    queryFn: getClearanceOverrideReport,
+  })
+
+  const rows = data?.rows ?? []
+  const filteredRows = rows.filter(row => {
+    if (checkFilter && row.checkType !== checkFilter) return false
+    if (search) {
+      const query = search.toLowerCase()
+      const target = `${row.submissionNumber} ${row.insuredName} ${row.programName ?? ''} ${row.lineOfBusiness ?? ''} ${row.state ?? ''} ${row.checkType} ${row.matchedRecordLabel ?? ''} ${row.overrideReason} ${row.overriddenByName ?? ''}`.toLowerCase()
+      if (!target.includes(query)) return false
+    }
+    return true
+  })
+  const hasFilters = checkFilter || search
+
+  return (
+    <ReportShell title="Clearance Overrides" isLoading={isLoading} error={error as Error}>
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Visible Overrides" value={filteredRows.length.toLocaleString()} sub={`${rows.length.toLocaleString()} total`} />
+            <KpiCard label="Blocked Checks" value={data.blockedOverrideCount.toLocaleString()} highlight={data.blockedOverrideCount > 0 ? 'warn' : undefined} />
+            <KpiCard label="Warning Checks" value={data.warningOverrideCount.toLocaleString()} />
+            <KpiCard label="Check Types" value={data.checkTypes.length.toLocaleString()} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search overrides..."
+              style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', minWidth: 240, fontSize: 12.5, color: 'var(--ink)', background: 'var(--surface)' }}
+            />
+            <select value={checkFilter} onChange={(e) => setCheckFilter(e.target.value)} style={filterStyle}>
+              <option value="">All checks</option>
+              {data.checkTypes.map(check => (
+                <option key={check.checkType} value={check.checkType}>{check.checkType}</option>
+              ))}
+            </select>
+            {hasFilters && (
+              <button
+                onClick={() => { setCheckFilter(''); setSearch('') }}
+                style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontSize: 12.5, color: 'var(--ink-3)', background: 'var(--surface)', cursor: 'pointer' }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          <h3 style={sectionHead}>Check Summary</h3>
+          <div style={{ overflowX: 'auto', marginBottom: 24 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Check', 'Overrides'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: h === 'Check' ? 'left' : 'right' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.checkTypes.map(check => (
+                  <tr key={check.checkType} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={tdStyle}>{check.checkType}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{check.count}</td>
+                  </tr>
+                ))}
+                {data.checkTypes.length === 0 && (
+                  <tr><td colSpan={2} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No clearance overrides</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style={sectionHead}>Override Details</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Submission', 'Insured', 'Program', 'LOB / State', 'Check', 'Matched', 'Overridden', 'Reason'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map(row => (
+                  <tr key={row.id} style={{ borderBottom: '1px solid var(--line)', verticalAlign: 'top' }}>
+                    <td style={tdStyle}>
+                      <Link to={row.actionUrl} style={{ color: 'var(--accent-ink)', fontWeight: 600, textDecoration: 'none' }}>
+                        {row.submissionNumber}
+                      </Link>
+                    </td>
+                    <td style={tdStyle}>{row.insuredName}</td>
+                    <td style={tdStyle}>
+                      <div>{row.programName ?? 'Unassigned'}</div>
+                      {row.programCode && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.programCode}</div>}
+                    </td>
+                    <td style={tdStyle}>
+                      <div>{row.lineOfBusiness ?? '-'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.state ?? '-'}</div>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 600 }}>{row.checkType}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.status}</div>
+                    </td>
+                    <td style={tdStyle}>{row.matchedRecordLabel ?? '-'}</td>
+                    <td style={tdStyle}>
+                      <div>{fmtDateTime(row.overriddenAt)}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.overriddenByName ?? 'Unknown'}</div>
+                    </td>
+                    <td style={{ ...tdStyle, minWidth: 280 }}>
+                      <div>{row.overrideReason || '-'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>{row.explanation}</div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredRows.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No clearance overrides</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 function UnassignedProgramCleanupReport() {
   const [typeFilter, setTypeFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -1109,6 +1243,7 @@ const REPORT_CATEGORIES = [
       { id: 'manager-queue', label: 'Manager Queue' },
       { id: 'authority-approvals', label: 'Authority Approvals' },
       { id: 'decline-reasons', label: 'Decline Reasons' },
+      { id: 'clearance-overrides', label: 'Clearance Overrides' },
       { id: 'post-bind-follow-up', label: 'Post-Bind Follow-Up' },
       { id: 'unassigned-program-cleanup', label: 'Unassigned Program Cleanup' },
     ],
@@ -1159,6 +1294,7 @@ function renderReport(id: string) {
     case 'manager-queue':          return <ManagerQueueReport />
     case 'authority-approvals':    return <AuthorityApprovalActivityReport />
     case 'decline-reasons':        return <DeclineReasonReportView />
+    case 'clearance-overrides':    return <ClearanceOverrideReportView />
     case 'post-bind-follow-up':    return <PostBindFollowUpReport />
     case 'unassigned-program-cleanup': return <UnassignedProgramCleanupReport />
     default:                       return null

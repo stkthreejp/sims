@@ -253,3 +253,39 @@ export interface DeclineReasonReport {
   reasons: DeclineReasonSummary[]
   rows: DeclineReasonRow[]
 }
+
+export interface ClearanceOverrideSummary {
+  checkType: string
+  count: number
+}
+
+export interface ClearanceOverrideRow {
+  id: string
+  submissionId: string
+  submissionNumber: string
+  insuredName: string
+  programId: string | null
+  programName: string | null
+  programCode: string | null
+  state: string | null
+  lineOfBusiness: string | null
+  checkType: string
+  status: string
+  matchedRecordId: string | null
+  matchedRecordLabel: string | null
+  explanation: string
+  overriddenById: string | null
+  overriddenByName: string | null
+  overriddenAt: string | null
+  overrideReason: string
+  reviewedAt: string
+  actionUrl: string
+}
+
+export interface ClearanceOverrideReport {
+  totalOverrides: number
+  blockedOverrideCount: number
+  warningOverrideCount: number
+  checkTypes: ClearanceOverrideSummary[]
+  rows: ClearanceOverrideRow[]
+}
