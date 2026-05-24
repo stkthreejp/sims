@@ -795,6 +795,55 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task IssueEndorsement_RequiresAuthorityApprovalForLargePremiumChange()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var createResult = await policyService.AddEndorsementAsync(fixture.Policy.Id, new CreateEndorsementDto
+        {
+            EffectiveDate = new DateOnly(2026, 6, 1),
+            PremiumChange = 30000m,
+            EndorsementDescription = "Large scheduled equipment change",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(createResult.IsSuccess);
+
+        var blocked = await policyService.IssueEndorsementAsync(
+            fixture.Policy.Id,
+            createResult.Value!.Id,
+            new IssueEndorsementDto(),
+            UserAccessScope.All(fixture.UserId),
+            Array.Empty<string>());
+
+        Assert.False(blocked.IsSuccess);
+        Assert.Equal("AUTHORITY_APPROVAL_REQUIRED", blocked.ErrorCode);
+        var approval = await db.Set<AuthorityApprovalRequest>().SingleAsync();
+        Assert.Equal(AuthorityApprovalTargetType.PolicyTransaction, approval.TargetType);
+        Assert.Equal(createResult.Value.Id, approval.TargetId);
+        Assert.Equal("policy.endorsement.large-premium-change", approval.ActionCode);
+        Assert.Equal("Large endorsement premium change", approval.ActionLabel);
+        Assert.Equal("LargeEndorsementPremiumChange", approval.ApprovalType);
+        Assert.Equal(AuthorityApprovalStatus.Pending, approval.Status);
+        Assert.Contains("$30,000.00", approval.Reason);
+
+        approval.Status = AuthorityApprovalStatus.Approved;
+        approval.DecisionById = Guid.NewGuid();
+        approval.DecisionAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var issued = await policyService.IssueEndorsementAsync(
+            fixture.Policy.Id,
+            createResult.Value.Id,
+            new IssueEndorsementDto(),
+            UserAccessScope.All(fixture.UserId),
+            Array.Empty<string>());
+
+        Assert.True(issued.IsSuccess, $"{issued.ErrorCode}: {issued.ErrorMessage}");
+        Assert.Equal(PolicyTransactionStatus.Issued, issued.Value!.Status);
+    }
+
+    [Fact]
     public async Task AddEndorsement_BlocksWhenRequiredPostBindDocumentsAreIncomplete()
     {
         await using var db = CreateDb();
@@ -2077,6 +2126,7 @@ public class PolicyLifecycleRegressionTests
             .AddSingleton<IDocumentGenerationService>(documentGeneration ?? new RecordingDocumentGenerationService(db))
             .AddSingleton<IUnderwritingReferralService>(new UnderwritingReferralService(db))
             .AddSingleton<IUnderwritingControlEnforcementService>(new UnderwritingControlEnforcementService(db))
+            .AddSingleton<IAuthorityApprovalService>(new AuthorityApprovalService(db))
             .AddSingleton(checklist ?? new NoOpQuoteChecklistService())
             .AddSingleton(quoteService)
             .BuildServiceProvider();

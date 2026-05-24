@@ -14,12 +14,15 @@ using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
 using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
+using System.Globalization;
 using System.Text.Json;
 
 namespace SIMS.Application.Services;
 
 public class PolicyService : IPolicyService
 {
+    private const decimal LargeEndorsementPremiumChangeThreshold = 25000m;
+
     private readonly IServiceProvider _sp;
     private readonly IInvoicingService _invoicing;
     private readonly IVoidService _voids;
@@ -680,7 +683,11 @@ public class PolicyService : IPolicyService
     }
 
     public async Task<Result<PolicyTransactionDto>> IssueEndorsementAsync(
-        Guid policyId, Guid txnId, IssueEndorsementDto dto, UserAccessScope access)
+        Guid policyId,
+        Guid txnId,
+        IssueEndorsementDto dto,
+        UserAccessScope access,
+        IReadOnlyCollection<string>? currentUserPermissions = null)
     {
         var txn = await Db.Set<PolicyTransaction>()
             .Include(t => t.Policy).ThenInclude(p => p.BoundQuote)
@@ -713,6 +720,10 @@ public class PolicyService : IPolicyService
             txn.PremiumAfter = txn.NewTotalPremium;
         }
         txn.PremiumAfter ??= txn.NewTotalPremium;
+
+        var authorityGate = await EnsureLargeEndorsementAuthorityAsync(txn, access.UserId, currentUserPermissions ?? Array.Empty<string>());
+        if (!authorityGate.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(authorityGate.ErrorCode!, authorityGate.ErrorMessage!);
 
         var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(txn.Policy, access.UserId);
         var transitionResult = await _transactionLifecycle.TransitionAsync(txn, PolicyTransactionStatus.Issued, access.UserId, "Endorsement issued.");
@@ -1943,5 +1954,46 @@ public class PolicyService : IPolicyService
         var labels = incompleteRequiredItems.Take(3).Select(i => i.Label);
         var suffix = incompleteRequiredItems.Count > 3 ? $" and {incompleteRequiredItems.Count - 3} more" : "";
         return Result.Failure("POST_BIND_REQUIREMENTS_INCOMPLETE", $"Complete required post-bind items before {action}: {string.Join(", ", labels)}{suffix}.");
+    }
+
+    private async Task<Result> EnsureLargeEndorsementAuthorityAsync(
+        PolicyTransaction transaction,
+        Guid currentUserId,
+        IReadOnlyCollection<string> currentUserPermissions)
+    {
+        var premiumChange = Math.Abs(transaction.PremiumChange);
+        if (premiumChange <= LargeEndorsementPremiumChangeThreshold)
+            return Result.Success();
+
+        var authorityApproval = (IAuthorityApprovalService?)_sp.GetService(typeof(IAuthorityApprovalService));
+        if (authorityApproval == null)
+            return Result.Success();
+
+        var formattedChange = premiumChange.ToString("C", CultureInfo.GetCultureInfo("en-US"));
+        var authority = await authorityApproval.EvaluateAsync(
+            new AuthorityApprovalEvaluationRequest(
+                AuthorityApprovalTargetType.PolicyTransaction,
+                transaction.Id,
+                "policy.endorsement.large-premium-change",
+                "Large endorsement premium change",
+                AppPermissions.UnderwritingAuthorityApprove,
+                "LargeEndorsementPremiumChange",
+                $"Endorsement premium change of {formattedChange} exceeds the {LargeEndorsementPremiumChangeThreshold.ToString("C", CultureInfo.GetCultureInfo("en-US"))} authority threshold.",
+                JsonSerializer.Serialize(new
+                {
+                    transaction.PolicyId,
+                    transaction.TransactionNumber,
+                    transaction.PremiumBefore,
+                    transaction.PremiumChange,
+                    transaction.NewTotalPremium,
+                    Threshold = LargeEndorsementPremiumChangeThreshold
+                }),
+                null),
+            currentUserPermissions,
+            currentUserId);
+
+        return authority.Allowed
+            ? Result.Success()
+            : Result.Failure("AUTHORITY_APPROVAL_REQUIRED", authority.Message);
     }
 }

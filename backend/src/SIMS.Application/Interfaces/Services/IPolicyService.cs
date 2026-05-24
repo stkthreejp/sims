@@ -18,7 +18,12 @@ public interface IPolicyService
     Task<Result<VoidTestBindResultDto>> VoidTestBindAsync(Guid policyId, VoidTestBindDto dto, UserAccessScope access, bool isAdmin);
 
     Task<Result<PolicyTransactionDto>> AddEndorsementAsync(Guid policyId, CreateEndorsementDto dto, UserAccessScope access);
-    Task<Result<PolicyTransactionDto>> IssueEndorsementAsync(Guid policyId, Guid txnId, IssueEndorsementDto dto, UserAccessScope access);
+    Task<Result<PolicyTransactionDto>> IssueEndorsementAsync(
+        Guid policyId,
+        Guid txnId,
+        IssueEndorsementDto dto,
+        UserAccessScope access,
+        IReadOnlyCollection<string>? currentUserPermissions = null);
 
     Task<Result<QuoteDto>> CreateRenewalQuoteAsync(Guid policyId, UserAccessScope access);
 
