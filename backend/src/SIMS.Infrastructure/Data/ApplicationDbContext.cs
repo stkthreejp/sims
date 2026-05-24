@@ -65,6 +65,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<PolicyPackageConfiguration> PolicyPackageConfigurations => Set<PolicyPackageConfiguration>();
     public DbSet<PolicyPackageForm> PolicyPackageForms => Set<PolicyPackageForm>();
     public DbSet<QuotePolicyFormSelection> QuotePolicyFormSelections => Set<QuotePolicyFormSelection>();
+    public DbSet<ProposalDocumentConfiguration> ProposalDocumentConfigurations => Set<ProposalDocumentConfiguration>();
     public DbSet<OutboundCommunication> OutboundCommunications => Set<OutboundCommunication>();
     public DbSet<OutboundCommunicationAttachment> OutboundCommunicationAttachments => Set<OutboundCommunicationAttachment>();
     public DbSet<InboundEmail> InboundEmails => Set<InboundEmail>();

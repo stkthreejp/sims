@@ -102,6 +102,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IQuotePolicyFormSelectionService, QuotePolicyFormSelectionService>();
         services.AddScoped<IPolicyAssemblyService, PolicyAssemblyService>();
         services.AddScoped<IProposalGenerationService, ProposalGenerationService>();
+        services.AddScoped<IProposalDocumentConfigurationService>(sp =>
+            new ProposalDocumentConfigurationService(sp.GetRequiredService<ApplicationDbContext>()));
         services.AddScoped<IHtmlToPdfService, SyncfusionHtmlToPdfService>();
         services.AddScoped<IOutboundCommunicationService, OutboundCommunicationService>();
         services.AddScoped<IComplianceDocumentService, ComplianceDocumentService>();
