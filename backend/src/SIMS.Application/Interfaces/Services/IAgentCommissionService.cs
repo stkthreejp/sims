@@ -10,5 +10,5 @@ public interface IAgentCommissionService
     Task<Result<AgentCommissionDto>> DisableAsync(long id, DateOnly? disabledDate, CancellationToken ct = default);
 
     // Used by InvoicingService at invoice time
-    Task<decimal?> GetActiveRateAsync(Guid agentId, string? lineOfBusiness, DateOnly asOfDate, CancellationToken ct = default);
+    Task<decimal?> GetActiveRateAsync(Guid agentId, string? lineOfBusiness, DateOnly asOfDate, Guid? programConfigurationId = null, CancellationToken ct = default);
 }

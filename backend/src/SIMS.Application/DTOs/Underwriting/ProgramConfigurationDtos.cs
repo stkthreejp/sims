@@ -32,6 +32,8 @@ public record ProgramCarrierLineOfBusinessDto(
     DateOnly EffectiveDate,
     DateOnly? ExpirationDate,
     string? Notes,
+    string? BillingMode,
+    int? PaymentTermsDays,
     IReadOnlyList<ProgramCarrierLobStateDto> States);
 
 public record ProgramCarrierLobStateDto(
@@ -67,7 +69,9 @@ public record UpsertProgramCarrierLineOfBusinessRequest(
     bool IsActive,
     DateOnly EffectiveDate,
     DateOnly? ExpirationDate,
-    string? Notes);
+    string? Notes,
+    string? BillingMode = null,
+    int? PaymentTermsDays = null);
 
 public record UpsertProgramCarrierLobStateRequest(
     string StateCode,

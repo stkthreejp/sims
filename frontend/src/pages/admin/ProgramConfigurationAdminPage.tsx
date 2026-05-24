@@ -43,6 +43,8 @@ const emptyLob = (): ProgramCarrierLineOfBusinessUpsert => ({
   isActive: true,
   effectiveDate: today(),
   expirationDate: null,
+  billingMode: '',
+  paymentTermsDays: null,
   notes: '',
 })
 
@@ -204,6 +206,8 @@ export function ProgramConfigurationAdminPage() {
       isActive: lob.isActive,
       effectiveDate: lob.effectiveDate,
       expirationDate: lob.expirationDate,
+      billingMode: lob.billingMode ?? '',
+      paymentTermsDays: lob.paymentTermsDays,
       notes: lob.notes ?? '',
     })
   }
@@ -349,6 +353,10 @@ export function ProgramConfigurationAdminPage() {
                   notes={lobForm.notes ?? ''}
                   onChange={(patch) => setLobForm((f) => ({ ...f, ...patch }))}
                 />
+                <div className="grid grid-cols-2 gap-3">
+                  <TextInput label="Billing mode" value={lobForm.billingMode ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, billingMode: value }))} />
+                  <TextInput label="Payment terms" type="number" value={lobForm.paymentTermsDays?.toString() ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, paymentTermsDays: value ? Number(value) : null }))} />
+                </div>
                 <FormActions
                   isEditing={!!editingLobId}
                   disabled={!lobParentCarrierId || saveLob.isPending}
@@ -426,6 +434,9 @@ export function ProgramConfigurationAdminPage() {
                           <div>
                             <div className="text-sm font-medium text-slate-800">{lob.lineOfBusinessLabel}</div>
                             <div className="text-xs text-slate-500">{dateRange(lob.effectiveDate, lob.expirationDate)}</div>
+                            {(lob.billingMode || lob.paymentTermsDays != null) && (
+                              <div className="mt-1 text-xs text-slate-500">{[lob.billingMode, lob.paymentTermsDays != null ? `Net ${lob.paymentTermsDays}` : null].filter(Boolean).join(' / ')}</div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusPill active={lob.isActive} />
@@ -588,6 +599,8 @@ function cleanLob(lob: ProgramCarrierLineOfBusinessUpsert): ProgramCarrierLineOf
   return {
     ...lob,
     expirationDate: lob.expirationDate || null,
+    billingMode: lob.billingMode?.trim() ? lob.billingMode : null,
+    paymentTermsDays: lob.paymentTermsDays ?? null,
     notes: lob.notes?.trim() ? lob.notes : null,
   }
 }

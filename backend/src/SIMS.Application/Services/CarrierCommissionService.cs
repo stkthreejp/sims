@@ -30,8 +30,10 @@ public class CarrierCommissionService : ICarrierCommissionService
     public async Task<IReadOnlyList<CarrierCommissionDto>> GetAllAsync(Guid carrierId, CancellationToken ct = default)
     {
         var rows = await Db.Set<CarrierCommission>()
+            .Include(c => c.ProgramConfiguration)
             .Where(c => c.CarrierId == carrierId)
-            .OrderBy(c => c.LineOfBusiness)
+            .OrderBy(c => c.ProgramConfiguration == null ? string.Empty : c.ProgramConfiguration.Name)
+            .ThenBy(c => c.LineOfBusiness)
             .ThenByDescending(c => c.EffectiveDate)
             .ToListAsync(ct);
 
@@ -49,8 +51,17 @@ public class CarrierCommissionService : ICarrierCommissionService
 
         var db = Db;
 
+        if (req.ProgramConfigurationId.HasValue)
+        {
+            var programExists = await db.Set<ProgramConfiguration>()
+                .AnyAsync(p => p.Id == req.ProgramConfigurationId.Value && p.IsActive, ct);
+            if (!programExists)
+                return Result<CarrierCommissionDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+        }
+
         var duplicate = await db.Set<CarrierCommission>()
             .AnyAsync(c => c.CarrierId == carrierId
+                && c.ProgramConfigurationId == req.ProgramConfigurationId
                 && c.LineOfBusiness == req.LineOfBusiness
                 && c.EffectiveDate == req.EffectiveDate, ct);
 
@@ -60,6 +71,7 @@ public class CarrierCommissionService : ICarrierCommissionService
         var entry = new CarrierCommission
         {
             CarrierId = carrierId,
+            ProgramConfigurationId = req.ProgramConfigurationId,
             LineOfBusiness = req.LineOfBusiness,
             CommissionRate = req.CommissionRate,
             SMMRetentionRate = req.SMMRetentionRate,
@@ -91,34 +103,31 @@ public class CarrierCommissionService : ICarrierCommissionService
     }
 
     public async Task<CarrierCommissionRates?> GetActiveRatesAsync(
-        Guid carrierId, string? lineOfBusiness, DateOnly asOfDate, CancellationToken ct = default)
+        Guid carrierId, string? lineOfBusiness, DateOnly asOfDate, Guid? programConfigurationId = null, CancellationToken ct = default)
     {
         var candidates = await Db.Set<CarrierCommission>()
             .Where(c => c.CarrierId == carrierId
+                && (c.ProgramConfigurationId == programConfigurationId || c.ProgramConfigurationId == null)
                 && (c.LineOfBusiness == lineOfBusiness || c.LineOfBusiness == null)
                 && c.EffectiveDate <= asOfDate
                 && (c.DisabledDate == null || c.DisabledDate > asOfDate))
             .ToListAsync(ct);
 
-        // Prefer exact LOB match over null (all-LOB fallback)
         var specific = candidates
-            .Where(c => c.LineOfBusiness == lineOfBusiness)
-            .OrderByDescending(c => c.EffectiveDate)
+            .OrderByDescending(c => c.ProgramConfigurationId == programConfigurationId ? 1 : 0)
+            .ThenByDescending(c => c.LineOfBusiness == lineOfBusiness ? 1 : 0)
+            .ThenByDescending(c => c.EffectiveDate)
             .FirstOrDefault();
 
         if (specific != null)
             return new CarrierCommissionRates(specific.CommissionRate, specific.SMMRetentionRate);
-
-        var fallback = candidates
-            .Where(c => c.LineOfBusiness == null)
-            .OrderByDescending(c => c.EffectiveDate)
-            .FirstOrDefault();
-
-        return fallback == null ? null : new CarrierCommissionRates(fallback.CommissionRate, fallback.SMMRetentionRate);
+        return null;
     }
 
     private static CarrierCommissionDto ToDto(CarrierCommission c) => new(
         c.Id,
+        c.ProgramConfigurationId,
+        c.ProgramConfiguration?.Name,
         c.LineOfBusiness,
         c.LineOfBusiness != null && LobLabels.TryGetValue(c.LineOfBusiness, out var label) ? label : null,
         c.CommissionRate,

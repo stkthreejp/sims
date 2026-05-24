@@ -2,6 +2,8 @@ namespace SIMS.Application.DTOs;
 
 public record CarrierCommissionDto(
     long Id,
+    Guid? ProgramConfigurationId,
+    string? ProgramName,
     string? LineOfBusiness,
     string? LineOfBusinessLabel,
     decimal CommissionRate,
@@ -13,6 +15,7 @@ public record CarrierCommissionDto(
 );
 
 public record CreateCarrierCommissionRequest(
+    Guid? ProgramConfigurationId,
     string? LineOfBusiness,
     decimal CommissionRate,
     decimal SMMRetentionRate,

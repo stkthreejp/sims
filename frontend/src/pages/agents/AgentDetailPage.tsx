@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { agentsApi } from '@/api/agents.api'
+import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import type { AgentLocation, AgentContact, AgentLocationInput, AgentContactInput } from '@/types/agent.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -321,7 +322,7 @@ export function AgentDetailPage() {
 
   // Commission state
   const [showAddCommission, setShowAddCommission] = useState(false)
-  const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '', rate: '', effectiveDate: '' })
+  const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', lineOfBusiness: '', rate: '', effectiveDate: '' })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
 
   const { data: agent, isLoading } = useQuery({
@@ -334,6 +335,11 @@ export function AgentDetailPage() {
     queryKey: ['agent-commissions', id],
     queryFn: () => getAgentCommissions(id!),
     enabled: !!id,
+  })
+
+  const { data: programs = [] } = useQuery({
+    queryKey: ['admin', 'program-configurations', 'active'],
+    queryFn: () => programConfigurationsApi.getAll(false),
   })
 
   // ─── Info mutations ──────────────────────────────────────────────────────────
@@ -446,6 +452,7 @@ export function AgentDetailPage() {
 
   const addCommissionMutation = useMutation({
     mutationFn: () => createAgentCommission(id!, {
+      programConfigurationId: commissionForm.programConfigurationId || null,
       lineOfBusiness: commissionForm.lineOfBusiness || null,
       commissionRate: parseFloat(commissionForm.rate) / 100,
       effectiveDate: commissionForm.effectiveDate,
@@ -453,7 +460,7 @@ export function AgentDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['agent-commissions', id] })
       setShowAddCommission(false)
-      setCommissionForm({ lineOfBusiness: '', rate: '', effectiveDate: '' })
+      setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', rate: '', effectiveDate: '' })
       toast.success('Commission rate added')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -694,7 +701,18 @@ export function AgentDetailPage() {
         {showAddCommission && (
           <div className="mb-4 rounded-lg p-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
             <p className="text-xs font-medium text-slate-600 mb-2">New Commission Rate</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Program</label>
+                <select
+                  value={commissionForm.programConfigurationId}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value })}
+                  className="sims-select"
+                >
+                  <option value="">Any program</option>
+                  {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
                 <select
@@ -745,7 +763,7 @@ export function AgentDetailPage() {
                 <Check className="h-3.5 w-3.5" /> Save Rate
               </button>
               <button
-                onClick={() => { setShowAddCommission(false); setCommissionForm({ lineOfBusiness: '', rate: '', effectiveDate: '' }) }}
+                onClick={() => { setShowAddCommission(false); setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', rate: '', effectiveDate: '' }) }}
                 className="sd-btn outline sm"
               >
                 <X className="h-3.5 w-3.5" /> Cancel
@@ -790,6 +808,9 @@ export function AgentDetailPage() {
                               {(active.commissionRate * 100).toFixed(2)}%
                             </span>
                           )}
+                          {active?.programName && (
+                            <span className="text-xs text-blue-600">{active.programName}</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {active ? (
@@ -807,6 +828,7 @@ export function AgentDetailPage() {
                             <thead>
                               <tr className="text-slate-500">
                                 <th className="text-left py-1 font-medium">Rate</th>
+                                <th className="text-left py-1 font-medium">Program</th>
                                 <th className="text-left py-1 font-medium">Effective</th>
                                 <th className="text-left py-1 font-medium">Disabled</th>
                                 <th className="text-left py-1 font-medium">Status</th>
@@ -817,6 +839,7 @@ export function AgentDetailPage() {
                               {rows.map((r) => (
                                 <tr key={r.id}>
                                   <td className="py-1.5 font-medium text-slate-800">{(r.commissionRate * 100).toFixed(2)}%</td>
+                                  <td className="py-1.5 text-slate-600">{r.programName ?? 'Any program'}</td>
                                   <td className="py-1.5 text-slate-600">{r.effectiveDate}</td>
                                   <td className="py-1.5 text-slate-600">{r.disabledDate ?? '—'}</td>
                                   <td className="py-1.5">

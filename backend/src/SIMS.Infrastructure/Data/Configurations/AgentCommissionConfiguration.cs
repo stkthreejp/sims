@@ -13,12 +13,17 @@ public class AgentCommissionConfiguration : IEntityTypeConfiguration<AgentCommis
         builder.Property(e => e.CommissionRate).HasColumnType("numeric(8,6)");
         builder.Property(e => e.LineOfBusiness).HasMaxLength(50);
 
+        builder.HasOne(e => e.ProgramConfiguration)
+            .WithMany()
+            .HasForeignKey(e => e.ProgramConfigurationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(e => e.Agent)
             .WithMany()
             .HasForeignKey(e => e.AgentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(e => new { e.AgentId, e.LineOfBusiness, e.EffectiveDate }).IsUnique();
+        builder.HasIndex(e => new { e.ProgramConfigurationId, e.AgentId, e.LineOfBusiness, e.EffectiveDate }).IsUnique();
         builder.HasIndex(e => new { e.AgentId, e.DisabledDate });
     }
 }

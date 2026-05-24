@@ -168,9 +168,9 @@ public class QuoteService : IQuoteService
         var asOfDate = dto.EffectiveDate;
         var lobKey = lineOfBusiness.ToString();
 
-        var carrierRates = await _carrierCommissions.GetActiveRatesAsync(carrierId, lobKey, asOfDate);
+        var carrierRates = await _carrierCommissions.GetActiveRatesAsync(carrierId, lobKey, asOfDate, program?.Id);
         var agentRate = submission.AgentId.HasValue
-            ? await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate)
+            ? await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate, program?.Id)
             : null;
 
         var quoteNumber = await GenerateQuoteNumberAsync();
@@ -255,7 +255,7 @@ public class QuoteService : IQuoteService
             return Result<QuoteDto>.Failure(programPathValidation.Value.Code, programPathValidation.Value.Message);
 
         var previousStatus = quote.Status;
-        var lobChanged = quote.CarrierId != carrierId || quote.LineOfBusiness != lineOfBusiness;
+        var lobChanged = quote.CarrierId != carrierId || quote.LineOfBusiness != lineOfBusiness || quote.ProgramId != program?.Id;
 
         quote.ProgramId = program?.Id;
         quote.Program = program;
@@ -279,14 +279,14 @@ public class QuoteService : IQuoteService
         {
             var lobKey = lineOfBusiness.ToString();
             var asOfDate = dto.EffectiveDate;
-            var carrierRates = await _carrierCommissions.GetActiveRatesAsync(carrierId, lobKey, asOfDate);
+            var carrierRates = await _carrierCommissions.GetActiveRatesAsync(carrierId, lobKey, asOfDate, program?.Id);
             quote.CarrierCommissionRate = carrierRates?.CommissionRate ?? 0;
             quote.SMMRetentionRate = carrierRates?.SMMRetentionRate ?? 0;
 
             var submission = await Db.Set<Submission>().FirstOrDefaultAsync(s => s.Id == quote.SubmissionId);
             if (submission?.AgentId.HasValue == true)
             {
-                var agentRate = await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate);
+                var agentRate = await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate, program?.Id);
                 quote.AgentCommissionRate = agentRate ?? 0;
             }
         }

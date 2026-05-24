@@ -140,6 +140,32 @@ public class ProgramConfigurationServiceTests
     }
 
     [Fact]
+    public async Task AddLineOfBusinessAsync_SavesBillingModeAndPaymentTerms()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "Falls Lake", IsActive = true };
+        db.AddRange(program, carrier);
+        await db.SaveChangesAsync();
+
+        var service = new ProgramConfigurationService(db);
+        var programCarrier = await service.AddCarrierAsync(program.Id, new UpsertProgramCarrierRequest(carrier.Id, true, new DateOnly(2026, 1, 1), null, null));
+
+        var result = await service.AddLineOfBusinessAsync(program.Id, programCarrier.Value!.Id, new UpsertProgramCarrierLineOfBusinessRequest(
+            PolicyLineOfBusiness.InlandMarine,
+            true,
+            new DateOnly(2026, 1, 1),
+            null,
+            "IM setup",
+            "AgencyBill",
+            30));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("AgencyBill", result.Value!.BillingMode);
+        Assert.Equal(30, result.Value.PaymentTermsDays);
+    }
+
+    [Fact]
     public async Task CreateDocumentAsync_UsesProgramIdentityWithoutOverridingCarrierLineOrState()
     {
         await using var db = CreateDb();

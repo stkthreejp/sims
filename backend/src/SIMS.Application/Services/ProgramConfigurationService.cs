@@ -157,6 +157,9 @@ public class ProgramConfigurationService : IProgramConfigurationService
         var validation = ValidateDates(request.EffectiveDate, request.ExpirationDate);
         if (validation is not null)
             return Result<ProgramCarrierLineOfBusinessDto>.Failure(validation.Value.Code, validation.Value.Message);
+        var paymentValidation = ValidatePaymentTerms(request.PaymentTermsDays);
+        if (paymentValidation is not null)
+            return Result<ProgramCarrierLineOfBusinessDto>.Failure(paymentValidation.Value.Code, paymentValidation.Value.Message);
 
         var programCarrier = await _db.Set<ProgramCarrier>()
             .SingleOrDefaultAsync(c => c.Id == programCarrierId && c.ProgramConfigurationId == programId, ct);
@@ -175,6 +178,8 @@ public class ProgramConfigurationService : IProgramConfigurationService
             IsActive = request.IsActive,
             EffectiveDate = request.EffectiveDate,
             ExpirationDate = request.ExpirationDate,
+            BillingMode = TrimToNull(request.BillingMode),
+            PaymentTermsDays = request.PaymentTermsDays,
             Notes = TrimToNull(request.Notes)
         };
 
@@ -189,6 +194,9 @@ public class ProgramConfigurationService : IProgramConfigurationService
         var validation = ValidateDates(request.EffectiveDate, request.ExpirationDate);
         if (validation is not null)
             return Result<ProgramCarrierLineOfBusinessDto>.Failure(validation.Value.Code, validation.Value.Message);
+        var paymentValidation = ValidatePaymentTerms(request.PaymentTermsDays);
+        if (paymentValidation is not null)
+            return Result<ProgramCarrierLineOfBusinessDto>.Failure(paymentValidation.Value.Code, paymentValidation.Value.Message);
 
         var lob = await _db.Set<ProgramCarrierLineOfBusiness>()
             .Include(l => l.ProgramCarrier)
@@ -209,6 +217,8 @@ public class ProgramConfigurationService : IProgramConfigurationService
         lob.IsActive = request.IsActive;
         lob.EffectiveDate = request.EffectiveDate;
         lob.ExpirationDate = request.ExpirationDate;
+        lob.BillingMode = TrimToNull(request.BillingMode);
+        lob.PaymentTermsDays = request.PaymentTermsDays;
         lob.Notes = TrimToNull(request.Notes);
 
         await _db.SaveChangesAsync(ct);
@@ -364,6 +374,10 @@ public class ProgramConfigurationService : IProgramConfigurationService
         expirationDate.HasValue && expirationDate.Value < effectiveDate
             ? ("INVALID_DATE_RANGE", "Expiration date cannot be before effective date.")
             : null;
+    private static (string Code, string Message)? ValidatePaymentTerms(int? paymentTermsDays) =>
+        paymentTermsDays is < 0 or > 365
+            ? ("INVALID_PAYMENT_TERMS", "Payment terms must be between 0 and 365 days.")
+            : null;
 
     private static Result<string> NormalizeStateCode(string stateCode)
     {
@@ -415,6 +429,8 @@ public class ProgramConfigurationService : IProgramConfigurationService
             lob.EffectiveDate,
             lob.ExpirationDate,
             lob.Notes,
+            lob.BillingMode,
+            lob.PaymentTermsDays,
             lob.States
                 .OrderBy(s => s.StateCode)
                 .Select(Map)

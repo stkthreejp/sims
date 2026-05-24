@@ -9,6 +9,8 @@ public class ProgramCarrierLineOfBusiness : BaseEntity
     public bool IsActive { get; set; } = true;
     public DateOnly EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
+    public string? BillingMode { get; set; }
+    public int? PaymentTermsDays { get; set; }
     public string? Notes { get; set; }
 
     public ProgramCarrier ProgramCarrier { get; set; } = null!;

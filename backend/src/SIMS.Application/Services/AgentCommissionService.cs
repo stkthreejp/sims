@@ -30,8 +30,10 @@ public class AgentCommissionService : IAgentCommissionService
     public async Task<IReadOnlyList<AgentCommissionDto>> GetAllAsync(Guid agentId, CancellationToken ct = default)
     {
         var rows = await Db.Set<AgentCommission>()
+            .Include(c => c.ProgramConfiguration)
             .Where(c => c.AgentId == agentId)
-            .OrderBy(c => c.LineOfBusiness)
+            .OrderBy(c => c.ProgramConfiguration == null ? string.Empty : c.ProgramConfiguration.Name)
+            .ThenBy(c => c.LineOfBusiness)
             .ThenByDescending(c => c.EffectiveDate)
             .ToListAsync(ct);
 
@@ -46,8 +48,17 @@ public class AgentCommissionService : IAgentCommissionService
 
         var db = Db;
 
+        if (req.ProgramConfigurationId.HasValue)
+        {
+            var programExists = await db.Set<ProgramConfiguration>()
+                .AnyAsync(p => p.Id == req.ProgramConfigurationId.Value && p.IsActive, ct);
+            if (!programExists)
+                return Result<AgentCommissionDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+        }
+
         var duplicate = await db.Set<AgentCommission>()
             .AnyAsync(c => c.AgentId == agentId
+                && c.ProgramConfigurationId == req.ProgramConfigurationId
                 && c.LineOfBusiness == req.LineOfBusiness
                 && c.EffectiveDate == req.EffectiveDate, ct);
 
@@ -57,6 +68,7 @@ public class AgentCommissionService : IAgentCommissionService
         var entry = new AgentCommission
         {
             AgentId = agentId,
+            ProgramConfigurationId = req.ProgramConfigurationId,
             LineOfBusiness = req.LineOfBusiness,
             CommissionRate = req.CommissionRate,
             EffectiveDate = req.EffectiveDate,
@@ -87,30 +99,27 @@ public class AgentCommissionService : IAgentCommissionService
     }
 
     public async Task<decimal?> GetActiveRateAsync(
-        Guid agentId, string? lineOfBusiness, DateOnly asOfDate, CancellationToken ct = default)
+        Guid agentId, string? lineOfBusiness, DateOnly asOfDate, Guid? programConfigurationId = null, CancellationToken ct = default)
     {
         var candidates = await Db.Set<AgentCommission>()
             .Where(c => c.AgentId == agentId
+                && (c.ProgramConfigurationId == programConfigurationId || c.ProgramConfigurationId == null)
                 && (c.LineOfBusiness == lineOfBusiness || c.LineOfBusiness == null)
                 && c.EffectiveDate <= asOfDate
                 && (c.DisabledDate == null || c.DisabledDate > asOfDate))
             .ToListAsync(ct);
 
-        var specific = candidates
-            .Where(c => c.LineOfBusiness == lineOfBusiness)
-            .OrderByDescending(c => c.EffectiveDate)
-            .FirstOrDefault();
-
-        if (specific != null) return specific.CommissionRate;
-
         return candidates
-            .Where(c => c.LineOfBusiness == null)
-            .OrderByDescending(c => c.EffectiveDate)
+            .OrderByDescending(c => c.ProgramConfigurationId == programConfigurationId ? 1 : 0)
+            .ThenByDescending(c => c.LineOfBusiness == lineOfBusiness ? 1 : 0)
+            .ThenByDescending(c => c.EffectiveDate)
             .FirstOrDefault()?.CommissionRate;
     }
 
     private static AgentCommissionDto ToDto(AgentCommission c) => new(
         c.Id,
+        c.ProgramConfigurationId,
+        c.ProgramConfiguration?.Name,
         c.LineOfBusiness,
         c.LineOfBusiness != null && LobLabels.TryGetValue(c.LineOfBusiness, out var label) ? label : null,
         c.CommissionRate,

@@ -10,6 +10,7 @@ public class ProgramCarrierLineOfBusinessConfiguration : IEntityTypeConfiguratio
     {
         builder.ToTable("program_carrier_lines_of_business");
 
+        builder.Property(x => x.BillingMode).HasMaxLength(50);
         builder.Property(x => x.Notes).HasMaxLength(1000);
 
         builder.HasIndex(x => new { x.ProgramCarrierId, x.LineOfBusiness }).IsUnique();

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
+import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import type { CarrierContact, CarrierContactInput, CarrierUpdate } from '@/types/carrier.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
@@ -214,7 +215,7 @@ export function CarrierDetailPage() {
   const [editContactForm, setEditContactForm] = useState<ContactFormData>(emptyContactForm())
 
   const [showAddCommission, setShowAddCommission] = useState(false)
-  const [commissionForm, setCommissionForm] = useState({ lineOfBusiness: '' as string, commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+  const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', lineOfBusiness: '' as string, commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
   const [showAdditionalInterestRateForm, setShowAdditionalInterestRateForm] = useState(false)
   const [editingAdditionalInterestRateId, setEditingAdditionalInterestRateId] = useState<string | null>(null)
@@ -238,6 +239,11 @@ export function CarrierDetailPage() {
     enabled: !!id,
   })
 
+  const { data: programs = [] } = useQuery({
+    queryKey: ['admin', 'program-configurations', 'active'],
+    queryFn: () => programConfigurationsApi.getAll(false),
+  })
+
   const { data: additionalInterestRates = [] } = useQuery<CarrierAdditionalInterestRate[]>({
     queryKey: ['carrier-additional-interest-rates', id],
     queryFn: () => carrierAdditionalInterestRatesApi.getAll(id!),
@@ -246,6 +252,7 @@ export function CarrierDetailPage() {
 
   const addCommissionMutation = useMutation({
     mutationFn: () => createCarrierCommission(id!, {
+      programConfigurationId: commissionForm.programConfigurationId || null,
       lineOfBusiness: commissionForm.lineOfBusiness || null,
       commissionRate: parseFloat(commissionForm.commissionRate) / 100,
       smmRetentionRate: parseFloat(commissionForm.smmRetentionRate) / 100,
@@ -254,7 +261,7 @@ export function CarrierDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['carrier-commissions', id] })
       setShowAddCommission(false)
-      setCommissionForm({ lineOfBusiness: '', commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+      setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
       toast.success('Commission rate added')
     },
     onError: (err: Error) => toast.error(err.message),
@@ -677,7 +684,18 @@ export function CarrierDetailPage() {
         {showAddCommission && (
           <div className="rounded-lg p-4 space-y-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
             <p className="text-sm font-medium text-slate-700">New Commission Rate</p>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Program</label>
+                <select
+                  value={commissionForm.programConfigurationId}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value })}
+                  className="sims-select"
+                >
+                  <option value="">Any program</option>
+                  {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
                 <select
@@ -809,6 +827,9 @@ export function CarrierDetailPage() {
                           {activeRow && (
                             <span className="text-xs text-slate-400">eff. {activeRow.effectiveDate}</span>
                           )}
+                          {activeRow?.programName && (
+                            <span className="text-xs text-blue-600">{activeRow.programName}</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-400">{rows.length} version{rows.length !== 1 ? 's' : ''}</span>
@@ -822,6 +843,7 @@ export function CarrierDetailPage() {
                             <thead>
                               <tr className="text-left text-slate-500 border-b">
                                 <th className="px-4 py-2 font-medium">Total Rate</th>
+                                <th className="px-4 py-2 font-medium">Program</th>
                                 <th className="px-4 py-2 font-medium">SMM Retention</th>
                                 <th className="px-4 py-2 font-medium">Effective</th>
                                 <th className="px-4 py-2 font-medium">Disabled</th>
@@ -833,6 +855,7 @@ export function CarrierDetailPage() {
                               {rows.map((r) => (
                                 <tr key={r.id} className="hover:bg-white">
                                   <td className="px-4 py-2 font-semibold text-slate-800">{(r.commissionRate * 100).toFixed(2)}%</td>
+                                  <td className="px-4 py-2 text-slate-600">{r.programName ?? 'Any program'}</td>
                                   <td className="px-4 py-2 text-slate-700">{(r.smmRetentionRate * 100).toFixed(2)}%</td>
                                   <td className="px-4 py-2 text-slate-600">{r.effectiveDate}</td>
                                   <td className="px-4 py-2 text-slate-500">{r.disabledDate ?? '—'}</td>

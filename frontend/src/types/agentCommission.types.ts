@@ -1,5 +1,7 @@
 export interface AgentCommission {
   id: number
+  programConfigurationId: string | null
+  programName: string | null
   lineOfBusiness: string | null
   lineOfBusinessLabel: string | null
   commissionRate: number
@@ -10,6 +12,7 @@ export interface AgentCommission {
 }
 
 export interface CreateAgentCommissionRequest {
+  programConfigurationId?: string | null
   lineOfBusiness: string | null
   commissionRate: number
   effectiveDate: string
