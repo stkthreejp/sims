@@ -10,6 +10,7 @@ import type {
   ManagerQueue,
   UnassignedProgramCleanup,
   AuthorityApprovalActivity,
+  DeclineReasonReport,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -46,3 +47,6 @@ export const getUnassignedProgramCleanup = (): Promise<UnassignedProgramCleanup>
 
 export const getAuthorityApprovalActivity = (): Promise<AuthorityApprovalActivity> =>
   apiClient.get(`${BASE}/operations/authority-approvals`).then(r => r.data)
+
+export const getDeclineReasonReport = (): Promise<DeclineReasonReport> =>
+  apiClient.get(`${BASE}/operations/decline-reasons`).then(r => r.data)

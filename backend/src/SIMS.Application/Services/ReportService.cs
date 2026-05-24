@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.DTOs.Reports;
+using SIMS.Application.DTOs.UWWriteup;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
@@ -672,6 +674,61 @@ public class ReportService : IReportService
             rows);
     }
 
+    public async Task<DeclineReasonReportDto> GetDeclineReasonReportAsync(CancellationToken ct = default)
+    {
+        var quotes = await Db.Set<Quote>()
+            .Include(q => q.Submission).ThenInclude(s => s.Insured)
+            .Include(q => q.Carrier)
+            .Include(q => q.Program)
+            .Include(q => q.UWWriteup)
+            .Where(q => !q.IsDeleted
+                        && (q.Status == QuoteStatus.Declined
+                            || (q.UWWriteup != null && q.UWWriteup.Decision == UWWriteupDecision.Decline)))
+            .ToListAsync(ct);
+
+        var rows = quotes.Select(q =>
+        {
+            var payload = ParseWriteupPayload(q.UWWriteup?.PayloadJson);
+            var reason = FirstNonBlank(payload?.DecisionRationale, payload?.ReasonSubmitted) ?? "Unspecified";
+            return new DeclineReasonRowDto(
+                q.Id,
+                q.QuoteNumber,
+                q.SubmissionId,
+                q.Submission.SubmissionNumber,
+                q.Submission.Insured.DisplayName,
+                q.Carrier.Name,
+                q.LineOfBusiness,
+                q.ProgramId,
+                q.Program?.Name,
+                q.Program?.Code,
+                q.Submission.Insured.State,
+                reason,
+                q.UWWriteup?.SubmittedAt ?? q.UpdatedAt,
+                $"/quotes/{q.Id}");
+        })
+        .OrderByDescending(r => r.DeclinedAt)
+        .ThenBy(r => r.QuoteNumber)
+        .ToList();
+
+        var total = rows.Count;
+        var reasons = rows
+            .GroupBy(r => r.Reason)
+            .Select(g => new DeclineReasonSummaryDto(
+                g.Key,
+                g.Count(),
+                total == 0 ? 0 : (decimal)g.Count() / total))
+            .OrderByDescending(r => r.Count)
+            .ThenBy(r => r.Reason)
+            .ToList();
+
+        return new DeclineReasonReportDto(
+            total,
+            rows.Count(r => r.Reason != "Unspecified"),
+            rows.Count(r => r.Reason == "Unspecified"),
+            reasons,
+            rows);
+    }
+
     private static string SlaStatusFor(int daysUntilDue)
     {
         if (daysUntilDue < 0) return "Overdue";
@@ -735,6 +792,23 @@ public class ReportService : IReportService
     }
 
     private record ApprovalTargetContext(string ReferenceNumber, string? InsuredName, string ActionUrl);
+
+    private static IMWriteupPayload? ParseWriteupPayload(string? payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson)) return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<IMWriteupPayload>(payloadJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? FirstNonBlank(params string?[] values) =>
+        values.Select(v => v?.Trim()).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
 
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)
     {

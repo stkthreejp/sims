@@ -13,6 +13,7 @@ import {
   getManagerQueue,
   getUnassignedProgramCleanup,
   getAuthorityApprovalActivity,
+  getDeclineReasonReport,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
@@ -25,6 +26,7 @@ import type {
   ManagerQueue,
   UnassignedProgramCleanup,
   AuthorityApprovalActivity,
+  DeclineReasonReport,
   AgingBucket,
   AgingRow,
   BrokerArRow,
@@ -688,6 +690,130 @@ function AuthorityApprovalActivityReport() {
   )
 }
 
+function DeclineReasonReportView() {
+  const [reasonFilter, setReasonFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const { data, isLoading, error } = useQuery<DeclineReasonReport>({
+    queryKey: ['report', 'decline-reasons'],
+    queryFn: getDeclineReasonReport,
+  })
+
+  const rows = data?.rows ?? []
+  const filteredRows = rows.filter(row => {
+    if (reasonFilter && row.reason !== reasonFilter) return false
+    if (search) {
+      const query = search.toLowerCase()
+      const target = `${row.quoteNumber} ${row.submissionNumber} ${row.insuredName} ${row.carrierName} ${row.programName ?? ''} ${row.lineOfBusiness} ${row.state ?? ''} ${row.reason}`.toLowerCase()
+      if (!target.includes(query)) return false
+    }
+    return true
+  })
+  const hasFilters = reasonFilter || search
+
+  return (
+    <ReportShell title="Decline Reasons" isLoading={isLoading} error={error as Error}>
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Visible Declines" value={filteredRows.length.toLocaleString()} sub={`${rows.length.toLocaleString()} total`} />
+            <KpiCard label="With Reason" value={data.withReasonCount.toLocaleString()} />
+            <KpiCard label="Unspecified" value={data.unspecifiedCount.toLocaleString()} highlight={data.unspecifiedCount > 0 ? 'warn' : undefined} />
+            <KpiCard label="Reason Buckets" value={data.reasons.length.toLocaleString()} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search declined quotes..."
+              style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', minWidth: 240, fontSize: 12.5, color: 'var(--ink)', background: 'var(--surface)' }}
+            />
+            <select value={reasonFilter} onChange={(e) => setReasonFilter(e.target.value)} style={filterStyle}>
+              <option value="">All reasons</option>
+              {data.reasons.map(reason => (
+                <option key={reason.reason} value={reason.reason}>{reason.reason}</option>
+              ))}
+            </select>
+            {hasFilters && (
+              <button
+                onClick={() => { setReasonFilter(''); setSearch('') }}
+                style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontSize: 12.5, color: 'var(--ink-3)', background: 'var(--surface)', cursor: 'pointer' }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          <h3 style={sectionHead}>Reason Summary</h3>
+          <div style={{ overflowX: 'auto', marginBottom: 24 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Reason', 'Count', 'Share'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: h === 'Reason' ? 'left' : 'right' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.reasons.map(reason => (
+                  <tr key={reason.reason} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={tdStyle}>{reason.reason}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{reason.count}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{Math.round(reason.share * 100)}%</td>
+                  </tr>
+                ))}
+                {data.reasons.length === 0 && (
+                  <tr><td colSpan={3} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No decline reasons</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style={sectionHead}>Declined Quotes</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Quote', 'Submission', 'Insured', 'Program', 'Carrier / LOB', 'State', 'Declined', 'Reason'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map(row => (
+                  <tr key={row.quoteId} style={{ borderBottom: '1px solid var(--line)', verticalAlign: 'top' }}>
+                    <td style={tdStyle}>
+                      <Link to={row.actionUrl} style={{ color: 'var(--accent-ink)', fontWeight: 600, textDecoration: 'none' }}>
+                        {row.quoteNumber}
+                      </Link>
+                    </td>
+                    <td style={tdStyle}>{row.submissionNumber}</td>
+                    <td style={tdStyle}>{row.insuredName}</td>
+                    <td style={tdStyle}>
+                      <div>{row.programName ?? 'Unassigned'}</div>
+                      {row.programCode && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.programCode}</div>}
+                    </td>
+                    <td style={tdStyle}>
+                      <div>{row.carrierName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.lineOfBusiness}</div>
+                    </td>
+                    <td style={tdStyle}>{row.state ?? '-'}</td>
+                    <td style={tdStyle}>{fmtDateTime(row.declinedAt)}</td>
+                    <td style={{ ...tdStyle, minWidth: 260, color: row.reason === 'Unspecified' ? 'var(--red, #b91c1c)' : 'var(--ink-3)' }}>{row.reason}</td>
+                  </tr>
+                ))}
+                {filteredRows.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center' }}>No declined quotes</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 function UnassignedProgramCleanupReport() {
   const [typeFilter, setTypeFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -982,6 +1108,7 @@ const REPORT_CATEGORIES = [
     reports: [
       { id: 'manager-queue', label: 'Manager Queue' },
       { id: 'authority-approvals', label: 'Authority Approvals' },
+      { id: 'decline-reasons', label: 'Decline Reasons' },
       { id: 'post-bind-follow-up', label: 'Post-Bind Follow-Up' },
       { id: 'unassigned-program-cleanup', label: 'Unassigned Program Cleanup' },
     ],
@@ -1031,6 +1158,7 @@ function renderReport(id: string) {
     case 'invoice-totals-by-transaction': return <InvoiceTotalsByPolicyTransactionReport />
     case 'manager-queue':          return <ManagerQueueReport />
     case 'authority-approvals':    return <AuthorityApprovalActivityReport />
+    case 'decline-reasons':        return <DeclineReasonReportView />
     case 'post-bind-follow-up':    return <PostBindFollowUpReport />
     case 'unassigned-program-cleanup': return <UnassignedProgramCleanupReport />
     default:                       return null

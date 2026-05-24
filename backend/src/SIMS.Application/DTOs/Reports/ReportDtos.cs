@@ -225,3 +225,34 @@ public record AuthorityApprovalActivityRowDto(
     string SlaStatus,
     string ActionUrl
 );
+
+public record DeclineReasonReportDto(
+    int TotalDeclines,
+    int WithReasonCount,
+    int UnspecifiedCount,
+    IReadOnlyList<DeclineReasonSummaryDto> Reasons,
+    IReadOnlyList<DeclineReasonRowDto> Rows
+);
+
+public record DeclineReasonSummaryDto(
+    string Reason,
+    int Count,
+    decimal Share
+);
+
+public record DeclineReasonRowDto(
+    Guid QuoteId,
+    string QuoteNumber,
+    Guid SubmissionId,
+    string SubmissionNumber,
+    string InsuredName,
+    string CarrierName,
+    PolicyLineOfBusiness LineOfBusiness,
+    Guid? ProgramId,
+    string? ProgramName,
+    string? ProgramCode,
+    string? State,
+    string Reason,
+    DateTime DeclinedAt,
+    string ActionUrl
+);

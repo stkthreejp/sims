@@ -669,6 +669,156 @@ public class ReportServiceTests
         Assert.Equal(6m, declinedOverride.DecisionHours);
     }
 
+    [Fact]
+    public async Task GetDeclineReasonReportAsync_GroupsDeclinedQuotesByWriteupReason()
+    {
+        await using var db = CreateDb();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var submittedAt = DateTime.UtcNow.AddDays(-2);
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "Decline Carrier" };
+        var insured = new Insured
+        {
+            InsuredType = InsuredType.Commercial,
+            CompanyName = "Decline Timber",
+            State = "GA"
+        };
+        var submission = new Submission
+        {
+            SubmissionNumber = "SUB-DECLINE",
+            Insured = insured,
+            InsuredId = insured.Id,
+            UnderwriterId = Guid.NewGuid(),
+            CreatedById = Guid.NewGuid()
+        };
+        var declinedWithReason = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-DECLINE-1",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            Program = program,
+            ProgramId = program.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            Status = QuoteStatus.Declined,
+            EffectiveDate = today.AddDays(15),
+            ExpirationDate = today.AddDays(380),
+            CreatedById = Guid.NewGuid()
+        };
+        var declinedSameReason = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-DECLINE-2",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            Program = program,
+            ProgramId = program.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            Status = QuoteStatus.Quoted,
+            EffectiveDate = today.AddDays(20),
+            ExpirationDate = today.AddDays(385),
+            CreatedById = Guid.NewGuid()
+        };
+        var declinedWithoutReason = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-DECLINE-3",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            Status = QuoteStatus.Declined,
+            EffectiveDate = today.AddDays(25),
+            ExpirationDate = today.AddDays(390),
+            CreatedById = Guid.NewGuid()
+        };
+        var approvedWriteup = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "Q-APPROVE",
+            Submission = submission,
+            SubmissionId = submission.Id,
+            Carrier = carrier,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            Status = QuoteStatus.Quoted,
+            EffectiveDate = today.AddDays(30),
+            ExpirationDate = today.AddDays(395),
+            CreatedById = Guid.NewGuid()
+        };
+
+        db.AddRange(
+            program,
+            carrier,
+            insured,
+            submission,
+            declinedWithReason,
+            declinedSameReason,
+            declinedWithoutReason,
+            approvedWriteup,
+            new QuoteUWWriteup
+            {
+                Quote = declinedWithReason,
+                QuoteId = declinedWithReason.Id,
+                Status = UWWriteupStatus.Submitted,
+                Decision = UWWriteupDecision.Decline,
+                SubmittedAt = submittedAt,
+                PayloadJson = """{"decisionRationale":"Loss history outside appetite"}"""
+            },
+            new QuoteUWWriteup
+            {
+                Quote = declinedSameReason,
+                QuoteId = declinedSameReason.Id,
+                Status = UWWriteupStatus.Submitted,
+                Decision = UWWriteupDecision.Decline,
+                SubmittedAt = submittedAt.AddHours(2),
+                PayloadJson = """{"decisionRationale":"Loss history outside appetite"}"""
+            },
+            new QuoteUWWriteup
+            {
+                Quote = approvedWriteup,
+                QuoteId = approvedWriteup.Id,
+                Status = UWWriteupStatus.Approved,
+                Decision = UWWriteupDecision.Approve,
+                SubmittedAt = submittedAt,
+                PayloadJson = """{"decisionRationale":"Acceptable risk"}"""
+            });
+        await db.SaveChangesAsync();
+
+        var reports = new ReportService(new ServiceCollection().AddSingleton<DbContext>(db).BuildServiceProvider());
+
+        var result = await reports.GetDeclineReasonReportAsync();
+
+        Assert.Equal(3, result.TotalDeclines);
+        Assert.Equal(2, result.WithReasonCount);
+        Assert.Equal(1, result.UnspecifiedCount);
+        Assert.Equal(2, result.Reasons.Count);
+
+        var reason = Assert.Single(result.Reasons, r => r.Reason == "Loss history outside appetite");
+        Assert.Equal(2, reason.Count);
+        Assert.Equal(2m / 3m, reason.Share);
+
+        var unspecified = Assert.Single(result.Reasons, r => r.Reason == "Unspecified");
+        Assert.Equal(1, unspecified.Count);
+
+        var row = Assert.Single(result.Rows, r => r.QuoteId == declinedWithReason.Id);
+        Assert.Equal("Q-DECLINE-1", row.QuoteNumber);
+        Assert.Equal("Decline Timber", row.InsuredName);
+        Assert.Equal("Decline Carrier", row.CarrierName);
+        Assert.Equal("Longleaf", row.ProgramName);
+        Assert.Equal("GA", row.State);
+        Assert.Equal("Loss history outside appetite", row.Reason);
+        Assert.Equal(submittedAt, row.DeclinedAt);
+        Assert.Equal($"/quotes/{declinedWithReason.Id}", row.ActionUrl);
+
+        Assert.DoesNotContain(result.Rows, r => r.QuoteId == approvedWriteup.Id);
+    }
+
     private static Policy PolicyFor(Guid? programId) => new()
     {
         Id = Guid.NewGuid(),

@@ -58,4 +58,8 @@ public class ReportsController : ControllerBase
     [HttpGet("operations/authority-approvals")]
     public async Task<IActionResult> GetAuthorityApprovalActivity(CancellationToken ct)
         => Ok(await _svc.GetAuthorityApprovalActivityAsync(ct));
+
+    [HttpGet("operations/decline-reasons")]
+    public async Task<IActionResult> GetDeclineReasonReport(CancellationToken ct)
+        => Ok(await _svc.GetDeclineReasonReportAsync(ct));
 }

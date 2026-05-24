@@ -222,3 +222,34 @@ export interface AuthorityApprovalActivity {
   averageDecisionHours: number | null
   rows: AuthorityApprovalActivityRow[]
 }
+
+export interface DeclineReasonSummary {
+  reason: string
+  count: number
+  share: number
+}
+
+export interface DeclineReasonRow {
+  quoteId: string
+  quoteNumber: string
+  submissionId: string
+  submissionNumber: string
+  insuredName: string
+  carrierName: string
+  lineOfBusiness: string
+  programId: string | null
+  programName: string | null
+  programCode: string | null
+  state: string | null
+  reason: string
+  declinedAt: string
+  actionUrl: string
+}
+
+export interface DeclineReasonReport {
+  totalDeclines: number
+  withReasonCount: number
+  unspecifiedCount: number
+  reasons: DeclineReasonSummary[]
+  rows: DeclineReasonRow[]
+}
