@@ -82,6 +82,60 @@ public class PolicyNumberServiceTests
     }
 
     [Fact]
+    public async Task GenerateForBindAsync_UsesCarrierLobAssignmentWhenQuoteHasProgram()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden Specialty" };
+        var quote = CreateQuote(carrier, "SC", PolicyLineOfBusiness.InlandMarine, new DateOnly(2026, 5, 1));
+        quote.ProgramId = program.Id;
+        quote.Program = program;
+        var sequence = CreateSequence("Carrier LOB", "CLOB-{LOB}-{SEQ:00}", 12);
+        db.AddRange(
+            program,
+            carrier,
+            quote.Submission.Insured,
+            quote.Submission,
+            quote,
+            sequence,
+            CreateAssignment(sequence, carrier, PolicyLineOfBusiness.InlandMarine, null));
+        await db.SaveChangesAsync();
+
+        var result = await new PolicyNumberService(db).GenerateForBindAsync(quote, Guid.NewGuid());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("CLOB-IM-12-01", result.Value!.PolicyNumber);
+    }
+
+    [Fact]
+    public async Task GenerateForBindAsync_DoesNotUseProgramToChooseBetweenCarrierLobAssignments()
+    {
+        await using var db = CreateDb();
+        var longleaf = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var shuttlebee = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Shuttlebee", Code = "SHUTTLEBEE", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden Specialty" };
+        var quote = CreateQuote(carrier, "GA", PolicyLineOfBusiness.GeneralLiability, new DateOnly(2026, 7, 1));
+        quote.ProgramId = shuttlebee.Id;
+        quote.Program = shuttlebee;
+        var sequence = CreateSequence("Carrier LOB", "CLOB-{LOB}-{SEQ:00}", 21);
+        db.AddRange(
+            longleaf,
+            shuttlebee,
+            carrier,
+            quote.Submission.Insured,
+            quote.Submission,
+            quote,
+            sequence,
+            CreateAssignment(sequence, carrier, PolicyLineOfBusiness.GeneralLiability, null));
+        await db.SaveChangesAsync();
+
+        var result = await new PolicyNumberService(db).GenerateForBindAsync(quote, Guid.NewGuid());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("CLOB-GL-21-01", result.Value!.PolicyNumber);
+    }
+
+    [Fact]
     public async Task GenerateForBindAsync_ResetsAnnualSequenceForPolicyEffectiveYear()
     {
         await using var db = CreateDb();
@@ -252,6 +306,9 @@ public class PolicyNumberServiceTests
             modelBuilder.Entity<Quote>().Ignore(q => q.Notes);
             modelBuilder.Entity<Quote>().Ignore(q => q.Attachments);
             modelBuilder.Entity<Quote>().Ignore(q => q.UWWriteup);
+            modelBuilder.Entity<ProgramConfiguration>().Ignore(p => p.ProgramCarriers);
+            modelBuilder.Entity<ProgramConfiguration>().Ignore(p => p.GuidelineDocuments);
+            modelBuilder.Entity<ProgramConfiguration>().Ignore(p => p.GuidelineControls);
             modelBuilder.Entity<Policy>().Ignore(p => p.Submission);
             modelBuilder.Entity<Policy>().Ignore(p => p.BoundQuote);
             modelBuilder.Entity<Policy>().Ignore(p => p.Carrier);

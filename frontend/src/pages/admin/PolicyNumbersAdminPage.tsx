@@ -175,7 +175,7 @@ export function PolicyNumbersAdminPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[22px] font-semibold tracking-[-0.01em]" style={{ color: 'var(--ink)' }}>Policy Numbering</h1>
-          <p className="m-0 mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>Create reusable number sequences and assign them by carrier, line, and state.</p>
+          <p className="m-0 mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>Program validates the setup path; policy numbers assign by carrier, line, and state.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="sd-lob">{sequences.length} sequences</span>
