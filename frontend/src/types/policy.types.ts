@@ -353,6 +353,12 @@ export interface IssuePolicy {
   notes?: string
 }
 
+export interface MarkNonRenewal {
+  nonRenewedDate: string
+  reason: string
+  notes?: string
+}
+
 export interface NonRenewPolicy {
   nonRenewedDate: string
   reason?: string

@@ -13,7 +13,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
 import type { QuoteChecklistItem } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACTION_STATUS_PILL } from '@/types/policy.types'
-import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy, StartRewritePolicy } from '@/types/policy.types'
+import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, MarkNonRenewal, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy, StartRewritePolicy } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import type { Attachment, DocumentType } from '@/types/attachment.types'
 import { formatCurrency } from '@/lib/utils'
@@ -45,7 +45,8 @@ export function PolicyDetailPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [editSubject, setEditSubject] = useState('')
   const [editBody, setEditBody] = useState('')
-  const [actionModal, setActionModal] = useState<'endorse' | 'cancel' | 'nonRenew' | 'reinstate' | 'rewrite' | null>(null)
+  const [actionModal, setActionModal] = useState<'endorse' | 'cancel' | 'markNonRenew' | 'reinstate' | 'rewrite' | null>(null)
+  const [nonRenewalNoticeTransactionId, setNonRenewalNoticeTransactionId] = useState<string | null>(null)
 
   const { data: policy, isLoading } = useQuery({
     queryKey: ['policies', id],
@@ -166,11 +167,22 @@ export function PolicyDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Cancellation notice could not be issued'),
   })
 
+  const markNonRenewalMutation = useMutation({
+    mutationFn: (data: MarkNonRenewal) => policiesApi.markForNonRenewal(id!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', id] })
+      setActionModal(null)
+      toast.success('Policy marked for non-renewal')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy could not be marked for non-renewal'),
+  })
+
   const nonRenewMutation = useMutation({
     mutationFn: (data: NonRenewPolicy) => policiesApi.nonRenew(id!, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', id] })
       setActionModal(null)
+      setNonRenewalNoticeTransactionId(null)
       toast.success('Non-renewal notice issued')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Non-renewal notice could not be issued'),
@@ -278,6 +290,10 @@ export function PolicyDetailPage() {
   const issueChecklist = policyChecklist.filter((item) => item.stage === 'Issue')
   const postBindChecklist = policyChecklist.filter((item) => item.stage === 'PostBind')
   const postBindBlockedReason = formatRequiredChecklistBlockers(postBindChecklist, 'post-bind')
+  const hasPendingNonRenewalNotice = policy.transactions.some((t) =>
+    t.transactionType === 'NonRenewal' && t.status === 'NoticePending'
+  )
+  const markNonRenewalBlockedReason = postBindBlockedReason ?? (hasPendingNonRenewalNotice ? 'A non-renewal notice is already pending.' : null)
 
   return (
     <div className="space-y-5 p-6">
@@ -328,12 +344,12 @@ export function PolicyDetailPage() {
           {policy.status === 'Active' && canCancelPolicies && (
             <>
               <button
-                onClick={() => !postBindBlockedReason && setActionModal('nonRenew')}
-                disabled={!!postBindBlockedReason}
-                title={postBindBlockedReason ?? 'Issue a non-renewal notice'}
+                onClick={() => !markNonRenewalBlockedReason && setActionModal('markNonRenew')}
+                disabled={!!markNonRenewalBlockedReason}
+                title={markNonRenewalBlockedReason ?? 'Mark this policy for non-renewal'}
                 className="sd-btn outline"
               >
-                <FileX2 className="h-3.5 w-3.5" /> Non-Renew
+                <FileX2 className="h-3.5 w-3.5" /> Mark Non-Renewal
               </button>
               <button
                 onClick={() => !postBindBlockedReason && setActionModal('cancel')}
@@ -424,13 +440,22 @@ export function PolicyDetailPage() {
         />
       )}
 
-      {actionModal === 'nonRenew' && (
+      {actionModal === 'markNonRenew' && (
+        <MarkNonRenewalModal
+          policy={policy}
+          saving={markNonRenewalMutation.isPending}
+          onClose={() => setActionModal(null)}
+          onSave={(data) => markNonRenewalMutation.mutate(data)}
+        />
+      )}
+
+      {nonRenewalNoticeTransactionId && (
         <NonRenewPolicyModal
           policy={policy}
           guidance={nonRenewalGuidance}
           templates={policyDocumentTemplates}
           saving={nonRenewMutation.isPending}
-          onClose={() => setActionModal(null)}
+          onClose={() => setNonRenewalNoticeTransactionId(null)}
           onSave={(data) => nonRenewMutation.mutate(data)}
         />
       )}
@@ -600,6 +625,7 @@ export function PolicyDetailPage() {
                   canCompleteCancellation={canCancelPolicies}
                   canCompleteRewrite={canEndorsePolicies}
                   postBindBlockedReason={postBindBlockedReason}
+                  onIssueNonRenewalNotice={() => setNonRenewalNoticeTransactionId(t.id)}
                 />
               ))}
             </tbody>
@@ -994,6 +1020,7 @@ function TransactionRows({
   canCompleteCancellation,
   canCompleteRewrite,
   postBindBlockedReason,
+  onIssueNonRenewalNotice,
 }: {
   transaction: PolicyTransaction
   policyDocumentEntityId: string
@@ -1001,6 +1028,7 @@ function TransactionRows({
   canCompleteCancellation: boolean
   canCompleteRewrite: boolean
   postBindBlockedReason: string | null
+  onIssueNonRenewalNotice: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const qc = useQueryClient()
@@ -1017,6 +1045,9 @@ function TransactionRows({
     t.transactionType === 'NonRenewal' &&
     hasCompletableStatus
   const canComplete = canCompleteCancellationTransaction || canCompleteNonRenewal
+  const canIssueNonRenewalNotice = canCompleteCancellation &&
+    t.transactionType === 'NonRenewal' &&
+    t.status === 'NoticePending'
   const completeCancellation = useMutation({
     mutationFn: () => policiesApi.completeCancellation(t.policyId, t.id, {
       completedDate: new Date().toISOString().slice(0, 10),
@@ -1061,6 +1092,22 @@ function TransactionRows({
         <td>
           <div className="flex flex-wrap items-center gap-2">
             <span>{t.processedByName}</span>
+            {canIssueNonRenewalNotice && (
+              <button
+                type="button"
+                className="sd-btn outline sm"
+                disabled={!!postBindBlockedReason}
+                title={postBindBlockedReason ?? 'Issue the non-renewal notice'}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  if (!postBindBlockedReason) {
+                    onIssueNonRenewalNotice()
+                  }
+                }}
+              >
+                <Send className="h-3.5 w-3.5" /> Issue Notice
+              </button>
+            )}
             {canComplete && (
               <button
                 type="button"
@@ -2171,6 +2218,48 @@ function CancelPolicyModal({
           <ModalActions saving={saving} disabled={!selectedReason || !requiredInputsComplete} onClose={onClose} submitLabel="Issue Notice" danger />
         </div>
         <LegalGuidancePanel guidance={guidance} mode="Cancellation" />
+      </form>
+    </ActionModal>
+  )
+}
+
+function MarkNonRenewalModal({
+  policy,
+  saving,
+  onClose,
+  onSave,
+}: {
+  policy: Policy
+  saving: boolean
+  onClose: () => void
+  onSave: (data: MarkNonRenewal) => void
+}) {
+  const [nonRenewedDate, setNonRenewedDate] = useState(toDateInput(policy.expirationDate))
+  const [reason, setReason] = useState('')
+  const [notes, setNotes] = useState('')
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    onSave({
+      nonRenewedDate,
+      reason: reason.trim(),
+      notes: notes.trim() || undefined,
+    })
+  }
+
+  return (
+    <ActionModal title="Mark for Non-Renewal" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Non-Renewal Effective Date">
+          <input type="date" required value={nonRenewedDate} onChange={(e) => setNonRenewedDate(e.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Reason">
+          <textarea required rows={5} value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
+        </Field>
+        <Field label="Notes">
+          <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
+        </Field>
+        <ModalActions saving={saving} disabled={!reason.trim()} onClose={onClose} submitLabel="Mark" />
       </form>
     </ActionModal>
   )
