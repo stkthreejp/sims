@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Bordereaux;
@@ -13,6 +14,10 @@ namespace SIMS.Application.Services;
 public class BordereauxService : IBordereauxService
 {
     private readonly DbContext _db;
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     public BordereauxService(DbContext db) => _db = db;
 
@@ -143,6 +148,67 @@ public class BordereauxService : IBordereauxService
             previewRows.Sum(r => r.NetDueCarrier)));
     }
 
+    public async Task<Result<BordereauxRunDto>> CreatePremiumRunSnapshotAsync(
+        Guid profileId,
+        DateOnly periodStart,
+        DateOnly periodEnd,
+        Guid? generatedById,
+        CancellationToken ct = default)
+    {
+        var preview = await GetPremiumPreviewAsync(profileId, periodStart, periodEnd, ct);
+        if (!preview.IsSuccess)
+            return Result<BordereauxRunDto>.Failure(preview.ErrorCode!, preview.ErrorMessage!);
+
+        var profile = await BaseProfileQuery()
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == profileId, ct);
+        var nextRunNumber = await _db.Set<BordereauxRun>()
+            .Where(r => r.BordereauxProfileId == profileId
+                && r.PeriodStart == periodStart
+                && r.PeriodEnd == periodEnd)
+            .Select(r => (int?)r.RunNumber)
+            .MaxAsync(ct) ?? 0;
+
+        var rowCount = preview.Value!.Rows.Count;
+        var run = new BordereauxRun
+        {
+            BordereauxProfileId = profileId,
+            RunNumber = nextRunNumber + 1,
+            PeriodStart = periodStart,
+            PeriodEnd = periodEnd,
+            Status = BordereauxRunStatus.Draft,
+            ReconciliationStatus = BordereauxReconciliationStatus.NotRun,
+            GeneratedById = generatedById,
+            BordereauxRowCount = rowCount,
+            AccountCurrentRowCount = profile.RequiresAccountCurrent ? rowCount : 0,
+            DetailRowCountsJson = JsonSerializer.Serialize(new
+            {
+                premiumRows = rowCount,
+            }, SnapshotJsonOptions),
+            ValidationSummaryJson = JsonSerializer.Serialize(new
+            {
+                status = "not_run",
+                errors = 0,
+                warnings = 0,
+            }, SnapshotJsonOptions),
+            ReconciliationSummaryJson = JsonSerializer.Serialize(new
+            {
+                status = "not_run",
+                preview.Value.GrossPremiumTotal,
+                preview.Value.GrossCommissionTotal,
+                preview.Value.FeesTotal,
+                preview.Value.NetDueCarrierTotal,
+            }, SnapshotJsonOptions),
+            ProfileSnapshotJson = JsonSerializer.Serialize(Map(profile), SnapshotJsonOptions),
+            SourceRowsSnapshotJson = JsonSerializer.Serialize(preview.Value.Rows, SnapshotJsonOptions),
+        };
+
+        _db.Set<BordereauxRun>().Add(run);
+        await _db.SaveChangesAsync(ct);
+
+        return Result<BordereauxRunDto>.Success(MapRun(run, profile.Name));
+    }
+
     private IQueryable<BordereauxProfile> BaseProfileQuery()
         => _db.Set<BordereauxProfile>()
             .Where(p => !p.IsDeleted)
@@ -261,6 +327,25 @@ public class BordereauxService : IBordereauxService
         p.ValidationRulesJson,
         p.IncludedTransactionTypesJson,
         p.Notes);
+
+    private static BordereauxRunDto MapRun(BordereauxRun run, string profileName) => new(
+        run.Id,
+        run.BordereauxProfileId,
+        profileName,
+        run.RunNumber,
+        run.PeriodStart,
+        run.PeriodEnd,
+        run.Status,
+        run.ReconciliationStatus,
+        run.GeneratedById,
+        run.GeneratedAt,
+        run.BordereauxRowCount,
+        run.AccountCurrentRowCount,
+        run.DetailRowCountsJson,
+        run.ValidationSummaryJson,
+        run.ReconciliationSummaryJson,
+        run.ProfileSnapshotJson,
+        run.SourceRowsSnapshotJson);
 
     private static BordereauxPremiumPreviewRowDto BuildPreviewRow(Invoice invoice, PolicyTransaction transaction, BordereauxProfile profile)
     {

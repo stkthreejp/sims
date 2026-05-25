@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SIMS.Application.DTOs.Bordereaux;
@@ -13,6 +14,7 @@ namespace SIMS.API.Controllers.Admin;
 public class BordereauxProfilesController : ControllerBase
 {
     private readonly IBordereauxService _service;
+    private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     public BordereauxProfilesController(IBordereauxService service) => _service = service;
 
@@ -41,6 +43,21 @@ public class BordereauxProfilesController : ControllerBase
         CancellationToken ct)
     {
         var result = await _service.GetPremiumPreviewAsync(id, periodStart, periodEnd, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        return result.ErrorCode is "PROFILE_NOT_FOUND"
+            ? NotFound(new { result.ErrorCode, result.ErrorMessage })
+            : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPost("{id:guid}/premium-runs")]
+    public async Task<IActionResult> CreatePremiumRunSnapshot(
+        Guid id,
+        [FromBody] CreatePremiumBordereauxRunRequest request,
+        CancellationToken ct)
+    {
+        var result = await _service.CreatePremiumRunSnapshotAsync(id, request.PeriodStart, request.PeriodEnd, CurrentUserId, ct);
         if (result.IsSuccess)
             return Ok(result.Value);
 

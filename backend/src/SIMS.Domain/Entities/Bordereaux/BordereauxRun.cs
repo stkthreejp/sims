@@ -5,6 +5,7 @@ namespace SIMS.Domain.Entities.Bordereaux;
 public class BordereauxRun : BaseEntity
 {
     public Guid BordereauxProfileId { get; set; }
+    public int RunNumber { get; set; } = 1;
     public DateOnly PeriodStart { get; set; }
     public DateOnly PeriodEnd { get; set; }
     public BordereauxRunStatus Status { get; set; } = BordereauxRunStatus.Draft;
@@ -22,6 +23,8 @@ public class BordereauxRun : BaseEntity
     public string DetailRowCountsJson { get; set; } = "{}";
     public string ValidationSummaryJson { get; set; } = "{}";
     public string ReconciliationSummaryJson { get; set; } = "{}";
+    public string ProfileSnapshotJson { get; set; } = "{}";
+    public string SourceRowsSnapshotJson { get; set; } = "[]";
 
     public BordereauxProfile Profile { get; set; } = null!;
     public User? GeneratedBy { get; set; }

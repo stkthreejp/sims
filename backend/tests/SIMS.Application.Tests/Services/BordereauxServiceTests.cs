@@ -191,6 +191,64 @@ public class BordereauxServiceTests
         Assert.Equal(1088.25m, preview.Value.NetDueCarrierTotal);
     }
 
+    [Fact]
+    public async Task CreatePremiumRunSnapshotAsync_FreezesProfileAndPremiumRows()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            StaticValuesJson = """{"umr":"BRACE-SMM-2025-LOGGING"}""",
+        });
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: Guid.NewGuid());
+
+        Assert.True(run.IsSuccess);
+        Assert.Equal(1, run.Value!.RunNumber);
+        Assert.Equal(1, run.Value.BordereauxRowCount);
+        Assert.Contains("BRACE-SMM-2025-LOGGING", run.Value.ProfileSnapshotJson);
+        Assert.Contains("LL-GL-000145-00", run.Value.SourceRowsSnapshotJson);
+        Assert.Contains("1451", run.Value.SourceRowsSnapshotJson);
+
+        var savedProfile = await db.Set<SIMS.Domain.Entities.Bordereaux.BordereauxProfile>().SingleAsync();
+        savedProfile.StaticValuesJson = """{"umr":"CHANGED"}""";
+        var savedInvoice = await db.Set<Invoice>().SingleAsync();
+        savedInvoice.GrossPremium = 999m;
+        await db.SaveChangesAsync();
+
+        var savedRun = await db.Set<SIMS.Domain.Entities.Bordereaux.BordereauxRun>().SingleAsync();
+        Assert.Contains("BRACE-SMM-2025-LOGGING", savedRun.ProfileSnapshotJson);
+        Assert.DoesNotContain("CHANGED", savedRun.ProfileSnapshotJson);
+        Assert.Contains("1451", savedRun.SourceRowsSnapshotJson);
+        Assert.DoesNotContain("999", savedRun.SourceRowsSnapshotJson);
+    }
+
+    [Fact]
+    public async Task CreatePremiumRunSnapshotAsync_CreatesNextRunNumberWithoutOverwritingPriorRun()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+
+        var firstRun = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+        var invoice = await db.Set<Invoice>().SingleAsync();
+        invoice.GrossPremium = 999m;
+        await db.SaveChangesAsync();
+        var secondRun = await service.CreatePremiumRunSnapshotAsync(profile.Value.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        Assert.True(firstRun.IsSuccess);
+        Assert.True(secondRun.IsSuccess);
+        Assert.Equal(1, firstRun.Value!.RunNumber);
+        Assert.Equal(2, secondRun.Value!.RunNumber);
+        Assert.Equal(2, await db.Set<SIMS.Domain.Entities.Bordereaux.BordereauxRun>().CountAsync());
+        Assert.Contains("1451", firstRun.Value.SourceRowsSnapshotJson);
+        Assert.Contains("999", secondRun.Value.SourceRowsSnapshotJson);
+    }
+
     private static UpsertBordereauxProfileRequest ValidRequest(Guid programId, Guid carrierId) => new(
         Name: "BRACE London BDX",
         ProgramConfigurationId: programId,

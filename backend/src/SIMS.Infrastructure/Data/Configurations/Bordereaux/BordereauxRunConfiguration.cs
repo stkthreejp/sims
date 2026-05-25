@@ -10,6 +10,7 @@ public class BordereauxRunConfiguration : IEntityTypeConfiguration<BordereauxRun
     {
         builder.ToTable("bordereaux_runs");
 
+        builder.Property(x => x.RunNumber).HasDefaultValue(1);
         builder.Property(x => x.LondonBordereauxBlobPath).HasMaxLength(500);
         builder.Property(x => x.LondonBordereauxFileName).HasMaxLength(255);
         builder.Property(x => x.LondonBordereauxContentType).HasMaxLength(150);
@@ -19,8 +20,12 @@ public class BordereauxRunConfiguration : IEntityTypeConfiguration<BordereauxRun
         builder.Property(x => x.DetailRowCountsJson).HasColumnType("jsonb");
         builder.Property(x => x.ValidationSummaryJson).HasColumnType("jsonb");
         builder.Property(x => x.ReconciliationSummaryJson).HasColumnType("jsonb");
+        builder.Property(x => x.ProfileSnapshotJson).HasColumnType("jsonb").HasDefaultValue("{}");
+        builder.Property(x => x.SourceRowsSnapshotJson).HasColumnType("jsonb").HasDefaultValue("[]");
 
         builder.HasIndex(x => new { x.BordereauxProfileId, x.PeriodStart, x.PeriodEnd });
+        builder.HasIndex(x => new { x.BordereauxProfileId, x.PeriodStart, x.PeriodEnd, x.RunNumber })
+            .IsUnique();
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.ReconciliationStatus);
 

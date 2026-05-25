@@ -18,4 +18,5 @@ public interface IBordereauxService
     Task<Result<BordereauxProfileDto>> CreateProfileAsync(UpsertBordereauxProfileRequest request, CancellationToken ct = default);
     Task<Result<BordereauxProfileDto>> UpdateProfileAsync(Guid id, UpsertBordereauxProfileRequest request, CancellationToken ct = default);
     Task<Result<BordereauxPremiumPreviewDto>> GetPremiumPreviewAsync(Guid profileId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct = default);
+    Task<Result<BordereauxRunDto>> CreatePremiumRunSnapshotAsync(Guid profileId, DateOnly periodStart, DateOnly periodEnd, Guid? generatedById, CancellationToken ct = default);
 }
