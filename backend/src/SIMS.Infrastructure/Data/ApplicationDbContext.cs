@@ -1,5 +1,6 @@
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Entities.Bordereaux;
 using SIMS.Domain.Entities.Fmcsa;
 using SIMS.Domain.Entities.Rating;
 using Microsoft.AspNetCore.Identity;
@@ -34,6 +35,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<ProgramCarrier> ProgramCarriers => Set<ProgramCarrier>();
     public DbSet<ProgramCarrierLineOfBusiness> ProgramCarrierLinesOfBusiness => Set<ProgramCarrierLineOfBusiness>();
     public DbSet<ProgramCarrierLobState> ProgramCarrierLobStates => Set<ProgramCarrierLobState>();
+    public DbSet<BordereauxProfile> BordereauxProfiles => Set<BordereauxProfile>();
+    public DbSet<BordereauxRun> BordereauxRuns => Set<BordereauxRun>();
     public DbSet<UnderwritingGuidelineDocument> UnderwritingGuidelineDocuments => Set<UnderwritingGuidelineDocument>();
     public DbSet<UnderwritingGuidelineControl> UnderwritingGuidelineControls => Set<UnderwritingGuidelineControl>();
     public DbSet<UnderwritingGuidelineAuditLog> UnderwritingGuidelineAuditLogs => Set<UnderwritingGuidelineAuditLog>();
@@ -193,6 +196,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<ProgramCarrier>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ProgramCarrierLineOfBusiness>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ProgramCarrierLobState>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<BordereauxProfile>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<BordereauxRun>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineDocument>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineControl>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineAuditLog>().HasQueryFilter(e => !e.IsDeleted);
