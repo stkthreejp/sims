@@ -1835,7 +1835,8 @@ public class PolicyLifecycleRegressionTests
             fixture.Policy.Id,
             rewriteTransaction.Id,
             new CompleteRewritePolicyDto { CompletedDate = new DateOnly(2026, 8, 1), Notes = "Replacement policy bound." },
-            UserAccessScope.All(fixture.UserId));
+            UserAccessScope.All(fixture.UserId),
+            [AppPermissions.UnderwritingAuthorityApprove]);
 
         Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
         Assert.Equal(PolicyStatus.Renewed, fixture.Policy.Status);
@@ -1856,6 +1857,81 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(replacementPolicy.Id, artifacts.Value!.Transaction.RewriteDetail?.ReplacementPolicyId);
         Assert.Equal(replacementQuote.QuoteNumber, artifacts.Value.Transaction.RewriteDetail?.ReplacementQuoteNumber);
         Assert.Equal(replacementPolicy.PolicyNumber, artifacts.Value.Transaction.RewriteDetail?.ReplacementPolicyNumber);
+    }
+
+    [Fact]
+    public async Task CompleteRewrite_RequiresAuthorityApproval()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var quotes = new RecordingQuoteService(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService(), quoteService: quotes);
+        var rewrite = await policyService.StartRewriteAsync(fixture.Policy.Id, new StartRewritePolicyDto
+        {
+            EffectiveDate = new DateOnly(2026, 8, 1),
+            Reason = "Carrier requested new paper",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(rewrite.IsSuccess);
+        var rewriteTransaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.Rewrite);
+        var replacementQuote = await db.Set<Quote>().SingleAsync(q => q.Id == rewriteTransaction.RenewalQuoteId);
+        replacementQuote.Status = QuoteStatus.Bound;
+        replacementQuote.PolicyNumber = "POL-REWRITE-1";
+        replacementQuote.BoundDate = new DateOnly(2026, 8, 1);
+        var replacementPolicy = new Policy
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumber = "POL-REWRITE-1",
+            SubmissionId = fixture.Policy.SubmissionId,
+            Submission = fixture.Policy.Submission,
+            BoundQuoteId = replacementQuote.Id,
+            BoundQuote = replacementQuote,
+            CarrierId = fixture.Policy.CarrierId,
+            Carrier = fixture.Policy.Carrier,
+            LineOfBusiness = fixture.Policy.LineOfBusiness,
+            EffectiveDate = replacementQuote.EffectiveDate,
+            ExpirationDate = replacementQuote.ExpirationDate,
+            PremiumAmount = replacementQuote.PremiumAmount,
+            TaxesAndFees = replacementQuote.TaxesAndFees,
+            TotalPremium = replacementQuote.TotalPremium,
+            Status = PolicyStatus.Active,
+            BoundDate = replacementQuote.BoundDate.Value,
+        };
+        db.Add(replacementPolicy);
+        await db.SaveChangesAsync();
+
+        var blocked = await policyService.CompleteRewriteAsync(
+            fixture.Policy.Id,
+            rewriteTransaction.Id,
+            new CompleteRewritePolicyDto { CompletedDate = new DateOnly(2026, 8, 1), Notes = "Replacement policy bound." },
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.False(blocked.IsSuccess);
+        Assert.Equal("AUTHORITY_APPROVAL_REQUIRED", blocked.ErrorCode);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Equal(PolicyTransactionStatus.Submitted, rewriteTransaction.Status);
+        var approval = await db.Set<AuthorityApprovalRequest>().SingleAsync();
+        Assert.Equal(AuthorityApprovalTargetType.PolicyTransaction, approval.TargetType);
+        Assert.Equal(rewriteTransaction.Id, approval.TargetId);
+        Assert.Equal("policy.rewrite.complete", approval.ActionCode);
+        Assert.Equal("Complete policy rewrite", approval.ActionLabel);
+        Assert.Equal("PolicyRewriteCompletion", approval.ApprovalType);
+        Assert.Equal(AuthorityApprovalStatus.Pending, approval.Status);
+        Assert.Contains("rewrite", approval.Reason, StringComparison.OrdinalIgnoreCase);
+
+        approval.Status = AuthorityApprovalStatus.Approved;
+        approval.DecisionById = Guid.NewGuid();
+        approval.DecisionAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var completed = await policyService.CompleteRewriteAsync(
+            fixture.Policy.Id,
+            rewriteTransaction.Id,
+            new CompleteRewritePolicyDto { CompletedDate = new DateOnly(2026, 8, 1), Notes = "Replacement policy bound." },
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.True(completed.IsSuccess, $"{completed.ErrorCode}: {completed.ErrorMessage}");
+        Assert.Equal(PolicyStatus.Renewed, fixture.Policy.Status);
+        Assert.Equal(PolicyTransactionStatus.Completed, rewriteTransaction.Status);
     }
 
     [Fact]

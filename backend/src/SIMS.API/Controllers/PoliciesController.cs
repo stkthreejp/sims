@@ -207,8 +207,12 @@ public class PoliciesController : ControllerBase
     [Authorize(Policy = AppPermissions.PoliciesEndorse)]
     public async Task<IActionResult> CompleteRewrite(Guid id, Guid txnId, [FromBody] CompleteRewritePolicyDto dto)
     {
-        var result = await _policies.CompleteRewriteAsync(id, txnId, dto, CurrentAccess);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        var result = await _policies.CompleteRewriteAsync(id, txnId, dto, CurrentAccess, User.PermissionNames());
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : result.ErrorCode == "AUTHORITY_APPROVAL_REQUIRED"
+                ? StatusCode(StatusCodes.Status403Forbidden, new { result.ErrorCode, result.ErrorMessage })
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     // --- Non-renewal ---

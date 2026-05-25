@@ -1269,7 +1269,12 @@ public class PolicyService : IPolicyService
         return Result<PolicyTransactionDto>.Success(MapToTransactionDto(transaction));
     }
 
-    public async Task<Result<PolicyDto>> CompleteRewriteAsync(Guid policyId, Guid transactionId, CompleteRewritePolicyDto dto, UserAccessScope access)
+    public async Task<Result<PolicyDto>> CompleteRewriteAsync(
+        Guid policyId,
+        Guid transactionId,
+        CompleteRewritePolicyDto dto,
+        UserAccessScope access,
+        IReadOnlyCollection<string>? currentUserPermissions = null)
     {
         var db = Db;
         var policy = await db.Set<Policy>()
@@ -1312,6 +1317,9 @@ public class PolicyService : IPolicyService
             return Result<PolicyDto>.Failure("REPLACEMENT_POLICY_NOT_ACTIVE", "Replacement policy must be active and bound before completing the rewrite.");
         if (replacementPolicy.Id == policy.Id)
             return Result<PolicyDto>.Failure("INVALID_REPLACEMENT_POLICY", "Replacement policy cannot be the source policy.");
+        var authorityGate = await EnsureRewriteCompletionAuthorityAsync(policy, transaction, replacementPolicy, dto, access.UserId, currentUserPermissions ?? Array.Empty<string>());
+        if (!authorityGate.IsSuccess)
+            return Result<PolicyDto>.Failure(authorityGate.ErrorCode!, authorityGate.ErrorMessage!);
 
         await using var dbTransaction = await db.Database.BeginTransactionAsync();
 
@@ -2031,6 +2039,48 @@ public class PolicyService : IPolicyService
                     policy.CancelledDate,
                     dto.ReinstatedDate,
                     Reason = dto.Reason.Trim()
+                }),
+                null),
+            currentUserPermissions,
+            currentUserId);
+
+        return authority.Allowed
+            ? Result.Success()
+            : Result.Failure("AUTHORITY_APPROVAL_REQUIRED", authority.Message);
+    }
+
+    private async Task<Result> EnsureRewriteCompletionAuthorityAsync(
+        Policy sourcePolicy,
+        PolicyTransaction transaction,
+        Policy replacementPolicy,
+        CompleteRewritePolicyDto dto,
+        Guid currentUserId,
+        IReadOnlyCollection<string> currentUserPermissions)
+    {
+        var authorityApproval = (IAuthorityApprovalService?)_sp.GetService(typeof(IAuthorityApprovalService));
+        if (authorityApproval == null)
+            return Result.Success();
+
+        var authority = await authorityApproval.EvaluateAsync(
+            new AuthorityApprovalEvaluationRequest(
+                AuthorityApprovalTargetType.PolicyTransaction,
+                transaction.Id,
+                "policy.rewrite.complete",
+                "Complete policy rewrite",
+                AppPermissions.UnderwritingAuthorityApprove,
+                "PolicyRewriteCompletion",
+                "Completing a policy rewrite requires underwriting authority approval.",
+                JsonSerializer.Serialize(new
+                {
+                    SourcePolicyId = sourcePolicy.Id,
+                    SourcePolicyNumber = sourcePolicy.PolicyNumber,
+                    RewriteTransactionId = transaction.Id,
+                    transaction.TransactionNumber,
+                    transaction.EffectiveDate,
+                    dto.CompletedDate,
+                    ReplacementPolicyId = replacementPolicy.Id,
+                    ReplacementPolicyNumber = replacementPolicy.PolicyNumber,
+                    ReplacementQuoteId = replacementPolicy.BoundQuoteId
                 }),
                 null),
             currentUserPermissions,
