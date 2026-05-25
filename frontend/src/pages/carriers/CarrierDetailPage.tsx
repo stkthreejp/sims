@@ -503,6 +503,17 @@ export function CarrierDetailPage() {
   if (!carrier) return <EmptyState icon={ShieldCheck} title="Carrier not found" description="The requested carrier record could not be loaded." />
 
   const address = [carrier.addressLine1, carrier.addressLine2, [carrier.city, carrier.state].filter(Boolean).join(', '), carrier.zipCode].filter(Boolean).join(' ')
+  const ratingProgramOptions = programs.filter((program) =>
+    program.id === ratingForm.programConfigurationId ||
+    program.carriers.some((programCarrier) => programCarrier.carrierId === carrier.id && programCarrier.isActive)
+  )
+  const selectedRatingProgram = programs.find((program) => program.id === ratingForm.programConfigurationId)
+  const selectedRatingProgramCarrier = selectedRatingProgram?.carriers.find((programCarrier) => programCarrier.carrierId === carrier.id && programCarrier.isActive)
+  const ratingLobOptions = ratingForm.programConfigurationId
+    ? Array.from(new Set((selectedRatingProgramCarrier?.linesOfBusiness ?? [])
+        .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
+        .map((lob) => lob.lineOfBusiness)))
+    : carrier.linesOfBusiness
 
   return (
     <div className="space-y-5">
@@ -1153,12 +1164,15 @@ export function CarrierDetailPage() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Program</label>
                 <select
                   value={ratingForm.programConfigurationId}
-                  onChange={(e) => setRatingForm({ ...ratingForm, programConfigurationId: e.target.value })}
+                  onChange={(e) => {
+                    setRatingForm({ ...ratingForm, programConfigurationId: e.target.value, lineOfBusiness: '', ratingPlanVersionId: '' })
+                    setRatingPickerLob(null)
+                  }}
                   disabled={!!editingAssignmentId}
                   className="sims-select disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   <option value="">Any program</option>
-                  {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                  {ratingProgramOptions.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
                 </select>
               </div>
 
@@ -1175,10 +1189,13 @@ export function CarrierDetailPage() {
                   className="sims-select disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   <option value="">Select a line of business…</option>
-                  {carrier.linesOfBusiness.map((lob) => (
+                  {ratingLobOptions.map((lob) => (
                     <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
                   ))}
                 </select>
+                {ratingForm.programConfigurationId && ratingLobOptions.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">This carrier has no active lines configured under the selected program.</p>
+                )}
               </div>
 
               <div>

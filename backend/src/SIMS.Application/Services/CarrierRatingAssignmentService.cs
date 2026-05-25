@@ -83,6 +83,16 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
                 .FirstOrDefaultAsync(p => p.Id == dto.ProgramConfigurationId.Value && p.IsActive, ct);
             if (program == null)
                 return Result<CarrierRatingAssignmentDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+
+            var pathExists = await ProgramCarrierLobPathExistsAsync(
+                dto.ProgramConfigurationId.Value,
+                dto.CarrierId,
+                dto.LineOfBusiness,
+                version.EffectiveDate,
+                ct);
+            if (!pathExists)
+                return Result<CarrierRatingAssignmentDto>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                    "Selected carrier and line of business are not active for this program.");
         }
 
         var exists = await db.Set<CarrierRatingAssignment>()
@@ -211,6 +221,26 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
             EffectiveDate = v.EffectiveDate,
             Lob = v.RatingPlan.LineOfBusiness,
         }).ToList();
+    }
+
+    private async Task<bool> ProgramCarrierLobPathExistsAsync(
+        Guid programConfigurationId,
+        Guid carrierId,
+        PolicyLineOfBusiness lineOfBusiness,
+        DateOnly effectiveDate,
+        CancellationToken ct)
+    {
+        return await Db.Set<ProgramCarrierLineOfBusiness>()
+            .AnyAsync(l =>
+                l.LineOfBusiness == lineOfBusiness &&
+                l.IsActive &&
+                l.EffectiveDate <= effectiveDate &&
+                (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate) &&
+                l.ProgramCarrier.IsActive &&
+                l.ProgramCarrier.CarrierId == carrierId &&
+                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
+                l.ProgramCarrier.EffectiveDate <= effectiveDate &&
+                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate), ct);
     }
 
     private static CarrierRatingAssignmentDto ToDto(CarrierRatingAssignment a) => new()

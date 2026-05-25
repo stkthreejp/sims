@@ -74,6 +74,68 @@ public class CarrierRatingAssignmentProgramScopeTests
         Assert.Null(result.ProgramConfigurationId);
     }
 
+    [Fact]
+    public async Task CreateAsync_RejectsProgramSpecificAssignmentWhenCarrierLobIsNotConfiguredForProgram()
+    {
+        await using var db = CreateDb();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var version = CreateVersion("Longleaf GL", PolicyLineOfBusiness.GeneralLiability);
+
+        db.AddRange(carrier, program, version.RatingPlan, version);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreateAsync(new()
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            RatingPlanVersionId = version.Id,
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AllowsProgramSpecificAssignmentWhenCarrierLobIsConfiguredForProgram()
+    {
+        await using var db = CreateDb();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var version = CreateVersion("Longleaf GL", PolicyLineOfBusiness.GeneralLiability);
+        var programCarrier = new ProgramCarrier
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            LinesOfBusiness =
+            {
+                new ProgramCarrierLineOfBusiness
+                {
+                    LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+                    IsActive = true,
+                    EffectiveDate = new DateOnly(2026, 1, 1),
+                },
+            },
+        };
+
+        db.AddRange(carrier, program, version.RatingPlan, version, programCarrier);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreateAsync(new()
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            RatingPlanVersionId = version.Id,
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
+    }
+
     private static RatingPlanVersion CreateVersion(string planName, PolicyLineOfBusiness lob = PolicyLineOfBusiness.InlandMarine)
     {
         var plan = new RatingPlan
