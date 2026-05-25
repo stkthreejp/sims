@@ -26,7 +26,7 @@ const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','
 type View = 'list' | 'versions' | 'edit-version' | 'new-version'
 type AdminTab = 'fees' | 'premium-charges'
 
-type VersionForm = Omit<FeeRuleVersion, 'id' | 'feeCode' | 'feeDisplayName'>
+type VersionForm = Omit<FeeRuleVersion, 'id' | 'feeCode' | 'feeDisplayName' | 'programName'>
 
 const EMPTY: VersionForm = {
   feeDefinitionId: 0,

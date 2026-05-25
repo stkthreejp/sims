@@ -19,8 +19,6 @@ export interface ProgramCarrier {
   isActive: boolean
   effectiveDate: string
   expirationDate: string | null
-  billingMode: string | null
-  paymentTermsDays: number | null
   notes: string | null
   linesOfBusiness: ProgramCarrierLineOfBusiness[]
 }
@@ -34,6 +32,8 @@ export interface ProgramCarrierLineOfBusiness {
   effectiveDate: string
   expirationDate: string | null
   notes: string | null
+  billingMode: string | null
+  paymentTermsDays: number | null
   states: ProgramCarrierLobState[]
 }
 
@@ -59,8 +59,6 @@ export interface ProgramCarrierUpsert {
   isActive: boolean
   effectiveDate: string
   expirationDate?: string | null
-  billingMode?: string | null
-  paymentTermsDays?: number | null
   notes?: string | null
 }
 
@@ -69,6 +67,8 @@ export interface ProgramCarrierLineOfBusinessUpsert {
   isActive: boolean
   effectiveDate: string
   expirationDate?: string | null
+  billingMode?: string | null
+  paymentTermsDays?: number | null
   notes?: string | null
 }
 
