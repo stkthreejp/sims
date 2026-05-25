@@ -1356,7 +1356,11 @@ public class PolicyService : IPolicyService
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
 
-    public async Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access)
+    public async Task<Result<PolicyDto>> NonRenewAsync(
+        Guid policyId,
+        NonRenewPolicyDto dto,
+        UserAccessScope access,
+        IReadOnlyCollection<string>? currentUserPermissions = null)
     {
         var policy = await Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
@@ -1381,6 +1385,9 @@ public class PolicyService : IPolicyService
             return Result<PolicyDto>.Failure("INVALID_DATE", "Non-renewal date must be within the policy term.");
         if (dto.ComplianceChecklist.Any(i => !i.IsCompleted))
             return Result<PolicyDto>.Failure("COMPLIANCE_REVIEW_REQUIRED", "Complete the non-renewal compliance checklist before issuing notice.");
+        var authorityGate = await EnsureNonRenewalNoticeAuthorityAsync(policy, dto, access.UserId, currentUserPermissions ?? Array.Empty<string>());
+        if (!authorityGate.IsSuccess)
+            return Result<PolicyDto>.Failure(authorityGate.ErrorCode!, authorityGate.ErrorMessage!);
 
         var state = NormalizeState(policy.Submission?.Insured?.State);
         var legalRequirementIds = dto.LegalRequirementSectionIds
@@ -2081,6 +2088,47 @@ public class PolicyService : IPolicyService
                     ReplacementPolicyId = replacementPolicy.Id,
                     ReplacementPolicyNumber = replacementPolicy.PolicyNumber,
                     ReplacementQuoteId = replacementPolicy.BoundQuoteId
+                }),
+                null),
+            currentUserPermissions,
+            currentUserId);
+
+        return authority.Allowed
+            ? Result.Success()
+            : Result.Failure("AUTHORITY_APPROVAL_REQUIRED", authority.Message);
+    }
+
+    private async Task<Result> EnsureNonRenewalNoticeAuthorityAsync(
+        Policy policy,
+        NonRenewPolicyDto dto,
+        Guid currentUserId,
+        IReadOnlyCollection<string> currentUserPermissions)
+    {
+        var authorityApproval = (IAuthorityApprovalService?)_sp.GetService(typeof(IAuthorityApprovalService));
+        if (authorityApproval == null)
+            return Result.Success();
+
+        var authority = await authorityApproval.EvaluateAsync(
+            new AuthorityApprovalEvaluationRequest(
+                AuthorityApprovalTargetType.Policy,
+                policy.Id,
+                "policy.nonrenewal.issue-notice",
+                "Issue non-renewal notice",
+                AppPermissions.UnderwritingAuthorityApprove,
+                "PolicyNonRenewalNotice",
+                "Issuing a non-renewal notice requires underwriting authority approval.",
+                JsonSerializer.Serialize(new
+                {
+                    PolicyId = policy.Id,
+                    policy.PolicyNumber,
+                    policy.Status,
+                    policy.EffectiveDate,
+                    policy.ExpirationDate,
+                    dto.NonRenewedDate,
+                    dto.NoticeMailingDate,
+                    dto.NoticeRequirementDays,
+                    dto.MailingDays,
+                    Reason = dto.Reason?.Trim()
                 }),
                 null),
             currentUserPermissions,

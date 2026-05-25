@@ -221,8 +221,12 @@ public class PoliciesController : ControllerBase
     [Authorize(Policy = AppPermissions.PoliciesCancel)]
     public async Task<IActionResult> NonRenew(Guid id, [FromBody] NonRenewPolicyDto dto)
     {
-        var result = await _policies.NonRenewAsync(id, dto, CurrentAccess);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        var result = await _policies.NonRenewAsync(id, dto, CurrentAccess, User.PermissionNames());
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : result.ErrorCode == "AUTHORITY_APPROVAL_REQUIRED"
+                ? StatusCode(StatusCodes.Status403Forbidden, new { result.ErrorCode, result.ErrorMessage })
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpPost("{id:guid}/non-renewals/{txnId:guid}/complete")]

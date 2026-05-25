@@ -42,7 +42,11 @@ public interface IPolicyService
         CompleteRewritePolicyDto dto,
         UserAccessScope access,
         IReadOnlyCollection<string>? currentUserPermissions = null);
-    Task<Result<PolicyDto>> NonRenewAsync(Guid policyId, NonRenewPolicyDto dto, UserAccessScope access);
+    Task<Result<PolicyDto>> NonRenewAsync(
+        Guid policyId,
+        NonRenewPolicyDto dto,
+        UserAccessScope access,
+        IReadOnlyCollection<string>? currentUserPermissions = null);
     Task<Result<PolicyDto>> CompleteNonRenewalAsync(Guid policyId, Guid transactionId, CompleteNonRenewalDto dto, UserAccessScope access);
     Task<Result<LegalComplianceGuidanceDto>> GetCancellationGuidanceAsync(Guid policyId, UserAccessScope access);
     Task<Result<LegalComplianceGuidanceDto>> GetNonRenewalGuidanceAsync(Guid policyId, UserAccessScope access);

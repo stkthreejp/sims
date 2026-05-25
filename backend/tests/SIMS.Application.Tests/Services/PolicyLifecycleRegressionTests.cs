@@ -1964,7 +1964,7 @@ public class PolicyLifecycleRegressionTests
             MailingDays = 3,
             Method = "Certified Mail",
             NoticeTemplateId = template.Id,
-        }, UserAccessScope.All(fixture.UserId));
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
@@ -1999,6 +1999,56 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(
             new[] { "policy.transaction.created", "policy.transaction.notice_sent" },
             history.Select(h => h.EventName).ToArray());
+    }
+
+    [Fact]
+    public async Task NonRenewal_RequiresAuthorityApprovalBeforeNoticeIssued()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var blocked = await policyService.NonRenewAsync(fixture.Policy.Id, new NonRenewPolicyDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+            NoticeMailingDate = new DateOnly(2026, 11, 1),
+            NoticeRequirementDays = 45,
+            MailingDays = 3,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(blocked.IsSuccess);
+        Assert.Equal("AUTHORITY_APPROVAL_REQUIRED", blocked.ErrorCode);
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Empty(await db.Set<PolicyTransaction>().Where(t => t.TransactionType == TransactionType.NonRenewal).ToListAsync());
+        var approval = await db.Set<AuthorityApprovalRequest>().SingleAsync();
+        Assert.Equal(AuthorityApprovalTargetType.Policy, approval.TargetType);
+        Assert.Equal(fixture.Policy.Id, approval.TargetId);
+        Assert.Equal("policy.nonrenewal.issue-notice", approval.ActionCode);
+        Assert.Equal("Issue non-renewal notice", approval.ActionLabel);
+        Assert.Equal("PolicyNonRenewalNotice", approval.ApprovalType);
+        Assert.Equal(AuthorityApprovalStatus.Pending, approval.Status);
+        Assert.Contains("non-renewal", approval.Reason, StringComparison.OrdinalIgnoreCase);
+
+        approval.Status = AuthorityApprovalStatus.Approved;
+        approval.DecisionById = Guid.NewGuid();
+        approval.DecisionAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var issued = await policyService.NonRenewAsync(fixture.Policy.Id, new NonRenewPolicyDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+            NoticeMailingDate = new DateOnly(2026, 11, 1),
+            NoticeRequirementDays = 45,
+            MailingDays = 3,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(issued.IsSuccess, $"{issued.ErrorCode}: {issued.ErrorMessage}");
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
+        Assert.Equal(PolicyTransactionStatus.NoticeSent, transaction.Status);
     }
 
     [Fact]
@@ -2040,7 +2090,7 @@ public class PolicyLifecycleRegressionTests
                 }
             ],
             LegalRequirementSectionIds = [requirement.Id],
-        }, UserAccessScope.All(fixture.UserId));
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
 
         Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
         var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
@@ -2083,7 +2133,7 @@ public class PolicyLifecycleRegressionTests
             NoticeRequirementDays = 45,
             MailingDays = 3,
             Method = "Certified Mail",
-        }, UserAccessScope.All(fixture.UserId));
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
         Assert.True(notice.IsSuccess);
 
         var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
@@ -2113,7 +2163,7 @@ public class PolicyLifecycleRegressionTests
             NoticeRequirementDays = 45,
             MailingDays = 3,
             Method = "Certified Mail",
-        }, UserAccessScope.All(fixture.UserId));
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
         Assert.True(notice.IsSuccess);
 
         var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
