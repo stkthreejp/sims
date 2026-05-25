@@ -158,7 +158,36 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
             return Result.Failure("VALIDATION", "Select a valid carrier.");
         if (!string.IsNullOrWhiteSpace(dto.State) && dto.State.Trim().Length != 2)
             return Result.Failure("VALIDATION", "State must be blank or a two-letter code.");
+        if (dto.ProgramConfigurationId.HasValue)
+        {
+            var pathExists = await ProgramAssignmentPathExistsAsync(
+                dto.ProgramConfigurationId.Value,
+                dto.CarrierId,
+                dto.LineOfBusiness,
+                dto.State);
+            if (!pathExists)
+                return Result.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and state are not active for this program.");
+        }
         return Result.Success();
+    }
+
+    private async Task<bool> ProgramAssignmentPathExistsAsync(Guid programConfigurationId, Guid carrierId, PolicyLineOfBusiness lineOfBusiness, string? state)
+    {
+        var stateCode = string.IsNullOrWhiteSpace(state) ? null : state.Trim().ToUpperInvariant();
+        var query = _db.Set<ProgramCarrierLineOfBusiness>()
+            .Where(l =>
+                l.LineOfBusiness == lineOfBusiness &&
+                l.IsActive &&
+                l.ProgramCarrier.IsActive &&
+                l.ProgramCarrier.CarrierId == carrierId &&
+                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId);
+
+        if (stateCode != null)
+        {
+            query = query.Where(l => l.States.Any(s => s.StateCode == stateCode && s.IsActive));
+        }
+
+        return await query.AnyAsync();
     }
 
     private static void ApplySequence(PolicyNumberSequence sequence, PolicyNumberSequenceUpsertDto dto)

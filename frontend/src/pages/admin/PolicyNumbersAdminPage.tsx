@@ -57,6 +57,20 @@ export function PolicyNumbersAdminPage() {
     queryFn: () => programConfigurationsApi.getAll(true),
   })
 
+  const selectedAssignmentProgram = programs.find((program) => program.id === assignmentForm.programConfigurationId)
+  const selectedProgramCarriers = selectedAssignmentProgram?.carriers.filter((programCarrier) => programCarrier.isActive) ?? []
+  const assignmentCarrierOptions = assignmentForm.programConfigurationId
+    ? carriers.filter((carrier) => selectedProgramCarriers.some((programCarrier) => programCarrier.carrierId === carrier.id))
+    : carriers
+  const selectedProgramCarrier = selectedProgramCarriers.find((programCarrier) => programCarrier.carrierId === assignmentForm.carrierId)
+  const assignmentLobOptions = selectedProgramCarrier
+    ? selectedProgramCarrier.linesOfBusiness
+        .filter((lob) => lob.isActive)
+        .map((lob) => lob.lineOfBusiness)
+    : ACTIVE_LOBS
+  const selectedProgramLob = selectedProgramCarrier?.linesOfBusiness.find((lob) => lob.lineOfBusiness === assignmentForm.lineOfBusiness && lob.isActive)
+  const assignmentStateOptions = selectedProgramLob?.states.filter((state) => state.isActive).map((state) => state.stateCode) ?? []
+
   const previewCarrierName = useMemo(
     () => carriers.find((c) => c.id === assignmentForm.carrierId)?.name,
     [assignmentForm.carrierId, carriers],
@@ -82,10 +96,22 @@ export function PolicyNumbersAdminPage() {
   }, [assignmentForm.policyNumberSequenceId, sequences])
 
   useEffect(() => {
-    if (!assignmentForm.carrierId && carriers.length > 0) {
-      setAssignmentForm((f) => ({ ...f, carrierId: carriers[0].id }))
+    if (!assignmentForm.carrierId && assignmentCarrierOptions.length > 0) {
+      setAssignmentForm((f) => ({ ...f, carrierId: assignmentCarrierOptions[0].id }))
     }
-  }, [assignmentForm.carrierId, carriers])
+  }, [assignmentCarrierOptions, assignmentForm.carrierId])
+
+  useEffect(() => {
+    if (assignmentLobOptions.length > 0 && !assignmentLobOptions.includes(assignmentForm.lineOfBusiness)) {
+      setAssignmentForm((f) => ({ ...f, lineOfBusiness: assignmentLobOptions[0], state: '' }))
+    }
+  }, [assignmentForm.lineOfBusiness, assignmentLobOptions])
+
+  useEffect(() => {
+    if (assignmentForm.state && selectedProgramLob && !assignmentStateOptions.includes(assignmentForm.state)) {
+      setAssignmentForm((f) => ({ ...f, state: '' }))
+    }
+  }, [assignmentForm.state, assignmentStateOptions, selectedProgramLob])
 
   const saveSequence = useMutation({
     mutationFn: () => editingSequenceId
@@ -142,7 +168,7 @@ export function PolicyNumbersAdminPage() {
       ...emptyAssignment,
       programConfigurationId: f.programConfigurationId,
       policyNumberSequenceId: f.policyNumberSequenceId || sequences[0]?.id || '',
-      carrierId: f.carrierId || carriers[0]?.id || '',
+      carrierId: f.carrierId || assignmentCarrierOptions[0]?.id || '',
     }))
     setEditingAssignmentId(null)
   }
@@ -262,20 +288,27 @@ export function PolicyNumbersAdminPage() {
             )}
           </div>
           <div className="grid grid-cols-1 gap-2 border-b p-4 md:grid-cols-[minmax(150px,1.5fr)_minmax(180px,1.8fr)_minmax(160px,1.3fr)_minmax(140px,1fr)_80px_76px_auto]" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
-            <select value={assignmentForm.programConfigurationId ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, programConfigurationId: e.target.value || undefined }))} className="sims-select">
+            <select value={assignmentForm.programConfigurationId ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, programConfigurationId: e.target.value || undefined, carrierId: '', state: '' }))} className="sims-select">
               <option value="">All programs</option>
               {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
             </select>
             <select value={assignmentForm.policyNumberSequenceId} onChange={(e) => setAssignmentForm((f) => ({ ...f, policyNumberSequenceId: e.target.value }))} className="sims-select">
               {sequences.map((sequence) => <option key={sequence.id} value={sequence.id}>{sequence.name}</option>)}
             </select>
-            <select value={assignmentForm.carrierId} onChange={(e) => setAssignmentForm((f) => ({ ...f, carrierId: e.target.value }))} className="sims-select">
-              {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+            <select value={assignmentForm.carrierId} onChange={(e) => setAssignmentForm((f) => ({ ...f, carrierId: e.target.value, state: '' }))} className="sims-select">
+              {assignmentCarrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
             </select>
-            <select value={assignmentForm.lineOfBusiness} onChange={(e) => setAssignmentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="sims-select">
-              {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+            <select value={assignmentForm.lineOfBusiness} onChange={(e) => setAssignmentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness, state: '' }))} className="sims-select">
+              {assignmentLobOptions.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
             </select>
-            <input value={assignmentForm.state ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="State" className="sims-input" />
+            {assignmentForm.programConfigurationId && selectedProgramLob ? (
+              <select value={assignmentForm.state ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, state: e.target.value }))} className="sims-select">
+                <option value="">All states</option>
+                {assignmentStateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
+              </select>
+            ) : (
+              <input value={assignmentForm.state ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="State" className="sims-input" />
+            )}
             <input type="number" value={assignmentForm.priority} onChange={(e) => setAssignmentForm((f) => ({ ...f, priority: Number(e.target.value) || 0 }))} className="sims-input" />
             <button onClick={() => saveAssignment.mutate()} disabled={saveAssignment.isPending || !assignmentForm.policyNumberSequenceId || !assignmentForm.carrierId} className="sd-btn primary">
               {editingAssignmentId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
