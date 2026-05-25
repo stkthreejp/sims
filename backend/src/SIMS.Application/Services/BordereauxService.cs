@@ -1,0 +1,265 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using SIMS.Application.Common;
+using SIMS.Application.DTOs.Bordereaux;
+using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Entities;
+using SIMS.Domain.Entities.Bordereaux;
+using SIMS.Domain.Enums;
+
+namespace SIMS.Application.Services;
+
+public class BordereauxService : IBordereauxService
+{
+    private readonly DbContext _db;
+
+    public BordereauxService(DbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<BordereauxProfileDto>> GetProfilesAsync(
+        bool includeInactive = false,
+        Guid? programId = null,
+        Guid? carrierId = null,
+        BordereauxReportType? reportType = null,
+        BordereauxOutputFormat? outputFormat = null,
+        CancellationToken ct = default)
+    {
+        var query = BaseProfileQuery();
+
+        if (!includeInactive)
+            query = query.Where(p => p.IsActive);
+        if (programId.HasValue)
+            query = query.Where(p => p.ProgramConfigurationId == programId.Value);
+        if (carrierId.HasValue)
+            query = query.Where(p => p.CarrierId == carrierId.Value);
+        if (reportType.HasValue)
+            query = query.Where(p => p.ReportType == reportType.Value);
+        if (outputFormat.HasValue)
+            query = query.Where(p => p.OutputFormat == outputFormat.Value);
+
+        var profiles = await query
+            .OrderBy(p => p.ProgramConfiguration.Name)
+            .ThenBy(p => p.Carrier.Name)
+            .ThenBy(p => p.ReportType)
+            .ThenBy(p => p.LineOfBusiness)
+            .ThenBy(p => p.StateCode)
+            .ToListAsync(ct);
+
+        return profiles.Select(Map).ToList();
+    }
+
+    public async Task<Result<BordereauxProfileDto>> GetProfileAsync(Guid id, CancellationToken ct = default)
+    {
+        var profile = await BaseProfileQuery().FirstOrDefaultAsync(p => p.Id == id, ct);
+        return profile is null
+            ? Result<BordereauxProfileDto>.Failure("NOT_FOUND", "Bordereaux profile not found.")
+            : Result<BordereauxProfileDto>.Success(Map(profile));
+    }
+
+    public async Task<Result<BordereauxProfileDto>> CreateProfileAsync(UpsertBordereauxProfileRequest request, CancellationToken ct = default)
+    {
+        var validation = await ValidateAsync(request, null, ct);
+        if (validation is not null)
+            return Result<BordereauxProfileDto>.Failure(validation.Value.Code, validation.Value.Message);
+
+        var profile = new BordereauxProfile();
+        Apply(profile, request);
+        _db.Set<BordereauxProfile>().Add(profile);
+        await _db.SaveChangesAsync(ct);
+
+        return Result<BordereauxProfileDto>.Success(await LoadProfileDtoAsync(profile.Id, ct));
+    }
+
+    public async Task<Result<BordereauxProfileDto>> UpdateProfileAsync(Guid id, UpsertBordereauxProfileRequest request, CancellationToken ct = default)
+    {
+        var profile = await _db.Set<BordereauxProfile>()
+            .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
+        if (profile is null)
+            return Result<BordereauxProfileDto>.Failure("NOT_FOUND", "Bordereaux profile not found.");
+
+        var validation = await ValidateAsync(request, id, ct);
+        if (validation is not null)
+            return Result<BordereauxProfileDto>.Failure(validation.Value.Code, validation.Value.Message);
+
+        Apply(profile, request);
+        profile.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        return Result<BordereauxProfileDto>.Success(await LoadProfileDtoAsync(profile.Id, ct));
+    }
+
+    private IQueryable<BordereauxProfile> BaseProfileQuery()
+        => _db.Set<BordereauxProfile>()
+            .Where(p => !p.IsDeleted)
+            .Include(p => p.ProgramConfiguration)
+            .Include(p => p.Carrier);
+
+    private async Task<BordereauxProfileDto> LoadProfileDtoAsync(Guid id, CancellationToken ct)
+        => Map(await BaseProfileQuery().SingleAsync(p => p.Id == id, ct));
+
+    private async Task<(string Code, string Message)?> ValidateAsync(
+        UpsertBordereauxProfileRequest request,
+        Guid? existingProfileId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return ("NAME_REQUIRED", "Profile name is required.");
+
+        if (!Enum.IsDefined(request.ReportType))
+            return ("INVALID_REPORT_TYPE", "Report type is invalid.");
+        if (!Enum.IsDefined(request.Frequency))
+            return ("INVALID_FREQUENCY", "Frequency is invalid.");
+        if (!Enum.IsDefined(request.OutputFormat))
+            return ("INVALID_OUTPUT_FORMAT", "Output format is invalid.");
+        if (!Enum.IsDefined(request.DateBasis))
+            return ("INVALID_DATE_BASIS", "Date basis is invalid.");
+
+        var stateCode = NormalizeState(request.StateCode);
+        if (!string.IsNullOrWhiteSpace(request.StateCode) && stateCode is null)
+            return ("INVALID_STATE", "State must be a two-character code.");
+
+        var programExists = await _db.Set<ProgramConfiguration>()
+            .AnyAsync(p => p.Id == request.ProgramConfigurationId && p.IsActive && !p.IsDeleted, ct);
+        if (!programExists)
+            return ("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+
+        var carrierExists = await _db.Set<Carrier>()
+            .AnyAsync(c => c.Id == request.CarrierId && c.IsActive && !c.IsDeleted, ct);
+        if (!carrierExists)
+            return ("CARRIER_NOT_FOUND", "Carrier not found or inactive.");
+
+        var jsonValidation = ValidateJsonArray(request.RequiredTabsJson, "REQUIRED_TABS");
+        if (jsonValidation is not null)
+            return jsonValidation;
+        jsonValidation = ValidateJsonArray(request.RequiredColumnsJson, "REQUIRED_COLUMNS");
+        if (jsonValidation is not null)
+            return jsonValidation;
+        jsonValidation = ValidateJsonObject(request.MappingRulesJson, "MAPPING_RULES");
+        if (jsonValidation is not null)
+            return jsonValidation;
+        jsonValidation = ValidateJsonObject(request.StaticValuesJson, "STATIC_VALUES");
+        if (jsonValidation is not null)
+            return jsonValidation;
+        jsonValidation = ValidateJsonObject(request.ValidationRulesJson, "VALIDATION_RULES");
+        if (jsonValidation is not null)
+            return jsonValidation;
+        jsonValidation = ValidateJsonArray(request.IncludedTransactionTypesJson, "INCLUDED_TRANSACTION_TYPES");
+        if (jsonValidation is not null)
+            return jsonValidation;
+
+        var duplicate = await _db.Set<BordereauxProfile>()
+            .AnyAsync(p => !p.IsDeleted
+                && p.IsActive
+                && p.Id != existingProfileId
+                && p.ProgramConfigurationId == request.ProgramConfigurationId
+                && p.CarrierId == request.CarrierId
+                && p.ReportType == request.ReportType
+                && p.LineOfBusiness == request.LineOfBusiness
+                && p.StateCode == stateCode, ct);
+        if (request.IsActive && duplicate)
+            return ("DUPLICATE_ACTIVE_PROFILE", "An active bordereaux profile already exists for this program, carrier, report type, LOB, and state.");
+
+        return null;
+    }
+
+    private static void Apply(BordereauxProfile profile, UpsertBordereauxProfileRequest request)
+    {
+        profile.Name = request.Name.Trim();
+        profile.ProgramConfigurationId = request.ProgramConfigurationId;
+        profile.CarrierId = request.CarrierId;
+        profile.LineOfBusiness = request.LineOfBusiness;
+        profile.StateCode = NormalizeState(request.StateCode);
+        profile.ReportType = request.ReportType;
+        profile.Frequency = request.Frequency;
+        profile.OutputFormat = request.OutputFormat;
+        profile.DateBasis = request.DateBasis;
+        profile.RequiresAccountCurrent = request.RequiresAccountCurrent;
+        profile.IsActive = request.IsActive;
+        profile.RequiredTabsJson = NormalizeJson(request.RequiredTabsJson);
+        profile.RequiredColumnsJson = NormalizeJson(request.RequiredColumnsJson);
+        profile.MappingRulesJson = NormalizeJson(request.MappingRulesJson);
+        profile.StaticValuesJson = NormalizeJson(request.StaticValuesJson);
+        profile.ValidationRulesJson = NormalizeJson(request.ValidationRulesJson);
+        profile.IncludedTransactionTypesJson = NormalizeJson(request.IncludedTransactionTypesJson);
+        profile.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+    }
+
+    private static BordereauxProfileDto Map(BordereauxProfile p) => new(
+        p.Id,
+        p.Name,
+        p.ProgramConfigurationId,
+        p.ProgramConfiguration.Name,
+        p.CarrierId,
+        p.Carrier.Name,
+        p.LineOfBusiness,
+        p.StateCode,
+        p.ReportType,
+        p.Frequency,
+        p.OutputFormat,
+        p.DateBasis,
+        p.RequiresAccountCurrent,
+        p.IsActive,
+        p.RequiredTabsJson,
+        p.RequiredColumnsJson,
+        p.MappingRulesJson,
+        p.StaticValuesJson,
+        p.ValidationRulesJson,
+        p.IncludedTransactionTypesJson,
+        p.Notes);
+
+    private static (string Code, string Message)? ValidateJsonArray(string json, string label)
+    {
+        using var document = TryParse(json, label, out var error);
+        if (error is not null)
+            return error.Value;
+        if (document!.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
+            return ($"{label}_REQUIRED", $"{LabelToText(label)} must be a non-empty JSON array.");
+        return null;
+    }
+
+    private static (string Code, string Message)? ValidateJsonObject(string json, string label)
+    {
+        using var document = TryParse(json, label, out var error);
+        if (error is not null)
+            return error.Value;
+        return document!.RootElement.ValueKind == JsonValueKind.Object
+            ? null
+            : ($"INVALID_{label}_JSON", $"{LabelToText(label)} must be a JSON object.");
+    }
+
+    private static JsonDocument? TryParse(string json, string label, out (string Code, string Message)? error)
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            error = ($"{label}_REQUIRED", $"{LabelToText(label)} is required.");
+            return null;
+        }
+
+        try
+        {
+            return JsonDocument.Parse(json);
+        }
+        catch (JsonException)
+        {
+            error = ($"INVALID_{label}_JSON", $"{LabelToText(label)} must be valid JSON.");
+            return null;
+        }
+    }
+
+    private static string NormalizeJson(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return JsonSerializer.Serialize(document.RootElement);
+    }
+
+    private static string? NormalizeState(string? stateCode)
+    {
+        if (string.IsNullOrWhiteSpace(stateCode))
+            return null;
+        var trimmed = stateCode.Trim().ToUpperInvariant();
+        return trimmed.Length == 2 ? trimmed : null;
+    }
+
+    private static string LabelToText(string label)
+        => label.ToLowerInvariant().Replace('_', ' ');
+}
