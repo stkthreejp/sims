@@ -296,6 +296,41 @@ public class BordereauxServiceTests
         Assert.Contains("\"netDueCarrierDifference\":1.00", reconciled.Value.ReconciliationSummaryJson);
     }
 
+    [Fact]
+    public async Task GetRunsAsync_ReturnsRunHistoryNewestVersionFirst()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+        await service.CreatePremiumRunSnapshotAsync(profile.Value.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        var runs = await service.GetRunsAsync(profile.Value.Id);
+
+        Assert.Equal(2, runs.Count);
+        Assert.Equal(2, runs[0].RunNumber);
+        Assert.Equal(1, runs[1].RunNumber);
+    }
+
+    [Fact]
+    public async Task GetRunAsync_ReturnsFrozenAuditEvidence()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        var savedRun = await service.GetRunAsync(run.Value!.Id);
+
+        Assert.True(savedRun.IsSuccess);
+        Assert.Contains("LL-GL-000145-00", savedRun.Value!.SourceRowsSnapshotJson);
+        Assert.Contains("BRACE London BDX", savedRun.Value.ProfileSnapshotJson);
+    }
+
     private static UpsertBordereauxProfileRequest ValidRequest(Guid programId, Guid carrierId) => new(
         Name: "BRACE London BDX",
         ProgramConfigurationId: programId,

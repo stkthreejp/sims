@@ -18,6 +18,8 @@ public interface IBordereauxService
     Task<Result<BordereauxProfileDto>> CreateProfileAsync(UpsertBordereauxProfileRequest request, CancellationToken ct = default);
     Task<Result<BordereauxProfileDto>> UpdateProfileAsync(Guid id, UpsertBordereauxProfileRequest request, CancellationToken ct = default);
     Task<Result<BordereauxPremiumPreviewDto>> GetPremiumPreviewAsync(Guid profileId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct = default);
+    Task<IReadOnlyList<BordereauxRunDto>> GetRunsAsync(Guid? profileId = null, CancellationToken ct = default);
+    Task<Result<BordereauxRunDto>> GetRunAsync(Guid runId, CancellationToken ct = default);
     Task<Result<BordereauxRunDto>> CreatePremiumRunSnapshotAsync(Guid profileId, DateOnly periodStart, DateOnly periodEnd, Guid? generatedById, CancellationToken ct = default);
     Task<Result<BordereauxRunDto>> ReconcilePremiumRunAsync(Guid runId, ReconcileBordereauxRunRequest request, CancellationToken ct = default);
 }

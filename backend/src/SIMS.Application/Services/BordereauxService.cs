@@ -209,6 +209,36 @@ public class BordereauxService : IBordereauxService
         return Result<BordereauxRunDto>.Success(MapRun(run, profile.Name));
     }
 
+    public async Task<IReadOnlyList<BordereauxRunDto>> GetRunsAsync(Guid? profileId = null, CancellationToken ct = default)
+    {
+        var query = _db.Set<BordereauxRun>()
+            .AsNoTracking()
+            .Include(r => r.Profile)
+            .AsQueryable();
+
+        if (profileId.HasValue)
+            query = query.Where(r => r.BordereauxProfileId == profileId.Value);
+
+        var runs = await query
+            .OrderByDescending(r => r.PeriodEnd)
+            .ThenByDescending(r => r.RunNumber)
+            .ToListAsync(ct);
+
+        return runs.Select(r => MapRun(r, r.Profile.Name)).ToList();
+    }
+
+    public async Task<Result<BordereauxRunDto>> GetRunAsync(Guid runId, CancellationToken ct = default)
+    {
+        var run = await _db.Set<BordereauxRun>()
+            .AsNoTracking()
+            .Include(r => r.Profile)
+            .FirstOrDefaultAsync(r => r.Id == runId, ct);
+
+        return run is null
+            ? Result<BordereauxRunDto>.Failure("RUN_NOT_FOUND", "Bordereaux run not found.")
+            : Result<BordereauxRunDto>.Success(MapRun(run, run.Profile.Name));
+    }
+
     public async Task<Result<BordereauxRunDto>> ReconcilePremiumRunAsync(
         Guid runId,
         ReconcileBordereauxRunRequest request,

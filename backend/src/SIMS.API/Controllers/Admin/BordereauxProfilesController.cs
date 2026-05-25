@@ -51,6 +51,19 @@ public class BordereauxProfilesController : ControllerBase
             : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("premium-runs")]
+    public async Task<IActionResult> GetPremiumRuns(
+        [FromQuery] Guid? profileId = null,
+        CancellationToken ct = default)
+        => Ok(await _service.GetRunsAsync(profileId, ct));
+
+    [HttpGet("premium-runs/{runId:guid}")]
+    public async Task<IActionResult> GetPremiumRun(Guid runId, CancellationToken ct)
+    {
+        var result = await _service.GetRunAsync(runId, ct);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("{id:guid}/premium-runs")]
     public async Task<IActionResult> CreatePremiumRunSnapshot(
         Guid id,
