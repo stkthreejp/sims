@@ -3,6 +3,7 @@ using SIMS.Application.Common;
 using SIMS.Application.DTOs;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Enums;
 
 namespace SIMS.Application.Services;
 
@@ -57,6 +58,16 @@ public class CarrierCommissionService : ICarrierCommissionService
                 .AnyAsync(p => p.Id == req.ProgramConfigurationId.Value && p.IsActive, ct);
             if (!programExists)
                 return Result<CarrierCommissionDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+
+            var pathExists = await ProgramCarrierCommissionPathExistsAsync(
+                req.ProgramConfigurationId.Value,
+                carrierId,
+                req.LineOfBusiness,
+                req.EffectiveDate,
+                ct);
+            if (!pathExists)
+                return Result<CarrierCommissionDto>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                    "Selected carrier and line of business are not active for this program.");
         }
 
         var duplicate = await db.Set<CarrierCommission>()
@@ -122,6 +133,40 @@ public class CarrierCommissionService : ICarrierCommissionService
         if (specific != null)
             return new CarrierCommissionRates(specific.CommissionRate, specific.SMMRetentionRate);
         return null;
+    }
+
+    private async Task<bool> ProgramCarrierCommissionPathExistsAsync(
+        Guid programConfigurationId,
+        Guid carrierId,
+        string? lineOfBusiness,
+        DateOnly effectiveDate,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(lineOfBusiness))
+        {
+            return await Db.Set<ProgramCarrier>()
+                .AnyAsync(c =>
+                    c.ProgramConfigurationId == programConfigurationId &&
+                    c.CarrierId == carrierId &&
+                    c.IsActive &&
+                    c.EffectiveDate <= effectiveDate &&
+                    (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate), ct);
+        }
+
+        if (!Enum.TryParse<PolicyLineOfBusiness>(lineOfBusiness, out var lob))
+            return false;
+
+        return await Db.Set<ProgramCarrierLineOfBusiness>()
+            .AnyAsync(l =>
+                l.LineOfBusiness == lob &&
+                l.IsActive &&
+                l.EffectiveDate <= effectiveDate &&
+                (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate) &&
+                l.ProgramCarrier.IsActive &&
+                l.ProgramCarrier.CarrierId == carrierId &&
+                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
+                l.ProgramCarrier.EffectiveDate <= effectiveDate &&
+                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate), ct);
     }
 
     private static CarrierCommissionDto ToDto(CarrierCommission c) => new(

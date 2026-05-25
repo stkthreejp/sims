@@ -514,6 +514,17 @@ export function CarrierDetailPage() {
         .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
         .map((lob) => lob.lineOfBusiness)))
     : carrier.linesOfBusiness
+  const commissionProgramOptions = programs.filter((program) =>
+    program.id === commissionForm.programConfigurationId ||
+    program.carriers.some((programCarrier) => programCarrier.carrierId === carrier.id && programCarrier.isActive)
+  )
+  const selectedCommissionProgram = programs.find((program) => program.id === commissionForm.programConfigurationId)
+  const selectedCommissionProgramCarrier = selectedCommissionProgram?.carriers.find((programCarrier) => programCarrier.carrierId === carrier.id && programCarrier.isActive)
+  const commissionLobOptions = commissionForm.programConfigurationId
+    ? Array.from(new Set((selectedCommissionProgramCarrier?.linesOfBusiness ?? [])
+        .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
+        .map((lob) => lob.lineOfBusiness)))
+    : carrier.linesOfBusiness
 
   return (
     <div className="space-y-5">
@@ -705,11 +716,11 @@ export function CarrierDetailPage() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Program</label>
                 <select
                   value={commissionForm.programConfigurationId}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value })}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value, lineOfBusiness: '' })}
                   className="sims-select"
                 >
                   <option value="">Any program</option>
-                  {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                  {commissionProgramOptions.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
                 </select>
               </div>
               <div>
@@ -720,10 +731,13 @@ export function CarrierDetailPage() {
                   className="sims-select"
                 >
                   <option value="">All Lines (default)</option>
-                  {carrier.linesOfBusiness.map((lob) => (
+                  {commissionLobOptions.map((lob) => (
                     <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
                   ))}
                 </select>
+                {commissionForm.programConfigurationId && commissionLobOptions.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">This carrier has no active lines configured under the selected program.</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Total Commission %</label>
