@@ -4,6 +4,7 @@ using SIMS.Application.Common;
 using SIMS.Application.DTOs.Bordereaux;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Entities.Accounting;
 using SIMS.Domain.Entities.Bordereaux;
 using SIMS.Domain.Enums;
 
@@ -85,6 +86,61 @@ public class BordereauxService : IBordereauxService
         await _db.SaveChangesAsync(ct);
 
         return Result<BordereauxProfileDto>.Success(await LoadProfileDtoAsync(profile.Id, ct));
+    }
+
+    public async Task<Result<BordereauxPremiumPreviewDto>> GetPremiumPreviewAsync(Guid profileId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct = default)
+    {
+        if (periodEnd < periodStart)
+            return Result<BordereauxPremiumPreviewDto>.Failure("INVALID_PERIOD", "Period end cannot be before period start.");
+
+        var profile = await BaseProfileQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == profileId, ct);
+        if (profile is null)
+            return Result<BordereauxPremiumPreviewDto>.Failure("PROFILE_NOT_FOUND", "Bordereaux profile not found.");
+        if (profile.ReportType != BordereauxReportType.Premium)
+            return Result<BordereauxPremiumPreviewDto>.Failure("INVALID_REPORT_TYPE", "Only premium profiles support premium preview.");
+
+        var includedTypes = ParseIncludedTransactionTypes(profile.IncludedTransactionTypesJson);
+        var rows = await (
+            from invoice in _db.Set<Invoice>().AsNoTracking().Include(i => i.Lines)
+            join transaction in _db.Set<PolicyTransaction>().AsNoTracking()
+                    .Include(t => t.Policy).ThenInclude(p => p.Program)
+                    .Include(t => t.Policy).ThenInclude(p => p.Carrier)
+                    .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Insured)
+                on invoice.PolicyTransactionId equals transaction.Id
+            where invoice.PolicyTransactionId != null
+                && (invoice.Status == "Posted"
+                    || invoice.Status == "PartiallyPaid"
+                    || invoice.Status == "Paid")
+                && (transaction.Status == PolicyTransactionStatus.Completed
+                    || transaction.Status == PolicyTransactionStatus.Issued
+                    || transaction.Status == PolicyTransactionStatus.Bound)
+                && transaction.Policy.ProgramId == profile.ProgramConfigurationId
+                && transaction.Policy.CarrierId == profile.CarrierId
+                && (profile.LineOfBusiness == null || transaction.Policy.LineOfBusiness == profile.LineOfBusiness)
+                && (profile.StateCode == null || transaction.Policy.Submission.Insured.State.ToUpper() == profile.StateCode)
+                && (includedTypes.Count == 0 || includedTypes.Contains(transaction.TransactionType))
+            select new PreviewSourceRow(invoice, transaction)
+        ).ToListAsync(ct);
+
+        var previewRows = rows
+            .Select(row => BuildPreviewRow(row.Invoice, row.Transaction, profile))
+            .Where(row => row.ReportingDate >= periodStart && row.ReportingDate <= periodEnd)
+            .OrderBy(row => row.ReportingDate)
+            .ThenBy(row => row.PolicyNumber)
+            .ThenBy(row => row.TransactionNumber)
+            .ToList();
+
+        return Result<BordereauxPremiumPreviewDto>.Success(new BordereauxPremiumPreviewDto(
+            profile.Id,
+            periodStart,
+            periodEnd,
+            previewRows,
+            previewRows.Sum(r => r.GrossPremium),
+            previewRows.Sum(r => r.GrossCommission),
+            previewRows.Sum(r => r.Fees),
+            previewRows.Sum(r => r.NetDueCarrier)));
     }
 
     private IQueryable<BordereauxProfile> BaseProfileQuery()
@@ -206,6 +262,67 @@ public class BordereauxService : IBordereauxService
         p.IncludedTransactionTypesJson,
         p.Notes);
 
+    private static BordereauxPremiumPreviewRowDto BuildPreviewRow(Invoice invoice, PolicyTransaction transaction, BordereauxProfile profile)
+    {
+        var reportingDate = ResolveReportingDate(transaction, invoice, profile.DateBasis);
+        var insured = transaction.Policy.Submission.Insured;
+        var grossCommission = invoice.CommissionAmount;
+
+        return new BordereauxPremiumPreviewRowDto(
+            transaction.PolicyId,
+            transaction.Id,
+            invoice.Id,
+            transaction.Policy.PolicyNumber,
+            transaction.TransactionNumber,
+            transaction.TransactionType,
+            reportingDate,
+            transaction.EffectiveDate,
+            invoice.InvoiceDate,
+            transaction.ExpirationDate ?? transaction.Policy.ExpirationDate,
+            insured.DisplayName,
+            insured.State,
+            transaction.Policy.ProgramId,
+            transaction.Policy.Program?.Name,
+            transaction.Policy.CarrierId,
+            transaction.Policy.Carrier.Name,
+            transaction.Policy.LineOfBusiness,
+            invoice.GrossPremium,
+            grossCommission,
+            invoice.TotalFees,
+            invoice.TotalAmount,
+            invoice.GrossPremium - grossCommission,
+            invoice.InvoiceNumber);
+    }
+
+    private static DateOnly ResolveReportingDate(PolicyTransaction transaction, Invoice invoice, BordereauxDateBasis dateBasis)
+        => dateBasis switch
+        {
+            BordereauxDateBasis.EffectiveDate => transaction.EffectiveDate,
+            BordereauxDateBasis.BoundDate => invoice.InvoiceDate,
+            BordereauxDateBasis.EffectiveOrBoundDateGreater => invoice.InvoiceDate > transaction.EffectiveDate
+                ? invoice.InvoiceDate
+                : transaction.EffectiveDate,
+            _ => invoice.InvoiceDate > transaction.EffectiveDate ? invoice.InvoiceDate : transaction.EffectiveDate,
+        };
+
+    private static HashSet<TransactionType> ParseIncludedTransactionTypes(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var result = new HashSet<TransactionType>();
+        foreach (var element in document.RootElement.EnumerateArray())
+        {
+            if (element.ValueKind != JsonValueKind.String)
+                continue;
+            if (Enum.TryParse<TransactionType>(element.GetString(), ignoreCase: true, out var value))
+                result.Add(value);
+        }
+
+        return result;
+    }
+
     private static (string Code, string Message)? ValidateJsonArray(string json, string label)
     {
         using var document = TryParse(json, label, out var error);
@@ -262,4 +379,6 @@ public class BordereauxService : IBordereauxService
 
     private static string LabelToText(string label)
         => label.ToLowerInvariant().Replace('_', ' ');
+
+    private sealed record PreviewSourceRow(Invoice Invoice, PolicyTransaction Transaction);
 }

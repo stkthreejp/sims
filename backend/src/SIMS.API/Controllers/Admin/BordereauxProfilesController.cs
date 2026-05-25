@@ -33,6 +33,22 @@ public class BordereauxProfilesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("{id:guid}/premium-preview")]
+    public async Task<IActionResult> GetPremiumPreview(
+        Guid id,
+        [FromQuery] DateOnly periodStart,
+        [FromQuery] DateOnly periodEnd,
+        CancellationToken ct)
+    {
+        var result = await _service.GetPremiumPreviewAsync(id, periodStart, periodEnd, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        return result.ErrorCode is "PROFILE_NOT_FOUND"
+            ? NotFound(new { result.ErrorCode, result.ErrorMessage })
+            : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] UpsertBordereauxProfileRequest request, CancellationToken ct)
     {
