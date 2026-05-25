@@ -258,6 +258,34 @@ export function PolicyFormsAdminPage() {
     if (!carrierName || !packageForm.lineOfBusiness || !packageForm.state) return ''
     return [programName, carrierName, LOB_LABELS[packageForm.lineOfBusiness], packageForm.state].filter(Boolean).join(' - ')
   }, [carriers, packageForm.carrierId, packageForm.lineOfBusiness, packageForm.programConfigurationId, packageForm.state, programs])
+  const selectedProposalProgram = programs.find((program) => program.id === proposalDocumentForm.programConfigurationId)
+  const proposalCarrierOptions = useMemo(() => (
+    selectedProposalProgram
+      ? selectedProposalProgram.carriers
+          .filter((programCarrier) => programCarrier.isActive)
+          .map((programCarrier) => ({ id: programCarrier.carrierId, name: programCarrier.carrierName }))
+      : carriers
+  ), [carriers, selectedProposalProgram])
+  const selectedProposalProgramCarrier = selectedProposalProgram?.carriers.find((programCarrier) =>
+    programCarrier.carrierId === proposalDocumentForm.carrierId
+  )
+  const proposalLobOptions = useMemo(() => (
+    selectedProposalProgramCarrier
+      ? selectedProposalProgramCarrier.linesOfBusiness
+          .filter((lob) => lob.isActive)
+          .map((lob) => lob.lineOfBusiness)
+      : ACTIVE_LOBS
+  ), [selectedProposalProgramCarrier])
+  const selectedProposalLob = selectedProposalProgramCarrier?.linesOfBusiness.find((lob) =>
+    lob.lineOfBusiness === proposalDocumentForm.lineOfBusiness
+  )
+  const proposalStateOptions = useMemo(() => (
+    selectedProposalLob
+      ? selectedProposalLob.states
+          .filter((state) => state.isActive)
+          .map((state) => state.stateCode)
+      : US_STATES
+  ), [selectedProposalLob])
   const mappingDataPaths = useMemo(() => {
     const nonRepeatingTags = tags.filter((t) => !t.isRepeatable).map((t) => t.tag)
     return nonRepeatingTags.length > 0 ? nonRepeatingTags : DATA_PATH_OPTIONS
@@ -274,6 +302,33 @@ export function PolicyFormsAdminPage() {
       setTestPolicyId(policyOptions[0].id)
     }
   }, [policyOptions, testPolicyId])
+
+  useEffect(() => {
+    if (!selectedProposalProgram) return
+    setProposalDocumentForm((form) => {
+      const carrierId = proposalCarrierOptions.some((carrier) => carrier.id === form.carrierId)
+        ? form.carrierId
+        : proposalCarrierOptions[0]?.id ?? ''
+      const carrierSetup = selectedProposalProgram.carriers.find((programCarrier) => programCarrier.carrierId === carrierId)
+      const lobOptions = carrierSetup
+        ? carrierSetup.linesOfBusiness.filter((lob) => lob.isActive).map((lob) => lob.lineOfBusiness)
+        : []
+      const lineOfBusiness = lobOptions.includes(form.lineOfBusiness)
+        ? form.lineOfBusiness
+        : lobOptions[0] ?? form.lineOfBusiness
+      const lobSetup = carrierSetup?.linesOfBusiness.find((lob) => lob.lineOfBusiness === lineOfBusiness)
+      const stateOptions = lobSetup
+        ? lobSetup.states.filter((state) => state.isActive).map((state) => state.stateCode)
+        : []
+      const state = form.state && stateOptions.includes(form.state) ? form.state : ''
+
+      if (carrierId === form.carrierId && lineOfBusiness === form.lineOfBusiness && state === form.state) {
+        return form
+      }
+
+      return { ...form, carrierId, lineOfBusiness, state }
+    })
+  }, [proposalCarrierOptions, selectedProposalProgram])
 
   const createTemplate = useMutation({
     mutationFn: () => policyFormsApi.createTemplate({
@@ -700,15 +755,15 @@ export function PolicyFormsAdminPage() {
               </select>
               <select value={proposalDocumentForm.carrierId} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, carrierId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
                 <option value="">Select carrier</option>
-                {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+                {proposalCarrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
               </select>
               <div className="grid grid-cols-2 gap-2">
                 <select value={proposalDocumentForm.lineOfBusiness} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness }))} className="border rounded px-2 py-1.5 text-sm">
-                  {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+                  {proposalLobOptions.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
                 </select>
                 <select value={proposalDocumentForm.state ?? ''} onChange={(e) => setProposalDocumentForm((f) => ({ ...f, state: e.target.value }))} className="border rounded px-2 py-1.5 text-sm">
-                  <option value="">Any state</option>
-                  {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+                  <option value="">{proposalDocumentForm.role === 'StateNotice' ? 'Select state' : 'Any state'}</option>
+                  {proposalStateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -732,7 +787,7 @@ export function PolicyFormsAdminPage() {
               </label>
               <button
                 onClick={() => saveProposalDocument.mutate()}
-                disabled={saveProposalDocument.isPending || !proposalDocumentForm.carrierId || !proposalDocumentForm.documentTemplateId}
+                disabled={saveProposalDocument.isPending || !proposalDocumentForm.carrierId || !proposalDocumentForm.documentTemplateId || (proposalDocumentForm.role === 'StateNotice' && !proposalDocumentForm.state)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50"
               >
                 <Check className="h-4 w-4" /> Save setup
