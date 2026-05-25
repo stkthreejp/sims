@@ -10,6 +10,100 @@ namespace SIMS.Application.Tests.Services;
 public class ProposalDocumentConfigurationServiceTests
 {
     [Fact]
+    public async Task CreateAsync_RejectsProgramSpecificConfigurationWhenCarrierLobIsNotConfiguredForProgram()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var template = CreateTemplate("Longleaf proposal");
+        db.AddRange(
+            program,
+            carrier,
+            template,
+            new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+            });
+        await db.SaveChangesAsync();
+
+        var result = await new ProposalDocumentConfigurationService(db).CreateAsync(new(
+            program.Id,
+            carrier.Id,
+            PolicyLineOfBusiness.InlandMarine,
+            null,
+            ProposalDocumentRole.Proposal,
+            template.Id,
+            1,
+            true,
+            null,
+            null,
+            null));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AllowsProgramSpecificConfigurationWhenCarrierLobStateIsConfiguredForProgram()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var template = CreateTemplate("Texas notice");
+        db.AddRange(
+            program,
+            carrier,
+            template,
+            new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                LinesOfBusiness =
+                {
+                    new ProgramCarrierLineOfBusiness
+                    {
+                        LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+                        IsActive = true,
+                        EffectiveDate = new DateOnly(2026, 1, 1),
+                        States =
+                        {
+                            new ProgramCarrierLobState
+                            {
+                                StateCode = "TX",
+                                IsActive = true,
+                                EffectiveDate = new DateOnly(2026, 1, 1),
+                            },
+                        },
+                    },
+                },
+            });
+        await db.SaveChangesAsync();
+
+        var result = await new ProposalDocumentConfigurationService(db).CreateAsync(new(
+            program.Id,
+            carrier.Id,
+            PolicyLineOfBusiness.InlandMarine,
+            "TX",
+            ProposalDocumentRole.StateNotice,
+            template.Id,
+            1,
+            true,
+            null,
+            null,
+            null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
+        Assert.Equal(carrier.Id, result.Value.CarrierId);
+        Assert.Equal("TX", result.Value.State);
+    }
+
+    [Fact]
     public async Task ResolveForQuoteAsync_PrefersProgramProposalAndIncludesMatchingStateNotice()
     {
         await using var db = CreateDb();

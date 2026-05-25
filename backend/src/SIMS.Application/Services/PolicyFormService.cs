@@ -355,7 +355,30 @@ public class PolicyFormService : IPolicyFormService
             return "Carrier not found.";
         if (dto.ProgramConfigurationId.HasValue && !await Db.Set<ProgramConfiguration>().AnyAsync(p => p.Id == dto.ProgramConfigurationId.Value))
             return "Program not found.";
+        if (dto.ProgramConfigurationId.HasValue)
+        {
+            var pathExists = await ProgramPackagePathExistsAsync(
+                dto.ProgramConfigurationId.Value,
+                dto.CarrierId,
+                dto.LineOfBusiness,
+                dto.State);
+            if (!pathExists)
+                return "Selected carrier, line of business, and state are not active for this program.";
+        }
         return null;
+    }
+
+    private async Task<bool> ProgramPackagePathExistsAsync(Guid programConfigurationId, Guid carrierId, PolicyLineOfBusiness lineOfBusiness, string state)
+    {
+        var stateCode = state.Trim().ToUpperInvariant();
+        return await Db.Set<ProgramCarrierLineOfBusiness>()
+            .AnyAsync(l =>
+                l.LineOfBusiness == lineOfBusiness &&
+                l.IsActive &&
+                l.ProgramCarrier.IsActive &&
+                l.ProgramCarrier.CarrierId == carrierId &&
+                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
+                l.States.Any(s => s.StateCode == stateCode && s.IsActive));
     }
 
     private static void ApplyTemplate(PolicyFormTemplate form, PolicyFormTemplateUpsertDto dto)

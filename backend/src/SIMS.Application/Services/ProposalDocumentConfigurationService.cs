@@ -174,9 +174,42 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
                 .AnyAsync(p => p.Id == request.ProgramConfigurationId.Value && p.IsActive, ct);
             if (!programExists)
                 return ("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+
+            var pathExists = await ProgramProposalPathExistsAsync(
+                request.ProgramConfigurationId.Value,
+                request.CarrierId,
+                request.LineOfBusiness,
+                request.State,
+                ct);
+            if (!pathExists)
+                return ("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and state are not active for this program.");
         }
 
         return null;
+    }
+
+    private async Task<bool> ProgramProposalPathExistsAsync(
+        Guid programConfigurationId,
+        Guid carrierId,
+        PolicyLineOfBusiness lineOfBusiness,
+        string? state,
+        CancellationToken ct)
+    {
+        var stateCode = NormalizeState(state);
+        var query = _db.Set<ProgramCarrierLineOfBusiness>()
+            .Where(l =>
+                l.LineOfBusiness == lineOfBusiness &&
+                l.IsActive &&
+                l.ProgramCarrier.IsActive &&
+                l.ProgramCarrier.CarrierId == carrierId &&
+                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId);
+
+        if (stateCode != null)
+        {
+            query = query.Where(l => l.States.Any(s => s.StateCode == stateCode && s.IsActive));
+        }
+
+        return await query.AnyAsync(ct);
     }
 
     private static void Apply(ProposalDocumentConfiguration configuration, UpsertProposalDocumentConfigurationRequest request)
