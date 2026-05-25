@@ -22,6 +22,7 @@ namespace SIMS.Application.Services;
 public class PolicyService : IPolicyService
 {
     private const decimal LargeEndorsementPremiumChangeThreshold = 25000m;
+    private const string NonRenewalNoticeTaskTypeName = "Prepare non-renewal notice";
 
     private readonly IServiceProvider _sp;
     private readonly IInvoicingService _invoicing;
@@ -1356,6 +1357,70 @@ public class PolicyService : IPolicyService
         return Result<PolicyDto>.Success(MapToDto(policy));
     }
 
+    public async Task<Result<PolicyTransactionDto>> MarkForNonRenewalAsync(
+        Guid policyId,
+        MarkNonRenewalDto dto,
+        UserAccessScope access,
+        IReadOnlyCollection<string>? currentUserPermissions = null)
+    {
+        var db = Db;
+        var policy = await db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Carrier)
+            .Include(p => p.BoundQuote)
+            .Include(p => p.Transactions).ThenInclude(t => t.ProcessedBy)
+            .Where(p => p.Id == policyId && !p.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (policy == null) return Result<PolicyTransactionDto>.Failure("NOT_FOUND", "Policy not found.");
+        if (policy.Status != PolicyStatus.Active)
+            return Result<PolicyTransactionDto>.Failure("INVALID_STATUS", "Only active policies can be marked for non-renewal.");
+        var postBindGate = await EnsurePostBindRequirementsCompleteAsync(policy.BoundQuoteId, "marking this policy for non-renewal");
+        if (!postBindGate.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(postBindGate.ErrorCode!, postBindGate.ErrorMessage!);
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return Result<PolicyTransactionDto>.Failure("REASON_REQUIRED", "Non-renewal reason is required.");
+        if (dto.NonRenewedDate < policy.EffectiveDate || dto.NonRenewedDate > policy.ExpirationDate)
+            return Result<PolicyTransactionDto>.Failure("INVALID_DATE", "Non-renewal date must be within the policy term.");
+        if (policy.Transactions.Any(t => t.TransactionType == TransactionType.NonRenewal
+            && t.Status is not (PolicyTransactionStatus.Declined or PolicyTransactionStatus.Withdrawn or PolicyTransactionStatus.Voided)
+            && !t.IsDeleted))
+            return Result<PolicyTransactionDto>.Failure("NON_RENEWAL_ALREADY_EXISTS", "This policy already has an active non-renewal transaction.");
+
+        var authorityGate = await EnsureNonRenewalMarkAuthorityAsync(policy, dto, access.UserId, currentUserPermissions ?? Array.Empty<string>());
+        if (!authorityGate.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(authorityGate.ErrorCode!, authorityGate.ErrorMessage!);
+
+        var transaction = new PolicyTransaction
+        {
+            PolicyId = policy.Id,
+            Policy = policy,
+            TransactionType = TransactionType.NonRenewal,
+            Status = PolicyTransactionStatus.NoticePending,
+            TransactionNumber = await GenerateTransactionNumberAsync(),
+            EffectiveDate = dto.NonRenewedDate,
+            SourceQuoteId = policy.BoundQuoteId,
+            RequestedById = access.UserId,
+            RequestedAt = DateTime.UtcNow,
+            ReasonText = dto.Reason.Trim(),
+            PremiumBefore = policy.TotalPremium,
+            PremiumChange = 0m,
+            NewTotalPremium = policy.TotalPremium,
+            PremiumAfter = policy.TotalPremium,
+            ProcessedById = access.UserId,
+            ProcessedAt = DateTime.UtcNow,
+            Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim(),
+        };
+
+        db.Set<PolicyTransaction>().Add(transaction);
+        await CreateNonRenewalNoticeTaskAsync(policy, transaction);
+        await db.SaveChangesAsync();
+        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Policy marked for non-renewal; notice task created.");
+        await db.Entry(transaction).Reference(t => t.ProcessedBy).LoadAsync();
+
+        return Result<PolicyTransactionDto>.Success(MapToTransactionDto(transaction));
+    }
+
     public async Task<Result<PolicyDto>> NonRenewAsync(
         Guid policyId,
         NonRenewPolicyDto dto,
@@ -1400,26 +1465,32 @@ public class PolicyService : IPolicyService
                 .Where(r => legalRequirementIds.Contains(r.Id))
                 .ToListAsync();
 
-        var transaction = new PolicyTransaction
+        var transaction = policy.Transactions.FirstOrDefault(t => t.TransactionType == TransactionType.NonRenewal
+            && t.Status == PolicyTransactionStatus.NoticePending
+            && !t.IsDeleted);
+        var isMarkedTransaction = transaction != null;
+        transaction ??= new PolicyTransaction
         {
             PolicyId = policy.Id,
             Policy = policy,
             TransactionType = TransactionType.NonRenewal,
             Status = PolicyTransactionStatus.NoticeSent,
             TransactionNumber = await GenerateTransactionNumberAsync(),
-            EffectiveDate = dto.NonRenewedDate,
-            SourceQuoteId = policy.BoundQuoteId,
             RequestedById = access.UserId,
             RequestedAt = DateTime.UtcNow,
-            ReasonText = dto.Reason?.Trim(),
-            PremiumBefore = policy.TotalPremium,
-            PremiumChange = 0m,
-            NewTotalPremium = policy.TotalPremium,
-            PremiumAfter = policy.TotalPremium,
-            ProcessedById = access.UserId,
-            ProcessedAt = DateTime.UtcNow,
-            Notes = dto.Reason,
         };
+
+        transaction.EffectiveDate = dto.NonRenewedDate;
+        transaction.SourceQuoteId = policy.BoundQuoteId;
+        transaction.ReasonText = dto.Reason?.Trim() ?? transaction.ReasonText;
+        transaction.PremiumBefore = policy.TotalPremium;
+        transaction.PremiumChange = 0m;
+        transaction.NewTotalPremium = policy.TotalPremium;
+        transaction.PremiumAfter = policy.TotalPremium;
+        transaction.ProcessedById = access.UserId;
+        transaction.ProcessedAt = DateTime.UtcNow;
+        transaction.Notes = dto.Reason ?? transaction.Notes;
+
         var detail = new PolicyNonRenewalDetail
         {
             PolicyTransaction = transaction,
@@ -1432,7 +1503,8 @@ public class PolicyService : IPolicyService
             NoticeTemplateId = dto.NoticeTemplateId,
         };
         transaction.NonRenewalDetail = detail;
-        Db.Set<PolicyTransaction>().Add(transaction);
+        if (!isMarkedTransaction)
+            Db.Set<PolicyTransaction>().Add(transaction);
         Db.Set<PolicyNonRenewalDetail>().Add(detail);
         if (dto.ComplianceChecklist.Count > 0)
         {
@@ -1443,7 +1515,16 @@ public class PolicyService : IPolicyService
                 access.UserId));
         }
         await Db.SaveChangesAsync();
-        await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Non-renewal notice issued.");
+        if (isMarkedTransaction)
+        {
+            var transition = await _transactionLifecycle.TransitionAsync(transaction, PolicyTransactionStatus.NoticeSent, access.UserId, "Non-renewal notice issued.");
+            if (!transition.IsSuccess)
+                return Result<PolicyDto>.Failure(transition.ErrorCode ?? "NON_RENEWAL_NOTICE_FAILED", transition.ErrorMessage ?? "Non-renewal notice could not be issued.");
+        }
+        else
+        {
+            await _transactionLifecycle.RecordCreatedAsync(transaction, access.UserId, "Non-renewal notice issued.");
+        }
 
         var noticeTemplateId = dto.NoticeTemplateId ?? await ResolveDefaultNonRenewalNoticeTemplateIdAsync();
         if (noticeTemplateId.HasValue)
@@ -2137,5 +2218,81 @@ public class PolicyService : IPolicyService
         return authority.Allowed
             ? Result.Success()
             : Result.Failure("AUTHORITY_APPROVAL_REQUIRED", authority.Message);
+    }
+
+    private async Task<Result> EnsureNonRenewalMarkAuthorityAsync(
+        Policy policy,
+        MarkNonRenewalDto dto,
+        Guid currentUserId,
+        IReadOnlyCollection<string> currentUserPermissions)
+    {
+        var authorityApproval = (IAuthorityApprovalService?)_sp.GetService(typeof(IAuthorityApprovalService));
+        if (authorityApproval == null)
+            return Result.Success();
+
+        var authority = await authorityApproval.EvaluateAsync(
+            new AuthorityApprovalEvaluationRequest(
+                AuthorityApprovalTargetType.Policy,
+                policy.Id,
+                "policy.nonrenewal.mark",
+                "Mark policy for non-renewal",
+                AppPermissions.UnderwritingAuthorityApprove,
+                "PolicyNonRenewalMark",
+                "Marking a policy for non-renewal requires underwriting authority approval.",
+                JsonSerializer.Serialize(new
+                {
+                    PolicyId = policy.Id,
+                    policy.PolicyNumber,
+                    policy.Status,
+                    policy.EffectiveDate,
+                    policy.ExpirationDate,
+                    dto.NonRenewedDate,
+                    Reason = dto.Reason.Trim()
+                }),
+                null),
+            currentUserPermissions,
+            currentUserId);
+
+        return authority.Allowed
+            ? Result.Success()
+            : Result.Failure("AUTHORITY_APPROVAL_REQUIRED", authority.Message);
+    }
+
+    private async Task CreateNonRenewalNoticeTaskAsync(Policy policy, PolicyTransaction transaction)
+    {
+        var db = Db;
+        var taskType = await db.Set<TaskType>()
+            .FirstOrDefaultAsync(t => t.Name == NonRenewalNoticeTaskTypeName && !t.IsDeleted);
+        if (taskType == null)
+        {
+            taskType = new TaskType
+            {
+                Name = NonRenewalNoticeTaskTypeName,
+                Description = "Prepare and issue the required non-renewal notice.",
+                DefaultPriority = TaskPriority.Medium,
+                AssignedRoleTemplate = "AssistantUW",
+                DueDateFormula = "P1D",
+                IsActive = true,
+            };
+            db.Set<TaskType>().Add(taskType);
+        }
+        else if (!taskType.IsActive)
+        {
+            taskType.IsActive = true;
+            taskType.UpdatedAt = DateTime.UtcNow;
+        }
+
+        db.Set<TaskInstance>().Add(new TaskInstance
+        {
+            TaskType = taskType,
+            EntityType = TaskEntityType.PolicyTransaction,
+            EntityId = transaction.Id,
+            AssignedUserId = policy.Submission.AssistantUWId,
+            AssignedRoleExpression = policy.Submission.AssistantUWId.HasValue ? null : "AssistantUW",
+            Status = TaskInstanceStatus.Open,
+            Priority = taskType.DefaultPriority,
+            DueDate = DateTime.UtcNow.AddDays(1),
+            ReferenceUrl = $"/policies/{policy.Id}",
+        });
     }
 }

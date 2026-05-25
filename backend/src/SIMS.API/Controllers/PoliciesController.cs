@@ -217,6 +217,18 @@ public class PoliciesController : ControllerBase
 
     // --- Non-renewal ---
 
+    [HttpPost("{id:guid}/non-renew/mark")]
+    [Authorize(Policy = AppPermissions.PoliciesCancel)]
+    public async Task<IActionResult> MarkForNonRenewal(Guid id, [FromBody] MarkNonRenewalDto dto)
+    {
+        var result = await _policies.MarkForNonRenewalAsync(id, dto, CurrentAccess, User.PermissionNames());
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : result.ErrorCode == "AUTHORITY_APPROVAL_REQUIRED"
+                ? StatusCode(StatusCodes.Status403Forbidden, new { result.ErrorCode, result.ErrorMessage })
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost("{id:guid}/non-renew")]
     [Authorize(Policy = AppPermissions.PoliciesCancel)]
     public async Task<IActionResult> NonRenew(Guid id, [FromBody] NonRenewPolicyDto dto)

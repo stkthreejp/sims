@@ -304,6 +304,13 @@ public class NonRenewPolicyDto
     public Guid[] LegalRequirementSectionIds { get; set; } = [];
 }
 
+public class MarkNonRenewalDto
+{
+    public DateOnly NonRenewedDate { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
 public class ReinstatePolicyDto
 {
     public DateOnly ReinstatedDate { get; set; }

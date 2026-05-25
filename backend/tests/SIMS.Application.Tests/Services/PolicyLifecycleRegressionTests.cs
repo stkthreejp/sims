@@ -2052,6 +2052,130 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task MarkForNonRenewal_CreatesNoticePendingTransactionAndAssistantTask()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var assistant = new User
+        {
+            Id = Guid.NewGuid(),
+            UserName = "assistant@sims.test",
+            Email = "assistant@sims.test",
+            FirstName = "Assistant",
+            LastName = "User",
+        };
+        fixture.Submission.AssistantUWId = assistant.Id;
+        db.Add(assistant);
+        await db.SaveChangesAsync();
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var result = await policyService.MarkForNonRenewalAsync(fixture.Policy.Id, new MarkNonRenewalDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+            Notes = "UW approved non-renewal review.",
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        Assert.Equal(PolicyStatus.Active, fixture.Policy.Status);
+        Assert.Null(fixture.Policy.NonRenewedDate);
+        var transaction = await db.Set<PolicyTransaction>()
+            .Include(t => t.NonRenewalDetail)
+            .SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
+        Assert.Equal(PolicyTransactionStatus.NoticePending, transaction.Status);
+        Assert.Equal(new DateOnly(2026, 12, 31), transaction.EffectiveDate);
+        Assert.Equal("Carrier appetite change", transaction.ReasonText);
+        Assert.Equal("UW approved non-renewal review.", transaction.Notes);
+        Assert.Null(transaction.NonRenewalDetail);
+        Assert.Empty(await db.Set<PolicyNonRenewalDetail>().ToListAsync());
+        Assert.Empty(await db.Set<Attachment>().Where(a => a.PolicyTransactionId == transaction.Id).ToListAsync());
+
+        var task = await db.Set<TaskInstance>()
+            .Include(t => t.TaskType)
+            .SingleAsync(t => t.EntityType == TaskEntityType.PolicyTransaction && t.EntityId == transaction.Id);
+        Assert.Equal("Prepare non-renewal notice", task.TaskType.Name);
+        Assert.Equal(assistant.Id, task.AssignedUserId);
+        Assert.Equal(TaskInstanceStatus.Open, task.Status);
+        Assert.Contains(fixture.Policy.Id.ToString(), task.ReferenceUrl);
+
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.notice_pending" },
+            history.Select(h => h.EventName).ToArray());
+    }
+
+    [Fact]
+    public async Task MarkForNonRenewal_RequiresAuthorityApproval()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+
+        var blocked = await policyService.MarkForNonRenewalAsync(fixture.Policy.Id, new MarkNonRenewalDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+        }, UserAccessScope.All(fixture.UserId));
+
+        Assert.False(blocked.IsSuccess);
+        Assert.Equal("AUTHORITY_APPROVAL_REQUIRED", blocked.ErrorCode);
+        Assert.Empty(await db.Set<PolicyTransaction>().Where(t => t.TransactionType == TransactionType.NonRenewal).ToListAsync());
+        Assert.Empty(await db.Set<TaskInstance>().ToListAsync());
+        var approval = await db.Set<AuthorityApprovalRequest>().SingleAsync();
+        Assert.Equal(AuthorityApprovalTargetType.Policy, approval.TargetType);
+        Assert.Equal(fixture.Policy.Id, approval.TargetId);
+        Assert.Equal("policy.nonrenewal.mark", approval.ActionCode);
+        Assert.Equal("Mark policy for non-renewal", approval.ActionLabel);
+        Assert.Equal("PolicyNonRenewalMark", approval.ApprovalType);
+        Assert.Equal(AuthorityApprovalStatus.Pending, approval.Status);
+    }
+
+    [Fact]
+    public async Task NonRenewal_UsesMarkedTransactionWhenNoticeIsIssued()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var policyService = CreatePolicyService(db, new RecordingInvoicingService());
+        var mark = await policyService.MarkForNonRenewalAsync(fixture.Policy.Id, new MarkNonRenewalDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
+        Assert.True(mark.IsSuccess);
+
+        var issued = await policyService.NonRenewAsync(fixture.Policy.Id, new NonRenewPolicyDto
+        {
+            NonRenewedDate = new DateOnly(2026, 12, 31),
+            Reason = "Carrier appetite change",
+            NoticeMailingDate = new DateOnly(2026, 11, 1),
+            NoticeRequirementDays = 45,
+            MailingDays = 3,
+            Method = "Certified Mail",
+        }, UserAccessScope.All(fixture.UserId), [AppPermissions.UnderwritingAuthorityApprove]);
+
+        Assert.True(issued.IsSuccess, $"{issued.ErrorCode}: {issued.ErrorMessage}");
+        var transaction = await db.Set<PolicyTransaction>()
+            .Include(t => t.NonRenewalDetail)
+            .SingleAsync(t => t.TransactionType == TransactionType.NonRenewal);
+        Assert.Equal(mark.Value!.Id, transaction.Id);
+        Assert.Equal(PolicyTransactionStatus.NoticeSent, transaction.Status);
+        Assert.NotNull(transaction.NonRenewalDetail);
+        Assert.Equal(new DateOnly(2026, 11, 1), transaction.NonRenewalDetail.NoticeMailingDate);
+        Assert.Equal("Certified Mail", transaction.NonRenewalDetail.Method);
+
+        var history = await db.Set<PolicyTransactionStatusHistory>()
+            .Where(h => h.PolicyTransactionId == transaction.Id)
+            .OrderBy(h => h.ChangedAt)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "policy.transaction.created", "policy.transaction.notice_pending", "policy.transaction.notice_sent" },
+            history.Select(h => h.EventName).ToArray());
+    }
+
+    [Fact]
     public async Task NonRenewal_RecordsLegalAndComplianceSnapshot()
     {
         await using var db = CreateDb();
