@@ -249,6 +249,53 @@ public class BordereauxServiceTests
         Assert.Contains("999", secondRun.Value.SourceRowsSnapshotJson);
     }
 
+    [Fact]
+    public async Task ReconcilePremiumRunAsync_MarksMatchedWhenAccountCurrentTotalsAgree()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        var reconciled = await service.ReconcilePremiumRunAsync(run.Value!.Id, new ReconcileBordereauxRunRequest(
+            AccountCurrentRowCount: 1,
+            AccountCurrentGrossPremiumTotal: 1451m,
+            AccountCurrentGrossCommissionTotal: 362.75m,
+            AccountCurrentFeesTotal: 0m,
+            AccountCurrentNetDueCarrierTotal: 1088.25m));
+
+        Assert.True(reconciled.IsSuccess);
+        Assert.Equal(BordereauxReconciliationStatus.Matched, reconciled.Value!.ReconciliationStatus);
+        Assert.Contains("\"status\":\"matched\"", reconciled.Value.ReconciliationSummaryJson);
+        Assert.Contains("\"grossPremiumDifference\":0", reconciled.Value.ReconciliationSummaryJson);
+    }
+
+    [Fact]
+    public async Task ReconcilePremiumRunAsync_MarksMismatchWhenAccountCurrentTotalsDiffer()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        var reconciled = await service.ReconcilePremiumRunAsync(run.Value!.Id, new ReconcileBordereauxRunRequest(
+            AccountCurrentRowCount: 1,
+            AccountCurrentGrossPremiumTotal: 1450m,
+            AccountCurrentGrossCommissionTotal: 362.75m,
+            AccountCurrentFeesTotal: 0m,
+            AccountCurrentNetDueCarrierTotal: 1087.25m));
+
+        Assert.True(reconciled.IsSuccess);
+        Assert.Equal(BordereauxReconciliationStatus.Mismatch, reconciled.Value!.ReconciliationStatus);
+        Assert.Contains("\"status\":\"mismatch\"", reconciled.Value.ReconciliationSummaryJson);
+        Assert.Contains("\"grossPremiumDifference\":1", reconciled.Value.ReconciliationSummaryJson);
+        Assert.Contains("\"netDueCarrierDifference\":1.00", reconciled.Value.ReconciliationSummaryJson);
+    }
+
     private static UpsertBordereauxProfileRequest ValidRequest(Guid programId, Guid carrierId) => new(
         Name: "BRACE London BDX",
         ProgramConfigurationId: programId,

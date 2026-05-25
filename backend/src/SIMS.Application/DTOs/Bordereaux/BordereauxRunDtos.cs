@@ -24,3 +24,10 @@ public record BordereauxRunDto(
 public record CreatePremiumBordereauxRunRequest(
     DateOnly PeriodStart,
     DateOnly PeriodEnd);
+
+public record ReconcileBordereauxRunRequest(
+    int AccountCurrentRowCount,
+    decimal AccountCurrentGrossPremiumTotal,
+    decimal AccountCurrentGrossCommissionTotal,
+    decimal AccountCurrentFeesTotal,
+    decimal AccountCurrentNetDueCarrierTotal);

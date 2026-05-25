@@ -209,6 +209,72 @@ public class BordereauxService : IBordereauxService
         return Result<BordereauxRunDto>.Success(MapRun(run, profile.Name));
     }
 
+    public async Task<Result<BordereauxRunDto>> ReconcilePremiumRunAsync(
+        Guid runId,
+        ReconcileBordereauxRunRequest request,
+        CancellationToken ct = default)
+    {
+        var run = await _db.Set<BordereauxRun>()
+            .Include(r => r.Profile)
+            .FirstOrDefaultAsync(r => r.Id == runId, ct);
+        if (run is null)
+            return Result<BordereauxRunDto>.Failure("RUN_NOT_FOUND", "Bordereaux run not found.");
+
+        var rows = JsonSerializer.Deserialize<List<BordereauxPremiumPreviewRowDto>>(run.SourceRowsSnapshotJson, SnapshotJsonOptions) ?? [];
+        var grossPremiumTotal = rows.Sum(r => r.GrossPremium);
+        var grossCommissionTotal = rows.Sum(r => r.GrossCommission);
+        var feesTotal = rows.Sum(r => r.Fees);
+        var netDueCarrierTotal = rows.Sum(r => r.NetDueCarrier);
+
+        var grossPremiumDifference = grossPremiumTotal - request.AccountCurrentGrossPremiumTotal;
+        var grossCommissionDifference = grossCommissionTotal - request.AccountCurrentGrossCommissionTotal;
+        var feesDifference = feesTotal - request.AccountCurrentFeesTotal;
+        var netDueCarrierDifference = netDueCarrierTotal - request.AccountCurrentNetDueCarrierTotal;
+        var rowCountDifference = rows.Count - request.AccountCurrentRowCount;
+        var matched = grossPremiumDifference == 0m
+            && grossCommissionDifference == 0m
+            && feesDifference == 0m
+            && netDueCarrierDifference == 0m
+            && rowCountDifference == 0;
+
+        run.AccountCurrentRowCount = request.AccountCurrentRowCount;
+        run.ReconciliationStatus = matched
+            ? BordereauxReconciliationStatus.Matched
+            : BordereauxReconciliationStatus.Mismatch;
+        run.ReconciliationSummaryJson = JsonSerializer.Serialize(new
+        {
+            status = matched ? "matched" : "mismatch",
+            bordereaux = new
+            {
+                rowCount = rows.Count,
+                grossPremiumTotal,
+                grossCommissionTotal,
+                feesTotal,
+                netDueCarrierTotal,
+            },
+            accountCurrent = new
+            {
+                rowCount = request.AccountCurrentRowCount,
+                grossPremiumTotal = request.AccountCurrentGrossPremiumTotal,
+                grossCommissionTotal = request.AccountCurrentGrossCommissionTotal,
+                feesTotal = request.AccountCurrentFeesTotal,
+                netDueCarrierTotal = request.AccountCurrentNetDueCarrierTotal,
+            },
+            differences = new
+            {
+                rowCountDifference,
+                grossPremiumDifference,
+                grossCommissionDifference,
+                feesDifference,
+                netDueCarrierDifference,
+            },
+        }, SnapshotJsonOptions);
+        run.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        return Result<BordereauxRunDto>.Success(MapRun(run, run.Profile.Name));
+    }
+
     private IQueryable<BordereauxProfile> BaseProfileQuery()
         => _db.Set<BordereauxProfile>()
             .Where(p => !p.IsDeleted)
