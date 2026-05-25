@@ -186,6 +186,144 @@ public class CommissionProgramScopeTests
         Assert.Equal(0.12m, result);
     }
 
+    [Fact]
+    public async Task AgentCommissionCreate_RejectsProgramCarrierLobRateWhenLobIsNotConfiguredForProgramCarrier()
+    {
+        await using var db = CreateDb();
+        var agent = new Agent { Id = Guid.NewGuid(), Name = "Pine Agency", Email = "agent@example.com", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        db.AddRange(
+            agent,
+            carrier,
+            program,
+            new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+            });
+        await db.SaveChangesAsync();
+
+        var result = await CreateAgentService(db).CreateAsync(agent.Id, new(
+            program.Id,
+            carrier.Id,
+            "InlandMarine",
+            null,
+            0.12m,
+            new DateOnly(2026, 1, 1)), Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task AgentCommissionCreate_AllowsProgramCarrierLobStateRateWhenStateIsConfiguredForProgramCarrierLob()
+    {
+        await using var db = CreateDb();
+        var agent = new Agent { Id = Guid.NewGuid(), Name = "Pine Agency", Email = "agent@example.com", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        db.AddRange(
+            agent,
+            carrier,
+            program,
+            new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                LinesOfBusiness =
+                {
+                    new ProgramCarrierLineOfBusiness
+                    {
+                        LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+                        IsActive = true,
+                        EffectiveDate = new DateOnly(2026, 1, 1),
+                        States =
+                        {
+                            new ProgramCarrierLobState
+                            {
+                                StateCode = "TX",
+                                IsActive = true,
+                                EffectiveDate = new DateOnly(2026, 1, 1),
+                            },
+                        },
+                    },
+                },
+            });
+        await db.SaveChangesAsync();
+
+        var result = await CreateAgentService(db).CreateAsync(agent.Id, new(
+            program.Id,
+            carrier.Id,
+            "InlandMarine",
+            "TX",
+            0.12m,
+            new DateOnly(2026, 1, 1)), Guid.NewGuid());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
+        Assert.Equal(carrier.Id, result.Value.CarrierId);
+        Assert.Equal("InlandMarine", result.Value.LineOfBusiness);
+        Assert.Equal("TX", result.Value.StateCode);
+    }
+
+    [Fact]
+    public async Task AgentCommission_PrefersProgramCarrierLobStateRateOverBroaderRates()
+    {
+        await using var db = CreateDb();
+        var agent = new Agent { Id = Guid.NewGuid(), Name = "Pine Agency", Email = "agent@example.com", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        db.AddRange(
+            agent,
+            carrier,
+            program,
+            new AgentCommission
+            {
+                AgentId = agent.Id,
+                ProgramConfigurationId = program.Id,
+                CommissionRate = 0.08m,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                CreatedBy = Guid.NewGuid(),
+            },
+            new AgentCommission
+            {
+                AgentId = agent.Id,
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                LineOfBusiness = "InlandMarine",
+                CommissionRate = 0.10m,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                CreatedBy = Guid.NewGuid(),
+            },
+            new AgentCommission
+            {
+                AgentId = agent.Id,
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                LineOfBusiness = "InlandMarine",
+                StateCode = "TX",
+                CommissionRate = 0.13m,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                CreatedBy = Guid.NewGuid(),
+            });
+        await db.SaveChangesAsync();
+
+        var result = await CreateAgentService(db).GetActiveRateAsync(
+            agent.Id,
+            "InlandMarine",
+            new DateOnly(2026, 6, 1),
+            program.Id,
+            carrier.Id,
+            "TX");
+
+        Assert.Equal(0.13m, result);
+    }
+
     private static CarrierCommissionService CreateCarrierService(ApplicationDbContext db)
     {
         var provider = new ServiceCollection()

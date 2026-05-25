@@ -4,8 +4,10 @@ public class AgentCommission
 {
     public long Id { get; set; }
     public Guid? ProgramConfigurationId { get; set; }
+    public Guid? CarrierId { get; set; }
     public Guid AgentId { get; set; }
     public string? LineOfBusiness { get; set; }
+    public string? StateCode { get; set; }
     public decimal CommissionRate { get; set; }
     public DateOnly EffectiveDate { get; set; }
     public DateOnly? DisabledDate { get; set; }
@@ -13,5 +15,6 @@ public class AgentCommission
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ProgramConfiguration? ProgramConfiguration { get; set; }
+    public Carrier? Carrier { get; set; }
     public Agent Agent { get; set; } = null!;
 }

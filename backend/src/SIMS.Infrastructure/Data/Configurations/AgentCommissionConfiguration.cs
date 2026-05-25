@@ -12,10 +12,16 @@ public class AgentCommissionConfiguration : IEntityTypeConfiguration<AgentCommis
         builder.HasKey(e => e.Id);
         builder.Property(e => e.CommissionRate).HasColumnType("numeric(8,6)");
         builder.Property(e => e.LineOfBusiness).HasMaxLength(50);
+        builder.Property(e => e.StateCode).HasMaxLength(2);
 
         builder.HasOne(e => e.ProgramConfiguration)
             .WithMany()
             .HasForeignKey(e => e.ProgramConfigurationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.Carrier)
+            .WithMany()
+            .HasForeignKey(e => e.CarrierId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.Agent)
@@ -23,7 +29,7 @@ public class AgentCommissionConfiguration : IEntityTypeConfiguration<AgentCommis
             .HasForeignKey(e => e.AgentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(e => new { e.ProgramConfigurationId, e.AgentId, e.LineOfBusiness, e.EffectiveDate }).IsUnique();
+        builder.HasIndex(e => new { e.ProgramConfigurationId, e.CarrierId, e.AgentId, e.LineOfBusiness, e.StateCode, e.EffectiveDate }).IsUnique();
         builder.HasIndex(e => new { e.AgentId, e.DisabledDate });
     }
 }

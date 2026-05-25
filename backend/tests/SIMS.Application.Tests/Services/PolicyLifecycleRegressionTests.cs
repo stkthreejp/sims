@@ -3028,7 +3028,14 @@ public class PolicyLifecycleRegressionTests
         public Task<Result<AgentCommissionDto>> DisableAsync(long id, DateOnly? disabledDate, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<decimal?> GetActiveRateAsync(Guid agentId, string? lineOfBusiness, DateOnly asOfDate, Guid? programConfigurationId = null, CancellationToken ct = default)
+        public Task<decimal?> GetActiveRateAsync(
+            Guid agentId,
+            string? lineOfBusiness,
+            DateOnly asOfDate,
+            Guid? programConfigurationId = null,
+            Guid? carrierId = null,
+            string? stateCode = null,
+            CancellationToken ct = default)
             => Task.FromResult<decimal?>(null);
 
         public Task<IReadOnlyList<AgentCommissionDto>> GetAllAsync(Guid agentId, CancellationToken ct = default)

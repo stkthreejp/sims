@@ -170,7 +170,7 @@ public class QuoteService : IQuoteService
 
         var carrierRates = await _carrierCommissions.GetActiveRatesAsync(carrierId, lobKey, asOfDate, program?.Id);
         var agentRate = submission.AgentId.HasValue
-            ? await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate, program?.Id)
+            ? await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate, program?.Id, carrierId, submission.Insured?.State)
             : null;
 
         var quoteNumber = await GenerateQuoteNumberAsync();
@@ -286,7 +286,8 @@ public class QuoteService : IQuoteService
             var submission = await Db.Set<Submission>().FirstOrDefaultAsync(s => s.Id == quote.SubmissionId);
             if (submission?.AgentId.HasValue == true)
             {
-                var agentRate = await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate, program?.Id);
+                var insured = await Db.Entry(submission).Reference(s => s.Insured).Query().FirstOrDefaultAsync();
+                var agentRate = await _agentCommissions.GetActiveRateAsync(submission.AgentId.Value, lobKey, asOfDate, program?.Id, carrierId, insured?.State);
                 quote.AgentCommissionRate = agentRate ?? 0;
             }
         }

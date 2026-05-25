@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { agentsApi } from '@/api/agents.api'
+import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import type { AgentLocation, AgentContact, AgentLocationInput, AgentContactInput } from '@/types/agent.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -23,6 +24,9 @@ import type { AgentCommission } from '@/types/agentCommission.types'
 const LOB_OPTIONS = [
   { value: '', label: 'All Lines (default fallback)' },
   { value: 'GeneralLiability', label: 'General Liability' },
+  { value: 'InlandMarine', label: 'Inland Marine' },
+  { value: 'AutoLiability', label: 'Auto Liability' },
+  { value: 'AutoPhysicalDamage', label: 'Auto Physical Damage' },
   { value: 'Property', label: 'Property' },
   { value: 'CommercialAuto', label: 'Commercial Auto' },
   { value: 'BusinessOwners', label: 'Business Owners' },
@@ -322,7 +326,7 @@ export function AgentDetailPage() {
 
   // Commission state
   const [showAddCommission, setShowAddCommission] = useState(false)
-  const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', lineOfBusiness: '', rate: '', effectiveDate: '' })
+  const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
 
   const { data: agent, isLoading } = useQuery({
@@ -335,6 +339,11 @@ export function AgentDetailPage() {
     queryKey: ['agent-commissions', id],
     queryFn: () => getAgentCommissions(id!),
     enabled: !!id,
+  })
+
+  const { data: carriers = [] } = useQuery({
+    queryKey: ['carriers', 'active'],
+    queryFn: () => carriersApi.getAll(true),
   })
 
   const { data: programs = [] } = useQuery({
@@ -453,14 +462,16 @@ export function AgentDetailPage() {
   const addCommissionMutation = useMutation({
     mutationFn: () => createAgentCommission(id!, {
       programConfigurationId: commissionForm.programConfigurationId || null,
+      carrierId: commissionForm.carrierId || null,
       lineOfBusiness: commissionForm.lineOfBusiness || null,
+      stateCode: commissionForm.stateCode || null,
       commissionRate: parseFloat(commissionForm.rate) / 100,
       effectiveDate: commissionForm.effectiveDate,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['agent-commissions', id] })
       setShowAddCommission(false)
-      setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', rate: '', effectiveDate: '' })
+      setCommissionForm({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' })
       toast.success('Commission rate added')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -523,6 +534,29 @@ export function AgentDetailPage() {
   if (!agent) return <EmptyState icon={UserCircle} title="Agent not found" description="The requested agent record could not be loaded." />
 
   const primaryLocation = agent.locations.find((l) => l.isPrimary) ?? agent.locations[0]
+  const selectedCommissionProgram = programs.find((program) => program.id === commissionForm.programConfigurationId)
+  const selectedProgramCarriers = selectedCommissionProgram?.carriers.filter((programCarrier) => programCarrier.isActive) ?? []
+  const commissionCarrierOptions = commissionForm.programConfigurationId
+    ? carriers.filter((carrier) => selectedProgramCarriers.some((programCarrier) => programCarrier.carrierId === carrier.id))
+    : carriers
+  const selectedProgramCarrier = selectedProgramCarriers.find((programCarrier) => programCarrier.carrierId === commissionForm.carrierId)
+  const programLobs = selectedProgramCarrier
+    ? selectedProgramCarrier.linesOfBusiness.filter((lob) => lob.isActive)
+    : selectedProgramCarriers.flatMap((programCarrier) => programCarrier.linesOfBusiness).filter((lob) => lob.isActive)
+  const carrierLobs = commissionForm.carrierId
+    ? carriers.find((carrier) => carrier.id === commissionForm.carrierId)?.linesOfBusiness ?? []
+    : []
+  const commissionLobValues = commissionForm.programConfigurationId
+    ? Array.from(new Set(programLobs.map((lob) => lob.lineOfBusiness)))
+    : commissionForm.carrierId
+      ? carrierLobs
+      : LOB_OPTIONS.filter((option) => option.value).map((option) => option.value)
+  const commissionLobOptions = [
+    LOB_OPTIONS[0],
+    ...LOB_OPTIONS.filter((option) => option.value && commissionLobValues.includes(option.value)),
+  ]
+  const selectedProgramLob = selectedProgramCarrier?.linesOfBusiness.find((lob) => lob.lineOfBusiness === commissionForm.lineOfBusiness && lob.isActive)
+  const commissionStateOptions = selectedProgramLob?.states.filter((state) => state.isActive).map((state) => state.stateCode) ?? []
 
   return (
     <div className="space-y-5">
@@ -701,12 +735,12 @@ export function AgentDetailPage() {
         {showAddCommission && (
           <div className="mb-4 rounded-lg p-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
             <p className="text-xs font-medium text-slate-600 mb-2">New Commission Rate</p>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Program</label>
                 <select
                   value={commissionForm.programConfigurationId}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value })}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value, carrierId: '', lineOfBusiness: '', stateCode: '' })}
                   className="sims-select"
                 >
                   <option value="">Any program</option>
@@ -714,15 +748,38 @@ export function AgentDetailPage() {
                 </select>
               </div>
               <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Carrier</label>
+                <select
+                  value={commissionForm.carrierId}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, carrierId: e.target.value, lineOfBusiness: '', stateCode: '' })}
+                  className="sims-select"
+                >
+                  <option value="">Any carrier</option>
+                  {commissionCarrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
                 <select
                   value={commissionForm.lineOfBusiness}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value })}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value, stateCode: '' })}
                   className="sims-select"
                 >
-                  {LOB_OPTIONS.map((o) => (
+                  {commissionLobOptions.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                <select
+                  value={commissionForm.stateCode}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, stateCode: e.target.value })}
+                  disabled={!commissionForm.programConfigurationId || !commissionForm.carrierId || !commissionForm.lineOfBusiness}
+                  className="sims-select disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">Any state</option>
+                  {commissionStateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
                 </select>
               </div>
               <div>
@@ -751,6 +808,10 @@ export function AgentDetailPage() {
             <div className="flex gap-2 mt-3">
               <button
                 onClick={() => {
+                  if (commissionForm.stateCode && (!commissionForm.carrierId || !commissionForm.lineOfBusiness)) {
+                    toast.error('State-specific rates require carrier and line of business')
+                    return
+                  }
                   if (!commissionForm.rate || !commissionForm.effectiveDate) {
                     toast.error('Rate and effective date are required')
                     return
@@ -763,7 +824,7 @@ export function AgentDetailPage() {
                 <Check className="h-3.5 w-3.5" /> Save Rate
               </button>
               <button
-                onClick={() => { setShowAddCommission(false); setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', rate: '', effectiveDate: '' }) }}
+                onClick={() => { setShowAddCommission(false); setCommissionForm({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' }) }}
                 className="sd-btn outline sm"
               >
                 <X className="h-3.5 w-3.5" /> Cancel
@@ -811,6 +872,12 @@ export function AgentDetailPage() {
                           {active?.programName && (
                             <span className="text-xs text-blue-600">{active.programName}</span>
                           )}
+                          {active?.carrierName && (
+                            <span className="text-xs text-slate-500">{active.carrierName}</span>
+                          )}
+                          {active?.stateCode && (
+                            <span className="text-xs text-slate-500">{active.stateCode}</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {active ? (
@@ -829,6 +896,8 @@ export function AgentDetailPage() {
                               <tr className="text-slate-500">
                                 <th className="text-left py-1 font-medium">Rate</th>
                                 <th className="text-left py-1 font-medium">Program</th>
+                                <th className="text-left py-1 font-medium">Carrier</th>
+                                <th className="text-left py-1 font-medium">State</th>
                                 <th className="text-left py-1 font-medium">Effective</th>
                                 <th className="text-left py-1 font-medium">Disabled</th>
                                 <th className="text-left py-1 font-medium">Status</th>
@@ -840,6 +909,8 @@ export function AgentDetailPage() {
                                 <tr key={r.id}>
                                   <td className="py-1.5 font-medium text-slate-800">{(r.commissionRate * 100).toFixed(2)}%</td>
                                   <td className="py-1.5 text-slate-600">{r.programName ?? 'Any program'}</td>
+                                  <td className="py-1.5 text-slate-600">{r.carrierName ?? 'Any carrier'}</td>
+                                  <td className="py-1.5 text-slate-600">{r.stateCode ?? 'Any state'}</td>
                                   <td className="py-1.5 text-slate-600">{r.effectiveDate}</td>
                                   <td className="py-1.5 text-slate-600">{r.disabledDate ?? '—'}</td>
                                   <td className="py-1.5">

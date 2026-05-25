@@ -4,8 +4,11 @@ public record AgentCommissionDto(
     long Id,
     Guid? ProgramConfigurationId,
     string? ProgramName,
+    Guid? CarrierId,
+    string? CarrierName,
     string? LineOfBusiness,
     string? LineOfBusinessLabel,
+    string? StateCode,
     decimal CommissionRate,
     DateOnly EffectiveDate,
     DateOnly? DisabledDate,
@@ -15,7 +18,9 @@ public record AgentCommissionDto(
 
 public record CreateAgentCommissionRequest(
     Guid? ProgramConfigurationId,
+    Guid? CarrierId,
     string? LineOfBusiness,
+    string? StateCode,
     decimal CommissionRate,
     DateOnly EffectiveDate
 );
