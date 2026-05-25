@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCcw, Save, Search 
 import { toast } from 'sonner'
 import {
   createBordereauxPremiumRun,
+  generateBordereauxExportPackage,
   getBordereauxPremiumPreview,
   getBordereauxProfiles,
   getBordereauxRun,
@@ -257,6 +258,16 @@ export function BordereauxWorkbenchPage() {
     onError: () => toast.error('Could not create the monthly run'),
   })
 
+  const generatePackage = useMutation({
+    mutationFn: (runId: string) => generateBordereauxExportPackage(runId),
+    onSuccess: (run) => {
+      toast.success('Export package generated')
+      queryClient.setQueryData(['bordereaux', 'run', run.id], run)
+      queryClient.invalidateQueries({ queryKey: ['bordereaux', 'runs', profileId] })
+    },
+    onError: () => toast.error('Could not generate the export package'),
+  })
+
   const selectedProfile = premiumProfiles.find((profile) => profile.id === profileId)
   const selectedRun = selectedRunQuery.data
   const rows = previewQuery.data?.rows ?? []
@@ -357,7 +368,15 @@ export function BordereauxWorkbenchPage() {
         <section style={section}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
             <div style={sectionTitle}>Audit Detail</div>
-            {selectedRun && <StatusPill status={selectedRun.reconciliationStatus} />}
+            {selectedRun && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <StatusPill status={selectedRun.reconciliationStatus} />
+                <button className="sd-btn outline" disabled={generatePackage.isPending} onClick={() => generatePackage.mutate(selectedRun.id)}>
+                  <FileSpreadsheet size={14} />
+                  Generate Files
+                </button>
+              </div>
+            )}
           </div>
           {!selectedRun && (
             <div style={{ display: 'grid', placeItems: 'center', gap: 8, minHeight: 180, color: 'var(--ink-4)', fontSize: 13 }}>
@@ -372,6 +391,12 @@ export function BordereauxWorkbenchPage() {
                 <Metric label="AC Rows" value={String(selectedRun.accountCurrentRowCount)} />
                 <Metric label="Status" value={selectedRun.status} />
               </div>
+              {(selectedRun.londonBordereauxFileName || selectedRun.accountCurrentFileName) && (
+                <div style={{ display: 'grid', gap: 5, marginBottom: 12, color: 'var(--ink-3)', fontSize: 12 }}>
+                  {selectedRun.londonBordereauxFileName && <span>{selectedRun.londonBordereauxFileName}</span>}
+                  {selectedRun.accountCurrentFileName && <span>{selectedRun.accountCurrentFileName}</span>}
+                </div>
+              )}
               <div style={{ display: 'grid', gap: 10 }}>
                 <SnapshotBlock title="Profile Snapshot" json={selectedRun.profileSnapshotJson} />
                 <SnapshotBlock title="Reconciliation" json={selectedRun.reconciliationSummaryJson} />

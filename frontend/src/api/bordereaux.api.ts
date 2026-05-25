@@ -43,3 +43,6 @@ export const reconcileBordereauxRun = (
   request: ReconcileBordereauxRunRequest,
 ): Promise<BordereauxRun> =>
   apiClient.post<BordereauxRun>(`${BASE}/premium-runs/${runId}/reconcile`, request).then((r) => r.data)
+
+export const generateBordereauxExportPackage = (runId: string): Promise<BordereauxRun> =>
+  apiClient.post<BordereauxRun>(`${BASE}/premium-runs/${runId}/export-package`).then((r) => r.data)

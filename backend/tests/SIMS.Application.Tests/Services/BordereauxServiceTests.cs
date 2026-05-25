@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.Bordereaux;
 using SIMS.Application.Services;
@@ -331,6 +333,50 @@ public class BordereauxServiceTests
         Assert.Contains("BRACE London BDX", savedRun.Value.ProfileSnapshotJson);
     }
 
+    [Fact]
+    public async Task GeneratePremiumExportPackageAsync_StoresLondonAndAccountCurrentFilesOnRun()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        var generated = await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: Guid.NewGuid());
+
+        Assert.True(generated.IsSuccess);
+        Assert.Equal(BordereauxRunStatus.Generated, generated.Value!.Status);
+        Assert.EndsWith(".xlsx", generated.Value.LondonBordereauxFileName);
+        Assert.EndsWith(".xlsx", generated.Value.AccountCurrentFileName);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", generated.Value.LondonBordereauxContentType);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", generated.Value.AccountCurrentContentType);
+        Assert.Equal(2, blob.Uploads.Count);
+        Assert.Contains("LL-GL-000145-00", blob.Uploads[0].Text);
+        Assert.Contains("Account Current", blob.Uploads[1].Text);
+    }
+
+    [Fact]
+    public async Task GeneratePremiumExportPackageAsync_UsesFrozenRowsNotCurrentInvoiceValues()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+        var invoice = await db.Set<Invoice>().SingleAsync();
+        invoice.GrossPremium = 999m;
+        await db.SaveChangesAsync();
+
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        Assert.Contains("1451", blob.Uploads[0].Text);
+        Assert.DoesNotContain("999", blob.Uploads[0].Text);
+    }
+
     private static UpsertBordereauxProfileRequest ValidRequest(Guid programId, Guid carrierId) => new(
         Name: "BRACE London BDX",
         ProgramConfigurationId: programId,
@@ -459,5 +505,43 @@ public class BordereauxServiceTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+
+    private sealed class FakeBlobStorageService : SIMS.Application.Interfaces.Services.IBlobStorageService
+    {
+        public List<(string FileName, string ContentType, byte[] Bytes, string Text)> Uploads { get; } = [];
+
+        public async Task<string> UploadAsync(Stream content, string fileName, string contentType)
+        {
+            using var memory = new MemoryStream();
+            await content.CopyToAsync(memory);
+            var bytes = memory.ToArray();
+            Uploads.Add((fileName, contentType, bytes, ExtractText(bytes)));
+            return $"bordereaux-test/{Uploads.Count}/{fileName}";
+        }
+
+        public Task<string> GetDownloadUrlAsync(string blobPath, string fileName, TimeSpan? expiry = null) => Task.FromResult(blobPath);
+        public Task<byte[]> DownloadAsync(string blobPath) => Task.FromResult(Array.Empty<byte>());
+        public Task DeleteAsync(string blobPath) => Task.CompletedTask;
+
+        private static string ExtractText(byte[] bytes)
+        {
+            try
+            {
+                using var archive = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+                var text = new StringBuilder();
+                foreach (var entry in archive.Entries.Where(e => e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)))
+                {
+                    using var reader = new StreamReader(entry.Open(), Encoding.UTF8);
+                    text.AppendLine(reader.ReadToEnd());
+                }
+
+                return text.ToString();
+            }
+            catch (InvalidDataException)
+            {
+                return Encoding.UTF8.GetString(bytes);
+            }
+        }
     }
 }

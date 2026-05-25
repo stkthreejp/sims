@@ -22,4 +22,5 @@ public interface IBordereauxService
     Task<Result<BordereauxRunDto>> GetRunAsync(Guid runId, CancellationToken ct = default);
     Task<Result<BordereauxRunDto>> CreatePremiumRunSnapshotAsync(Guid profileId, DateOnly periodStart, DateOnly periodEnd, Guid? generatedById, CancellationToken ct = default);
     Task<Result<BordereauxRunDto>> ReconcilePremiumRunAsync(Guid runId, ReconcileBordereauxRunRequest request, CancellationToken ct = default);
+    Task<Result<BordereauxRunDto>> GeneratePremiumExportPackageAsync(Guid runId, Guid? generatedById, CancellationToken ct = default);
 }

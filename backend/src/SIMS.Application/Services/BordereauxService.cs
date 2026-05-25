@@ -13,13 +13,23 @@ namespace SIMS.Application.Services;
 
 public class BordereauxService : IBordereauxService
 {
+    private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private readonly DbContext _db;
+    private readonly IBlobStorageService? _blobStorage;
     private static readonly JsonSerializerOptions SnapshotJsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
     };
 
-    public BordereauxService(DbContext db) => _db = db;
+    public BordereauxService(DbContext db) : this(db, null)
+    {
+    }
+
+    public BordereauxService(DbContext db, IBlobStorageService? blobStorage)
+    {
+        _db = db;
+        _blobStorage = blobStorage;
+    }
 
     public async Task<IReadOnlyList<BordereauxProfileDto>> GetProfilesAsync(
         bool includeInactive = false,
@@ -239,6 +249,50 @@ public class BordereauxService : IBordereauxService
             : Result<BordereauxRunDto>.Success(MapRun(run, run.Profile.Name));
     }
 
+    public async Task<Result<BordereauxRunDto>> GeneratePremiumExportPackageAsync(
+        Guid runId,
+        Guid? generatedById,
+        CancellationToken ct = default)
+    {
+        if (_blobStorage is null)
+            return Result<BordereauxRunDto>.Failure("BLOB_STORAGE_NOT_CONFIGURED", "Blob storage is not configured.");
+
+        var run = await _db.Set<BordereauxRun>()
+            .Include(r => r.Profile).ThenInclude(p => p.ProgramConfiguration)
+            .Include(r => r.Profile).ThenInclude(p => p.Carrier)
+            .FirstOrDefaultAsync(r => r.Id == runId, ct);
+        if (run is null)
+            return Result<BordereauxRunDto>.Failure("RUN_NOT_FOUND", "Bordereaux run not found.");
+
+        var rows = JsonSerializer.Deserialize<List<BordereauxPremiumPreviewRowDto>>(run.SourceRowsSnapshotJson, SnapshotJsonOptions) ?? [];
+        var requiredTabs = ParseStringArray(run.Profile.RequiredTabsJson);
+        var londonBytes = BordereauxWorkbookBuilder.BuildLondonBordereaux(rows, requiredTabs);
+        var accountCurrentBytes = BordereauxWorkbookBuilder.BuildAccountCurrent(rows);
+        var periodLabel = run.PeriodStart.ToString("yyyy-MM");
+        var programName = SafeFilePart(run.Profile.ProgramConfiguration.Name);
+        var carrierName = SafeFilePart(run.Profile.Carrier.Name);
+        var londonFileName = $"{programName}-{carrierName}-London-BDX-{periodLabel}-run-{run.RunNumber}.xlsx";
+        var accountCurrentFileName = $"{programName}-{carrierName}-Account-Current-{periodLabel}-run-{run.RunNumber}.xlsx";
+
+        await using var londonStream = new MemoryStream(londonBytes);
+        await using var accountCurrentStream = new MemoryStream(accountCurrentBytes);
+        run.LondonBordereauxBlobPath = await _blobStorage.UploadAsync(londonStream, londonFileName, XlsxContentType);
+        run.LondonBordereauxFileName = londonFileName;
+        run.LondonBordereauxContentType = XlsxContentType;
+        run.AccountCurrentBlobPath = await _blobStorage.UploadAsync(accountCurrentStream, accountCurrentFileName, XlsxContentType);
+        run.AccountCurrentFileName = accountCurrentFileName;
+        run.AccountCurrentContentType = XlsxContentType;
+        run.Status = BordereauxRunStatus.Generated;
+        run.GeneratedById = generatedById;
+        run.GeneratedAt = DateTime.UtcNow;
+        run.BordereauxRowCount = rows.Count;
+        run.AccountCurrentRowCount = rows.Count;
+        run.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        return Result<BordereauxRunDto>.Success(MapRun(run, run.Profile.Name));
+    }
+
     public async Task<Result<BordereauxRunDto>> ReconcilePremiumRunAsync(
         Guid runId,
         ReconcileBordereauxRunRequest request,
@@ -435,6 +489,12 @@ public class BordereauxService : IBordereauxService
         run.ReconciliationStatus,
         run.GeneratedById,
         run.GeneratedAt,
+        run.LondonBordereauxBlobPath,
+        run.LondonBordereauxFileName,
+        run.LondonBordereauxContentType,
+        run.AccountCurrentBlobPath,
+        run.AccountCurrentFileName,
+        run.AccountCurrentContentType,
         run.BordereauxRowCount,
         run.AccountCurrentRowCount,
         run.DetailRowCountsJson,
@@ -504,6 +564,19 @@ public class BordereauxService : IBordereauxService
         return result;
     }
 
+    private static IReadOnlyList<string> ParseStringArray(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+            return [];
+
+        return document.RootElement
+            .EnumerateArray()
+            .Where(element => element.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(element.GetString()))
+            .Select(element => element.GetString()!.Trim())
+            .ToList();
+    }
+
     private static (string Code, string Message)? ValidateJsonArray(string json, string label)
     {
         using var document = TryParse(json, label, out var error);
@@ -560,6 +633,17 @@ public class BordereauxService : IBordereauxService
 
     private static string LabelToText(string label)
         => label.ToLowerInvariant().Replace('_', ' ');
+
+    private static string SafeFilePart(string value)
+    {
+        var cleaned = new string(value
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
+            .ToArray())
+            .Trim('-');
+        while (cleaned.Contains("--", StringComparison.Ordinal))
+            cleaned = cleaned.Replace("--", "-", StringComparison.Ordinal);
+        return string.IsNullOrWhiteSpace(cleaned) ? "bordereaux" : cleaned;
+    }
 
     private sealed record PreviewSourceRow(Invoice Invoice, PolicyTransaction Transaction);
 }

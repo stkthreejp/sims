@@ -70,6 +70,12 @@ export interface BordereauxRun {
   reconciliationStatus: string
   generatedById: string | null
   generatedAt: string | null
+  londonBordereauxBlobPath: string | null
+  londonBordereauxFileName: string | null
+  londonBordereauxContentType: string | null
+  accountCurrentBlobPath: string | null
+  accountCurrentFileName: string | null
+  accountCurrentContentType: string | null
   bordereauxRowCount: number
   accountCurrentRowCount: number
   detailRowCountsJson: string

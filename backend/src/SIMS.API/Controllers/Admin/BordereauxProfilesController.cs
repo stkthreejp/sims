@@ -94,6 +94,18 @@ public class BordereauxProfilesController : ControllerBase
             : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpPost("premium-runs/{runId:guid}/export-package")]
+    public async Task<IActionResult> GeneratePremiumExportPackage(Guid runId, CancellationToken ct)
+    {
+        var result = await _service.GeneratePremiumExportPackageAsync(runId, CurrentUserId, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        return result.ErrorCode is "RUN_NOT_FOUND"
+            ? NotFound(new { result.ErrorCode, result.ErrorMessage })
+            : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] UpsertBordereauxProfileRequest request, CancellationToken ct)
     {
