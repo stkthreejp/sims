@@ -1272,6 +1272,7 @@ const REPORT_CATEGORIES = [
       { id: 'commission-summary', label: 'Commission Summary' },
       { id: 'invoice-totals-by-program', label: 'Invoice Totals by Program' },
       { id: 'invoice-totals-by-transaction', label: 'Invoice Totals by Transaction' },
+      { id: 'bordereaux-workbench', label: 'Bordereaux Workbench', external: '/reports/bordereaux' },
       { id: 'qb-sync-health', label: 'QB Sync Health', external: '/billing/sync-health' },
     ],
   },

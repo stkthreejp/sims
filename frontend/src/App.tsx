@@ -94,6 +94,7 @@ const ActivityPage = lazy(() => import('@/pages/billing/ActivityPage').then((m) 
 const PeriodClosePage = lazy(() => import('@/pages/billing/PeriodClosePage').then((m) => ({ default: m.PeriodClosePage })))
 const SyncHealthPage = lazy(() => import('@/pages/billing/SyncHealthPage').then((m) => ({ default: m.SyncHealthPage })))
 const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
+const BordereauxWorkbenchPage = lazy(() => import('@/pages/reports/BordereauxWorkbenchPage').then((m) => ({ default: m.BordereauxWorkbenchPage })))
 
 const PageFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -228,6 +229,7 @@ export default function App() {
               <Route path="/billing/period-close" element={<PeriodClosePage />} />
               <Route path="/billing/sync-health" element={<SyncHealthPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/reports/bordereaux" element={<BordereauxWorkbenchPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
