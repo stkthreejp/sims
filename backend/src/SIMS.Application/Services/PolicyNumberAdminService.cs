@@ -66,9 +66,12 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
     {
         var assignments = await _db.Set<PolicyNumberAssignment>()
             .Include(a => a.PolicyNumberSequence)
+            .Include(a => a.ProgramConfiguration)
             .Include(a => a.Carrier)
             .Where(a => includeInactive || a.IsActive)
-            .OrderBy(a => a.Carrier.Name)
+            .OrderBy(a => a.ProgramConfiguration != null ? a.ProgramConfiguration.Name : "")
+            .ThenBy(a => a.ProgramConfigurationId == null ? 0 : 1)
+            .ThenBy(a => a.Carrier.Name)
             .ThenBy(a => a.LineOfBusiness)
             .ThenBy(a => a.State)
             .ToListAsync();
@@ -128,6 +131,7 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
     {
         var assignment = await _db.Set<PolicyNumberAssignment>()
             .Include(a => a.PolicyNumberSequence)
+            .Include(a => a.ProgramConfiguration)
             .Include(a => a.Carrier)
             .Where(a => a.Id == id)
             .FirstOrDefaultAsync();
@@ -148,6 +152,8 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
     {
         if (!await _db.Set<PolicyNumberSequence>().AnyAsync(s => s.Id == dto.PolicyNumberSequenceId))
             return Result.Failure("VALIDATION", "Select a valid sequence.");
+        if (dto.ProgramConfigurationId.HasValue && !await _db.Set<ProgramConfiguration>().AnyAsync(p => p.Id == dto.ProgramConfigurationId.Value && p.IsActive))
+            return Result.Failure("VALIDATION", "Select a valid active program.");
         if (!await _db.Set<Carrier>().AnyAsync(c => c.Id == dto.CarrierId))
             return Result.Failure("VALIDATION", "Select a valid carrier.");
         if (!string.IsNullOrWhiteSpace(dto.State) && dto.State.Trim().Length != 2)
@@ -171,6 +177,7 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
     private static void ApplyAssignment(PolicyNumberAssignment assignment, PolicyNumberAssignmentUpsertDto dto)
     {
         assignment.PolicyNumberSequenceId = dto.PolicyNumberSequenceId;
+        assignment.ProgramConfigurationId = dto.ProgramConfigurationId;
         assignment.CarrierId = dto.CarrierId;
         assignment.WritingCompanyId = dto.WritingCompanyId;
         assignment.LineOfBusiness = dto.LineOfBusiness;
@@ -198,6 +205,8 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         Id = assignment.Id,
         PolicyNumberSequenceId = assignment.PolicyNumberSequenceId,
         SequenceName = assignment.PolicyNumberSequence.Name,
+        ProgramConfigurationId = assignment.ProgramConfigurationId,
+        ProgramName = assignment.ProgramConfiguration?.Name,
         CarrierId = assignment.CarrierId,
         CarrierName = assignment.Carrier.Name,
         WritingCompanyId = assignment.WritingCompanyId,

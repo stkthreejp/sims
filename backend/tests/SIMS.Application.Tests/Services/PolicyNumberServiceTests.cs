@@ -108,7 +108,7 @@ public class PolicyNumberServiceTests
     }
 
     [Fact]
-    public async Task GenerateForBindAsync_DoesNotUseProgramToChooseBetweenCarrierLobAssignments()
+    public async Task GenerateForBindAsync_PrefersProgramSpecificAssignmentOverAllProgramAssignment()
     {
         await using var db = CreateDb();
         var longleaf = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
@@ -117,7 +117,8 @@ public class PolicyNumberServiceTests
         var quote = CreateQuote(carrier, "GA", PolicyLineOfBusiness.GeneralLiability, new DateOnly(2026, 7, 1));
         quote.ProgramId = shuttlebee.Id;
         quote.Program = shuttlebee;
-        var sequence = CreateSequence("Carrier LOB", "CLOB-{LOB}-{SEQ:00}", 21);
+        var allProgramSequence = CreateSequence("Carrier LOB", "CLOB-{LOB}-{SEQ:00}", 21);
+        var shuttlebeeSequence = CreateSequence("Shuttlebee Carrier LOB", "SHUT-{LOB}-{SEQ:00}", 4);
         db.AddRange(
             longleaf,
             shuttlebee,
@@ -125,14 +126,16 @@ public class PolicyNumberServiceTests
             quote.Submission.Insured,
             quote.Submission,
             quote,
-            sequence,
-            CreateAssignment(sequence, carrier, PolicyLineOfBusiness.GeneralLiability, null));
+            allProgramSequence,
+            shuttlebeeSequence,
+            CreateAssignment(allProgramSequence, carrier, PolicyLineOfBusiness.GeneralLiability, null),
+            CreateAssignment(shuttlebeeSequence, carrier, PolicyLineOfBusiness.GeneralLiability, null, programConfigurationId: shuttlebee.Id));
         await db.SaveChangesAsync();
 
         var result = await new PolicyNumberService(db).GenerateForBindAsync(quote, Guid.NewGuid());
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("CLOB-GL-21-01", result.Value!.PolicyNumber);
+        Assert.Equal("SHUT-GL-04-01", result.Value!.PolicyNumber);
     }
 
     [Fact]
@@ -250,11 +253,13 @@ public class PolicyNumberServiceTests
         Carrier carrier,
         PolicyLineOfBusiness lob,
         string? state,
-        int priority = 0) => new()
+        int priority = 0,
+        Guid? programConfigurationId = null) => new()
     {
         Id = Guid.NewGuid(),
         PolicyNumberSequenceId = sequence.Id,
         PolicyNumberSequence = sequence,
+        ProgramConfigurationId = programConfigurationId,
         CarrierId = carrier.Id,
         Carrier = carrier,
         LineOfBusiness = lob,

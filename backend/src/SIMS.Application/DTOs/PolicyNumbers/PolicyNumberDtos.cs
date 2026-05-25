@@ -34,6 +34,8 @@ public class PolicyNumberAssignmentDto
     public Guid Id { get; set; }
     public Guid PolicyNumberSequenceId { get; set; }
     public string SequenceName { get; set; } = string.Empty;
+    public Guid? ProgramConfigurationId { get; set; }
+    public string? ProgramName { get; set; }
     public Guid CarrierId { get; set; }
     public string CarrierName { get; set; } = string.Empty;
     public Guid? WritingCompanyId { get; set; }
@@ -46,6 +48,7 @@ public class PolicyNumberAssignmentDto
 public class PolicyNumberAssignmentUpsertDto
 {
     public Guid PolicyNumberSequenceId { get; set; }
+    public Guid? ProgramConfigurationId { get; set; }
     public Guid CarrierId { get; set; }
     public Guid? WritingCompanyId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }

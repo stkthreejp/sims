@@ -4,6 +4,7 @@ import { Check, Hash, Link2, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { policyNumbersApi } from '@/api/policyNumbers.api'
 import { carriersApi } from '@/api/carriers.api'
+import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { PolicyNumberAssignment, PolicyNumberAssignmentUpsert, PolicyNumberSequence, PolicyNumberSequenceUpsert } from '@/types/policyNumber.types'
@@ -49,6 +50,11 @@ export function PolicyNumbersAdminPage() {
   const { data: carriers = [] } = useQuery({
     queryKey: ['carriers', 'active'],
     queryFn: () => carriersApi.getAll(true),
+  })
+
+  const { data: programs = [] } = useQuery({
+    queryKey: ['admin', 'program-configurations'],
+    queryFn: () => programConfigurationsApi.getAll(true),
   })
 
   const previewCarrierName = useMemo(
@@ -134,6 +140,7 @@ export function PolicyNumbersAdminPage() {
   const resetAssignmentForm = () => {
     setAssignmentForm((f) => ({
       ...emptyAssignment,
+      programConfigurationId: f.programConfigurationId,
       policyNumberSequenceId: f.policyNumberSequenceId || sequences[0]?.id || '',
       carrierId: f.carrierId || carriers[0]?.id || '',
     }))
@@ -159,6 +166,7 @@ export function PolicyNumbersAdminPage() {
     setEditingAssignmentId(assignment.id)
     setAssignmentForm({
       policyNumberSequenceId: assignment.policyNumberSequenceId,
+      programConfigurationId: assignment.programConfigurationId ?? undefined,
       carrierId: assignment.carrierId,
       writingCompanyId: assignment.writingCompanyId ?? undefined,
       lineOfBusiness: assignment.lineOfBusiness,
@@ -253,7 +261,11 @@ export function PolicyNumbersAdminPage() {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-1 gap-2 border-b p-4 md:grid-cols-[minmax(180px,2fr)_minmax(160px,1.3fr)_minmax(140px,1fr)_80px_76px_auto]" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
+          <div className="grid grid-cols-1 gap-2 border-b p-4 md:grid-cols-[minmax(150px,1.5fr)_minmax(180px,1.8fr)_minmax(160px,1.3fr)_minmax(140px,1fr)_80px_76px_auto]" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
+            <select value={assignmentForm.programConfigurationId ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, programConfigurationId: e.target.value || undefined }))} className="sims-select">
+              <option value="">All programs</option>
+              {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+            </select>
             <select value={assignmentForm.policyNumberSequenceId} onChange={(e) => setAssignmentForm((f) => ({ ...f, policyNumberSequenceId: e.target.value }))} className="sims-select">
               {sequences.map((sequence) => <option key={sequence.id} value={sequence.id}>{sequence.name}</option>)}
             </select>
@@ -274,6 +286,7 @@ export function PolicyNumbersAdminPage() {
             <table className="sd-table">
               <thead>
                 <tr>
+                  <th>Program</th>
                   <th>Carrier</th>
                   <th>Line</th>
                   <th>Sequence</th>
@@ -286,6 +299,7 @@ export function PolicyNumbersAdminPage() {
               <tbody>
                 {assignments.map((assignment) => (
                   <tr key={assignment.id}>
+                    <td>{assignment.programName ?? 'All programs'}</td>
                     <td className="primary-cell">{assignment.carrierName}</td>
                     <td>{LOB_LABELS[assignment.lineOfBusiness]}</td>
                     <td>{assignment.sequenceName}</td>
@@ -308,7 +322,7 @@ export function PolicyNumbersAdminPage() {
                 ))}
                 {assignments.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center" style={{ color: 'var(--ink-4)' }}>No assignments yet.</td>
+                    <td colSpan={8} className="py-8 text-center" style={{ color: 'var(--ink-4)' }}>No assignments yet.</td>
                   </tr>
                 )}
               </tbody>
@@ -383,6 +397,7 @@ function cleanSequence(sequence: PolicyNumberSequenceUpsert): PolicyNumberSequen
 function cleanAssignment(assignment: PolicyNumberAssignmentUpsert): PolicyNumberAssignmentUpsert {
   return {
     ...assignment,
+    programConfigurationId: assignment.programConfigurationId || undefined,
     state: assignment.state || undefined,
     priority: Number(assignment.priority) || 0,
   }

@@ -31,6 +31,8 @@ export interface PolicyNumberAssignment {
   id: string
   policyNumberSequenceId: string
   sequenceName: string
+  programConfigurationId: string | null
+  programName: string | null
   carrierId: string
   carrierName: string
   writingCompanyId: string | null
@@ -42,6 +44,7 @@ export interface PolicyNumberAssignment {
 
 export interface PolicyNumberAssignmentUpsert {
   policyNumberSequenceId: string
+  programConfigurationId?: string
   carrierId: string
   writingCompanyId?: string
   lineOfBusiness: PolicyLineOfBusiness

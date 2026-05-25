@@ -5267,6 +5267,9 @@ namespace SIMS.Infrastructure.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("ProgramConfigurationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("State")
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
@@ -5279,9 +5282,12 @@ namespace SIMS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CarrierId");
+
                     b.HasIndex("PolicyNumberSequenceId");
 
-                    b.HasIndex("CarrierId", "WritingCompanyId", "LineOfBusiness", "State", "IsActive");
+                    b.HasIndex("ProgramConfigurationId", "CarrierId", "WritingCompanyId", "LineOfBusiness", "State", "IsActive")
+                        .HasDatabaseName("ix_policy_number_assignments_program_lookup");
 
                     b.ToTable("policy_number_assignments", (string)null);
                 });
@@ -10520,9 +10526,16 @@ namespace SIMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SIMS.Domain.Entities.ProgramConfiguration", "ProgramConfiguration")
+                        .WithMany()
+                        .HasForeignKey("ProgramConfigurationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Carrier");
 
                     b.Navigation("PolicyNumberSequence");
+
+                    b.Navigation("ProgramConfiguration");
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.PolicyNumberSequenceUsage", b =>

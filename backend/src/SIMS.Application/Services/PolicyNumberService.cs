@@ -24,7 +24,7 @@ public class PolicyNumberService : IPolicyNumberService
             return Result<PolicyNumberGenerationResult>.Failure("POLICY_NUMBER_EXISTS", "This quote already has a policy number.");
 
         var state = quote.Submission?.Insured?.State?.Trim().ToUpperInvariant();
-        var assignment = await FindAssignmentAsync(quote.CarrierId, quote.LineOfBusiness, state);
+        var assignment = await FindAssignmentAsync(quote.ProgramId, quote.CarrierId, quote.LineOfBusiness, state);
 
         if (assignment == null)
             return await GenerateLegacyNumberAsync();
@@ -84,18 +84,20 @@ public class PolicyNumberService : IPolicyNumberService
         }
     }
 
-    private async Task<PolicyNumberAssignment?> FindAssignmentAsync(Guid carrierId, PolicyLineOfBusiness lob, string? state)
+    private async Task<PolicyNumberAssignment?> FindAssignmentAsync(Guid? programConfigurationId, Guid carrierId, PolicyLineOfBusiness lob, string? state)
     {
         var assignments = await _db.Set<PolicyNumberAssignment>()
             .Include(a => a.PolicyNumberSequence)
             .Where(a =>
                 a.IsActive &&
                 a.PolicyNumberSequence.IsActive &&
+                (a.ProgramConfigurationId == null || (programConfigurationId.HasValue && a.ProgramConfigurationId == programConfigurationId.Value)) &&
                 a.CarrierId == carrierId &&
                 a.LineOfBusiness == lob &&
                 a.WritingCompanyId == null &&
                 (a.State == null || a.State == state))
-            .OrderByDescending(a => a.State != null)
+            .OrderByDescending(a => programConfigurationId.HasValue && a.ProgramConfigurationId == programConfigurationId.Value)
+            .ThenByDescending(a => a.State != null)
             .ThenBy(a => a.Priority)
             .ThenBy(a => a.CreatedAt)
             .ToListAsync();

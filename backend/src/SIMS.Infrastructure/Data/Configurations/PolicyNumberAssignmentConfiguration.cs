@@ -11,11 +11,17 @@ public class PolicyNumberAssignmentConfiguration : IEntityTypeConfiguration<Poli
         builder.ToTable("policy_number_assignments");
         builder.HasKey(a => a.Id);
         builder.Property(a => a.State).HasMaxLength(2);
-        builder.HasIndex(a => new { a.CarrierId, a.WritingCompanyId, a.LineOfBusiness, a.State, a.IsActive });
+        builder.HasIndex(a => new { a.ProgramConfigurationId, a.CarrierId, a.WritingCompanyId, a.LineOfBusiness, a.State, a.IsActive })
+            .HasDatabaseName("ix_policy_number_assignments_program_lookup");
 
         builder.HasOne(a => a.PolicyNumberSequence)
             .WithMany(s => s.Assignments)
             .HasForeignKey(a => a.PolicyNumberSequenceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(a => a.ProgramConfiguration)
+            .WithMany()
+            .HasForeignKey(a => a.ProgramConfigurationId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(a => a.Carrier)
