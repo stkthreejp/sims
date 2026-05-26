@@ -413,6 +413,41 @@ public class BordereauxServiceTests
         Assert.Contains("348.24", londonText);
     }
 
+    [Fact]
+    public async Task GetRunFileDownloadUrlAsync_ReturnsSignedUrlForGeneratedLondonFile()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        var url = await service.GetRunFileDownloadUrlAsync(run.Value.Id, BordereauxRunFileKind.LondonBordereaux);
+
+        Assert.True(url.IsSuccess);
+        Assert.Contains("bordereaux-test/1/", url.Value);
+        Assert.Contains("London-BDX", url.Value);
+    }
+
+    [Fact]
+    public async Task GetRunFileDownloadUrlAsync_RejectsRunWithoutGeneratedFile()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        var url = await service.GetRunFileDownloadUrlAsync(run.Value!.Id, BordereauxRunFileKind.AccountCurrent);
+
+        Assert.False(url.IsSuccess);
+        Assert.Equal("FILE_NOT_GENERATED", url.ErrorCode);
+    }
+
     private static UpsertBordereauxProfileRequest ValidRequest(Guid programId, Guid carrierId) => new(
         Name: "BRACE London BDX",
         ProgramConfigurationId: programId,
@@ -584,7 +619,7 @@ public class BordereauxServiceTests
             return $"bordereaux-test/{Uploads.Count}/{fileName}";
         }
 
-        public Task<string> GetDownloadUrlAsync(string blobPath, string fileName, TimeSpan? expiry = null) => Task.FromResult(blobPath);
+        public Task<string> GetDownloadUrlAsync(string blobPath, string fileName, TimeSpan? expiry = null) => Task.FromResult($"https://blob.test/{blobPath}?download={Uri.EscapeDataString(fileName)}");
         public Task<byte[]> DownloadAsync(string blobPath) => Task.FromResult(Array.Empty<byte>());
         public Task DeleteAsync(string blobPath) => Task.CompletedTask;
 

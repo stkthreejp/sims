@@ -37,3 +37,9 @@ public record ReconcileBordereauxRunRequest(
     decimal AccountCurrentGrossCommissionTotal,
     decimal AccountCurrentFeesTotal,
     decimal AccountCurrentNetDueCarrierTotal);
+
+public enum BordereauxRunFileKind
+{
+    LondonBordereaux = 1,
+    AccountCurrent = 2,
+}

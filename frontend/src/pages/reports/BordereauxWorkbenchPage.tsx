@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCcw, Save, Search } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCcw, Save, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createBordereauxPremiumRun,
   generateBordereauxExportPackage,
+  getAccountCurrentDownloadUrl,
   getBordereauxPremiumPreview,
   getBordereauxProfiles,
   getBordereauxRun,
   getBordereauxRuns,
+  getLondonBordereauxDownloadUrl,
   reconcileBordereauxRun,
 } from '@/api/bordereaux.api'
 import type {
@@ -209,6 +211,16 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
   )
 }
 
+function openDownload(url: string, fileName?: string | null) {
+  const link = document.createElement('a')
+  link.href = url
+  if (fileName) link.download = fileName
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
 export function BordereauxWorkbenchPage() {
   const queryClient = useQueryClient()
   const [profileId, setProfileId] = useState('')
@@ -266,6 +278,20 @@ export function BordereauxWorkbenchPage() {
       queryClient.invalidateQueries({ queryKey: ['bordereaux', 'runs', profileId] })
     },
     onError: () => toast.error('Could not generate the export package'),
+  })
+
+  const downloadFile = useMutation({
+    mutationFn: async ({ run, kind }: { run: BordereauxRun; kind: 'london' | 'accountCurrent' }) => {
+      const url = kind === 'london'
+        ? await getLondonBordereauxDownloadUrl(run.id)
+        : await getAccountCurrentDownloadUrl(run.id)
+      return {
+        url,
+        fileName: kind === 'london' ? run.londonBordereauxFileName : run.accountCurrentFileName,
+      }
+    },
+    onSuccess: ({ url, fileName }) => openDownload(url, fileName),
+    onError: () => toast.error('Could not get the download link'),
   })
 
   const selectedProfile = premiumProfiles.find((profile) => profile.id === profileId)
@@ -392,9 +418,21 @@ export function BordereauxWorkbenchPage() {
                 <Metric label="Status" value={selectedRun.status} />
               </div>
               {(selectedRun.londonBordereauxFileName || selectedRun.accountCurrentFileName) && (
-                <div style={{ display: 'grid', gap: 5, marginBottom: 12, color: 'var(--ink-3)', fontSize: 12 }}>
-                  {selectedRun.londonBordereauxFileName && <span>{selectedRun.londonBordereauxFileName}</span>}
-                  {selectedRun.accountCurrentFileName && <span>{selectedRun.accountCurrentFileName}</span>}
+                <div style={{ display: 'grid', gap: 7, marginBottom: 12, color: 'var(--ink-3)', fontSize: 12 }}>
+                  {selectedRun.londonBordereauxFileName && (
+                    <FileDownloadRow
+                      label={selectedRun.londonBordereauxFileName}
+                      disabled={downloadFile.isPending}
+                      onClick={() => downloadFile.mutate({ run: selectedRun, kind: 'london' })}
+                    />
+                  )}
+                  {selectedRun.accountCurrentFileName && (
+                    <FileDownloadRow
+                      label={selectedRun.accountCurrentFileName}
+                      disabled={downloadFile.isPending}
+                      onClick={() => downloadFile.mutate({ run: selectedRun, kind: 'accountCurrent' })}
+                    />
+                  )}
                 </div>
               )}
               <div style={{ display: 'grid', gap: 10 }}>
@@ -414,6 +452,18 @@ export function BordereauxWorkbenchPage() {
           queryClient.invalidateQueries({ queryKey: ['bordereaux', 'runs', profileId] })
         }}
       />
+    </div>
+  )
+}
+
+function FileDownloadRow({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: '1px solid var(--line-2)', borderRadius: 8, padding: '7px 9px', background: 'var(--surface-2)' }}>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <button type="button" className="sd-btn outline sm" disabled={disabled} onClick={onClick}>
+        <Download size={13} />
+        Download
+      </button>
     </div>
   )
 }

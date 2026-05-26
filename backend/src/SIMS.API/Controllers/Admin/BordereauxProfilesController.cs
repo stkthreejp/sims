@@ -106,6 +106,14 @@ public class BordereauxProfilesController : ControllerBase
             : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("premium-runs/{runId:guid}/london-bordereaux/download-url")]
+    public Task<IActionResult> GetLondonBordereauxDownloadUrl(Guid runId, CancellationToken ct)
+        => GetRunFileDownloadUrl(runId, BordereauxRunFileKind.LondonBordereaux, ct);
+
+    [HttpGet("premium-runs/{runId:guid}/account-current/download-url")]
+    public Task<IActionResult> GetAccountCurrentDownloadUrl(Guid runId, CancellationToken ct)
+        => GetRunFileDownloadUrl(runId, BordereauxRunFileKind.AccountCurrent, ct);
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] UpsertBordereauxProfileRequest request, CancellationToken ct)
     {
@@ -118,5 +126,16 @@ public class BordereauxProfilesController : ControllerBase
     {
         var result = await _service.UpdateProfileAsync(id, request, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    private async Task<IActionResult> GetRunFileDownloadUrl(Guid runId, BordereauxRunFileKind fileKind, CancellationToken ct)
+    {
+        var result = await _service.GetRunFileDownloadUrlAsync(runId, fileKind, ct);
+        if (result.IsSuccess)
+            return Ok(new { url = result.Value });
+
+        return result.ErrorCode is "RUN_NOT_FOUND"
+            ? NotFound(new { result.ErrorCode, result.ErrorMessage })
+            : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 }

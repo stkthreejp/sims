@@ -46,3 +46,9 @@ export const reconcileBordereauxRun = (
 
 export const generateBordereauxExportPackage = (runId: string): Promise<BordereauxRun> =>
   apiClient.post<BordereauxRun>(`${BASE}/premium-runs/${runId}/export-package`).then((r) => r.data)
+
+export const getLondonBordereauxDownloadUrl = (runId: string): Promise<string> =>
+  apiClient.get<{ url: string }>(`${BASE}/premium-runs/${runId}/london-bordereaux/download-url`).then((r) => r.data.url)
+
+export const getAccountCurrentDownloadUrl = (runId: string): Promise<string> =>
+  apiClient.get<{ url: string }>(`${BASE}/premium-runs/${runId}/account-current/download-url`).then((r) => r.data.url)

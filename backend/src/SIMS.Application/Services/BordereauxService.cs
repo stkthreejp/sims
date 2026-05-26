@@ -294,6 +294,34 @@ public class BordereauxService : IBordereauxService
         return Result<BordereauxRunDto>.Success(MapRun(run, run.Profile.Name));
     }
 
+    public async Task<Result<string>> GetRunFileDownloadUrlAsync(
+        Guid runId,
+        BordereauxRunFileKind fileKind,
+        CancellationToken ct = default)
+    {
+        if (_blobStorage is null)
+            return Result<string>.Failure("BLOB_STORAGE_NOT_CONFIGURED", "Blob storage is not configured.");
+
+        var run = await _db.Set<BordereauxRun>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == runId, ct);
+        if (run is null)
+            return Result<string>.Failure("RUN_NOT_FOUND", "Bordereaux run not found.");
+
+        var (blobPath, fileName) = fileKind switch
+        {
+            BordereauxRunFileKind.LondonBordereaux => (run.LondonBordereauxBlobPath, run.LondonBordereauxFileName),
+            BordereauxRunFileKind.AccountCurrent => (run.AccountCurrentBlobPath, run.AccountCurrentFileName),
+            _ => (null, null),
+        };
+
+        if (string.IsNullOrWhiteSpace(blobPath) || string.IsNullOrWhiteSpace(fileName))
+            return Result<string>.Failure("FILE_NOT_GENERATED", "The requested bordereaux file has not been generated yet.");
+
+        var url = await _blobStorage.GetDownloadUrlAsync(blobPath, fileName);
+        return Result<string>.Success(url);
+    }
+
     public async Task<Result<BordereauxRunDto>> ReconcilePremiumRunAsync(
         Guid runId,
         ReconcileBordereauxRunRequest request,
