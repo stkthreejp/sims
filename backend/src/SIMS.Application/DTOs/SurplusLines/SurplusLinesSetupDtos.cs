@@ -1,0 +1,70 @@
+using SIMS.Domain.Enums;
+
+namespace SIMS.Application.DTOs.SurplusLines;
+
+public record SurplusLinesStateSetupDto(
+    Guid Id,
+    string StateCode,
+    Guid? ProgramConfigurationId,
+    string? ProgramName,
+    Guid? CarrierId,
+    string? CarrierName,
+    PolicyLineOfBusiness? LineOfBusiness,
+    string? LineOfBusinessLabel,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    bool IsActive,
+    bool FilingRequired,
+    string LicenseHolderType,
+    string FilingBrokerName,
+    string LicenseNumber,
+    string LicenseState,
+    string BrokerAddressLine1,
+    string? BrokerAddressLine2,
+    string BrokerCity,
+    string BrokerState,
+    string BrokerZipCode,
+    string BrokerCountry,
+    string? StampingWording,
+    string? RequiredNoticeText,
+    string? PaperworkNotes,
+    string? FilingNotes,
+    long? SurplusLinesTaxFeeDefinitionId,
+    string? SurplusLinesTaxFeeName,
+    long? StampingFeeDefinitionId,
+    string? StampingFeeName,
+    long? FilingFeeDefinitionId,
+    string? FilingFeeName,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
+
+public record UpsertSurplusLinesStateSetupRequest(
+    string StateCode,
+    Guid? ProgramConfigurationId,
+    Guid? CarrierId,
+    PolicyLineOfBusiness? LineOfBusiness,
+    DateOnly EffectiveDate,
+    DateOnly? ExpirationDate,
+    bool IsActive,
+    bool FilingRequired,
+    string LicenseHolderType,
+    string FilingBrokerName,
+    string LicenseNumber,
+    string LicenseState,
+    string BrokerAddressLine1,
+    string? BrokerAddressLine2,
+    string BrokerCity,
+    string BrokerState,
+    string BrokerZipCode,
+    string BrokerCountry,
+    string? StampingWording,
+    string? RequiredNoticeText,
+    string? PaperworkNotes,
+    string? FilingNotes,
+    long? SurplusLinesTaxFeeDefinitionId,
+    long? StampingFeeDefinitionId,
+    long? FilingFeeDefinitionId
+);
+
+public record CopySurplusLinesStateSetupRequest(string TargetStateCode);

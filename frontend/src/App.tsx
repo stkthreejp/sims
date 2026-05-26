@@ -80,6 +80,7 @@ const LegalRequirementsPage = lazy(() => import('@/pages/admin/LegalRequirements
 const AiSettingsAdminPage = lazy(() => import('@/pages/admin/AiSettingsAdminPage').then((m) => ({ default: m.AiSettingsAdminPage })))
 const ProgramConfigurationAdminPage = lazy(() => import('@/pages/admin/ProgramConfigurationAdminPage').then((m) => ({ default: m.ProgramConfigurationAdminPage })))
 const UnderwritingControlsAdminPage = lazy(() => import('@/pages/admin/UnderwritingControlsAdminPage').then((m) => ({ default: m.UnderwritingControlsAdminPage })))
+const SurplusLinesAdminPage = lazy(() => import('@/pages/admin/SurplusLinesAdminPage').then((m) => ({ default: m.SurplusLinesAdminPage })))
 
 // Quotes & Billing
 const QuoteDetailPage = lazy(() => import('@/pages/quotes/QuoteDetailPage').then((m) => ({ default: m.QuoteDetailPage })))
@@ -217,6 +218,7 @@ export default function App() {
               <Route path="/admin/ai-settings" element={<AiSettingsAdminPage />} />
               <Route path="/admin/programs" element={<ProgramConfigurationAdminPage />} />
               <Route path="/admin/underwriting-controls" element={<UnderwritingControlsAdminPage />} />
+              <Route path="/admin/surplus-lines" element={<SurplusLinesAdminPage />} />
               <Route path="/quotes/:quoteId" element={<QuoteDetailPage />} />
               <Route path="/quotes/:quoteId/writeup" element={<QuoteWriteupPage />} />
               <Route path="/billing/invoices" element={<InvoicesPage />} />
