@@ -180,6 +180,7 @@ public class BordereauxService : IBordereauxService
             .MaxAsync(ct) ?? 0;
 
         var rowCount = preview.Value!.Rows.Count;
+        var validationSummary = await BuildRunValidationSummaryAsync(profile, preview.Value.Rows, periodStart, periodEnd, ct);
         var run = new BordereauxRun
         {
             BordereauxProfileId = profileId,
@@ -195,12 +196,7 @@ public class BordereauxService : IBordereauxService
             {
                 premiumRows = rowCount,
             }, SnapshotJsonOptions),
-            ValidationSummaryJson = JsonSerializer.Serialize(new
-            {
-                status = "not_run",
-                errors = 0,
-                warnings = 0,
-            }, SnapshotJsonOptions),
+            ValidationSummaryJson = validationSummary,
             ReconciliationSummaryJson = JsonSerializer.Serialize(new
             {
                 status = "not_run",
@@ -710,6 +706,75 @@ public class BordereauxService : IBordereauxService
                             LondonTransactionCode(t.TransactionType, t.PremiumChange)))
                         .ToList()
                     : []));
+    }
+
+    private async Task<string> BuildRunValidationSummaryAsync(
+        BordereauxProfile profile,
+        IReadOnlyList<BordereauxPremiumPreviewRowDto> rows,
+        DateOnly periodStart,
+        DateOnly periodEnd,
+        CancellationToken ct)
+    {
+        var lobSetups = await _db.Set<ProgramCarrierLineOfBusiness>()
+            .Include(l => l.ProgramCarrier)
+            .Where(l => l.ProgramCarrier.ProgramConfigurationId == profile.ProgramConfigurationId
+                && l.ProgramCarrier.CarrierId == profile.CarrierId
+                && l.ProgramCarrier.IsActive
+                && l.IsActive
+                && l.EffectiveDate <= periodEnd
+                && (l.ExpirationDate == null || l.ExpirationDate >= periodStart)
+                && l.ProgramCarrier.EffectiveDate <= periodEnd
+                && (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= periodStart))
+            .ToListAsync(ct);
+
+        var surplusLinesSetups = await _db.Set<SurplusLinesStateSetup>()
+            .Where(s => s.IsActive
+                && s.EffectiveDate <= periodEnd
+                && (s.ExpirationDate == null || s.ExpirationDate >= periodStart)
+                && (s.ProgramConfigurationId == profile.ProgramConfigurationId || s.ProgramConfigurationId == null)
+                && (s.CarrierId == profile.CarrierId || s.CarrierId == null))
+            .ToListAsync(ct);
+
+        var missingLondonRows = rows
+            .Where(row => ResolveLobSetup(lobSetups, row.LineOfBusiness, row.ReportingDate) is null)
+            .ToList();
+        var missingSurplusLinesRows = rows
+            .Where(row => ResolveSurplusLinesSetup(surplusLinesSetups, row, row.ReportingDate, profile.ProgramConfigurationId) is null)
+            .ToList();
+
+        var warnings = new List<object>();
+        warnings.AddRange(missingLondonRows.Select(row => new
+        {
+            code = "MISSING_LONDON_LOB_SETUP",
+            row.PolicyNumber,
+            row.TransactionNumber,
+            row.LineOfBusiness,
+            row.ReportingDate,
+            message = "No active Program > Carrier > LOB London setup matched this row."
+        }));
+        warnings.AddRange(missingSurplusLinesRows.Select(row => new
+        {
+            code = "MISSING_SURPLUS_LINES_SETUP",
+            row.PolicyNumber,
+            row.TransactionNumber,
+            row.LineOfBusiness,
+            row.InsuredState,
+            row.ReportingDate,
+            message = "No active surplus lines setup matched this row's program, carrier, LOB, state, and reporting date."
+        }));
+
+        return JsonSerializer.Serialize(new
+        {
+            status = warnings.Count == 0 ? "clear" : "warnings",
+            errors = 0,
+            warnings = warnings.Count,
+            periodStart,
+            periodEnd,
+            rowCount = rows.Count,
+            missingLondonLobSetupRows = missingLondonRows.Count,
+            missingSurplusLinesSetupRows = missingSurplusLinesRows.Count,
+            items = warnings,
+        }, SnapshotJsonOptions);
     }
 
     private static string LondonTransactionCode(TransactionType transactionType, decimal grossPremium)

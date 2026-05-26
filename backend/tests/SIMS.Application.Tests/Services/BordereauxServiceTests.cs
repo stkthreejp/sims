@@ -229,6 +229,24 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task CreatePremiumRunSnapshotAsync_RecordsMissingSetupValidationWarnings()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        Assert.True(run.IsSuccess);
+        Assert.Contains("\"status\":\"warnings\"", run.Value!.ValidationSummaryJson);
+        Assert.Contains("\"missingLondonLobSetupRows\":1", run.Value.ValidationSummaryJson);
+        Assert.Contains("\"missingSurplusLinesSetupRows\":1", run.Value.ValidationSummaryJson);
+        Assert.Contains("LL-GL-000145-00", run.Value.ValidationSummaryJson);
+    }
+
+    [Fact]
     public async Task CreatePremiumRunSnapshotAsync_CreatesNextRunNumberWithoutOverwritingPriorRun()
     {
         await using var db = CreateDb();
