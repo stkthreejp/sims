@@ -68,11 +68,83 @@ function summarizeRows(rows: BordereauxPremiumPreviewRow[]) {
   )
 }
 
+interface ValidationSummary {
+  status?: string
+  errors?: number
+  warnings?: number
+  missingLondonLobSetupRows?: number
+  missingSurplusLinesSetupRows?: number
+  items?: Array<{
+    code?: string
+    policyNumber?: string
+    transactionNumber?: string
+    lineOfBusiness?: string
+    insuredState?: string
+    reportingDate?: string
+    message?: string
+  }>
+}
+
+function parseValidationSummary(run?: BordereauxRun | null): ValidationSummary | null {
+  if (!run?.validationSummaryJson) return null
+  try {
+    return JSON.parse(run.validationSummaryJson) as ValidationSummary
+  } catch {
+    return null
+  }
+}
+
 function profileLabel(profile: BordereauxProfile) {
   const scope = [profile.programName, profile.carrierName, profile.lineOfBusiness, profile.stateCode]
     .filter(Boolean)
     .join(' / ')
   return scope ? `${profile.name} (${scope})` : profile.name
+}
+
+function ValidationPanel({ run }: { run: BordereauxRun }) {
+  const summary = parseValidationSummary(run)
+  if (!summary) return null
+
+  const warningCount = summary.warnings ?? summary.items?.length ?? 0
+  const errorCount = summary.errors ?? 0
+  const hasIssues = warningCount > 0 || errorCount > 0
+
+  return (
+    <div style={{
+      border: `1px solid ${hasIssues ? '#f59e0b' : '#bbf7d0'}`,
+      borderRadius: 8,
+      background: hasIssues ? '#fffbeb' : '#f0fdf4',
+      padding: 12,
+      marginBottom: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: hasIssues ? '#92400e' : '#166534', fontSize: 13, fontWeight: 750 }}>
+        {hasIssues ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
+        {hasIssues ? `${warningCount} setup warning${warningCount === 1 ? '' : 's'}` : 'No setup warnings recorded'}
+      </div>
+      {hasIssues && (
+        <>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#92400e' }}>
+            <span>Missing London LOB setup: {summary.missingLondonLobSetupRows ?? 0}</span>
+            <span>Missing surplus lines setup: {summary.missingSurplusLinesSetupRows ?? 0}</span>
+          </div>
+          <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
+            {(summary.items ?? []).slice(0, 8).map((item, index) => (
+              <div key={`${item.code}-${item.policyNumber}-${item.transactionNumber}-${index}`} style={{ borderTop: '1px solid #fde68a', paddingTop: 6, fontSize: 12, color: '#78350f' }}>
+                <strong>{item.policyNumber ?? 'Policy'} {item.transactionNumber ? `/ ${item.transactionNumber}` : ''}</strong>
+                <span> - {item.message ?? item.code}</span>
+                <div style={{ marginTop: 2, color: '#92400e' }}>
+                  {[item.lineOfBusiness, item.insuredState, formatDate(item.reportingDate)].filter(Boolean).join(' / ')}
+                </div>
+              </div>
+            ))}
+            {(summary.items?.length ?? 0) > 8 && (
+              <div style={{ fontSize: 12, color: '#92400e' }}>{(summary.items?.length ?? 0) - 8} more warning rows in the audit JSON.</div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -435,7 +507,9 @@ export function BordereauxWorkbenchPage() {
                   )}
                 </div>
               )}
+              <ValidationPanel run={selectedRun} />
               <div style={{ display: 'grid', gap: 10 }}>
+                <SnapshotBlock title="Validation Summary" json={selectedRun.validationSummaryJson} />
                 <SnapshotBlock title="Profile Snapshot" json={selectedRun.profileSnapshotJson} />
                 <SnapshotBlock title="Reconciliation" json={selectedRun.reconciliationSummaryJson} />
                 <SnapshotBlock title="Source Rows" json={selectedRun.sourceRowsSnapshotJson} compact />
