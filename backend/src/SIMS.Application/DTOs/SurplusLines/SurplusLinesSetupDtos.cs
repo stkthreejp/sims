@@ -35,6 +35,7 @@ public record SurplusLinesStateSetupDto(
     string? StampingFeeName,
     long? FilingFeeDefinitionId,
     string? FilingFeeName,
+    IReadOnlyList<string> FeeValidationMessages,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

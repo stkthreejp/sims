@@ -146,6 +146,102 @@ public class SurplusLinesSetupAdminServiceTests
         Assert.Equal("FEE_DEFINITION_NOT_FOUND", result.ErrorCode);
     }
 
+    [Fact]
+    public async Task CreateAsync_ReturnsValidationMessageWhenLinkedFeeHasNoMatchingRule()
+    {
+        await using var db = CreateDb();
+        var fee = new FeeDefinition { Code = "TX_SL_TAX", DisplayName = "TX Surplus Lines Tax", FeeCategory = "Tax", LedgerAccountId = 1 };
+        db.Add(fee);
+        await db.SaveChangesAsync();
+
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "TX",
+            null,
+            null,
+            PolicyLineOfBusiness.GeneralLiability,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "TX-SL-1",
+            "TX",
+            "123 Main",
+            null,
+            "Dallas",
+            "TX",
+            "75201",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            fee.Id,
+            null,
+            null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(result.Value!.FeeValidationMessages, message => message.Contains("TX Surplus Lines Tax"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_DoesNotReturnValidationMessageWhenLinkedFeeHasMatchingRule()
+    {
+        await using var db = CreateDb();
+        var fee = new FeeDefinition { Code = "TX_SL_TAX", DisplayName = "TX Surplus Lines Tax", FeeCategory = "Tax", LedgerAccountId = 1 };
+        db.Add(fee);
+        await db.SaveChangesAsync();
+        db.Add(new FeeRuleVersion
+        {
+            FeeDefinitionId = fee.Id,
+            StateCode = "TX",
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability.ToString(),
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            CalcType = "Percent",
+            PercentRate = 0.0485m,
+            InstallmentBehavior = "PerInstallment",
+            RoundingMode = "NearestCent",
+            PayableRouting = "Entity",
+            CreatedBy = Guid.NewGuid(),
+        });
+        await db.SaveChangesAsync();
+
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "TX",
+            null,
+            null,
+            PolicyLineOfBusiness.GeneralLiability,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "TX-SL-1",
+            "TX",
+            "123 Main",
+            null,
+            "Dallas",
+            "TX",
+            "75201",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            fee.Id,
+            null,
+            null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.FeeValidationMessages);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

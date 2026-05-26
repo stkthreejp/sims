@@ -277,6 +277,9 @@ export function SurplusLinesAdminPage() {
                       </td>
                       <td className="text-xs text-slate-600">
                         {[setup.surplusLinesTaxFeeName, setup.stampingFeeName, setup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'}
+                        {setup.feeValidationMessages.length > 0 && (
+                          <div className="mt-1 font-medium text-amber-700">{setup.feeValidationMessages.length} fee setup issue{setup.feeValidationMessages.length === 1 ? '' : 's'}</div>
+                        )}
                       </td>
                       <td><StatusPill active={setup.isActive} filingRequired={setup.filingRequired} /></td>
                       <td>
@@ -308,6 +311,14 @@ export function SurplusLinesAdminPage() {
                 <DetailBlock label="License" value={`${selectedSetup.licenseNumber} (${selectedSetup.licenseState})`} />
                 <DetailBlock label="Address" value={[selectedSetup.brokerAddressLine1, selectedSetup.brokerAddressLine2, selectedSetup.brokerCity, selectedSetup.brokerState, selectedSetup.brokerZipCode, selectedSetup.brokerCountry].filter(Boolean).join(', ')} />
                 <DetailBlock label="Linked fees" value={[selectedSetup.surplusLinesTaxFeeName, selectedSetup.stampingFeeName, selectedSetup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'} />
+                {selectedSetup.feeValidationMessages.length > 0 && (
+                  <div className="rounded border border-amber-200 bg-amber-50 p-3 md:col-span-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Fee setup issues</div>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
+                      {selectedSetup.feeValidationMessages.map((message) => <li key={message}>{message}</li>)}
+                    </ul>
+                  </div>
+                )}
                 <DetailBlock label="Stamping wording" value={selectedSetup.stampingWording || 'None'} />
                 <DetailBlock label="Required notice" value={selectedSetup.requiredNoticeText || 'None'} />
                 <DetailBlock label="Paperwork notes" value={selectedSetup.paperworkNotes || 'None'} />

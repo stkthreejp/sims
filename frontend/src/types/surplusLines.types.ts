@@ -33,6 +33,7 @@ export interface SurplusLinesStateSetup {
   stampingFeeName: string | null
   filingFeeDefinitionId: number | null
   filingFeeName: string | null
+  feeValidationMessages: string[]
   createdAt: string
   updatedAt: string
 }

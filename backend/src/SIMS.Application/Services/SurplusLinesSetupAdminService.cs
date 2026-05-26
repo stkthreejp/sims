@@ -28,7 +28,10 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             .ThenByDescending(s => s.EffectiveDate)
             .ToListAsync(ct);
 
-        return setups.Select(Map).ToList();
+        var result = new List<SurplusLinesStateSetupDto>();
+        foreach (var setup in setups)
+            result.Add(await MapAsync(setup, ct));
+        return result;
     }
 
     public async Task<Result<SurplusLinesStateSetupDto>> GetAsync(Guid id, CancellationToken ct = default)
@@ -36,7 +39,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         var setup = await BaseQuery().SingleOrDefaultAsync(s => s.Id == id, ct);
         return setup is null
             ? Result<SurplusLinesStateSetupDto>.Failure("SURPLUS_LINES_SETUP_NOT_FOUND", "Surplus lines setup was not found.")
-            : Result<SurplusLinesStateSetupDto>.Success(Map(setup));
+            : Result<SurplusLinesStateSetupDto>.Success(await MapAsync(setup, ct));
     }
 
     public async Task<Result<SurplusLinesStateSetupDto>> CreateAsync(UpsertSurplusLinesStateSetupRequest request, CancellationToken ct = default)
@@ -221,7 +224,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             : Result<string>.Failure("STATE_CODE_INVALID", "State code must be two characters.");
     }
 
-    private static SurplusLinesStateSetupDto Map(SurplusLinesStateSetup setup) =>
+    private async Task<SurplusLinesStateSetupDto> MapAsync(SurplusLinesStateSetup setup, CancellationToken ct) =>
         new(
             setup.Id,
             setup.StateCode,
@@ -255,8 +258,40 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             setup.StampingFeeDefinition?.DisplayName,
             setup.FilingFeeDefinitionId,
             setup.FilingFeeDefinition?.DisplayName,
+            await GetFeeValidationMessagesAsync(setup, ct),
             setup.CreatedAt,
             setup.UpdatedAt);
+
+    private async Task<IReadOnlyList<string>> GetFeeValidationMessagesAsync(SurplusLinesStateSetup setup, CancellationToken ct)
+    {
+        var linkedFees = new (long? Id, string Label, string? DisplayName)[]
+        {
+            (setup.SurplusLinesTaxFeeDefinitionId, "surplus lines tax", setup.SurplusLinesTaxFeeDefinition?.DisplayName),
+            (setup.StampingFeeDefinitionId, "stamping fee", setup.StampingFeeDefinition?.DisplayName),
+            (setup.FilingFeeDefinitionId, "filing fee", setup.FilingFeeDefinition?.DisplayName),
+        };
+
+        var messages = new List<string>();
+        foreach (var linkedFee in linkedFees.Where(f => f.Id.HasValue))
+        {
+            var hasMatchingRule = await _db.Set<FeeRuleVersion>().AnyAsync(v =>
+                v.FeeDefinitionId == linkedFee.Id!.Value &&
+                v.EffectiveDate <= setup.EffectiveDate &&
+                (!v.DisabledDate.HasValue || v.DisabledDate.Value > setup.EffectiveDate) &&
+                (v.ProgramConfigurationId == null || v.ProgramConfigurationId == setup.ProgramConfigurationId) &&
+                (v.CarrierId == null || v.CarrierId == setup.CarrierId) &&
+                (v.LineOfBusiness == null || v.LineOfBusiness == (setup.LineOfBusiness == null ? null : setup.LineOfBusiness.Value.ToString())) &&
+                (v.StateCode == null || v.StateCode == setup.StateCode), ct);
+
+            if (!hasMatchingRule)
+            {
+                var feeName = linkedFee.DisplayName ?? linkedFee.Label;
+                messages.Add($"{feeName} is linked, but no active fee rule matches this setup scope and effective date.");
+            }
+        }
+
+        return messages;
+    }
 
     private static string GetLobLabel(PolicyLineOfBusiness lob) => lob switch
     {
