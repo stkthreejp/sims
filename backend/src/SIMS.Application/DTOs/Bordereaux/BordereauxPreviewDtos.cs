@@ -35,4 +35,10 @@ public record BordereauxPremiumPreviewRowDto(
     decimal Fees,
     decimal TotalAmount,
     decimal NetDueCarrier,
-    string InvoiceNumber);
+    string InvoiceNumber,
+    string InsuredAddress,
+    string InsuredPostcode,
+    string InsuredCounty,
+    DateOnly? PolicyIssuanceDate,
+    string IndustrialSector,
+    string NewRenewalIndicator);

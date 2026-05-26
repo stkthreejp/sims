@@ -542,32 +542,43 @@ public class BordereauxService : IBordereauxService
     {
         var reportingDate = ResolveReportingDate(transaction, invoice, profile.DateBasis);
         var insured = transaction.Policy.Submission.Insured;
+        var policy = transaction.Policy;
         var grossCommission = invoice.CommissionAmount;
+        var insuredAddress = FormatAddress(insured.AddressLine1, insured.AddressLine2);
+        var newRenewal = transaction.TransactionType == TransactionType.Renewal || policy.PolicyTermNumber > 1
+            ? "Renewal"
+            : "New";
 
         return new BordereauxPremiumPreviewRowDto(
             transaction.PolicyId,
             transaction.Id,
             invoice.Id,
-            transaction.Policy.PolicyNumber,
+            policy.PolicyNumber,
             transaction.TransactionNumber,
             transaction.TransactionType,
             reportingDate,
             transaction.EffectiveDate,
             invoice.InvoiceDate,
-            transaction.ExpirationDate ?? transaction.Policy.ExpirationDate,
+            transaction.ExpirationDate ?? policy.ExpirationDate,
             insured.DisplayName,
             insured.State,
-            transaction.Policy.ProgramId,
-            transaction.Policy.Program?.Name,
-            transaction.Policy.CarrierId,
-            transaction.Policy.Carrier.Name,
-            transaction.Policy.LineOfBusiness,
+            policy.ProgramId,
+            policy.Program?.Name,
+            policy.CarrierId,
+            policy.Carrier.Name,
+            policy.LineOfBusiness,
             invoice.GrossPremium,
             grossCommission,
             invoice.TotalFees,
             invoice.TotalAmount,
             invoice.GrossPremium - grossCommission,
-            invoice.InvoiceNumber);
+            invoice.InvoiceNumber,
+            insuredAddress,
+            insured.ZipCode,
+            insured.County ?? string.Empty,
+            policy.IssuedDate ?? policy.BoundDate,
+            insured.OperationType ?? string.Empty,
+            newRenewal);
     }
 
     private async Task<IReadOnlyList<BordereauxLondonPremiumRow>> BuildLondonRowsAsync(
@@ -756,6 +767,11 @@ public class BordereauxService : IBordereauxService
         => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value.Trim()
             : null;
+
+    private static string FormatAddress(string addressLine1, string? addressLine2)
+        => string.IsNullOrWhiteSpace(addressLine2)
+            ? addressLine1.Trim()
+            : $"{addressLine1.Trim()} {addressLine2.Trim()}";
 
     private static ProgramCarrierLineOfBusiness? ResolveLobSetup(
         IReadOnlyList<ProgramCarrierLineOfBusiness> setups,

@@ -46,6 +46,12 @@ export interface BordereauxPremiumPreviewRow {
   totalAmount: number
   netDueCarrier: number
   invoiceNumber: string
+  insuredAddress: string
+  insuredPostcode: string
+  insuredCounty: string
+  policyIssuanceDate: string | null
+  industrialSector: string
+  newRenewalIndicator: string
 }
 
 export interface BordereauxPremiumPreview {

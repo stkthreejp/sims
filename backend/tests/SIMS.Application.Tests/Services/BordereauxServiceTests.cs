@@ -495,6 +495,44 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task GeneratePremiumExportPackageAsync_WritesInsuredAndPolicyIssueColumns()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            IncludedTransactionTypesJson = """["NewBusiness","Endorsement","Renewal"]""",
+        });
+        await SeedPolicyTransactionWithInvoiceAsync(
+            db,
+            program,
+            carrier,
+            TransactionType.Renewal,
+            new DateOnly(2026, 4, 8),
+            new DateOnly(2026, 4, 10),
+            "LL-GL-000145-01",
+            "MS",
+            1451m,
+            362.75m,
+            issuedDate: new DateOnly(2026, 4, 10),
+            policyTermNumber: 2);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        var londonText = blob.Uploads[0].Text;
+        Assert.Contains("100 Main", londonText);
+        Assert.Contains("Hinds", londonText);
+        Assert.Contains("39000", londonText);
+        Assert.Contains("04/10/2026", londonText);
+        Assert.Contains("Forestry Operations", londonText);
+        Assert.Contains("Renewal", londonText);
+    }
+
+    [Fact]
     public async Task GetRunFileDownloadUrlAsync_ReturnsSignedUrlForGeneratedLondonFile()
     {
         await using var db = CreateDb();
@@ -598,16 +636,20 @@ public class BordereauxServiceTests
         decimal grossPremium,
         decimal commissionAmount,
         string invoiceStatus = "Posted",
-        PolicyLineOfBusiness lineOfBusiness = PolicyLineOfBusiness.GeneralLiability)
+        PolicyLineOfBusiness lineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+        DateOnly? issuedDate = null,
+        int policyTermNumber = 1)
     {
         var insured = new Insured
         {
             InsuredType = InsuredType.Commercial,
             CompanyName = "Test Logging LLC",
+            OperationType = "Forestry Operations",
             AddressLine1 = "100 Main",
             City = "Jackson",
             State = state,
             ZipCode = "39000",
+            County = "Hinds",
             CreatedById = Guid.NewGuid(),
         };
         var submission = new Submission
@@ -641,9 +683,11 @@ public class BordereauxServiceTests
             LineOfBusiness = lineOfBusiness,
             EffectiveDate = effectiveDate,
             ExpirationDate = effectiveDate.AddYears(1),
+            PolicyTermNumber = policyTermNumber,
             PremiumAmount = grossPremium,
             TotalPremium = grossPremium,
             BoundDate = invoiceDate,
+            IssuedDate = issuedDate,
         };
         var transaction = new PolicyTransaction
         {

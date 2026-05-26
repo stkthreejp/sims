@@ -162,12 +162,63 @@ internal static class BordereauxWorkbookBuilder
         };
 
         if (sheetName.Contains("Inland Marine", StringComparison.OrdinalIgnoreCase))
+        {
             values.AddRange(new object?[] { null, row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, null, null, row.NetPremiumToLondon, row.CurrencyCode });
+            values.AddRange(LondonTrailingValues(row, extraTrailingFields: 5));
+        }
         else if (sheetName.Contains("Commercial Auto", StringComparison.OrdinalIgnoreCase))
+        {
             values.AddRange(new object?[] { row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, row.NetPremiumToLondon, row.CurrencyCode });
+            values.AddRange(LondonTrailingValues(row, extraTrailingFields: 4));
+        }
         else
+        {
             values.AddRange(new object?[] { row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, null, null, row.NetPremiumToLondon, row.CurrencyCode });
+            values.AddRange(LondonTrailingValues(row, extraTrailingFields: 4));
+        }
 
+        return values;
+    }
+
+    private static IReadOnlyList<object?> LondonTrailingValues(BordereauxLondonPremiumRow row, int extraTrailingFields)
+    {
+        var values = new List<object?>
+        {
+            null,
+            row.Source.InsuredState,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            row.Source.InsuredAddress,
+            row.Source.InsuredPostcode,
+            row.Source.InsuredAddress,
+            row.Source.InsuredCounty,
+            row.Source.InsuredPostcode,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            row.Source.PolicyIssuanceDate?.ToString("MM/dd/yyyy"),
+            row.Source.IndustrialSector,
+        };
+
+        for (var i = 0; i < extraTrailingFields - 1; i++)
+            values.Add(null);
+        values.Add(row.Source.NewRenewalIndicator);
         return values;
     }
 
