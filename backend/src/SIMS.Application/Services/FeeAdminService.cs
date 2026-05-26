@@ -76,6 +76,10 @@ public class FeeAdminService : IFeeAdminService
 
     public async Task<Result<FeeRuleVersionDto>> CreateVersionAsync(Guid userId, CreateFeeRuleVersionRequest req, CancellationToken ct = default)
     {
+        var validation = await ValidateVersionRequestAsync(req, ct);
+        if (validation is not null)
+            return Result<FeeRuleVersionDto>.Failure(validation.Value.Code, validation.Value.Message);
+
         var version = BuildVersion(req, userId);
         Db.Set<FeeRuleVersion>().Add(version);
 
@@ -105,6 +109,10 @@ public class FeeAdminService : IFeeAdminService
     {
         var existing = await Db.Set<FeeRuleVersion>().FindAsync([existingVersionId], ct);
         if (existing is null) return Result<FeeRuleVersionDto>.Failure("NOT_FOUND", "Existing version not found");
+
+        var validation = await ValidateVersionRequestAsync(req, ct);
+        if (validation is not null)
+            return Result<FeeRuleVersionDto>.Failure(validation.Value.Code, validation.Value.Message);
 
         // Stamp old version's disabled_date with the new version's effective_date in one transaction
         existing.DisabledDate = req.EffectiveDate;
@@ -268,6 +276,26 @@ public class FeeAdminService : IFeeAdminService
             .ToDictionary(g => g.Key, g => g.Select(s => s.StateCode).ToList());
     }
 
+    private async Task<(string Code, string Message)?> ValidateVersionRequestAsync(
+        CreateFeeRuleVersionRequest req, CancellationToken ct)
+    {
+        if (req.PayableRouting is not "NotPayable" and not "Company" and not "Entity")
+            return ("PAYABLE_ROUTING_INVALID", "Payable routing must be NotPayable, Company, or Entity.");
+
+        if (req.PayableRouting == "Entity")
+        {
+            if (!req.PayablePayeeId.HasValue)
+                return ("PAYABLE_PAYEE_REQUIRED", "A third-party/vendor payee is required when payable routing is Entity.");
+
+            var payeeExists = await Db.Set<Payee>()
+                .AnyAsync(p => p.Id == req.PayablePayeeId.Value && p.IsActive, ct);
+            if (!payeeExists)
+                return ("PAYABLE_PAYEE_NOT_FOUND", "The selected third-party/vendor payee was not found or is inactive.");
+        }
+
+        return null;
+    }
+
     private static FeeRuleVersion BuildVersion(CreateFeeRuleVersionRequest req, Guid userId)
     {
         var version = new FeeRuleVersion
@@ -320,7 +348,7 @@ public class FeeAdminService : IFeeAdminService
             PayHomeState = req.PayHomeState,
             ExcludedPolicyTransactionTypes = req.ExcludedPolicyTransactionTypes,
             PayableRouting = req.PayableRouting,
-            PayablePayeeId = req.PayablePayeeId,
+            PayablePayeeId = req.PayableRouting == "Entity" ? req.PayablePayeeId : null,
             MasterPayeeWhenHomeState = req.MasterPayeeWhenHomeState,
             Notes = req.Notes,
             CreatedBy = userId,

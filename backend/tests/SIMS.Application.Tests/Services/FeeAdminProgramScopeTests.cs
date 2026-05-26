@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
@@ -49,6 +50,69 @@ public class FeeAdminProgramScopeTests
         Assert.Equal("Longleaf", version.ProgramName);
     }
 
+    [Fact]
+    public async Task CreateVersionAsync_RejectsEntityPayableWithoutPayee()
+    {
+        await using var db = CreateDb();
+        var fee = new FeeDefinition
+        {
+            Code = "SL_TAX",
+            DisplayName = "Surplus Lines Tax",
+            FeeCategory = "Tax",
+            IsTaxable = false,
+            CalculationOrder = 10,
+            LedgerAccountId = 1,
+        };
+        db.Add(fee);
+        await db.SaveChangesAsync();
+
+        var request = ValidRequest(fee.Id) with
+        {
+            PayableRouting = "Entity",
+            PayablePayeeId = null
+        };
+
+        var result = await new FeeAdminService(new TestServiceProvider(db)).CreateVersionAsync(Guid.NewGuid(), request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("PAYABLE_PAYEE_REQUIRED", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateVersionAsync_AllowsEntityPayableWithActivePayee()
+    {
+        await using var db = CreateDb();
+        var fee = new FeeDefinition
+        {
+            Code = "SL_TAX",
+            DisplayName = "Surplus Lines Tax",
+            FeeCategory = "Tax",
+            IsTaxable = false,
+            CalculationOrder = 10,
+            LedgerAccountId = 1,
+        };
+        var payee = new Payee
+        {
+            Name = "State Filing Vendor",
+            PayeeType = "TaxFilingService",
+            IsActive = true,
+        };
+        db.AddRange(fee, payee);
+        await db.SaveChangesAsync();
+
+        var request = ValidRequest(fee.Id) with
+        {
+            PayableRouting = "Entity",
+            PayablePayeeId = payee.Id
+        };
+
+        var result = await new FeeAdminService(new TestServiceProvider(db)).CreateVersionAsync(Guid.NewGuid(), request);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Entity", result.Value!.PayableRouting);
+        Assert.Equal(payee.Id, result.Value.PayablePayeeId);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -57,6 +121,61 @@ public class FeeAdminProgramScopeTests
 
         return new ApplicationDbContext(options);
     }
+
+    private static CreateFeeRuleVersionRequest ValidRequest(long feeDefinitionId) =>
+        new(
+            FeeDefinitionId: feeDefinitionId,
+            ProgramConfigurationId: null,
+            CarrierId: null,
+            CompanyId: null,
+            ProducerId: null,
+            LineOfBusiness: null,
+            StateCode: "TX",
+            City: null,
+            LicenseType: null,
+            EffectiveDate: new DateOnly(2026, 1, 1),
+            CalcType: "Percent",
+            FlatAmount: null,
+            PercentRate: 0.0485m,
+            PercentOfNet: false,
+            MinimumAmount: null,
+            MaxPercent: null,
+            MaxAmount: null,
+            Commissionable: false,
+            InstallmentBehavior: "PerInstallment",
+            SplitByParticipation: false,
+            FullyEarned: false,
+            FullyEarnedDays: null,
+            ExcludeTerrorism: false,
+            MultiplyByLocations: false,
+            MultiplyByVehicles: false,
+            SendToAccounting: true,
+            ApplyOnlyOnce: false,
+            MandatoryCharge: true,
+            ApplyAutomatically: true,
+            ApplyWhenPackagePolicyOnly: false,
+            DoNotApplyWhenPackagePolicyOnly: false,
+            ApplyToChildLines: false,
+            OnlyAppliesToIssuanceState: true,
+            AppliesToFlatCancellations: false,
+            PremiumMinThreshold: null,
+            PremiumMaxThreshold: null,
+            PremiumThresholdBasis: null,
+            StateCountMin: null,
+            StateCountMax: null,
+            RoundingMode: "NearestCent",
+            ExcludeWhenNotFiling: false,
+            ExcludeOnEndorsements: false,
+            ExcludeOnRenewal: false,
+            ExcludeOnOriginalBinder: false,
+            ExcludeOnMultiCarrierPolicy: false,
+            PayHomeState: false,
+            ExcludedPolicyTransactionTypes: null,
+            PayableRouting: "NotPayable",
+            PayablePayeeId: null,
+            MasterPayeeWhenHomeState: false,
+            Notes: null,
+            PremiumBrackets: []);
 
     private sealed class TestServiceProvider(DbContext db) : IServiceProvider
     {

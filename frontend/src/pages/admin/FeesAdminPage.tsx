@@ -249,6 +249,8 @@ export function FeesAdminPage() {
 
   if (isLoading) return <LoadingSpinner />
 
+  const missingVendorPayee = form.payableRouting === 'Entity' && !form.payablePayeeId
+
   // ── VERSION EDITOR (shared by new + edit) ──────────────────────────────────
   const VersionEditor = (
     <div className="bg-white border border-gray-200 rounded-lg flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
@@ -269,7 +271,7 @@ export function FeesAdminPage() {
             <button onClick={() => { if (confirm('Disable this version as of today?')) disableVersion() }}
               className="px-3 py-1.5 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">Disable</button>
           )}
-          <button onClick={() => saveVersion()} disabled={savingVersion}
+          <button onClick={() => saveVersion()} disabled={savingVersion || missingVendorPayee}
             className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
             {savingVersion ? 'Saving…' : 'Save Version'}
           </button>
@@ -455,6 +457,7 @@ export function FeesAdminPage() {
                   </option>
                 ))}
               </select>
+              {missingVendorPayee && <p className="mt-1 text-xs text-red-600">Select the vendor that will receive the monthly payable.</p>}
             </Field>
           )}
           <label className="flex items-center gap-2 cursor-pointer">
