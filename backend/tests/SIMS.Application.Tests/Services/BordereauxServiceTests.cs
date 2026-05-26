@@ -386,6 +386,25 @@ public class BordereauxServiceTests
         var (program, carrier) = await SeedProgramCarrierAsync(db);
         carrier.DefaultCurrencyCode = "USD";
         await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        db.Add(new SurplusLinesStateSetup
+        {
+            StateCode = "MS",
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            IsActive = true,
+            FilingRequired = true,
+            LicenseHolderType = "SMM",
+            FilingBrokerName = "Specialty Market Managers, LLC",
+            LicenseNumber = "MS-SL-12345",
+            LicenseState = "MS",
+            BrokerAddressLine1 = "456 Filing Ave",
+            BrokerCity = "Ridgeland",
+            BrokerState = "MS",
+            BrokerZipCode = "39157",
+            BrokerCountry = "USA",
+        });
         db.Add(new CarrierCommission
         {
             ProgramConfigurationId = program.Id,
@@ -412,6 +431,10 @@ public class BordereauxServiceTests
         Assert.Contains("USD", londonText);
         Assert.Contains("0.24", londonText);
         Assert.Contains("348.24", londonText);
+        Assert.Contains("Specialty Market Managers, LLC", londonText);
+        Assert.Contains("MS-SL-12345", londonText);
+        Assert.Contains("456 Filing Ave", londonText);
+        Assert.Contains("39157", londonText);
     }
 
     [Fact]

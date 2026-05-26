@@ -608,11 +608,19 @@ public class BordereauxService : IBordereauxService
                 && c.EffectiveDate <= run.PeriodEnd
                 && (c.DisabledDate == null || c.DisabledDate > run.PeriodStart))
             .ToListAsync(ct);
+        var surplusLinesSetups = await _db.Set<SurplusLinesStateSetup>()
+            .Where(s => s.IsActive
+                && s.EffectiveDate <= run.PeriodEnd
+                && (s.ExpirationDate == null || s.ExpirationDate >= run.PeriodStart)
+                && (s.ProgramConfigurationId == run.Profile.ProgramConfigurationId || s.ProgramConfigurationId == null)
+                && (s.CarrierId == run.Profile.CarrierId || s.CarrierId == null))
+            .ToListAsync(ct);
         var detailRows = await BuildLondonDetailRowsAsync(rows, ct);
 
         return rows.Select(row =>
         {
             var setup = ResolveLobSetup(lobSetups, row.LineOfBusiness, row.ReportingDate);
+            var surplusLinesSetup = ResolveSurplusLinesSetup(surplusLinesSetups, row, row.ReportingDate, run.Profile.ProgramConfigurationId);
             var commissionRate = ResolveCarrierCommissionRate(commissionRows, row.LineOfBusiness, row.ReportingDate, run.Profile.ProgramConfigurationId)
                 ?? (row.GrossPremium == 0 ? 0 : decimal.Round(row.GrossCommission / row.GrossPremium, 6));
             var commissionAmount = decimal.Round(row.GrossPremium * commissionRate, 2);
@@ -635,6 +643,14 @@ public class BordereauxService : IBordereauxService
                 commissionRate,
                 commissionAmount,
                 row.GrossPremium - commissionAmount,
+                surplusLinesSetup?.StateCode ?? row.InsuredState,
+                surplusLinesSetup?.FilingBrokerName ?? string.Empty,
+                surplusLinesSetup?.LicenseNumber ?? string.Empty,
+                null,
+                surplusLinesSetup == null ? string.Empty : FormatAddress(surplusLinesSetup.BrokerAddressLine1, surplusLinesSetup.BrokerAddressLine2),
+                surplusLinesSetup?.BrokerState ?? string.Empty,
+                surplusLinesSetup?.BrokerZipCode ?? string.Empty,
+                surplusLinesSetup?.BrokerCountry ?? string.Empty,
                 details?.AutoVehicles ?? [],
                 details?.ImUnits ?? []);
         }).ToList();
@@ -799,6 +815,24 @@ public class BordereauxService : IBordereauxService
             .ThenByDescending(c => c.LineOfBusiness == lineOfBusiness.ToString() ? 1 : 0)
             .ThenByDescending(c => c.EffectiveDate)
             .Select(c => (decimal?)c.CommissionRate)
+            .FirstOrDefault();
+
+    private static SurplusLinesStateSetup? ResolveSurplusLinesSetup(
+        IReadOnlyList<SurplusLinesStateSetup> setups,
+        BordereauxPremiumPreviewRowDto row,
+        DateOnly asOfDate,
+        Guid programConfigurationId)
+        => setups
+            .Where(s => s.StateCode == row.InsuredState
+                && (s.ProgramConfigurationId == programConfigurationId || s.ProgramConfigurationId == null)
+                && (s.CarrierId == row.CarrierId || s.CarrierId == null)
+                && (s.LineOfBusiness == row.LineOfBusiness || s.LineOfBusiness == null)
+                && s.EffectiveDate <= asOfDate
+                && (s.ExpirationDate == null || s.ExpirationDate >= asOfDate))
+            .OrderByDescending(s => s.ProgramConfigurationId == programConfigurationId ? 1 : 0)
+            .ThenByDescending(s => s.CarrierId == row.CarrierId ? 1 : 0)
+            .ThenByDescending(s => s.LineOfBusiness == row.LineOfBusiness ? 1 : 0)
+            .ThenByDescending(s => s.EffectiveDate)
             .FirstOrDefault();
 
     private static (string Code, string Message)? ValidateJsonArray(string json, string label)
