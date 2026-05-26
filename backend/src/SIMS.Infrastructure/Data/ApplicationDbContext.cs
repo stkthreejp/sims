@@ -35,6 +35,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<ProgramCarrier> ProgramCarriers => Set<ProgramCarrier>();
     public DbSet<ProgramCarrierLineOfBusiness> ProgramCarrierLinesOfBusiness => Set<ProgramCarrierLineOfBusiness>();
     public DbSet<ProgramCarrierLobState> ProgramCarrierLobStates => Set<ProgramCarrierLobState>();
+    public DbSet<SurplusLinesStateSetup> SurplusLinesStateSetups => Set<SurplusLinesStateSetup>();
     public DbSet<BordereauxProfile> BordereauxProfiles => Set<BordereauxProfile>();
     public DbSet<BordereauxRun> BordereauxRuns => Set<BordereauxRun>();
     public DbSet<UnderwritingGuidelineDocument> UnderwritingGuidelineDocuments => Set<UnderwritingGuidelineDocument>();
@@ -196,6 +197,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<ProgramCarrier>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ProgramCarrierLineOfBusiness>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<ProgramCarrierLobState>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<SurplusLinesStateSetup>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<BordereauxProfile>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<BordereauxRun>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<UnderwritingGuidelineDocument>().HasQueryFilter(e => !e.IsDeleted);
