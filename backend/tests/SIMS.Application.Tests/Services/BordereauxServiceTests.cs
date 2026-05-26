@@ -372,6 +372,8 @@ public class BordereauxServiceTests
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", generated.Value.LondonBordereauxContentType);
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", generated.Value.AccountCurrentContentType);
         Assert.Equal(2, blob.Uploads.Count);
+        Assert.Contains("londonBordereauxSha256", generated.Value.DetailRowCountsJson);
+        Assert.Contains("accountCurrentSha256", generated.Value.DetailRowCountsJson);
         Assert.Contains("LL-GL-000145-00", blob.Uploads[0].Text);
         Assert.Contains("Account Current", blob.Uploads[1].Text);
     }

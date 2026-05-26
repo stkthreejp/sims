@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Bordereaux;
@@ -289,6 +290,8 @@ public class BordereauxService : IBordereauxService
             premiumRows = rows.Count,
             autoVehicleRows = londonRows.Sum(row => row.AutoVehicles.Count),
             imUnitRows = londonRows.Sum(row => row.ImUnits.Count),
+            londonBordereauxSha256 = Sha256(londonBytes),
+            accountCurrentSha256 = Sha256(accountCurrentBytes),
         }, SnapshotJsonOptions);
         run.UpdatedAt = DateTime.UtcNow;
 
@@ -785,6 +788,9 @@ public class BordereauxService : IBordereauxService
             TransactionType.Reinstatement => "AP",
             _ => "OP",
         };
+
+    private static string Sha256(byte[] bytes)
+        => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
     private static DateOnly ResolveReportingDate(PolicyTransaction transaction, Invoice invoice, BordereauxDateBasis dateBasis)
         => dateBasis switch
