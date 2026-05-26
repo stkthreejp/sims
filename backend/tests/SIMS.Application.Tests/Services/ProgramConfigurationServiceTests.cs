@@ -258,6 +258,40 @@ public class ProgramConfigurationServiceTests
     }
 
     [Fact]
+    public async Task AddLineOfBusinessAsync_SavesLondonReportingValues()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "BRACE", IsActive = true };
+        db.AddRange(program, carrier);
+        await db.SaveChangesAsync();
+
+        var service = new ProgramConfigurationService(db);
+        var programCarrier = await service.AddCarrierAsync(program.Id, new UpsertProgramCarrierRequest(carrier.Id, true, new DateOnly(2026, 1, 1), null, null));
+
+        var result = await service.AddLineOfBusinessAsync(program.Id, programCarrier.Value!.Id, new UpsertProgramCarrierLineOfBusinessRequest(
+            PolicyLineOfBusiness.GeneralLiability,
+            true,
+            new DateOnly(2026, 1, 1),
+            null,
+            "GL London setup",
+            "AgencyBill",
+            30,
+            "BRACE-SMM-2025-LOGGING",
+            "Section No 1",
+            "FORESTRY GENERAL LIABILITY",
+            "LOGGING LUMBERING",
+            "DIRECT"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("BRACE-SMM-2025-LOGGING", result.Value!.LondonUmr);
+        Assert.Equal("Section No 1", result.Value.LondonSectionNumber);
+        Assert.Equal("FORESTRY GENERAL LIABILITY", result.Value.LondonClassOfBusiness);
+        Assert.Equal("LOGGING LUMBERING", result.Value.LondonRiskCode);
+        Assert.Equal("DIRECT", result.Value.LondonInsuranceType);
+    }
+
+    [Fact]
     public async Task CreateDocumentAsync_UsesProgramIdentityWithoutOverridingCarrierLineOrState()
     {
         await using var db = CreateDb();

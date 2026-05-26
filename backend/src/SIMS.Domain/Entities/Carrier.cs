@@ -11,6 +11,7 @@ public class Carrier : BaseEntity
     public string? State { get; set; }
     public string? ZipCode { get; set; }
     public string? Website { get; set; }
+    public string DefaultCurrencyCode { get; set; } = "USD";
     public bool IsActive { get; set; } = true;
 
     // Navigation

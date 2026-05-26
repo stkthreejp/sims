@@ -11,6 +11,11 @@ public class ProgramCarrierLineOfBusinessConfiguration : IEntityTypeConfiguratio
         builder.ToTable("program_carrier_lines_of_business");
 
         builder.Property(x => x.BillingMode).HasMaxLength(50);
+        builder.Property(x => x.LondonUmr).HasMaxLength(120);
+        builder.Property(x => x.LondonSectionNumber).HasMaxLength(80);
+        builder.Property(x => x.LondonClassOfBusiness).HasMaxLength(160);
+        builder.Property(x => x.LondonRiskCode).HasMaxLength(120);
+        builder.Property(x => x.LondonInsuranceType).HasMaxLength(80);
         builder.Property(x => x.Notes).HasMaxLength(1000);
 
         builder.HasIndex(x => new { x.ProgramCarrierId, x.LineOfBusiness }).IsUnique();

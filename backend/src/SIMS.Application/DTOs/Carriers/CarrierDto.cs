@@ -27,6 +27,7 @@ public class CarrierDto
     public string? State { get; set; }
     public string? ZipCode { get; set; }
     public string? Website { get; set; }
+    public string DefaultCurrencyCode { get; set; } = "USD";
     public bool IsActive { get; set; }
     public List<PolicyLineOfBusiness> LinesOfBusiness { get; set; } = new();
     public List<CarrierContactDto> Contacts { get; set; } = new();
@@ -69,6 +70,7 @@ public class CarrierCreateDto
     public string? State { get; set; }
     public string? ZipCode { get; set; }
     public string? Website { get; set; }
+    public string? DefaultCurrencyCode { get; set; }
     public List<PolicyLineOfBusiness> LinesOfBusiness { get; set; } = new();
 }
 
@@ -83,6 +85,7 @@ public class CarrierUpdateDto
     public string? State { get; set; }
     public string? ZipCode { get; set; }
     public string? Website { get; set; }
+    public string? DefaultCurrencyCode { get; set; }
     public bool IsActive { get; set; } = true;
     public List<PolicyLineOfBusiness> LinesOfBusiness { get; set; } = new();
 }

@@ -21,6 +21,7 @@ export interface Carrier {
   state: string | null
   zipCode: string | null
   website: string | null
+  defaultCurrencyCode: string
   isActive: boolean
   linesOfBusiness: PolicyLineOfBusiness[]
   contacts: CarrierContact[]
@@ -49,6 +50,7 @@ export interface CarrierCreate {
   state?: string
   zipCode?: string
   website?: string
+  defaultCurrencyCode?: string
   linesOfBusiness: PolicyLineOfBusiness[]
 }
 
@@ -62,6 +64,7 @@ export interface CarrierUpdate {
   state?: string
   zipCode?: string
   website?: string
+  defaultCurrencyCode?: string
   isActive: boolean
   linesOfBusiness: PolicyLineOfBusiness[]
 }

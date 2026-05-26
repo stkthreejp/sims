@@ -34,6 +34,11 @@ public record ProgramCarrierLineOfBusinessDto(
     string? Notes,
     string? BillingMode,
     int? PaymentTermsDays,
+    string? LondonUmr,
+    string? LondonSectionNumber,
+    string? LondonClassOfBusiness,
+    string? LondonRiskCode,
+    string? LondonInsuranceType,
     IReadOnlyList<ProgramCarrierLobStateDto> States);
 
 public record ProgramCarrierLobStateDto(
@@ -71,7 +76,12 @@ public record UpsertProgramCarrierLineOfBusinessRequest(
     DateOnly? ExpirationDate,
     string? Notes,
     string? BillingMode = null,
-    int? PaymentTermsDays = null);
+    int? PaymentTermsDays = null,
+    string? LondonUmr = null,
+    string? LondonSectionNumber = null,
+    string? LondonClassOfBusiness = null,
+    string? LondonRiskCode = null,
+    string? LondonInsuranceType = null);
 
 public record UpsertProgramCarrierLobStateRequest(
     string StateCode,

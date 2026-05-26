@@ -377,6 +377,42 @@ public class BordereauxServiceTests
         Assert.DoesNotContain("999", blob.Uploads[0].Text);
     }
 
+    [Fact]
+    public async Task GeneratePremiumExportPackageAsync_UsesCarrierLobLondonSetupAndCarrierCommission()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        carrier.DefaultCurrencyCode = "USD";
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        db.Add(new CarrierCommission
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability.ToString(),
+            CommissionRate = 0.24m,
+            SMMRetentionRate = 0.05m,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            CreatedBy = Guid.NewGuid(),
+        });
+        await db.SaveChangesAsync();
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        var londonText = blob.Uploads[0].Text;
+        Assert.Contains("BRACE-SMM-2025-LOGGING", londonText);
+        Assert.Contains("FORESTRY GENERAL LIABILITY", londonText);
+        Assert.Contains("LOGGING LUMBERING", londonText);
+        Assert.Contains("DIRECT", londonText);
+        Assert.Contains("USD", londonText);
+        Assert.Contains("0.24", londonText);
+        Assert.Contains("348.24", londonText);
+    }
+
     private static UpsertBordereauxProfileRequest ValidRequest(Guid programId, Guid carrierId) => new(
         Name: "BRACE London BDX",
         ProgramConfigurationId: programId,
@@ -404,6 +440,34 @@ public class BordereauxServiceTests
         db.AddRange(program, carrier);
         await db.SaveChangesAsync();
         return (program, carrier);
+    }
+
+    private static async Task SeedProgramCarrierLobSetupAsync(
+        ApplicationDbContext db,
+        ProgramConfiguration program,
+        Carrier carrier,
+        PolicyLineOfBusiness lineOfBusiness)
+    {
+        var programCarrier = new ProgramCarrier
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+        };
+        programCarrier.LinesOfBusiness.Add(new ProgramCarrierLineOfBusiness
+        {
+            LineOfBusiness = lineOfBusiness,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            LondonUmr = "BRACE-SMM-2025-LOGGING",
+            LondonSectionNumber = "Section No 1",
+            LondonClassOfBusiness = "FORESTRY GENERAL LIABILITY",
+            LondonRiskCode = "LOGGING LUMBERING",
+            LondonInsuranceType = "DIRECT",
+        });
+        db.Add(programCarrier);
+        await db.SaveChangesAsync();
     }
 
     private static async Task<PolicyTransaction> SeedPolicyTransactionWithInvoiceAsync(

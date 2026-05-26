@@ -57,6 +57,7 @@ public class CarrierService : ICarrierService
             State = dto.State,
             ZipCode = dto.ZipCode,
             Website = dto.Website,
+            DefaultCurrencyCode = NormalizeCurrency(dto.DefaultCurrencyCode),
             IsActive = true,
         };
 
@@ -91,6 +92,7 @@ public class CarrierService : ICarrierService
         carrier.State = dto.State;
         carrier.ZipCode = dto.ZipCode;
         carrier.Website = dto.Website;
+        carrier.DefaultCurrencyCode = NormalizeCurrency(dto.DefaultCurrencyCode);
         carrier.IsActive = dto.IsActive;
         carrier.UpdatedAt = DateTime.UtcNow;
 
@@ -220,6 +222,7 @@ public class CarrierService : ICarrierService
         State = c.State,
         ZipCode = c.ZipCode,
         Website = c.Website,
+        DefaultCurrencyCode = c.DefaultCurrencyCode,
         IsActive = c.IsActive,
         LinesOfBusiness = c.LinesOfBusiness.Select(x => x.LineOfBusiness).ToList(),
         Contacts = c.Contacts.OrderByDescending(x => x.IsPrimary).ThenBy(x => x.LastName).ThenBy(x => x.FirstName).Select(MapContactToDto).ToList(),
@@ -238,4 +241,7 @@ public class CarrierService : ICarrierService
         LinesOfBusiness = c.LinesOfBusiness.Select(x => x.LineOfBusiness).ToList(),
         ContactCount = c.Contacts.Count,
     };
+
+    private static string NormalizeCurrency(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "USD" : value.Trim().ToUpperInvariant();
 }

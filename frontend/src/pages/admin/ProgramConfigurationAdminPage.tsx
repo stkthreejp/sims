@@ -45,6 +45,11 @@ const emptyLob = (): ProgramCarrierLineOfBusinessUpsert => ({
   expirationDate: null,
   billingMode: '',
   paymentTermsDays: null,
+  londonUmr: '',
+  londonSectionNumber: '',
+  londonClassOfBusiness: '',
+  londonRiskCode: '',
+  londonInsuranceType: 'DIRECT',
   notes: '',
 })
 
@@ -208,6 +213,11 @@ export function ProgramConfigurationAdminPage() {
       expirationDate: lob.expirationDate,
       billingMode: lob.billingMode ?? '',
       paymentTermsDays: lob.paymentTermsDays,
+      londonUmr: lob.londonUmr ?? '',
+      londonSectionNumber: lob.londonSectionNumber ?? '',
+      londonClassOfBusiness: lob.londonClassOfBusiness ?? '',
+      londonRiskCode: lob.londonRiskCode ?? '',
+      londonInsuranceType: lob.londonInsuranceType ?? 'DIRECT',
       notes: lob.notes ?? '',
     })
   }
@@ -357,6 +367,13 @@ export function ProgramConfigurationAdminPage() {
                   <TextInput label="Billing mode" value={lobForm.billingMode ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, billingMode: value }))} />
                   <TextInput label="Payment terms" type="number" value={lobForm.paymentTermsDays?.toString() ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, paymentTermsDays: value ? Number(value) : null }))} />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <TextInput label="London UMR" value={lobForm.londonUmr ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, londonUmr: value }))} />
+                  <TextInput label="London section" value={lobForm.londonSectionNumber ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, londonSectionNumber: value }))} />
+                  <TextInput label="London class" value={lobForm.londonClassOfBusiness ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, londonClassOfBusiness: value }))} />
+                  <TextInput label="London risk code" value={lobForm.londonRiskCode ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, londonRiskCode: value }))} />
+                  <TextInput label="London insurance type" value={lobForm.londonInsuranceType ?? ''} onChange={(value) => setLobForm((f) => ({ ...f, londonInsuranceType: value }))} />
+                </div>
                 <FormActions
                   isEditing={!!editingLobId}
                   disabled={!lobParentCarrierId || saveLob.isPending}
@@ -436,6 +453,9 @@ export function ProgramConfigurationAdminPage() {
                             <div className="text-xs text-slate-500">{dateRange(lob.effectiveDate, lob.expirationDate)}</div>
                             {(lob.billingMode || lob.paymentTermsDays != null) && (
                               <div className="mt-1 text-xs text-slate-500">{[lob.billingMode, lob.paymentTermsDays != null ? `Net ${lob.paymentTermsDays}` : null].filter(Boolean).join(' / ')}</div>
+                            )}
+                            {(lob.londonUmr || lob.londonRiskCode) && (
+                              <div className="mt-1 text-xs text-slate-500">{[lob.londonUmr, lob.londonRiskCode].filter(Boolean).join(' / ')}</div>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
@@ -601,6 +621,11 @@ function cleanLob(lob: ProgramCarrierLineOfBusinessUpsert): ProgramCarrierLineOf
     expirationDate: lob.expirationDate || null,
     billingMode: lob.billingMode?.trim() ? lob.billingMode : null,
     paymentTermsDays: lob.paymentTermsDays ?? null,
+    londonUmr: lob.londonUmr?.trim() ? lob.londonUmr : null,
+    londonSectionNumber: lob.londonSectionNumber?.trim() ? lob.londonSectionNumber : null,
+    londonClassOfBusiness: lob.londonClassOfBusiness?.trim() ? lob.londonClassOfBusiness : null,
+    londonRiskCode: lob.londonRiskCode?.trim() ? lob.londonRiskCode : null,
+    londonInsuranceType: lob.londonInsuranceType?.trim() ? lob.londonInsuranceType : null,
     notes: lob.notes?.trim() ? lob.notes : null,
   }
 }

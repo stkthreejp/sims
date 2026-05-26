@@ -11,6 +11,11 @@ public class ProgramCarrierLineOfBusiness : BaseEntity
     public DateOnly? ExpirationDate { get; set; }
     public string? BillingMode { get; set; }
     public int? PaymentTermsDays { get; set; }
+    public string? LondonUmr { get; set; }
+    public string? LondonSectionNumber { get; set; }
+    public string? LondonClassOfBusiness { get; set; }
+    public string? LondonRiskCode { get; set; }
+    public string? LondonInsuranceType { get; set; }
     public string? Notes { get; set; }
 
     public ProgramCarrier ProgramCarrier { get; set; } = null!;

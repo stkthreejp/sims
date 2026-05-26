@@ -8,14 +8,14 @@ namespace SIMS.Application.Services;
 
 internal static class BordereauxWorkbookBuilder
 {
-    public static byte[] BuildLondonBordereaux(IReadOnlyList<BordereauxPremiumPreviewRowDto> rows, IReadOnlyList<string> requiredTabs)
+    public static byte[] BuildLondonBordereaux(IReadOnlyList<BordereauxLondonPremiumRow> rows, IReadOnlyList<string> requiredTabs)
     {
         var sheetNames = requiredTabs.Count > 0
             ? requiredTabs
             : new[] { "Premium Bordereaux" };
 
         var sheets = sheetNames
-            .Select(name => new WorksheetData(name, IsPremiumSheet(name) ? BuildPremiumRows(rows) : BuildEmptyRows(name)))
+            .Select(name => new WorksheetData(name, BuildLondonSheetRows(name, rows)))
             .ToList();
 
         return BuildWorkbook(sheets);
@@ -53,42 +53,70 @@ internal static class BordereauxWorkbookBuilder
         return BuildWorkbook(new[] { new WorksheetData("Account Current", data) });
     }
 
-    private static IReadOnlyList<IReadOnlyList<object?>> BuildPremiumRows(IReadOnlyList<BordereauxPremiumPreviewRowDto> rows)
+    private static IReadOnlyList<IReadOnlyList<object?>> BuildLondonSheetRows(string sheetName, IReadOnlyList<BordereauxLondonPremiumRow> rows)
     {
+        if (sheetName.Equals("Auto Veh Info", StringComparison.OrdinalIgnoreCase))
+            return new[] { new object?[] { "Certificate Ref", "Number", "YearMade", "Make", "Model", "VIN", "Type", "ACV", "Deductible", "Premium", "Rate" } };
+        if (sheetName.Equals("IM Unit Info", StringComparison.OrdinalIgnoreCase))
+            return new[] { new object?[] { "Certificate Ref", "Number", "YearMade", "Make", "Model", "Serial", "Type", "ACV", "ACV Note", "Deductible", "Premium", "Rate", "TransType" } };
+
+        if (IsLondonSectionSheet(sheetName))
+            return BuildLondonSectionRows(sheetName, rows.Where(row => RowBelongsOnSheet(row.Source.LineOfBusiness, sheetName)).ToList());
+
+        return BuildEmptyRows(sheetName);
+    }
+
+    private static IReadOnlyList<IReadOnlyList<object?>> BuildLondonSectionRows(string sheetName, IReadOnlyList<BordereauxLondonPremiumRow> rows)
+    {
+        var headers = LondonHeaders(sheetName);
         var data = new List<IReadOnlyList<object?>>
         {
-            new object?[]
-            {
-                "Reporting Date",
-                "Policy Number",
-                "Transaction Number",
-                "Transaction Type",
-                "Insured",
-                "State",
-                "Gross Premium",
-                "Gross Commission",
-                "Fees",
-                "Net Due Carrier",
-                "Invoice Number",
-            },
+            headers.Refs,
+            headers.Fields,
         };
 
-        data.AddRange(rows.Select(row => new object?[]
-        {
-            row.ReportingDate.ToString("yyyy-MM-dd"),
-            row.PolicyNumber,
-            row.TransactionNumber,
-            row.TransactionType.ToString(),
-            row.InsuredName,
-            row.InsuredState,
-            row.GrossPremium,
-            row.GrossCommission,
-            row.Fees,
-            row.NetDueCarrier,
-            row.InvoiceNumber,
-        }));
+        data.AddRange(rows.Select(row => LondonSectionRow(sheetName, row)));
 
         return data;
+    }
+
+    private static IReadOnlyList<object?> LondonSectionRow(string sheetName, BordereauxLondonPremiumRow row)
+    {
+        var values = new List<object?>
+        {
+            string.Empty,
+            row.CoverholderName,
+            row.CoverholderPin,
+            row.Umr,
+            row.PeriodStart.ToString("MM/dd/yyyy"),
+            row.PeriodEnd.ToString("MM/dd/yyyy"),
+            row.SectionNumber,
+            row.ClassOfBusiness,
+            row.RiskCode,
+            row.InsuranceType,
+            row.YearOfAccount,
+            row.Source.PolicyNumber,
+            row.Source.InsuredName,
+            row.Source.InsuredState,
+            "USA",
+            row.Source.TransactionEffectiveDate.ToString("MM/dd/yyyy"),
+            row.Source.ExpirationDate?.ToString("MM/dd/yyyy"),
+            "USA",
+            row.Source.InsuredState,
+            TransactionCode(row.Source.TransactionType, row.Source.GrossPremium),
+            row.Source.ReportingDate.ToString("MM/dd/yyyy"),
+            row.CurrencyCode,
+            row.Source.GrossPremium,
+        };
+
+        if (sheetName.Contains("Inland Marine", StringComparison.OrdinalIgnoreCase))
+            values.AddRange(new object?[] { null, row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, null, null, row.NetPremiumToLondon, row.CurrencyCode });
+        else if (sheetName.Contains("Commercial Auto", StringComparison.OrdinalIgnoreCase))
+            values.AddRange(new object?[] { row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, row.NetPremiumToLondon, row.CurrencyCode });
+        else
+            values.AddRange(new object?[] { row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, null, null, row.NetPremiumToLondon, row.CurrencyCode });
+
+        return values;
     }
 
     private static IReadOnlyList<IReadOnlyList<object?>> BuildEmptyRows(string sheetName)
@@ -98,10 +126,40 @@ internal static class BordereauxWorkbookBuilder
             new object?[] { "Status", "No detail rows generated in this foundation export." },
         };
 
-    private static bool IsPremiumSheet(string sheetName)
+    private static bool IsLondonSectionSheet(string sheetName)
         => sheetName.Contains("premium", StringComparison.OrdinalIgnoreCase)
             || sheetName.Contains("general liability", StringComparison.OrdinalIgnoreCase)
+            || sheetName.Contains("commercial auto", StringComparison.OrdinalIgnoreCase)
             || sheetName.Contains("inland marine", StringComparison.OrdinalIgnoreCase);
+
+    private static bool RowBelongsOnSheet(SIMS.Domain.Enums.PolicyLineOfBusiness lineOfBusiness, string sheetName)
+    {
+        if (sheetName.Contains("general liability", StringComparison.OrdinalIgnoreCase))
+            return lineOfBusiness == SIMS.Domain.Enums.PolicyLineOfBusiness.GeneralLiability;
+        if (sheetName.Contains("commercial auto", StringComparison.OrdinalIgnoreCase))
+            return lineOfBusiness is SIMS.Domain.Enums.PolicyLineOfBusiness.AutoLiability or SIMS.Domain.Enums.PolicyLineOfBusiness.AutoPhysicalDamage;
+        if (sheetName.Contains("inland marine", StringComparison.OrdinalIgnoreCase))
+            return lineOfBusiness == SIMS.Domain.Enums.PolicyLineOfBusiness.InlandMarine;
+        return true;
+    }
+
+    private static LondonHeaderRows LondonHeaders(string sheetName)
+    {
+        if (sheetName.Contains("Commercial Auto", StringComparison.OrdinalIgnoreCase))
+            return CommercialAutoHeaders;
+        if (sheetName.Contains("Inland Marine", StringComparison.OrdinalIgnoreCase))
+            return InlandMarineHeaders;
+        return GeneralLiabilityHeaders;
+    }
+
+    private static string TransactionCode(SIMS.Domain.Enums.TransactionType transactionType, decimal grossPremium)
+        => transactionType switch
+        {
+            SIMS.Domain.Enums.TransactionType.Endorsement => grossPremium < 0 ? "RP" : "AP",
+            SIMS.Domain.Enums.TransactionType.Cancellation => "RP",
+            SIMS.Domain.Enums.TransactionType.Reinstatement => "AP",
+            _ => "OP",
+        };
 
     private static byte[] BuildWorkbook(IReadOnlyList<WorksheetData> sheets)
     {
@@ -203,5 +261,35 @@ internal static class BordereauxWorkbookBuilder
         return cleaned.Length <= 31 ? cleaned : cleaned[..31];
     }
 
+    private static readonly LondonHeaderRows GeneralLiabilityHeaders = new(
+        new object?[] { "Ref", "CR0013", "CR0014", "CR0005", "CR0001", "CR0002", "CR0007", "CR0017", "CR0016", "CR0019", "CR0010", "CR0029", "CR0035", "CR0039", "CR0041", "CR0030", "CR0031", "CR0050", "CR0048", "CR0056", "CR0057", "CR0020", "CR0021", "CR0059", "CR0061", "CR0062", null, null, "CR0065", "CR0066", "CR0025", "CR0088", "CR0096", "CR0097", "CR0098", "CR0099", "CR0100", "CR0101", "CR0102", "CR0038", "CR0040", "CR0046", "CR0047", "CR0049", "CR0226", "CR0051", "CR0052", "CR0053", "CR0054", "CR0055", "CR0086", "CR0087", "CR0089", "CR0090", "CR0091", "CR0092", "CR0093", "CR0094", "CR0095", "CR0315", "CR1298", null, null, null, null, null },
+        new object?[] { "Field", "Coverholder Name", "Coverholder PIN", "Unique Market Reference (UMR)", "Reporting Period Start Date", "Reporting Period (End Date)", "Section No", "Class of Business", "Risk Code", "Type of Insurance (Direct or Type or Reinsurance)", "Year of Account", "Certificate Ref", "Insured Full Name, Last Name or Company Name", "Insured Country Sub-division: State, Province, Territory, Canton etc.", "Insured Country (see code list)", "Risk Inception Date", "Risk Expiry Date", "Location of risk - Country", "Location of Risk - Country Sub-division: State, Province, Territory, Canton etc.", "Transaction Type - Original Premium etc.", "Effective Date of Transaction", "Original Currency", "Total gross written premium", "Gross premium paid this time", "Commission %", "Commission Amount", "Brokerage %", "Brokerage Amount", "Net Premium to London in original currency", "Settlement Currency", "US Classification", "State of Filing (see code list)", "Surplus Lines Broker Name", "Surplus Lines Broker Licence No ", "New Jersey SLA No", "Surplus Lines Broker Address", "Surplus Lines Broker State", "Surplus Lines Broker Zip Code", "Surplus Lines Broker Country", "Insured Address ", "Insured Postcode, Zip Code or Similar", "Location of Risk, Address", "Location of Risk, County", "Location of Risk, Postcode, zip code or similar", "Country of Registration", "Sum Insured Currency (see code list)", "Sum Insured Amount", "Aggregate Sum Insured Amount", "Deductible or Excess Amount", "Deductible or Excess Basis", "Other Fees or Deductions Description", "Other Fees or Deductions Amount", "Intermediary - Role", "Intermediary - Name", "Intermediary - Reference No etc", "Intermediary  - Address", "Intermediary - State", "Intermediary - Postcode, zip or similar", "Intermediary - Country (see code list)", "Policy issuance date", "Industrial sector of the insured ", "New/Renewal", "Logging 97111 Payroll", "Logging 97111 Premium", "LL End Limit", "Debit/Credit Mod" });
+
+    private static readonly LondonHeaderRows CommercialAutoHeaders = new(
+        new object?[] { "Ref", "CR0013", "CR0014", "CR0005", "CR0001", "CR0002", "CR0007", "CR0017", "CR0016", "CR0019", "CR0010", "CR0029", "CR0035", "CR0039", "CR0041", "CR0030", "CR0031", "CR0050", "CR0048", "CR0056", "CR0057", "CR0020", "CR0021", "CR0059", "CR0061", "CR0062", "CR0065", "CR0066", "CR0025", "CR0088", "CR0096", "CR0097", "CR0098", "CR0099", "CR0100", "CR0101", "CR0102", "CR0038", "CR0040", "CR0046", "CR0047", "CR0049", "CR0226", "CR0051", null, null, "CR0052", "CR0054", "CR0055", null, null, null, null, null, null, null, null, null, "CR0315", "CR1298", null, null, null },
+        new object?[] { "Field", "Coverholder Name", "Coverholder PIN", "Unique Market Reference (UMR)", "Reporting Period Start Date", "Reporting Period (End Date)", "Section No", "Class of Business", "Risk Code", "Type of Insurance (Direct or Type or Reinsurance)", "Year of Account", "Certificate Ref", "Insured Full Name, Last Name or Company Name", "Insured Country Sub-division: State, Province, Territory, Canton etc.", "Insured Country (see code list)", "Risk Inception Date", "Risk Expiry Date", "Location of risk - Country", "Location of Risk - Country Sub-division: State, Province, Territory, Canton etc.", "Transaction Type - Original Premium etc.", "Effective Date of Transaction", "Original Currency", "Total gross written premium", "Gross premium paid this time", "Commission %", "Commission Amount", "Net Premium to London in original currency", "Settlement Currency", "US Classification", "State of Filing (see code list)", "Surplus Lines Broker Name", "Surplus Lines Broker Licence No ", "New Jersey SLA No", "Surplus Lines Broker Address", "Surplus Lines Broker State", "Surplus Lines Broker Zip Code", "Surplus Lines Broker Country", "Insured Address ", "Insured Postcode, Zip Code or Similar", "Location of Risk, Address", "Location of Risk, County", "Location of Risk, Postcode, zip code or similar", "Country of Registration", "Sum Insured Currency (see code list)", "Sum Insured Occurrence", "Sum Insured Aggregate", "Vehicle Information", "Deductible or Excess Amount", "Deductible or Excess Basis", "Other Fees or Deductions Description", "Other Fees or Deductions Amount", "Intermediary - Role", "Intermediary - Name", "Intermediary - Reference No etc", "Intermediary  - Address", "Intermediary - State", "Intermediary - Postcode, zip or similar", "Intermediary - Country (see code list)", "Policy issuance date", "Industrial sector of the insured ", "Add'l Rate Increase/Decrease Percent", "New/Renewal", "Debit/Credit Mod" });
+
+    private static readonly LondonHeaderRows InlandMarineHeaders = new(
+        new object?[] { "Ref", "CR0013", "CR0014", "CR0005", "CR0001", "CR0002", "CR0007", "CR0017", "CR0016", "CR0019", "CR0010", "CR0029", "CR0035", "CR0039", "CR0041", "CR0030", "CR0031", "CR0050", "CR0048", "CR0056", "CR0057", "CR0020", "CR0021", "CR0054", "CR0059", "CR0061", "CR0062", null, null, "CR0065", "CR0066", "CR0025", "CR0088", "CR0096", "CR0097", "CR0098", "CR0099", "CR0100", "CR0101", "CR0102", "CR0038", "CR0040", "CR0046", "CR0047", "CR0049", "CR0226", "CR0051", "CR0052", null, null, "CR0054", "CR0055", null, null, null, null, null, null, null, null, null, "CR0315", "CR1298", null, null, null, null },
+        new object?[] { "Field", "Coverholder Name", "Coverholder PIN", "Unique Market Reference (UMR)", "Reporting Period Start Date", "Reporting Period (End Date)", "Section No", "Class of Business", "Risk Code", "Type of Insurance (Direct or Type or Reinsurance)", "Year of Account", "Certificate Ref", "Insured Full Name, Last Name or Company Name", "Insured Country Sub-division: State, Province, Territory, Canton etc.", "Insured Country (see code list)", "Risk Inception Date", "Risk Expiry Date", "Location of risk - Country", "Location of Risk - Country Sub-division: State, Province, Territory, Canton etc.", "Transaction Type - Original Premium etc.", "Effective Date of Transaction", "Original Currency", "Total gross written premium", "Deductible or Excess Amount (minimum)", "Gross premium paid this time", "Commission %", "Commission Amount", "Brokerage %", "Brokerage Amount", "Net Premium to London in original currency", "Settlement Currency", "US Classification", "State of Filing (see code list)", "Surplus Lines Broker Name", "Surplus Lines Broker Licence No ", "New Jersey SLA No", "Surplus Lines Broker Address", "Surplus Lines Broker State", "Surplus Lines Broker Zip Code", "Surplus Lines Broker Country", "Insured Address ", "Insured Postcode, Zip Code or Similar", "Location of Risk, Address", "Location of Risk, County", "Location of Risk, Postcode, zip code or similar", "Country of Registration", "Sum Insured Currency (see code list)", "Sum Insured Amount Occurrence Limit", "Sum Insured Amount Aggregate Limit", "Total Insurable Value", "Deductible or Excess Amount", "Deductible or Excess Basis", "Other Fees or Deductions Description", "Other Fees or Deductions Amount", "Intermediary - Role", "Intermediary - Name", "Intermediary - Reference No etc", "Intermediary  - Address", "Intermediary - State", "Intermediary - Postcode, zip or similar", "Intermediary - Country (see code list)", "Policy issuance date", "Industrial sector of the insured ", "Add'l Rate Increase/Decrease Percent", "New/Renewal", "Rate", "Debit/Credit Mod" });
+
+    private sealed record LondonHeaderRows(IReadOnlyList<object?> Refs, IReadOnlyList<object?> Fields);
     private sealed record WorksheetData(string Name, IReadOnlyList<IReadOnlyList<object?>> Rows);
 }
+
+internal sealed record BordereauxLondonPremiumRow(
+    BordereauxPremiumPreviewRowDto Source,
+    DateOnly PeriodStart,
+    DateOnly PeriodEnd,
+    string CoverholderName,
+    string CoverholderPin,
+    string Umr,
+    string SectionNumber,
+    string ClassOfBusiness,
+    string RiskCode,
+    string InsuranceType,
+    string YearOfAccount,
+    string CurrencyCode,
+    decimal CommissionRate,
+    decimal CommissionAmount,
+    decimal NetPremiumToLondon);

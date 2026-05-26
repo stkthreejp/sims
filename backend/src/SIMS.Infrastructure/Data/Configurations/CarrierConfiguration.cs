@@ -14,6 +14,7 @@ public class CarrierConfiguration : IEntityTypeConfiguration<Carrier>
         builder.HasIndex(c => c.Name).IsUnique();
         builder.Property(c => c.Naic).HasMaxLength(20);
         builder.Property(c => c.AmBestRating).HasMaxLength(10);
+        builder.Property(c => c.DefaultCurrencyCode).HasMaxLength(3).HasDefaultValue("USD");
 
         builder.HasMany(c => c.Contacts)
             .WithOne(cc => cc.Carrier)

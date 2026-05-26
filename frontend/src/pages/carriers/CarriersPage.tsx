@@ -10,7 +10,7 @@ import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
 import type { CarrierCreate } from '@/types/carrier.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 
-const EMPTY_FORM: CarrierCreate = { name: '', naic: '', amBestRating: '', linesOfBusiness: [] }
+const EMPTY_FORM: CarrierCreate = { name: '', naic: '', amBestRating: '', defaultCurrencyCode: 'USD', linesOfBusiness: [] }
 
 function LobCheckboxes({ selected, onChange }: { selected: PolicyLineOfBusiness[]; onChange: (lobs: PolicyLineOfBusiness[]) => void }) {
   const toggle = (lob: PolicyLineOfBusiness) =>
@@ -96,6 +96,10 @@ export function CarriersPage() {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">AM Best Rating</label>
                 <input value={form.amBestRating ?? ''} onChange={set('amBestRating')} placeholder="e.g. A+" className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Currency</label>
+                <input value={form.defaultCurrencyCode ?? 'USD'} onChange={set('defaultCurrencyCode')} maxLength={3} placeholder="USD" className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
             <div>

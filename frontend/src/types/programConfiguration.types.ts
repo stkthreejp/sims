@@ -34,6 +34,11 @@ export interface ProgramCarrierLineOfBusiness {
   notes: string | null
   billingMode: string | null
   paymentTermsDays: number | null
+  londonUmr: string | null
+  londonSectionNumber: string | null
+  londonClassOfBusiness: string | null
+  londonRiskCode: string | null
+  londonInsuranceType: string | null
   states: ProgramCarrierLobState[]
 }
 
@@ -69,6 +74,11 @@ export interface ProgramCarrierLineOfBusinessUpsert {
   expirationDate?: string | null
   billingMode?: string | null
   paymentTermsDays?: number | null
+  londonUmr?: string | null
+  londonSectionNumber?: string | null
+  londonClassOfBusiness?: string | null
+  londonRiskCode?: string | null
+  londonInsuranceType?: string | null
   notes?: string | null
 }
 

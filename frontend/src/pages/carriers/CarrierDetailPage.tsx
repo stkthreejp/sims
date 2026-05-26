@@ -165,6 +165,7 @@ type InfoFormData = {
   state: string
   zipCode: string
   website: string
+  defaultCurrencyCode: string
   isActive: boolean
   linesOfBusiness: PolicyLineOfBusiness[]
 }
@@ -206,7 +207,7 @@ export function CarrierDetailPage() {
   const [editingInfo, setEditingInfo] = useState(false)
   const [infoForm, setInfoForm] = useState<InfoFormData>({
     name: '', naic: '', amBestRating: '', addressLine1: '', addressLine2: '',
-    city: '', state: '', zipCode: '', website: '', isActive: true, linesOfBusiness: [],
+    city: '', state: '', zipCode: '', website: '', defaultCurrencyCode: 'USD', isActive: true, linesOfBusiness: [],
   })
 
   const [showNewContact, setShowNewContact] = useState(false)
@@ -418,6 +419,7 @@ export function CarrierDetailPage() {
         state: infoForm.state || undefined,
         zipCode: infoForm.zipCode || undefined,
         website: infoForm.website || undefined,
+        defaultCurrencyCode: infoForm.defaultCurrencyCode || 'USD',
         isActive: infoForm.isActive,
         linesOfBusiness: infoForm.linesOfBusiness,
       }
@@ -444,6 +446,7 @@ export function CarrierDetailPage() {
       state: carrier.state ?? '',
       zipCode: carrier.zipCode ?? '',
       website: carrier.website ?? '',
+      defaultCurrencyCode: carrier.defaultCurrencyCode ?? 'USD',
       isActive: carrier.isActive,
       linesOfBusiness: [...carrier.linesOfBusiness],
     })
@@ -617,6 +620,11 @@ export function CarrierDetailPage() {
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Website</label>
               <input value={infoForm.website} onChange={infoSet('website')} placeholder="https://example.com" className="sims-input" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Currency</label>
+              <input value={infoForm.defaultCurrencyCode} onChange={infoSet('defaultCurrencyCode')} maxLength={3} placeholder="USD" className="sims-input uppercase" />
             </div>
 
             <div>

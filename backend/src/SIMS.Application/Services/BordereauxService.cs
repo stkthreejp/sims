@@ -266,7 +266,8 @@ public class BordereauxService : IBordereauxService
 
         var rows = JsonSerializer.Deserialize<List<BordereauxPremiumPreviewRowDto>>(run.SourceRowsSnapshotJson, SnapshotJsonOptions) ?? [];
         var requiredTabs = ParseStringArray(run.Profile.RequiredTabsJson);
-        var londonBytes = BordereauxWorkbookBuilder.BuildLondonBordereaux(rows, requiredTabs);
+        var londonRows = await BuildLondonRowsAsync(run, rows, ct);
+        var londonBytes = BordereauxWorkbookBuilder.BuildLondonBordereaux(londonRows, requiredTabs);
         var accountCurrentBytes = BordereauxWorkbookBuilder.BuildAccountCurrent(rows);
         var periodLabel = run.PeriodStart.ToString("yyyy-MM");
         var programName = SafeFilePart(run.Profile.ProgramConfiguration.Name);
@@ -535,6 +536,61 @@ public class BordereauxService : IBordereauxService
             invoice.InvoiceNumber);
     }
 
+    private async Task<IReadOnlyList<BordereauxLondonPremiumRow>> BuildLondonRowsAsync(
+        BordereauxRun run,
+        IReadOnlyList<BordereauxPremiumPreviewRowDto> rows,
+        CancellationToken ct)
+    {
+        var staticValues = ParseJsonObject(run.Profile.StaticValuesJson);
+        var coverholderName = GetStaticValue(staticValues, "coverholderName") ?? "Specialty Market Managers, LLC";
+        var coverholderPin = GetStaticValue(staticValues, "coverholderPin") ?? "USA00060";
+        var profileUmr = GetStaticValue(staticValues, "umr") ?? string.Empty;
+        var yearOfAccount = GetStaticValue(staticValues, "yearOfAccount") ?? string.Empty;
+        var currencyCode = string.IsNullOrWhiteSpace(run.Profile.Carrier.DefaultCurrencyCode)
+            ? "USD"
+            : run.Profile.Carrier.DefaultCurrencyCode.Trim().ToUpperInvariant();
+
+        var lobSetups = await _db.Set<ProgramCarrierLineOfBusiness>()
+            .Include(l => l.ProgramCarrier)
+            .Where(l => l.ProgramCarrier.ProgramConfigurationId == run.Profile.ProgramConfigurationId
+                && l.ProgramCarrier.CarrierId == run.Profile.CarrierId
+                && l.ProgramCarrier.IsActive
+                && l.IsActive)
+            .ToListAsync(ct);
+        var commissionRows = await _db.Set<CarrierCommission>()
+            .Where(c => c.CarrierId == run.Profile.CarrierId
+                && (c.ProgramConfigurationId == run.Profile.ProgramConfigurationId || c.ProgramConfigurationId == null)
+                && c.EffectiveDate <= run.PeriodEnd
+                && (c.DisabledDate == null || c.DisabledDate > run.PeriodStart))
+            .ToListAsync(ct);
+
+        return rows.Select(row =>
+        {
+            var setup = ResolveLobSetup(lobSetups, row.LineOfBusiness, row.ReportingDate);
+            var commissionRate = ResolveCarrierCommissionRate(commissionRows, row.LineOfBusiness, row.ReportingDate, run.Profile.ProgramConfigurationId)
+                ?? (row.GrossPremium == 0 ? 0 : decimal.Round(row.GrossCommission / row.GrossPremium, 6));
+            var commissionAmount = decimal.Round(row.GrossPremium * commissionRate, 2);
+            var umr = setup?.LondonUmr ?? profileUmr;
+
+            return new BordereauxLondonPremiumRow(
+                row,
+                run.PeriodStart,
+                run.PeriodEnd,
+                coverholderName,
+                coverholderPin,
+                umr,
+                setup?.LondonSectionNumber ?? string.Empty,
+                setup?.LondonClassOfBusiness ?? string.Empty,
+                setup?.LondonRiskCode ?? string.Empty,
+                setup?.LondonInsuranceType ?? "DIRECT",
+                yearOfAccount,
+                currencyCode,
+                commissionRate,
+                commissionAmount,
+                row.GrossPremium - commissionAmount);
+        }).ToList();
+    }
+
     private static DateOnly ResolveReportingDate(PolicyTransaction transaction, Invoice invoice, BordereauxDateBasis dateBasis)
         => dateBasis switch
         {
@@ -576,6 +632,55 @@ public class BordereauxService : IBordereauxService
             .Select(element => element.GetString()!.Trim())
             .ToList();
     }
+
+    private static Dictionary<string, string> ParseJsonObject(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            return [];
+
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.String)
+                values[property.Name] = property.Value.GetString() ?? string.Empty;
+        }
+
+        return values;
+    }
+
+    private static string? GetStaticValue(IReadOnlyDictionary<string, string> values, string key)
+        => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value.Trim()
+            : null;
+
+    private static ProgramCarrierLineOfBusiness? ResolveLobSetup(
+        IReadOnlyList<ProgramCarrierLineOfBusiness> setups,
+        PolicyLineOfBusiness lineOfBusiness,
+        DateOnly asOfDate)
+        => setups
+            .Where(l => l.LineOfBusiness == lineOfBusiness
+                && l.EffectiveDate <= asOfDate
+                && (l.ExpirationDate == null || l.ExpirationDate >= asOfDate)
+                && l.ProgramCarrier.EffectiveDate <= asOfDate
+                && (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= asOfDate))
+            .OrderByDescending(l => l.EffectiveDate)
+            .FirstOrDefault();
+
+    private static decimal? ResolveCarrierCommissionRate(
+        IReadOnlyList<CarrierCommission> commissions,
+        PolicyLineOfBusiness lineOfBusiness,
+        DateOnly asOfDate,
+        Guid programConfigurationId)
+        => commissions
+            .Where(c => (c.LineOfBusiness == lineOfBusiness.ToString() || c.LineOfBusiness == null)
+                && c.EffectiveDate <= asOfDate
+                && (c.DisabledDate == null || c.DisabledDate > asOfDate))
+            .OrderByDescending(c => c.ProgramConfigurationId == programConfigurationId ? 1 : 0)
+            .ThenByDescending(c => c.LineOfBusiness == lineOfBusiness.ToString() ? 1 : 0)
+            .ThenByDescending(c => c.EffectiveDate)
+            .Select(c => (decimal?)c.CommissionRate)
+            .FirstOrDefault();
 
     private static (string Code, string Message)? ValidateJsonArray(string json, string label)
     {

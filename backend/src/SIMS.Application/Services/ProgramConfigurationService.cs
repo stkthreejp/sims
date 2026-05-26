@@ -180,6 +180,11 @@ public class ProgramConfigurationService : IProgramConfigurationService
             ExpirationDate = request.ExpirationDate,
             BillingMode = TrimToNull(request.BillingMode),
             PaymentTermsDays = request.PaymentTermsDays,
+            LondonUmr = TrimToNull(request.LondonUmr),
+            LondonSectionNumber = TrimToNull(request.LondonSectionNumber),
+            LondonClassOfBusiness = TrimToNull(request.LondonClassOfBusiness),
+            LondonRiskCode = TrimToNull(request.LondonRiskCode),
+            LondonInsuranceType = TrimToNull(request.LondonInsuranceType),
             Notes = TrimToNull(request.Notes)
         };
 
@@ -219,6 +224,11 @@ public class ProgramConfigurationService : IProgramConfigurationService
         lob.ExpirationDate = request.ExpirationDate;
         lob.BillingMode = TrimToNull(request.BillingMode);
         lob.PaymentTermsDays = request.PaymentTermsDays;
+        lob.LondonUmr = TrimToNull(request.LondonUmr);
+        lob.LondonSectionNumber = TrimToNull(request.LondonSectionNumber);
+        lob.LondonClassOfBusiness = TrimToNull(request.LondonClassOfBusiness);
+        lob.LondonRiskCode = TrimToNull(request.LondonRiskCode);
+        lob.LondonInsuranceType = TrimToNull(request.LondonInsuranceType);
         lob.Notes = TrimToNull(request.Notes);
 
         await _db.SaveChangesAsync(ct);
@@ -526,6 +536,11 @@ public class ProgramConfigurationService : IProgramConfigurationService
             lob.Notes,
             lob.BillingMode,
             lob.PaymentTermsDays,
+            lob.LondonUmr,
+            lob.LondonSectionNumber,
+            lob.LondonClassOfBusiness,
+            lob.LondonRiskCode,
+            lob.LondonInsuranceType,
             lob.States
                 .OrderBy(s => s.StateCode)
                 .Select(Map)
