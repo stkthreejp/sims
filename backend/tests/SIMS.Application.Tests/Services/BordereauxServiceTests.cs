@@ -5,6 +5,7 @@ using SIMS.Application.DTOs.Bordereaux;
 using SIMS.Application.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 using SIMS.Infrastructure.Data;
 using Xunit;
@@ -414,6 +415,86 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task GeneratePremiumExportPackageAsync_WritesAutoAndImDetailTabsFromSubmissionSchedules()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.AutoPhysicalDamage);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.InlandMarine);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            LineOfBusiness = null,
+        });
+        var autoTransaction = await SeedPolicyTransactionWithInvoiceAsync(
+            db,
+            program,
+            carrier,
+            TransactionType.NewBusiness,
+            new DateOnly(2026, 4, 8),
+            new DateOnly(2026, 4, 8),
+            "LL-APD-000145-00",
+            "MS",
+            1451m,
+            348.24m,
+            lineOfBusiness: PolicyLineOfBusiness.AutoPhysicalDamage);
+        db.Add(new SubmissionVehicle
+        {
+            SubmissionId = autoTransaction.Policy.SubmissionId,
+            UnitNumber = 7,
+            Year = 2022,
+            Make = "Kenworth",
+            Model = "T880",
+            Vin = "1XKZD49X9NJ123456",
+            VehicleClass = VehicleClass.Truck,
+            ApdStatedValue = 185000m,
+            ApdCompDeductible = 5000m,
+        });
+        var equipmentType = new EquipmentType { TypeNumber = 12, Name = "Skidder" };
+        db.Add(equipmentType);
+        await db.SaveChangesAsync();
+        var imTransaction = await SeedPolicyTransactionWithInvoiceAsync(
+            db,
+            program,
+            carrier,
+            TransactionType.NewBusiness,
+            new DateOnly(2026, 4, 9),
+            new DateOnly(2026, 4, 9),
+            "LL-IM-000146-00",
+            "MS",
+            500m,
+            120m,
+            lineOfBusiness: PolicyLineOfBusiness.InlandMarine);
+        db.Add(new SubmissionEquipment
+        {
+            SubmissionId = imTransaction.Policy.SubmissionId,
+            ItemNumber = 3,
+            Year = 2021,
+            Make = "Tigercat",
+            Model = "620H",
+            SerialNumber = "SKD-620H-4455",
+            Value = 275000m,
+            Deductible = 10000m,
+            EquipmentTypeId = equipmentType.Id,
+        });
+        await db.SaveChangesAsync();
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        var generated = await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        var londonText = blob.Uploads[0].Text;
+        Assert.Contains("\"autoVehicleRows\":1", generated.Value!.DetailRowCountsJson);
+        Assert.Contains("\"imUnitRows\":1", generated.Value.DetailRowCountsJson);
+        Assert.Contains("1XKZD49X9NJ123456", londonText);
+        Assert.Contains("Kenworth", londonText);
+        Assert.Contains("185000", londonText);
+        Assert.Contains("SKD-620H-4455", londonText);
+        Assert.Contains("Tigercat", londonText);
+        Assert.Contains("275000", londonText);
+    }
+
+    [Fact]
     public async Task GetRunFileDownloadUrlAsync_ReturnsSignedUrlForGeneratedLondonFile()
     {
         await using var db = CreateDb();
@@ -516,7 +597,8 @@ public class BordereauxServiceTests
         string state,
         decimal grossPremium,
         decimal commissionAmount,
-        string invoiceStatus = "Posted")
+        string invoiceStatus = "Posted",
+        PolicyLineOfBusiness lineOfBusiness = PolicyLineOfBusiness.GeneralLiability)
     {
         var insured = new Insured
         {
@@ -541,7 +623,7 @@ public class BordereauxServiceTests
             Submission = submission,
             ProgramId = program.Id,
             CarrierId = carrier.Id,
-            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            LineOfBusiness = lineOfBusiness,
             Status = QuoteStatus.Bound,
             EffectiveDate = effectiveDate,
             ExpirationDate = effectiveDate.AddYears(1),
@@ -556,7 +638,7 @@ public class BordereauxServiceTests
             BoundQuote = quote,
             ProgramId = program.Id,
             CarrierId = carrier.Id,
-            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            LineOfBusiness = lineOfBusiness,
             EffectiveDate = effectiveDate,
             ExpirationDate = effectiveDate.AddYears(1),
             PremiumAmount = grossPremium,

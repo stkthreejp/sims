@@ -56,14 +56,66 @@ internal static class BordereauxWorkbookBuilder
     private static IReadOnlyList<IReadOnlyList<object?>> BuildLondonSheetRows(string sheetName, IReadOnlyList<BordereauxLondonPremiumRow> rows)
     {
         if (sheetName.Equals("Auto Veh Info", StringComparison.OrdinalIgnoreCase))
-            return new[] { new object?[] { "Certificate Ref", "Number", "YearMade", "Make", "Model", "VIN", "Type", "ACV", "Deductible", "Premium", "Rate" } };
+            return BuildAutoVehicleRows(rows.SelectMany(row => row.AutoVehicles).ToList());
         if (sheetName.Equals("IM Unit Info", StringComparison.OrdinalIgnoreCase))
-            return new[] { new object?[] { "Certificate Ref", "Number", "YearMade", "Make", "Model", "Serial", "Type", "ACV", "ACV Note", "Deductible", "Premium", "Rate", "TransType" } };
+            return BuildInlandMarineUnitRows(rows.SelectMany(row => row.ImUnits).ToList());
 
         if (IsLondonSectionSheet(sheetName))
             return BuildLondonSectionRows(sheetName, rows.Where(row => RowBelongsOnSheet(row.Source.LineOfBusiness, sheetName)).ToList());
 
         return BuildEmptyRows(sheetName);
+    }
+
+    private static IReadOnlyList<IReadOnlyList<object?>> BuildAutoVehicleRows(IReadOnlyList<BordereauxAutoVehicleDetail> vehicles)
+    {
+        var data = new List<IReadOnlyList<object?>>
+        {
+            new object?[] { "Certificate Ref", "Number", "YearMade", "Make", "Model", "VIN", "Type", "ACV", "Deductible", "Premium", "Rate" },
+        };
+
+        data.AddRange(vehicles.Select(vehicle => new object?[]
+        {
+            vehicle.CertificateRef,
+            vehicle.Number,
+            vehicle.YearMade,
+            vehicle.Make,
+            vehicle.Model,
+            vehicle.Vin,
+            vehicle.Type,
+            vehicle.ActualCashValue,
+            vehicle.Deductible,
+            vehicle.Premium,
+            vehicle.Rate,
+        }));
+
+        return data;
+    }
+
+    private static IReadOnlyList<IReadOnlyList<object?>> BuildInlandMarineUnitRows(IReadOnlyList<BordereauxInlandMarineUnitDetail> units)
+    {
+        var data = new List<IReadOnlyList<object?>>
+        {
+            new object?[] { "Certificate Ref", "Number", "YearMade", "Make", "Model", "Serial", "Type", "ACV", "ACV Note", "Deductible", "Premium", "Rate", "TransType" },
+        };
+
+        data.AddRange(units.Select(unit => new object?[]
+        {
+            unit.CertificateRef,
+            unit.Number,
+            unit.YearMade,
+            unit.Make,
+            unit.Model,
+            unit.Serial,
+            unit.Type,
+            unit.ActualCashValue,
+            unit.ActualCashValueNote,
+            unit.Deductible,
+            unit.Premium,
+            unit.Rate,
+            unit.TransactionType,
+        }));
+
+        return data;
     }
 
     private static IReadOnlyList<IReadOnlyList<object?>> BuildLondonSectionRows(string sheetName, IReadOnlyList<BordereauxLondonPremiumRow> rows)
@@ -292,4 +344,34 @@ internal sealed record BordereauxLondonPremiumRow(
     string CurrencyCode,
     decimal CommissionRate,
     decimal CommissionAmount,
-    decimal NetPremiumToLondon);
+    decimal NetPremiumToLondon,
+    IReadOnlyList<BordereauxAutoVehicleDetail> AutoVehicles,
+    IReadOnlyList<BordereauxInlandMarineUnitDetail> ImUnits);
+
+internal sealed record BordereauxAutoVehicleDetail(
+    string CertificateRef,
+    int Number,
+    int? YearMade,
+    string Make,
+    string Model,
+    string Vin,
+    string Type,
+    decimal? ActualCashValue,
+    decimal? Deductible,
+    decimal? Premium,
+    decimal? Rate);
+
+internal sealed record BordereauxInlandMarineUnitDetail(
+    string CertificateRef,
+    int Number,
+    int? YearMade,
+    string Make,
+    string Model,
+    string Serial,
+    string Type,
+    decimal? ActualCashValue,
+    string ActualCashValueNote,
+    decimal? Deductible,
+    decimal? Premium,
+    decimal? Rate,
+    string TransactionType);

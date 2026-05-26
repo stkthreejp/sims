@@ -288,6 +288,12 @@ public class BordereauxService : IBordereauxService
         run.GeneratedAt = DateTime.UtcNow;
         run.BordereauxRowCount = rows.Count;
         run.AccountCurrentRowCount = rows.Count;
+        run.DetailRowCountsJson = JsonSerializer.Serialize(new
+        {
+            premiumRows = rows.Count,
+            autoVehicleRows = londonRows.Sum(row => row.AutoVehicles.Count),
+            imUnitRows = londonRows.Sum(row => row.ImUnits.Count),
+        }, SnapshotJsonOptions);
         run.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -591,6 +597,7 @@ public class BordereauxService : IBordereauxService
                 && c.EffectiveDate <= run.PeriodEnd
                 && (c.DisabledDate == null || c.DisabledDate > run.PeriodStart))
             .ToListAsync(ct);
+        var detailRows = await BuildLondonDetailRowsAsync(rows, ct);
 
         return rows.Select(row =>
         {
@@ -599,6 +606,7 @@ public class BordereauxService : IBordereauxService
                 ?? (row.GrossPremium == 0 ? 0 : decimal.Round(row.GrossCommission / row.GrossPremium, 6));
             var commissionAmount = decimal.Round(row.GrossPremium * commissionRate, 2);
             var umr = setup?.LondonUmr ?? profileUmr;
+            detailRows.TryGetValue(row.PolicyTransactionId, out var details);
 
             return new BordereauxLondonPremiumRow(
                 row,
@@ -615,9 +623,76 @@ public class BordereauxService : IBordereauxService
                 currencyCode,
                 commissionRate,
                 commissionAmount,
-                row.GrossPremium - commissionAmount);
+                row.GrossPremium - commissionAmount,
+                details?.AutoVehicles ?? [],
+                details?.ImUnits ?? []);
         }).ToList();
     }
+
+    private async Task<Dictionary<Guid, LondonDetailRows>> BuildLondonDetailRowsAsync(
+        IReadOnlyList<BordereauxPremiumPreviewRowDto> rows,
+        CancellationToken ct)
+    {
+        var transactionIds = rows.Select(r => r.PolicyTransactionId).Distinct().ToList();
+        if (transactionIds.Count == 0)
+            return [];
+
+        var transactions = await _db.Set<PolicyTransaction>()
+            .AsNoTracking()
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Vehicles)
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Equipment).ThenInclude(e => e.EquipmentType)
+            .Where(t => transactionIds.Contains(t.Id))
+            .ToListAsync(ct);
+
+        return transactions.ToDictionary(
+            t => t.Id,
+            t => new LondonDetailRows(
+                t.Policy.LineOfBusiness is PolicyLineOfBusiness.AutoLiability or PolicyLineOfBusiness.AutoPhysicalDamage
+                    ? t.Policy.Submission.Vehicles
+                        .OrderBy(v => v.UnitNumber)
+                        .Select(v => new BordereauxAutoVehicleDetail(
+                            t.Policy.PolicyNumber,
+                            v.UnitNumber,
+                            v.Year,
+                            v.Make ?? string.Empty,
+                            v.Model ?? string.Empty,
+                            v.Vin ?? string.Empty,
+                            v.VehicleClass.ToString(),
+                            v.ApdStatedValue,
+                            v.ApdCompDeductible ?? v.ApdCollDeductible,
+                            null,
+                            null))
+                        .ToList()
+                    : [],
+                t.Policy.LineOfBusiness == PolicyLineOfBusiness.InlandMarine
+                    ? t.Policy.Submission.Equipment
+                        .OrderBy(e => e.ItemNumber)
+                        .Select(e => new BordereauxInlandMarineUnitDetail(
+                            t.Policy.PolicyNumber,
+                            e.ItemNumber,
+                            e.Year,
+                            e.Make ?? string.Empty,
+                            e.Model ?? e.Description ?? string.Empty,
+                            e.SerialNumber ?? string.Empty,
+                            e.EquipmentType?.Name ?? string.Empty,
+                            e.Value,
+                            e.SettlementBasis ?? string.Empty,
+                            e.Deductible,
+                            null,
+                            null,
+                            LondonTransactionCode(t.TransactionType, t.PremiumChange)))
+                        .ToList()
+                    : []));
+    }
+
+    private static string LondonTransactionCode(TransactionType transactionType, decimal grossPremium)
+        => transactionType switch
+        {
+            TransactionType.Endorsement => grossPremium < 0 ? "RP" : "AP",
+            TransactionType.Cancellation => "RP",
+            TransactionType.Reinstatement => "AP",
+            _ => "OP",
+        };
 
     private static DateOnly ResolveReportingDate(PolicyTransaction transaction, Invoice invoice, BordereauxDateBasis dateBasis)
         => dateBasis switch
@@ -779,4 +854,7 @@ public class BordereauxService : IBordereauxService
     }
 
     private sealed record PreviewSourceRow(Invoice Invoice, PolicyTransaction Transaction);
+    private sealed record LondonDetailRows(
+        IReadOnlyList<BordereauxAutoVehicleDetail> AutoVehicles,
+        IReadOnlyList<BordereauxInlandMarineUnitDetail> ImUnits);
 }
