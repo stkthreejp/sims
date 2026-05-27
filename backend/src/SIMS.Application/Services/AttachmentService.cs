@@ -58,7 +58,7 @@ public class AttachmentService : IAttachmentService
             .AsNoTracking()
             .Include(a => a.UploadedBy)
             .Include(a => a.PolicyVersion)
-            .Where(a => a.EntityType == entityType);
+            .Where(a => a.EntityType == entityType && !a.IsDeleted);
 
         q = entityType switch
         {
@@ -215,7 +215,7 @@ public class AttachmentService : IAttachmentService
 
     public async Task<Result<string>> GetDownloadUrlAsync(Guid id, Guid userId)
     {
-        var attachment = await _db.Set<Attachment>().AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
+        var attachment = await _db.Set<Attachment>().AsNoTracking().FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
         if (attachment == null)
             return Result<string>.Failure("NOT_FOUND", "Attachment not found.");
 
@@ -228,7 +228,7 @@ public class AttachmentService : IAttachmentService
 
     public async Task<Result> DeleteAsync(Guid id, Guid userId)
     {
-        var attachment = await _db.Set<Attachment>().FirstOrDefaultAsync(a => a.Id == id);
+        var attachment = await _db.Set<Attachment>().FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
         if (attachment == null)
             return Result.Failure("NOT_FOUND", "Attachment not found.");
 
@@ -293,9 +293,9 @@ public class AttachmentService : IAttachmentService
                  q.Submission.CreatedById == userId ||
                  q.Submission.UnderwriterId == userId ||
                  q.Submission.AssistantUWId == userId)),
-            DocumentEntityType.Carrier => await _db.Set<Carrier>().AsNoTracking().AnyAsync(c => c.Id == entityId),
-            DocumentEntityType.Agent => await _db.Set<Agent>().AsNoTracking().AnyAsync(a => a.Id == entityId),
-            DocumentEntityType.Insured => await _db.Set<Insured>().AsNoTracking().AnyAsync(i => i.Id == entityId),
+            DocumentEntityType.Carrier => await CanAccessCarrierAsync(entityId, userId),
+            DocumentEntityType.Agent => await CanAccessAgentAsync(entityId, userId),
+            DocumentEntityType.Insured => await CanAccessInsuredAsync(entityId, userId),
             _ => false,
         };
     }
@@ -303,13 +303,58 @@ public class AttachmentService : IAttachmentService
     private async Task<bool> EntityExistsAsync(DocumentEntityType entityType, Guid entityId)
         => entityType switch
         {
-            DocumentEntityType.Submission => await _db.Set<Submission>().AsNoTracking().AnyAsync(s => s.Id == entityId),
-            DocumentEntityType.Policy => await _db.Set<Quote>().AsNoTracking().AnyAsync(q => q.Id == entityId),
-            DocumentEntityType.Carrier => await _db.Set<Carrier>().AsNoTracking().AnyAsync(c => c.Id == entityId),
-            DocumentEntityType.Agent => await _db.Set<Agent>().AsNoTracking().AnyAsync(a => a.Id == entityId),
-            DocumentEntityType.Insured => await _db.Set<Insured>().AsNoTracking().AnyAsync(i => i.Id == entityId),
+            DocumentEntityType.Submission => await _db.Set<Submission>().AsNoTracking().AnyAsync(s => s.Id == entityId && !s.IsDeleted),
+            DocumentEntityType.Policy => await _db.Set<Quote>().AsNoTracking().AnyAsync(q => q.Id == entityId && !q.IsDeleted),
+            DocumentEntityType.Carrier => await _db.Set<Carrier>().AsNoTracking().AnyAsync(c => c.Id == entityId && !c.IsDeleted),
+            DocumentEntityType.Agent => await _db.Set<Agent>().AsNoTracking().AnyAsync(a => a.Id == entityId && !a.IsDeleted),
+            DocumentEntityType.Insured => await _db.Set<Insured>().AsNoTracking().AnyAsync(i => i.Id == entityId && !i.IsDeleted),
             _ => false,
         };
+
+    private async Task<bool> CanAccessCarrierAsync(Guid carrierId, Guid userId)
+    {
+        if (!await _db.Set<Carrier>().AsNoTracking().AnyAsync(c => c.Id == carrierId && !c.IsDeleted))
+            return false;
+
+        return await _db.Set<Quote>().AsNoTracking().AnyAsync(q =>
+            q.CarrierId == carrierId &&
+            !q.IsDeleted &&
+            !q.Submission.IsDeleted &&
+            (q.CreatedById == userId ||
+             q.Submission.CreatedById == userId ||
+             q.Submission.UnderwriterId == userId ||
+             q.Submission.AssistantUWId == userId));
+    }
+
+    private async Task<bool> CanAccessAgentAsync(Guid agentId, Guid userId)
+    {
+        if (!await _db.Set<Agent>().AsNoTracking().AnyAsync(a => a.Id == agentId && !a.IsDeleted))
+            return false;
+
+        return await _db.Set<Submission>().AsNoTracking().AnyAsync(s =>
+            s.AgentId == agentId &&
+            !s.IsDeleted &&
+            (s.CreatedById == userId ||
+             s.UnderwriterId == userId ||
+             s.AssistantUWId == userId));
+    }
+
+    private async Task<bool> CanAccessInsuredAsync(Guid insuredId, Guid userId)
+    {
+        if (await _db.Set<Insured>().AsNoTracking().AnyAsync(i =>
+                i.Id == insuredId &&
+                !i.IsDeleted &&
+                i.CreatedById == userId))
+            return true;
+
+        return await _db.Set<Submission>().AsNoTracking().AnyAsync(s =>
+            s.InsuredId == insuredId &&
+            !s.IsDeleted &&
+            !s.Insured.IsDeleted &&
+            (s.CreatedById == userId ||
+             s.UnderwriterId == userId ||
+             s.AssistantUWId == userId));
+    }
 
     private async Task<bool> HasElevatedAttachmentAccessAsync(Guid userId)
     {

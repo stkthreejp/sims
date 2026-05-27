@@ -274,6 +274,11 @@ public class LegalRequirementsController : ControllerBase
         if (string.IsNullOrWhiteSpace(source.ApiKey))
             return BadRequest(new { errorMessage = "OpenLaws API key is required before this source can be checked." });
 
+        var baseUrlError = OpenLawsEndpointGuard.ValidateBaseUrl(source.Url);
+        if (baseUrlError != null)
+            return BadRequest(new { errorMessage = baseUrlError });
+
+        var baseUrl = OpenLawsEndpointGuard.NormalizeBaseUrl(source.Url);
         var now = DateTime.UtcNow;
         var run = new LegalSourceScanRun
         {
@@ -300,7 +305,7 @@ public class LegalRequirementsController : ControllerBase
                 {
                     var results = await _openLawsClient.SearchAsync(
                         new OpenLawsSearchRequest(
-                            source.Url ?? "https://api.openlaws.us",
+                            baseUrl,
                             source.ApiKey,
                             jurisdiction.Key,
                             scanQuery.Query,
@@ -939,6 +944,12 @@ public class LegalRequirementsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(dto.Url) &&
             !Uri.TryCreate(dto.Url.Trim(), UriKind.Absolute, out _))
             return "URL must be a valid absolute URL.";
+        if (OpenLawsEndpointGuard.IsOpenLawsSourceType(dto.SourceType))
+        {
+            var baseUrlError = OpenLawsEndpointGuard.ValidateBaseUrl(dto.Url);
+            if (baseUrlError != null)
+                return baseUrlError;
+        }
 
         return null;
     }

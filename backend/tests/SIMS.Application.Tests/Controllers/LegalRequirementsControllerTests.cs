@@ -24,7 +24,7 @@ public class LegalRequirementsControllerTests
             "All",
             "OpenLaw Test",
             "OpenLaw API",
-            "https://api.openlaw.test",
+            "https://api.openlaws.us",
             "openlaw-test-key",
             true,
             "Manual",
@@ -39,6 +39,32 @@ public class LegalRequirementsControllerTests
 
         var saved = await db.LegalTrackedSources.SingleAsync();
         Assert.Equal("openlaw-test-key", saved.ApiKey);
+    }
+
+    [Theory]
+    [InlineData("https://evil.example")]
+    [InlineData("http://127.0.0.1:8080")]
+    [InlineData("http://169.254.169.254/latest")]
+    [InlineData("http://[::1]")]
+    public async Task CreateSource_RejectsUnsafeOpenLawsBaseUrl(string url)
+    {
+        await using var db = CreateDbContext();
+        var controller = CreateController(db, new FakeOpenLawsClient());
+        var input = new LegalTrackedSourceUpsertDto(
+            "All",
+            "Unsafe OpenLaws",
+            "OpenLaws API",
+            url,
+            "openlaws-test-key",
+            true,
+            "Manual",
+            null);
+
+        var result = await controller.CreateSource(input);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("OpenLaws", badRequest.Value!.ToString());
+        Assert.Empty(await db.LegalTrackedSources.ToListAsync());
     }
 
     [Fact]
@@ -64,7 +90,7 @@ public class LegalRequirementsControllerTests
             State = "TX",
             Name = "OpenLaws TX",
             SourceType = "OpenLaw API",
-            Url = "https://api.openlaws.test",
+            Url = "https://api.openlaws.us",
             ApiKey = "openlaws-test-key",
             IsEnabled = true,
             ScanCadence = "Manual",
@@ -119,7 +145,7 @@ public class LegalRequirementsControllerTests
             State = "Texas",
             Name = "OpenLaws Texas",
             SourceType = "OpenLaw API",
-            Url = "https://api.openlaws.test",
+            Url = "https://api.openlaws.us",
             ApiKey = "openlaws-test-key",
             IsEnabled = true,
             ScanCadence = "Manual",
@@ -168,7 +194,7 @@ public class LegalRequirementsControllerTests
         var client = new OpenLawsClient(new FakeHttpClientFactory(handler));
 
         var results = await client.SearchAsync(
-            new OpenLawsSearchRequest("https://api.openlaws.test", "secret-key", "TX", "commercial insurance cancellation notice", 5),
+            new OpenLawsSearchRequest("https://api.openlaws.us", "secret-key", "TX", "commercial insurance cancellation notice", 5),
             CancellationToken.None);
 
         var result = Assert.Single(results);
@@ -195,10 +221,24 @@ public class LegalRequirementsControllerTests
         var client = new OpenLawsClient(new FakeHttpClientFactory(handler));
 
         var results = await client.SearchAsync(
-            new OpenLawsSearchRequest("https://api.openlaws.test", "secret-key", "TX", "unlikely phrase", 5),
+            new OpenLawsSearchRequest("https://api.openlaws.us", "secret-key", "TX", "unlikely phrase", 5),
             CancellationToken.None);
 
         Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task OpenLawsClient_RejectsUnsafeBaseUrlBeforeRequest()
+    {
+        var handler = new CaptureHandler("[]");
+        var client = new OpenLawsClient(new FakeHttpClientFactory(handler));
+
+        await Assert.ThrowsAsync<OpenLawsException>(() =>
+            client.SearchAsync(
+                new OpenLawsSearchRequest("http://127.0.0.1:8080", "secret-key", "TX", "commercial insurance cancellation notice", 5),
+                CancellationToken.None));
+
+        Assert.Equal(string.Empty, handler.RequestUri);
     }
 
     [Fact]
@@ -210,7 +250,7 @@ public class LegalRequirementsControllerTests
             State = "TX",
             Name = "OpenLaws TX",
             SourceType = "OpenLaw API",
-            Url = "https://api.openlaws.test",
+            Url = "https://api.openlaws.us",
             ApiKey = "openlaws-test-key",
             IsEnabled = true,
             ScanCadence = "Manual",
@@ -231,6 +271,33 @@ public class LegalRequirementsControllerTests
         var savedSource = await db.LegalTrackedSources.SingleAsync();
         Assert.Equal("Failed", savedSource.LastStatus);
         Assert.Equal("OpenLaws returned 401 Unauthorized: Invalid token", savedSource.LastErrorMessage);
+    }
+
+    [Fact]
+    public async Task ScanSource_RejectsStoredUnsafeOpenLawsBaseUrlBeforeClientCall()
+    {
+        await using var db = CreateDbContext();
+        var source = new LegalTrackedSource
+        {
+            State = "TX",
+            Name = "Unsafe OpenLaws TX",
+            SourceType = "OpenLaw API",
+            Url = "http://127.0.0.1:8080",
+            ApiKey = "openlaws-test-key",
+            IsEnabled = true,
+            ScanCadence = "Manual",
+            LastStatus = "NotChecked"
+        };
+        db.LegalTrackedSources.Add(source);
+        await db.SaveChangesAsync();
+
+        var client = new FakeOpenLawsClient();
+        var controller = CreateController(db, client);
+
+        var result = await controller.ScanSource(source.Id);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Empty(client.Requests);
     }
 
     private static ApplicationDbContext CreateDbContext()

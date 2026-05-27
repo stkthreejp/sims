@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-27 after the first auth-hardening pass.
+Last updated on 2026-05-27 during auth-hardening follow-up.
 
 ## P0 Immediate Security / Secret Response
 
@@ -36,7 +36,7 @@ Last updated on 2026-05-27 after the first auth-hardening pass.
 
 ### Party attachment downloads are globally accessible to authenticated users
 
-- Status: Partially remediated on 2026-05-27. Attachment list/download-url endpoints now require `policies.view`; object-level party attachment rules still need a dedicated pass.
+- Status: Remediated on 2026-05-27. Attachment list/download-url endpoints require `policies.view`, and party attachment access now requires elevated access or a scoped submission/quote relationship to the carrier, agent, or insured.
 - Evidence: `backend/src/SIMS.API/Controllers/AttachmentsController.cs`; `backend/src/SIMS.Application/Services/AttachmentService.cs` `CanAccessEntityAsync`.
 - Risk: for agent/carrier/insured attachments, access checks only confirm entity existence.
 - Impact: sensitive uploaded documents can be exposed through signed blob URLs.
@@ -45,7 +45,7 @@ Last updated on 2026-05-27 after the first auth-hardening pass.
 
 ### Legal requirements admin surface allows compliance tampering and SSRF
 
-- Status: Partially remediated on 2026-05-27. Legal source mutation, scan, import, simulate, approve, and reject routes now require system-admin permission; URL allowlisting and private-address blocking remain open.
+- Status: Remediated on 2026-05-27. Legal source mutation, scan, import, simulate, approve, and reject routes require system-admin permission; OpenLaws base URLs now require the official allowlisted host, HTTPS, no custom ports, and no localhost/private/link-local literal addresses.
 - Evidence: `backend/src/SIMS.API/Controllers/LegalRequirementsController.cs`; `backend/src/SIMS.API/Services/OpenLawsClient.cs`.
 - Risk: any authenticated user can create/update tracked legal sources with arbitrary absolute URLs, trigger scans, and approve/reject results.
 - Impact: regulatory source-of-truth tampering and server-side requests to attacker-selected URLs with a bearer API key.
