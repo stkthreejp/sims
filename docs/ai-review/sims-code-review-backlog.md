@@ -182,6 +182,7 @@ Last updated on 2026-05-27 during auth-hardening follow-up.
 
 ### Role Permissions page can crash from conditional hook order
 
+- Status: Remediated on 2026-05-27. Draft initialization now uses `useEffect`, and permission grouping is computed before any early return.
 - Evidence: `frontend/src/pages/admin/RolePermissionsPage.tsx`.
 - Risk: `useMemo` is called after an early return, so hook count changes between loading and loaded renders.
 - Impact: cold refresh can crash with React hook-order error.
@@ -190,6 +191,7 @@ Last updated on 2026-05-27 during auth-hardening follow-up.
 
 ### Quote bind UI uses create-policy permission instead of bind permission
 
+- Status: Remediated on 2026-05-27. Quote bind availability now checks `policies.bind`.
 - Evidence: `frontend/src/pages/quotes/QuoteDetailPage.tsx`; `usePermissions` exposes `canBindPolicies`.
 - Risk: bind UI checks `canCreatePolicies`.
 - Impact: a user allowed to bind but not create is blocked; a user allowed to create but not bind sees a failing action.
@@ -198,6 +200,7 @@ Last updated on 2026-05-27 during auth-hardening follow-up.
 
 ### Add quote is always rendered on submission detail
 
+- Status: Remediated on 2026-05-27. Submission detail Add Quote entry points and the quote form are gated by `policies.create`.
 - Evidence: `frontend/src/pages/submissions/SubmissionDetailPage.tsx`.
 - Risk: add-quote entry point is not permission-gated.
 - Impact: read-only users can attempt quote creation and enter unauthorized workflow.

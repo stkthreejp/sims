@@ -1214,11 +1214,11 @@ export function SubmissionDetailPage() {
           icon={FileText}
           title="No quotes yet"
           description="Add the first carrier quote for this submission."
-          action={
+          action={canCreatePolicies && (
             <button className="sd-btn outline sm" onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
               <Plus size={13} /> Add Quote
             </button>
-          }
+          )}
         />
       ) : (
         <div>
@@ -1276,7 +1276,7 @@ export function SubmissionDetailPage() {
       )}
 
       {/* Add quote form */}
-      {showQuoteForm && (
+      {showQuoteForm && canCreatePolicies && (
         <div style={{ padding: '14px 16px', borderTop: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>New Quote</span>
@@ -1319,7 +1319,7 @@ export function SubmissionDetailPage() {
         </div>
       )}
 
-      {!showQuoteForm && quotes.length > 0 && (
+      {!showQuoteForm && quotes.length > 0 && canCreatePolicies && (
         <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line-2)' }}>
           <button className="sd-btn ghost sm" onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
             <Plus size={13} /> Add Quote
@@ -1391,12 +1391,14 @@ export function SubmissionDetailPage() {
               <FileText size={13} /> Generate doc
             </button>
           )}
-          <button
-            className="sd-btn primary"
-            onClick={() => { setActiveTab('quotes'); setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}
-          >
-            <Plus size={13} /> Add quote
-          </button>
+          {canCreatePolicies && (
+            <button
+              className="sd-btn primary"
+              onClick={() => { setActiveTab('quotes'); setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}
+            >
+              <Plus size={13} /> Add quote
+            </button>
+          )}
         </div>
       </div>
 
@@ -1766,11 +1768,13 @@ export function SubmissionDetailPage() {
         <section className="sd-card">
           <div className="sd-card-head">
             <h3>All quotes <span className="cnt">{quotes.length}</span></h3>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="sd-btn sm primary" onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
-                <Plus size={12} /> Add quote
-              </button>
-            </div>
+            {canCreatePolicies && (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="sd-btn sm primary" onClick={() => { setShowQuoteForm(true); setQuoteForm(emptyQuoteForm()) }}>
+                  <Plus size={12} /> Add quote
+                </button>
+              </div>
+            )}
           </div>
           <div className="sd-card-body tight">
             {renderQuoteList()}

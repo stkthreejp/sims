@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ShieldCheck, Save, Info } from 'lucide-react'
 import { toast } from 'sonner'
@@ -52,11 +52,22 @@ export function RolePermissionsPage() {
   const [dirty, setDirty] = useState<Set<string>>(new Set())
 
   // Init draft when data arrives (only once)
-  useMemo(() => {
+  useEffect(() => {
     if (roles && permissions && !draft) {
       setDraft(buildDraft(roles, permissions))
     }
   }, [roles, permissions, draft])
+
+  // Group permissions by category, in defined order
+  const grouped = useMemo(() => {
+    const map = new Map<string, Permission[]>()
+    for (const cat of CATEGORY_ORDER) map.set(cat, [])
+    for (const p of permissions ?? []) {
+      if (!map.has(p.category)) map.set(p.category, [])
+      map.get(p.category)!.push(p)
+    }
+    return map
+  }, [permissions])
 
   const saveMutation = useMutation({
     mutationFn: ({ roleId, ids }: { roleId: string; ids: number[] }) =>
@@ -89,17 +100,6 @@ export function RolePermissionsPage() {
   if (rolesLoading || permsLoading || !draft || !roles || !permissions) {
     return <LoadingSpinner />
   }
-
-  // Group permissions by category, in defined order
-  const grouped = useMemo(() => {
-    const map = new Map<string, Permission[]>()
-    for (const cat of CATEGORY_ORDER) map.set(cat, [])
-    for (const p of permissions) {
-      if (!map.has(p.category)) map.set(p.category, [])
-      map.get(p.category)!.push(p)
-    }
-    return map
-  }, [permissions])
 
   // Editable roles (Admin is read-only)
   const editableRoles = roles.filter((r) => r.name !== 'Admin')

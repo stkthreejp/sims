@@ -1036,7 +1036,7 @@ export function QuoteDetailPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { canCreatePolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
+  const { canCreatePolicies, canBindPolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
   const [showBind, setShowBind] = useState(false)
   const [showRating, setShowRating] = useState(false)
   const [showReduce, setShowReduce] = useState(false)
@@ -1231,7 +1231,7 @@ export function QuoteDetailPage() {
   const ratedTotalPremium = ratingSnapshot?.grandTotalPremium ?? quote.totalPremium
   const bindClosedStatus = quote.status === 'Bound' || quote.status === 'Declined' || quote.status === 'Cancelled' || quote.status === 'Expired'
   const hasBindablePremium = ratedTotalPremium > 0
-  const bindUnavailableReason = !canCreatePolicies
+  const bindUnavailableReason = !canBindPolicies
     ? 'You do not have permission to bind policies.'
     : bindClosedStatus
       ? `This quote is ${quote.status.toLowerCase()}.`
