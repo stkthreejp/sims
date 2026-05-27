@@ -7,7 +7,15 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Applicatio
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
-        var connectionString = "Host=sims.postgres.database.azure.com;Database=postgres;Username=sims_admin;Password=Smmims3881$!;SSL Mode=Require;Trust Server Certificate=true";
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+            ?? Environment.GetEnvironmentVariable("SIMS_DEFAULT_CONNECTION");
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "Database connection string is required for design-time EF operations. " +
+                "Set ConnectionStrings__DefaultConnection or SIMS_DEFAULT_CONNECTION.");
+        }
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(connectionString)
