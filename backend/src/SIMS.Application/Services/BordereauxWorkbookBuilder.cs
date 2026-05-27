@@ -163,24 +163,28 @@ internal static class BordereauxWorkbookBuilder
 
         if (sheetName.Contains("Inland Marine", StringComparison.OrdinalIgnoreCase))
         {
-            values.AddRange(new object?[] { null, row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, null, null, row.NetPremiumToLondon, row.CurrencyCode });
-            values.AddRange(LondonTrailingValues(row, extraTrailingFields: 5));
+            values.AddRange(new object?[] { row.DeductibleAmount, row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, row.BrokerageRate, row.BrokerageAmount, row.NetPremiumToLondon, row.CurrencyCode });
+            values.AddRange(LondonTrailingValues(row, includeValueAfterAggregate: true, row.TotalInsurableValue, new object?[] { null, row.Source.NewRenewalIndicator, row.ImRate, row.DebitCreditMod }));
         }
         else if (sheetName.Contains("Commercial Auto", StringComparison.OrdinalIgnoreCase))
         {
             values.AddRange(new object?[] { row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, row.NetPremiumToLondon, row.CurrencyCode });
-            values.AddRange(LondonTrailingValues(row, extraTrailingFields: 4));
+            values.AddRange(LondonTrailingValues(row, includeValueAfterAggregate: true, null, new object?[] { null, row.Source.NewRenewalIndicator, row.DebitCreditMod }));
         }
         else
         {
-            values.AddRange(new object?[] { row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, null, null, row.NetPremiumToLondon, row.CurrencyCode });
-            values.AddRange(LondonTrailingValues(row, extraTrailingFields: 4));
+            values.AddRange(new object?[] { row.Source.GrossPremium, row.CommissionRate, row.CommissionAmount, row.BrokerageRate, row.BrokerageAmount, row.NetPremiumToLondon, row.CurrencyCode });
+            values.AddRange(LondonTrailingValues(row, includeValueAfterAggregate: false, null, new object?[] { row.Source.NewRenewalIndicator, row.Logging97111Payroll, row.Logging97111Premium, row.LlEndLimit, row.DebitCreditMod }));
         }
 
         return values;
     }
 
-    private static IReadOnlyList<object?> LondonTrailingValues(BordereauxLondonPremiumRow row, int extraTrailingFields)
+    private static IReadOnlyList<object?> LondonTrailingValues(
+        BordereauxLondonPremiumRow row,
+        bool includeValueAfterAggregate,
+        object? valueAfterAggregate,
+        IReadOnlyList<object?> sheetSpecificValues)
     {
         var values = new List<object?>
         {
@@ -195,30 +199,36 @@ internal static class BordereauxWorkbookBuilder
             row.SurplusLinesBrokerCountry,
             row.Source.InsuredAddress,
             row.Source.InsuredPostcode,
-            row.Source.InsuredAddress,
-            row.Source.InsuredCounty,
-            row.Source.InsuredPostcode,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            row.Source.PolicyIssuanceDate?.ToString("MM/dd/yyyy"),
-            row.Source.IndustrialSector,
+            row.RiskLocationAddress,
+            row.RiskLocationCounty,
+            row.RiskLocationPostcode,
+            "USA",
+            row.CurrencyCode,
+            row.SumInsuredAmount,
+            row.AggregateSumInsuredAmount,
         };
 
-        for (var i = 0; i < extraTrailingFields - 1; i++)
-            values.Add(null);
-        values.Add(row.Source.NewRenewalIndicator);
+        if (includeValueAfterAggregate)
+            values.Add(valueAfterAggregate);
+
+        values.AddRange(new object?[]
+        {
+            row.DeductibleAmount,
+            row.DeductibleBasis,
+            row.OtherFeesDescription,
+            row.OtherFeesAmount,
+            row.IntermediaryRole,
+            row.IntermediaryName,
+            row.IntermediaryReferenceNumber,
+            row.IntermediaryAddress,
+            row.IntermediaryState,
+            row.IntermediaryPostcode,
+            row.IntermediaryCountry,
+            row.Source.PolicyIssuanceDate?.ToString("MM/dd/yyyy"),
+            row.Source.IndustrialSector,
+        });
+
+        values.AddRange(sheetSpecificValues);
         return values;
     }
 
@@ -259,8 +269,8 @@ internal static class BordereauxWorkbookBuilder
         => transactionType switch
         {
             SIMS.Domain.Enums.TransactionType.Endorsement => grossPremium < 0 ? "RP" : "AP",
-            SIMS.Domain.Enums.TransactionType.Cancellation => "RP",
-            SIMS.Domain.Enums.TransactionType.Reinstatement => "AP",
+            SIMS.Domain.Enums.TransactionType.Cancellation => "CP",
+            SIMS.Domain.Enums.TransactionType.Reinstatement => "RN",
             _ => "OP",
         };
 
@@ -404,6 +414,30 @@ internal sealed record BordereauxLondonPremiumRow(
     string SurplusLinesBrokerState,
     string SurplusLinesBrokerZipCode,
     string SurplusLinesBrokerCountry,
+    decimal? BrokerageRate,
+    decimal? BrokerageAmount,
+    string RiskLocationAddress,
+    string RiskLocationCounty,
+    string RiskLocationPostcode,
+    decimal? SumInsuredAmount,
+    decimal? AggregateSumInsuredAmount,
+    decimal? TotalInsurableValue,
+    decimal? DeductibleAmount,
+    string DeductibleBasis,
+    string OtherFeesDescription,
+    decimal? OtherFeesAmount,
+    string IntermediaryRole,
+    string IntermediaryName,
+    string IntermediaryReferenceNumber,
+    string IntermediaryAddress,
+    string IntermediaryState,
+    string IntermediaryPostcode,
+    string IntermediaryCountry,
+    decimal? Logging97111Payroll,
+    decimal? Logging97111Premium,
+    decimal? LlEndLimit,
+    decimal? ImRate,
+    decimal? DebitCreditMod,
     IReadOnlyList<BordereauxAutoVehicleDetail> AutoVehicles,
     IReadOnlyList<BordereauxInlandMarineUnitDetail> ImUnits);
 

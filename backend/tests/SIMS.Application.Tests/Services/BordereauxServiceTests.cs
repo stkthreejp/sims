@@ -576,6 +576,168 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task GeneratePremiumExportPackageAsync_WritesClarifiedLondonMappings()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        var intermediary = new Intermediary
+        {
+            Name = "London Broker Ltd",
+            ReferenceNumber = "LON-001",
+            AddressLine1 = "1 Lime Street",
+            City = "London",
+            State = "UK",
+            ZipCode = "EC3M",
+            Country = "GBR",
+            IsActive = true,
+        };
+        db.Add(intermediary);
+        db.Add(new IntermediaryProgramCarrierLobSetup
+        {
+            Intermediary = intermediary,
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            BrokerageRate = 0.015m,
+            CreatePayable = false,
+            IsActive = true,
+        });
+        await db.SaveChangesAsync();
+        var agent = new Agent
+        {
+            Name = "Pine Producer",
+            AgencyName = "Pine Agency",
+            LicenseNumber = "AGT-100",
+            IsActive = true,
+            Locations =
+            {
+                new AgentLocation
+                {
+                    AddressLine1 = "12 Producer Rd",
+                    City = "Birmingham",
+                    State = "AL",
+                    ZipCode = "35203",
+                    IsPrimary = true,
+                },
+            },
+        };
+        var transaction = await SeedPolicyTransactionWithInvoiceAsync(
+            db,
+            program,
+            carrier,
+            TransactionType.Endorsement,
+            new DateOnly(2026, 4, 8),
+            new DateOnly(2026, 4, 10),
+            "LL-GL-000145-00",
+            "MS",
+            1451m,
+            362.75m,
+            agent: agent,
+            totalFees: 87.65m);
+        db.Add(new SubmissionLocation
+        {
+            SubmissionId = transaction.Policy.SubmissionId,
+            LocationNumber = 2,
+            Address = "500 Risk Yard",
+            City = "Mayersville",
+            State = "MS",
+            County = "Issaquena",
+            ZipCode = "39113",
+            Country = "USA",
+            IsPrimary = true,
+        });
+        db.Add(new SubmissionGLCoverages
+        {
+            SubmissionId = transaction.Policy.SubmissionId,
+            EachOccurrence = 1_000_000m,
+            GeneralAggregate = 2_000_000m,
+        });
+        db.Add(new SubmissionGLClassification
+        {
+            SubmissionId = transaction.Policy.SubmissionId,
+            LocationNumber = 2,
+            ClassCode = "97111",
+            Exposure = 1_250_000m,
+        });
+        await SeedRatingSnapshotAsync(
+            db,
+            transaction,
+            scheduleModifier: 1.15m,
+            lines:
+            [
+                new QuoteRatingLine
+                {
+                    ExposureRef = "GL-002-97111",
+                    Inputs = """{"class_code":"97111","exposure":1250000,"occ_limit":1000000}""",
+                    FactorsApplied = "{}",
+                    LinePremium = 6200m,
+                },
+            ]);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            IncludedTransactionTypesJson = """["Endorsement"]""",
+        });
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        var londonText = blob.Uploads[0].Text;
+        Assert.Contains("500 Risk Yard", londonText);
+        Assert.Contains("Issaquena", londonText);
+        Assert.Contains("39113", londonText);
+        Assert.Contains("State Taxes and Fees", londonText);
+        Assert.Contains("87.65", londonText);
+        Assert.Contains("Producing Agents and Brokers", londonText);
+        Assert.Contains("Pine Agency", londonText);
+        Assert.Contains("AGT-100", londonText);
+        Assert.Contains("12 Producer Rd", londonText);
+        Assert.Contains("35203", londonText);
+        Assert.Contains("0.015", londonText);
+        Assert.Contains("21.77", londonText);
+        Assert.Contains("1250000", londonText);
+        Assert.Contains("6200", londonText);
+        Assert.Contains("1000000", londonText);
+        Assert.Contains("1.15", londonText);
+        Assert.Contains(">AP<", londonText);
+    }
+
+    [Theory]
+    [InlineData(TransactionType.Cancellation, "CP")]
+    [InlineData(TransactionType.Reinstatement, "RN")]
+    public async Task GeneratePremiumExportPackageAsync_UsesLondonTransactionCodes(TransactionType transactionType, string expectedCode)
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            IncludedTransactionTypesJson = $"""["{transactionType}"]""",
+        });
+        await SeedPolicyTransactionWithInvoiceAsync(
+            db,
+            program,
+            carrier,
+            transactionType,
+            new DateOnly(2026, 4, 8),
+            new DateOnly(2026, 4, 8),
+            $"LL-GL-{expectedCode}",
+            "MS",
+            transactionType == TransactionType.Cancellation ? -100m : 100m,
+            transactionType == TransactionType.Cancellation ? -25m : 25m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        Assert.Contains($">{expectedCode}<", blob.Uploads[0].Text);
+    }
+
+    [Fact]
     public async Task GetRunFileDownloadUrlAsync_ReturnsSignedUrlForGeneratedLondonFile()
     {
         await using var db = CreateDb();
@@ -681,7 +843,9 @@ public class BordereauxServiceTests
         string invoiceStatus = "Posted",
         PolicyLineOfBusiness lineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
         DateOnly? issuedDate = null,
-        int policyTermNumber = 1)
+        int policyTermNumber = 1,
+        Agent? agent = null,
+        decimal totalFees = 0m)
     {
         var insured = new Insured
         {
@@ -699,6 +863,7 @@ public class BordereauxServiceTests
         {
             SubmissionNumber = $"SUB-{Guid.NewGuid():N}",
             Insured = insured,
+            Agent = agent,
             UnderwriterId = Guid.NewGuid(),
             CreatedById = Guid.NewGuid(),
         };
@@ -754,8 +919,8 @@ public class BordereauxServiceTests
             InvoiceDate = invoiceDate,
             GrossPremium = grossPremium,
             CommissionAmount = commissionAmount,
-            TotalAmount = grossPremium,
-            TotalFees = 0m,
+            TotalAmount = grossPremium + totalFees,
+            TotalFees = totalFees,
             Status = invoiceStatus,
             LedgerTransactionId = Guid.NewGuid(),
             CreatedBy = Guid.NewGuid(),
@@ -764,6 +929,47 @@ public class BordereauxServiceTests
         db.AddRange(transaction, invoice);
         await db.SaveChangesAsync();
         return transaction;
+    }
+
+    private static async Task SeedRatingSnapshotAsync(
+        ApplicationDbContext db,
+        PolicyTransaction transaction,
+        decimal scheduleModifier,
+        IReadOnlyList<QuoteRatingLine> lines)
+    {
+        var plan = new RatingPlan
+        {
+            Name = "Test Rating Plan",
+            LineOfBusiness = transaction.Policy.LineOfBusiness,
+            FormulaKey = "TEST",
+            Status = PlanStatus.Active,
+        };
+        var version = new RatingPlanVersion
+        {
+            RatingPlan = plan,
+            VersionNumber = 1,
+            Status = PlanStatus.Active,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            ScheduleMin = 0.8m,
+            ScheduleMax = 1.2m,
+        };
+        var snapshot = new QuoteRatingSnapshot
+        {
+            QuoteId = transaction.Policy.BoundQuoteId,
+            PolicyTransactionId = transaction.Id,
+            RatingPlanVersion = version,
+            RatedAt = DateTime.UtcNow,
+            RatedById = Guid.NewGuid(),
+            ManualPremium = lines.Sum(l => l.LinePremium),
+            ScheduleModifier = scheduleModifier,
+            GrandTotalPremium = lines.Sum(l => l.LinePremium),
+            IsBoundSnapshot = true,
+        };
+        foreach (var line in lines)
+            snapshot.Lines.Add(line);
+
+        db.Add(snapshot);
+        await db.SaveChangesAsync();
     }
 
     private static ApplicationDbContext CreateDb()

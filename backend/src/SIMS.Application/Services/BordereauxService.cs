@@ -8,6 +8,7 @@ using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
 using SIMS.Domain.Entities.Bordereaux;
+using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 
 namespace SIMS.Application.Services;
@@ -614,15 +615,29 @@ public class BordereauxService : IBordereauxService
                 && (s.ProgramConfigurationId == run.Profile.ProgramConfigurationId || s.ProgramConfigurationId == null)
                 && (s.CarrierId == run.Profile.CarrierId || s.CarrierId == null))
             .ToListAsync(ct);
+        var intermediarySetups = await _db.Set<IntermediaryProgramCarrierLobSetup>()
+            .Include(s => s.Intermediary)
+            .Where(s => s.IsActive
+                && s.Intermediary.IsActive
+                && s.EffectiveDate <= run.PeriodEnd
+                && (s.ExpirationDate == null || s.ExpirationDate >= run.PeriodStart)
+                && s.ProgramConfigurationId == run.Profile.ProgramConfigurationId
+                && s.CarrierId == run.Profile.CarrierId)
+            .ToListAsync(ct);
         var detailRows = await BuildLondonDetailRowsAsync(rows, ct);
 
         return rows.Select(row =>
         {
             var setup = ResolveLobSetup(lobSetups, row.LineOfBusiness, row.ReportingDate);
             var surplusLinesSetup = ResolveSurplusLinesSetup(surplusLinesSetups, row, row.ReportingDate, run.Profile.ProgramConfigurationId);
+            var intermediarySetup = ResolveIntermediarySetup(intermediarySetups, row.LineOfBusiness, row.ReportingDate);
             var commissionRate = ResolveCarrierCommissionRate(commissionRows, row.LineOfBusiness, row.ReportingDate, run.Profile.ProgramConfigurationId)
                 ?? (row.GrossPremium == 0 ? 0 : decimal.Round(row.GrossCommission / row.GrossPremium, 6));
-            var commissionAmount = decimal.Round(row.GrossPremium * commissionRate, 2);
+            var commissionAmount = decimal.Round(row.GrossPremium * commissionRate, 2, MidpointRounding.AwayFromZero);
+            var brokerageRate = intermediarySetup?.BrokerageRate;
+            var brokerageAmount = brokerageRate.HasValue
+                ? decimal.Round(row.GrossPremium * brokerageRate.Value, 2, MidpointRounding.AwayFromZero)
+                : (decimal?)null;
             var umr = setup?.LondonUmr ?? profileUmr;
             detailRows.TryGetValue(row.PolicyTransactionId, out var details);
 
@@ -641,7 +656,7 @@ public class BordereauxService : IBordereauxService
                 currencyCode,
                 commissionRate,
                 commissionAmount,
-                row.GrossPremium - commissionAmount,
+                row.GrossPremium - commissionAmount - (brokerageAmount ?? 0m),
                 surplusLinesSetup?.StateCode ?? row.InsuredState,
                 surplusLinesSetup?.FilingBrokerName ?? string.Empty,
                 surplusLinesSetup?.LicenseNumber ?? string.Empty,
@@ -650,6 +665,30 @@ public class BordereauxService : IBordereauxService
                 surplusLinesSetup?.BrokerState ?? string.Empty,
                 surplusLinesSetup?.BrokerZipCode ?? string.Empty,
                 surplusLinesSetup?.BrokerCountry ?? string.Empty,
+                brokerageRate,
+                brokerageAmount,
+                details?.PrimaryRiskLocationAddress ?? row.InsuredAddress,
+                details?.PrimaryRiskLocationCounty ?? row.InsuredCounty,
+                details?.PrimaryRiskLocationPostcode ?? row.InsuredPostcode,
+                details?.SumInsuredAmount,
+                details?.AggregateSumInsuredAmount,
+                details?.TotalInsurableValue,
+                details?.DeductibleAmount,
+                details?.DeductibleBasis ?? string.Empty,
+                row.Fees == 0m ? string.Empty : "State Taxes and Fees",
+                row.Fees == 0m ? null : row.Fees,
+                details?.Agent is null ? string.Empty : "Producing Agents and Brokers",
+                AgentName(details?.Agent),
+                details?.Agent?.LicenseNumber ?? string.Empty,
+                FormatAgentAddress(details?.AgentLocation),
+                details?.AgentLocation?.State ?? string.Empty,
+                details?.AgentLocation?.ZipCode ?? string.Empty,
+                "USA",
+                details?.Logging97111Payroll,
+                details?.Logging97111Premium,
+                details?.LlEndLimit,
+                details?.ImRate,
+                details?.DebitCreditMod,
                 details?.AutoVehicles ?? [],
                 details?.ImUnits ?? []);
         }).ToList();
@@ -665,15 +704,53 @@ public class BordereauxService : IBordereauxService
 
         var transactions = await _db.Set<PolicyTransaction>()
             .AsNoTracking()
+            .Include(t => t.Policy).ThenInclude(p => p.BoundQuote)
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Insured)
             .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Vehicles)
             .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Equipment).ThenInclude(e => e.EquipmentType)
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Locations)
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.GLCoverages)
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.IMCoverages)
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.GLClassifications)
+            .Include(t => t.Policy).ThenInclude(p => p.Submission).ThenInclude(s => s.Agent).ThenInclude(a => a!.Locations)
             .Where(t => transactionIds.Contains(t.Id))
             .ToListAsync(ct);
+        var ratingSnapshots = await _db.Set<QuoteRatingSnapshot>()
+            .AsNoTracking()
+            .Include(s => s.Lines)
+            .Where(s => s.PolicyTransactionId != null && transactionIds.Contains(s.PolicyTransactionId.Value))
+            .OrderByDescending(s => s.RatedAt)
+            .ToListAsync(ct);
+        var ratingByTransactionId = ratingSnapshots
+            .GroupBy(s => s.PolicyTransactionId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
 
         return transactions.ToDictionary(
             t => t.Id,
-            t => new LondonDetailRows(
-                t.Policy.LineOfBusiness is PolicyLineOfBusiness.AutoLiability or PolicyLineOfBusiness.AutoPhysicalDamage
+            t =>
+            {
+                ratingByTransactionId.TryGetValue(t.Id, out var ratingSnapshot);
+                var primaryLocation = ResolvePrimaryRiskLocation(t.Policy.Submission);
+                var agentLocation = ResolvePrimaryAgentLocation(t.Policy.Submission.Agent);
+                var ratingValues = ResolveLondonRatingValues(t, ratingSnapshot);
+
+                return new LondonDetailRows(
+                    PrimaryRiskLocationAddress: primaryLocation?.Address ?? FormatInsuredAddress(t.Policy.Submission.Insured),
+                    PrimaryRiskLocationCounty: primaryLocation?.County ?? t.Policy.Submission.Insured.County ?? string.Empty,
+                    PrimaryRiskLocationPostcode: primaryLocation?.ZipCode ?? t.Policy.Submission.Insured.ZipCode,
+                    Agent: t.Policy.Submission.Agent,
+                    AgentLocation: agentLocation,
+                    SumInsuredAmount: ratingValues.SumInsuredAmount,
+                    AggregateSumInsuredAmount: ratingValues.AggregateSumInsuredAmount,
+                    TotalInsurableValue: ratingValues.TotalInsurableValue,
+                    DeductibleAmount: ratingValues.DeductibleAmount,
+                    DeductibleBasis: ratingValues.DeductibleBasis,
+                    Logging97111Payroll: ratingValues.Logging97111Payroll,
+                    Logging97111Premium: ratingValues.Logging97111Premium,
+                    LlEndLimit: ratingValues.LlEndLimit,
+                    ImRate: ratingValues.ImRate,
+                    DebitCreditMod: ratingValues.DebitCreditMod,
+                    AutoVehicles: t.Policy.LineOfBusiness is PolicyLineOfBusiness.AutoLiability or PolicyLineOfBusiness.AutoPhysicalDamage
                     ? t.Policy.Submission.Vehicles
                         .OrderBy(v => v.UnitNumber)
                         .Select(v => new BordereauxAutoVehicleDetail(
@@ -690,7 +767,7 @@ public class BordereauxService : IBordereauxService
                             null))
                         .ToList()
                     : [],
-                t.Policy.LineOfBusiness == PolicyLineOfBusiness.InlandMarine
+                    ImUnits: t.Policy.LineOfBusiness == PolicyLineOfBusiness.InlandMarine
                     ? t.Policy.Submission.Equipment
                         .OrderBy(e => e.ItemNumber)
                         .Select(e => new BordereauxInlandMarineUnitDetail(
@@ -708,7 +785,154 @@ public class BordereauxService : IBordereauxService
                             null,
                             LondonTransactionCode(t.TransactionType, t.PremiumChange)))
                         .ToList()
-                    : []));
+                    : []);
+            });
+    }
+
+    private static SubmissionLocation? ResolvePrimaryRiskLocation(Submission submission)
+        => submission.Locations
+            .Where(l => !l.IsDeleted)
+            .OrderByDescending(l => l.IsPrimary)
+            .ThenBy(l => l.LocationNumber)
+            .FirstOrDefault();
+
+    private static AgentLocation? ResolvePrimaryAgentLocation(Agent? agent)
+        => agent?.Locations
+            .Where(l => !l.IsDeleted)
+            .OrderByDescending(l => l.IsPrimary)
+            .ThenBy(l => l.Name)
+            .FirstOrDefault();
+
+    private static LondonRatingValues ResolveLondonRatingValues(PolicyTransaction transaction, QuoteRatingSnapshot? snapshot)
+    {
+        var submission = transaction.Policy.Submission;
+        var quote = transaction.Policy.BoundQuote;
+        var scheduleModifier = snapshot?.ScheduleModifier;
+
+        if (transaction.Policy.LineOfBusiness == PolicyLineOfBusiness.GeneralLiability)
+        {
+            var loggingLine = snapshot?.Lines.FirstOrDefault(l => RatingInputString(l.Inputs, "class_code") == "97111");
+            return new LondonRatingValues(
+                SumInsuredAmount: submission.GLCoverages?.EachOccurrence ?? quote.Limit,
+                AggregateSumInsuredAmount: submission.GLCoverages?.GeneralAggregate,
+                TotalInsurableValue: null,
+                DeductibleAmount: quote.Deductible,
+                DeductibleBasis: quote.Deductible.HasValue ? "Deductible" : string.Empty,
+                Logging97111Payroll: loggingLine is null
+                    ? submission.GLClassifications.FirstOrDefault(c => c.ClassCode == "97111")?.Exposure
+                    : RatingInputDecimal(loggingLine.Inputs, "exposure"),
+                Logging97111Premium: loggingLine?.LinePremium,
+                LlEndLimit: loggingLine is null ? submission.GLCoverages?.EachOccurrence : RatingInputDecimal(loggingLine.Inputs, "occ_limit"),
+                ImRate: null,
+                DebitCreditMod: scheduleModifier);
+        }
+
+        if (transaction.Policy.LineOfBusiness == PolicyLineOfBusiness.InlandMarine)
+        {
+            var equipmentValues = submission.Equipment
+                .Where(e => !e.IsDeleted && e.Value.HasValue)
+                .Select(e => e.Value!.Value)
+                .ToList();
+            var tiv = equipmentValues.Sum();
+            var deductible = submission.Equipment
+                .Where(e => !e.IsDeleted && e.Deductible.HasValue)
+                .Select(e => e.Deductible!.Value)
+                .DefaultIfEmpty(submission.IMCoverages?.Deductible ?? 0m)
+                .Where(v => v > 0)
+                .DefaultIfEmpty()
+                .Min();
+            decimal? rate = tiv == 0m || snapshot is null
+                ? null
+                : decimal.Round(snapshot.GrandTotalPremium / tiv * 100m, 6);
+
+            return new LondonRatingValues(
+                SumInsuredAmount: equipmentValues.Count == 0 ? submission.IMCoverages?.MaximumValueAnyOneItem : equipmentValues.Max(),
+                AggregateSumInsuredAmount: submission.IMCoverages?.ScheduledEquipmentTotalLimit ?? tiv,
+                TotalInsurableValue: tiv == 0m ? null : tiv,
+                DeductibleAmount: deductible == 0m ? null : deductible,
+                DeductibleBasis: deductible == 0m ? string.Empty : "Deductible",
+                Logging97111Payroll: null,
+                Logging97111Premium: null,
+                LlEndLimit: null,
+                ImRate: rate,
+                DebitCreditMod: scheduleModifier);
+        }
+
+        var autoTiv = submission.Vehicles
+            .Where(v => !v.IsDeleted && v.ApdStatedValue.HasValue)
+            .Sum(v => v.ApdStatedValue!.Value);
+        var autoDeductible = submission.Vehicles
+            .Where(v => !v.IsDeleted)
+            .Select(v => v.ApdCompDeductible ?? v.ApdCollDeductible)
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .DefaultIfEmpty()
+            .Min();
+
+        return new LondonRatingValues(
+            SumInsuredAmount: quote.Limit,
+            AggregateSumInsuredAmount: autoTiv == 0m ? null : autoTiv,
+            TotalInsurableValue: autoTiv == 0m ? null : autoTiv,
+            DeductibleAmount: autoDeductible == 0m ? null : autoDeductible,
+            DeductibleBasis: autoDeductible == 0m ? string.Empty : "Deductible",
+            Logging97111Payroll: null,
+            Logging97111Premium: null,
+            LlEndLimit: null,
+            ImRate: null,
+            DebitCreditMod: scheduleModifier);
+    }
+
+    private static string AgentName(Agent? agent)
+        => agent is null ? string.Empty : agent.AgencyName ?? agent.Name;
+
+    private static string FormatAgentAddress(AgentLocation? location)
+        => location is null ? string.Empty : FormatAddress(location.AddressLine1 ?? string.Empty, location.AddressLine2);
+
+    private static string FormatInsuredAddress(Insured insured)
+        => FormatAddress(insured.AddressLine1, insured.AddressLine2);
+
+    private static decimal? RatingInputDecimal(string json, string propertyName)
+    {
+        using var document = TryParseJsonDocument(json);
+        if (document is null)
+            return null;
+
+        return document.RootElement.TryGetProperty(propertyName, out var property)
+            ? property.ValueKind switch
+            {
+                JsonValueKind.Number when property.TryGetDecimal(out var value) => value,
+                JsonValueKind.String when decimal.TryParse(property.GetString(), out var value) => value,
+                _ => null,
+            }
+            : null;
+    }
+
+    private static string? RatingInputString(string json, string propertyName)
+    {
+        using var document = TryParseJsonDocument(json);
+        if (document is null)
+            return null;
+
+        return document.RootElement.TryGetProperty(propertyName, out var property)
+            ? property.ValueKind switch
+            {
+                JsonValueKind.String => property.GetString(),
+                JsonValueKind.Number => property.GetRawText(),
+                _ => null,
+            }
+            : null;
+    }
+
+    private static JsonDocument? TryParseJsonDocument(string json)
+    {
+        try
+        {
+            return JsonDocument.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task<string> BuildRunValidationSummaryAsync(
@@ -784,8 +1008,8 @@ public class BordereauxService : IBordereauxService
         => transactionType switch
         {
             TransactionType.Endorsement => grossPremium < 0 ? "RP" : "AP",
-            TransactionType.Cancellation => "RP",
-            TransactionType.Reinstatement => "AP",
+            TransactionType.Cancellation => "CP",
+            TransactionType.Reinstatement => "RN",
             _ => "OP",
         };
 
@@ -888,6 +1112,18 @@ public class BordereauxService : IBordereauxService
             .Select(c => (decimal?)c.CommissionRate)
             .FirstOrDefault();
 
+    private static IntermediaryProgramCarrierLobSetup? ResolveIntermediarySetup(
+        IReadOnlyList<IntermediaryProgramCarrierLobSetup> setups,
+        PolicyLineOfBusiness lineOfBusiness,
+        DateOnly asOfDate)
+        => setups
+            .Where(s => (s.LineOfBusiness == lineOfBusiness || s.LineOfBusiness == null)
+                && s.EffectiveDate <= asOfDate
+                && (s.ExpirationDate == null || s.ExpirationDate >= asOfDate))
+            .OrderByDescending(s => s.LineOfBusiness == lineOfBusiness ? 1 : 0)
+            .ThenByDescending(s => s.EffectiveDate)
+            .FirstOrDefault();
+
     private static SurplusLinesStateSetup? ResolveSurplusLinesSetup(
         IReadOnlyList<SurplusLinesStateSetup> setups,
         BordereauxPremiumPreviewRowDto row,
@@ -976,6 +1212,33 @@ public class BordereauxService : IBordereauxService
 
     private sealed record PreviewSourceRow(Invoice Invoice, PolicyTransaction Transaction);
     private sealed record LondonDetailRows(
+        string PrimaryRiskLocationAddress,
+        string PrimaryRiskLocationCounty,
+        string PrimaryRiskLocationPostcode,
+        Agent? Agent,
+        AgentLocation? AgentLocation,
+        decimal? SumInsuredAmount,
+        decimal? AggregateSumInsuredAmount,
+        decimal? TotalInsurableValue,
+        decimal? DeductibleAmount,
+        string DeductibleBasis,
+        decimal? Logging97111Payroll,
+        decimal? Logging97111Premium,
+        decimal? LlEndLimit,
+        decimal? ImRate,
+        decimal? DebitCreditMod,
         IReadOnlyList<BordereauxAutoVehicleDetail> AutoVehicles,
         IReadOnlyList<BordereauxInlandMarineUnitDetail> ImUnits);
+
+    private sealed record LondonRatingValues(
+        decimal? SumInsuredAmount,
+        decimal? AggregateSumInsuredAmount,
+        decimal? TotalInsurableValue,
+        decimal? DeductibleAmount,
+        string DeductibleBasis,
+        decimal? Logging97111Payroll,
+        decimal? Logging97111Premium,
+        decimal? LlEndLimit,
+        decimal? ImRate,
+        decimal? DebitCreditMod);
 }

@@ -21,6 +21,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<AgentLocation> AgentLocations => Set<AgentLocation>();
     public DbSet<AgentContact> AgentContacts => Set<AgentContact>();
+    public DbSet<Intermediary> Intermediaries => Set<Intermediary>();
+    public DbSet<IntermediaryProgramCarrierLobSetup> IntermediaryProgramCarrierLobSetups => Set<IntermediaryProgramCarrierLobSetup>();
     public DbSet<Carrier> Carriers => Set<Carrier>();
     public DbSet<CarrierContact> CarrierContacts => Set<CarrierContact>();
     public DbSet<CarrierLineOfBusiness> CarrierLinesOfBusiness => Set<CarrierLineOfBusiness>();
@@ -185,6 +187,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Agent>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<AgentLocation>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<AgentContact>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<Intermediary>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<IntermediaryProgramCarrierLobSetup>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<Carrier>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<CarrierContact>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<CarrierLineOfBusiness>().HasQueryFilter(e => !e.Carrier.IsDeleted);
