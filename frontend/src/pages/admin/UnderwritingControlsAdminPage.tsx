@@ -1026,7 +1026,29 @@ export function UnderwritingControlsAdminPage() {
                   <div className="divide-y">
                     {visibleControls.map((control) => (
                       <div key={control.id} className="px-5 py-4">
-                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+                        <div className="flex w-full flex-nowrap items-start justify-end gap-2 overflow-x-auto pb-1">
+                          <button type="button" onClick={() => editControl(control)} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                            <Save className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => decideControl.mutate({ control, action: 'approve' })} disabled={control.status === 'Approved' || control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                            <Check className="h-3.5 w-3.5" />
+                            Approve
+                          </button>
+                          <button type="button" onClick={() => decideControl.mutate({ control, action: 'reject' })} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
+                            <X className="h-3.5 w-3.5" />
+                            Reject
+                          </button>
+                          <button type="button" onClick={() => decideControl.mutate({ control, action: 'publish' })} disabled={control.status !== 'Approved'} className={iconBtnCls}>
+                            <Rocket className="h-3.5 w-3.5" />
+                            Publish
+                          </button>
+                          <button type="button" onClick={() => decideControl.mutate({ control, action: 'retire' })} disabled={control.status !== 'Published'} className={iconBtnCls}>
+                            <Archive className="h-3.5 w-3.5" />
+                            Retire
+                          </button>
+                        </div>
+                        <div className="mt-3">
                           <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3">
                             <input
                               type="checkbox"
@@ -1035,7 +1057,7 @@ export function UnderwritingControlsAdminPage() {
                               disabled={control.status === 'Published' || control.status === 'Retired'}
                               onChange={() => toggleControlSelection(control.id)}
                             />
-                            <div className="min-w-0 max-w-4xl">
+                            <div className="min-w-0 w-full">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h3 className="text-base font-semibold text-slate-900">{control.label}</h3>
                                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[control.status]}`}>{statusLabel(control.status)}</span>
@@ -1050,30 +1072,8 @@ export function UnderwritingControlsAdminPage() {
                                 {control.ruleKey} / {itemTypeLabel(control.itemType)} / {stageLabel(control.stage)} / {severityLabel(control.severity)}
                               </div>
                               {control.description && <p className="mt-3 text-sm leading-6 text-slate-700">{control.description}</p>}
-                              {control.sourceCitation && <div className="mt-3 max-w-4xl text-sm leading-6 text-slate-500">Source: {control.sourceCitation}</div>}
+                              {control.sourceCitation && <div className="mt-3 text-sm leading-6 text-slate-500">Source: {control.sourceCitation}</div>}
                             </div>
-                          </div>
-                          <div className="flex flex-wrap items-start gap-2 xl:max-w-[360px] xl:justify-end">
-                            <button type="button" onClick={() => editControl(control)} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
-                              <Save className="h-3.5 w-3.5" />
-                              Edit
-                            </button>
-                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'approve' })} disabled={control.status === 'Approved' || control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
-                              <Check className="h-3.5 w-3.5" />
-                              Approve
-                            </button>
-                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'reject' })} disabled={control.status === 'Published' || control.status === 'Retired'} className={iconBtnCls}>
-                              <X className="h-3.5 w-3.5" />
-                              Reject
-                            </button>
-                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'publish' })} disabled={control.status !== 'Approved'} className={iconBtnCls}>
-                              <Rocket className="h-3.5 w-3.5" />
-                              Publish
-                            </button>
-                            <button type="button" onClick={() => decideControl.mutate({ control, action: 'retire' })} disabled={control.status !== 'Published'} className={iconBtnCls}>
-                              <Archive className="h-3.5 w-3.5" />
-                              Retire
-                            </button>
                           </div>
                         </div>
                         <input

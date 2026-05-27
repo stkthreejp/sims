@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2, Hash, Bot, Boxes } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2, Hash, Bot, Boxes, Handshake } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
@@ -107,6 +107,7 @@ export function Sidebar() {
             {isAdmin && <NavItem to="/admin/jobs" label="Jobs" icon={Settings2} />}
             {isAdmin && <NavItem to="/admin/ai-settings" label="AI Settings" icon={Bot} />}
             {isAdmin && <NavItem to="/admin/programs" label="Programs" icon={Boxes} />}
+            {isAdmin && <NavItem to="/admin/intermediaries" label="Intermediaries" icon={Handshake} />}
             {isAdmin && <NavItem to="/admin/underwriting-controls" label="UW Controls" icon={ShieldCheck} />}
             {isAdmin && <NavItem to="/admin/surplus-lines" label="Surplus Lines" icon={FileCheck2} />}
             {isAdmin && <NavItem to="/admin/legal-requirements" label="Legal Tracker" icon={BookOpenCheck} />}

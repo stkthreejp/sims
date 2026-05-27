@@ -2,7 +2,7 @@
 
 **Status:** Draft for team review
 **Owner:** Jeremiah O'Donovan
-**Last updated:** 2026-05-03
+**Last updated:** 2026-05-24
 **Related:** [rating-engine-plan.md](./rating-engine-plan.md) (original roadmap)
 
 This document picks up where the original plan left off and lays out **everything remaining** in detail — every endpoint, every UI page, every validation, every gotcha — through to the end.
@@ -16,14 +16,14 @@ This document picks up where the original plan left off and lays out **everythin
 | 0 — LOB cleanup (IM/AL/APD active enum values) | ✅ done | `a8822b7` |
 | 1 — Domain + versioning + IM seed (incl. Beazley assignment) | ✅ done | `034834e` |
 | 2 — Engine (`IM_v1`) | ✅ done | `034834e` |
-| 2 — Excel parity test harness | ❌ **not done** — moved into Phase 7 |
+| 2 — Excel parity test harness | ✅ done — implemented in `backend/tests/SIMS.Application.Rating.Tests` with IM v1 fixtures |
 | 3A — Submission Equipment editor (rating fields + IM lookups) | ✅ done | `f7eb0de` |
 | 3B — Quote Rating panel + snapshot retrieval | ✅ done | `f7eb0de` |
 | 3C — Bind flow integration (snapshot lock) | ✅ done | `f2a1742` |
 | **Phase 4 — Plan & Carrier Admin** | ⏳ next | — |
 | Phase 5 — Shadow rate cutover | ❌ pending | — |
 | Phase 6 — Second LOB rater | ❌ pending | — |
-| Phase 7 — Polish (parity harness, role bounds, etc.) | ❌ pending | — |
+| Phase 7 — Polish (parity harness, role bounds, etc.) | ⚠️ partially done — parity harness/admin safety gates are in place; role bounds, worksheet PDF, renewal, and endorsement policies remain | — |
 
 ---
 
@@ -283,6 +283,8 @@ For each LOB:
 These are small but real items that the engine isn't truly "done" without.
 
 ### 7A — Excel parity test harness *(was Phase 2 leftover)*
+**Status:** Done in `backend/tests/SIMS.Application.Rating.Tests` with 24 IM v1 fixture folders. Keep adding fixture coverage for each new LOB.
+
 - New project `tests/SIMS.Application.Rating.Tests/`.
 - Folder `Fixtures/{lob}/{name}/` containing `inputs.json` + `expected.json`.
 - xUnit test `RatingFixturesTests` that runs every fixture against an in-memory engine + seeded factor tables.
@@ -290,20 +292,28 @@ These are small but real items that the engine isn't truly "done" without.
 - CI gate: any fixture failure blocks merge.
 
 ### 7B — Per-role schedule modifier authority
+**Status:** Still open. The main 5.17 roadmap now assigns this to Phase 7A, with the option to enforce through the Phase 7 authority matrix.
+
 - Three permissions: `RatingMod15` (UW: ±15%), `RatingMod25` (Senior UW: ±25%), `RatingModFull` (Admin: full filed range).
 - Engine validates the modifier against the user's effective cap (computed from their roles' permissions), not just the plan bounds.
 - UI shows the user their effective range above the modifier input.
 
 ### 7C — Rating worksheet PDF
+**Status:** Still open. Keep this tied to immutable rating snapshots and the document-artifact backlog if it is not delivered in Phase 7A.
+
 - New endpoint `GET /api/v1/quotes/{id}/rating-worksheet.pdf` — generates a PDF showing the snapshot's per-line breakdown, factors, modifier, total. Useful for explaining premium to brokers.
 - Reuses the existing `DocumentGenerationService` infrastructure.
 
 ### 7D — Renewal rating logic
+**Status:** Still open. The default recommendation is renewal-effective-date rates until SMM confirms otherwise.
+
 - When a quote is created as a renewal (linked to a prior bound quote), confirm the policy: do we use the rates active at the renewal effective date (typical) or the bound version of the prior policy (rare)?
 - Default to **renewal effective date** rates.
 - UI flag on the renewal screen: "Using rates effective {date}, version v{N}".
 
 ### 7E — Endorsement rating logic
+**Status:** Still open. The default recommendation is bound-policy-version rates plus pro-rata calculation for mid-term changes.
+
 - Mid-term equipment add: a re-rate against the **bound** version of the policy, producing a new snapshot tagged as endorsement-only.
 - New `QuoteRatingSnapshot` field: `IsEndorsement bool`, `EndorsementOf Guid?` pointing at the prior snapshot.
 - Pro-rata calculation against remaining policy term.
@@ -326,12 +336,10 @@ These are small but real items that the engine isn't truly "done" without.
 
 1. **Now:** 4A (carrier assignment UI) — unblocks every non-Beazley carrier.
 2. **Next:** 4B + 4C (plans index, version detail, factor viewer, promote) — gives admins visibility + the safe "promote a draft someone else built" path.
-3. **Then:** 7A (parity harness) — builds confidence before we let admins edit factors.
-4. **Then:** 4D (maker/checker) — small, defensive.
-5. **Then:** 4E (factor editor + impact preview) — the big payoff. Now under maker/checker + parity harness safety net.
-6. **Then:** Phase 5 (shadow cutover).
-7. **Then:** Phase 6 (second LOB — APD recommended first, easiest shape).
-8. **Then:** 7B–7E in any order.
+3. **Already covered:** 7A (parity harness), 4D (maker/checker), and 4E safety gates/factor edit/impact preview now exist in the codebase.
+4. **Then:** Phase 5 (shadow cutover).
+5. **Then:** Phase 6 (second LOB — APD recommended first, easiest shape).
+6. **Then:** 7B–7E in any order, unless per-role schedule modifier authority is pulled into the main Phase 7 authority matrix first.
 
 ---
 

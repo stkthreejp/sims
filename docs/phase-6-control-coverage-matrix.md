@@ -95,7 +95,7 @@ Closeout call: Phase 6 is complete as the underwriting-control baseline. Rows th
 
 ## Ninth Implemented Slice
 
-- Added admin guideline document records scoped by program, company, line, and state/all states.
+- Added admin guideline document records scoped by Program > Carrier > LOB > State/all states.
 - Added proposed/published underwriting control records for appetite rules, referral triggers, authority limits, document checklist items, and appetite notes.
 - Added review, approve, reject, publish, and retire API workflow.
 - Added audit log records for document creation and every control review/publish/retire action.
@@ -104,7 +104,7 @@ Closeout call: Phase 6 is complete as the underwriting-control baseline. Rows th
 ## Tenth Implemented Slice
 
 - Added Admin > UW Controls page for guideline documents and scoped proposed/published controls.
-- Added guideline document creation by program, company, line, and state/all states.
+- Added guideline document creation by Program > Carrier > LOB > State/all states.
 - Added manual proposed-control creation/editing for document checklist items, appetite rules, referral triggers, authority limits, and appetite notes.
 - Added approve, reject, publish, and retire UI actions with decision notes.
 - Added recent activity visibility from the guideline audit log.
@@ -143,14 +143,14 @@ Closeout call: Phase 6 is complete as the underwriting-control baseline. Rows th
 - Added first-class Program Configuration records with program code, active status, and notes. Program now represents the umbrella product, such as Longleaf or ShuttleBee.
 - Added Admin > Programs for creating, editing, activating, and deactivating program products.
 - Linked underwriting guideline documents and proposed controls to optional `ProgramId` while preserving legacy `ProgramName` text.
-- Added program selection to Admin > UW Controls guideline setup so AI-imported/manual guideline documents can use the same program identity while company, line, and state stay on the guideline scope.
+- Added program selection to Admin > UW Controls guideline setup so AI-imported/manual guideline documents can use the same program identity while carrier, LOB, and state stay on the guideline scope.
 
 ## Sixteenth Implemented Slice
 
 - Added nullable program assignment to quotes and bound policies.
 - Added program selection to submission quote creation without filling or locking company/line, so LOB remains on the quote/policy transaction.
-- Updated published underwriting control matching so program-specific controls only apply to quotes/policies assigned to that program.
-- Preserved legacy controls without `ProgramId` using the existing company, line, and state/all-states matching path.
+- Updated published underwriting control matching so program-specific controls only apply to quotes/policies assigned to that program and matching carrier/LOB/state scope.
+- Preserved legacy controls without `ProgramId` using the existing carrier, LOB, and state/all-states matching path.
 
 ## Seventeenth Implemented Slice
 
@@ -235,3 +235,5 @@ Closeout call: Phase 6 is complete as the underwriting-control baseline. Rows th
 2. Show all related referrals, authority approvals, checklist blockers, and tasks inline on every policy transaction artifact.
 3. Add reporting for approval turnaround, authority overrides, decline reasons, and clearance overrides.
 4. Backfill old UW writeups conservatively only where the historical decision is clear.
+
+Disposition: these items are no longer an unnamed backlog. They are now called out in `docs/SIMS improvement 5.17.26.md` under Phase 7 Program Configuration as deferred Phase 6 control hardening, with broader production dashboards left to Phase 9.

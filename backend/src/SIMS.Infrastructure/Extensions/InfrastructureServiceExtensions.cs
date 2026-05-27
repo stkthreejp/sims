@@ -65,6 +65,7 @@ public static class InfrastructureServiceExtensions
         // Application services
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IAgentService, AgentService>();
+        services.AddScoped<IIntermediaryService, IntermediaryService>();
         services.AddScoped<ICarrierService, CarrierService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();

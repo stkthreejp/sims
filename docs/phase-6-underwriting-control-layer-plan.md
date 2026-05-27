@@ -16,7 +16,7 @@ The original Phase 6 plan also described a broader deterministic authority rule 
 - Bind blocking for unresolved blocked clearance results.
 - Structured underwriting referral records from UW writeup referral flags.
 - Bind and issue blocking for open required referrals.
-- Admin guideline/rule setup by program, company, line, and state/all states.
+- Admin guideline/rule setup by Program > Carrier > LOB > State/all states.
 - AI handoff contract for proposed controls using documented measurable fields.
 - Published underwriting controls and deterministic enforcement results.
 - Override audit for published blockers.
@@ -36,6 +36,8 @@ The original Phase 6 plan also described a broader deterministic authority rule 
 - Approval turnaround, authority override, decline reason, and clearance override reporting beyond the operational manager queue.
 - Conservative historical backfill from old UW writeups where the original decision can be proven.
 
+Disposition: the main 5.17 improvement roadmap now assigns these items to Phase 7 Program Configuration planned changes and acceptance criteria. Broader dashboards that go beyond these operational control reports remain Phase 9.
+
 ### Final Call
 
 Do not add another Phase 6 implementation slice only to satisfy the broad wording of the original plan. The foundation is usable and auditable; remaining items are better handled as Phase 7 program-configuration depth, reporting, and transaction-artifact polish.
@@ -44,7 +46,7 @@ Do not add another Phase 6 implementation slice only to satisfy the broad wordin
 
 - Phase 5 is complete enough that policy transactions, status history, transaction artifacts, cancellation/non-renewal/reinstatement/rewrite detail records, and transaction approvals exist.
 - Phase 6 should reuse `PolicyTransaction`, `PolicyTransactionApproval`, UW writeups, quote checklists, task workflows, rating eligibility rules, FMCSA data, loss history, and permissions.
-- Program Configuration foundation now exists in Phase 6 as the umbrella product identity, so new guideline/rule setup should prefer `ProgramId` while keeping carrier/LOB/state on the guideline, rule, quote, and policy scopes.
+- Program Configuration foundation now exists in Phase 6 as the umbrella product identity, so new guideline/rule setup should prefer `ProgramId` while still matching through carrier/LOB/state on the guideline, rule, quote, and policy scopes.
 - AI underwriting work remains advisory until deterministic clearance, referral, authority, and approval records exist.
 
 ## Scope

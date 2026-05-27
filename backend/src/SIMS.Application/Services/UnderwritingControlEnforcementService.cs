@@ -141,7 +141,12 @@ public class UnderwritingControlEnforcementService : IUnderwritingControlEnforce
         return await _db.Set<UnderwritingGuidelineControl>()
             .Where(c => c.Status == UnderwritingControlStatus.Published
                 && stages.Contains(c.Stage)
-                && ((c.ProgramId.HasValue && programId.HasValue && c.ProgramId.Value == programId.Value)
+                && ((c.ProgramId.HasValue
+                        && programId.HasValue
+                        && c.ProgramId.Value == programId.Value
+                        && c.LineOfBusiness == lineOfBusiness
+                        && (c.CarrierId == null || c.CarrierId == carrierId)
+                        && (c.StateCode == "ALL" || c.StateCode == state))
                     || (c.ProgramId == null
                         && c.LineOfBusiness == lineOfBusiness
                         && (c.CarrierId == null || c.CarrierId == carrierId)

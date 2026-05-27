@@ -100,7 +100,7 @@ Purpose: add clearance, appetite, authority, referral, and approval as auditable
 
 ### Phase 7: Program Configuration
 
-Purpose: create the program-level source of truth for carrier, LOB, rating, forms, fees, commissions, authority, appetite, documents, and bordereaux setup.
+Purpose: create the top-level program source of truth, with setup resolved through Program > Carrier > LOB > State for rating, forms, fees, commissions, authority, appetite, documents, and bordereaux references.
 
 ### Phase 7A: Rating Model Deepening
 
@@ -768,10 +768,18 @@ Phase 6 is complete as an operational underwriting-control baseline. SIMS now ha
 
 ### Why This Is Needed
 
-Carrier + LOB is not enough. MGA work is program-driven. Program should connect carrier, forms, rating, fees, commissions, underwriting appetite, authority, documents, and reporting.
+Carrier + LOB is not enough. MGA work is program-driven. Program is the top-level umbrella, and setup should resolve through `Program > Carrier > LOB > State`. Carrier and LOB remain the main operational drivers underneath the program, with State applying where rules, forms, fees, or numbering vary by jurisdiction.
+
+### Phase 7 Review Notes
+
+As of the Phase 6 closeout, SIMS already has a lightweight `ProgramConfiguration` foundation: program name/code/status/notes, an admin page, nullable quote and policy program assignment, program-scoped underwriting guideline setup, published controls, authority approval requests, manager queue visibility, and an invoice-totals-by-program report.
+
+The missing Phase 7 work is therefore not "add Program from nothing." It is to turn that lightweight program label into the top-level setup source of truth while preserving carrier/LOB/state as the concrete setup dimensions, and to absorb the Phase 6 deferred hardening items that belong under program-level authority, appetite, artifacts, reporting, and backfill.
 
 ### Existing Pieces To Reuse
 
+- `ProgramConfiguration`
+- quote and policy `ProgramId`
 - `Carrier`
 - `CarrierLineOfBusiness`
 - `CarrierCommission`
@@ -782,24 +790,33 @@ Carrier + LOB is not enough. MGA work is program-driven. Program should connect 
 - fee rules
 - policy number assignments
 - legal requirements
+- underwriting guideline documents and published controls
+- authority approval requests
+- manager queue and operational report service
 
 ### Planned Changes
 
-1. Add `Program`.
+1. Expand `ProgramConfiguration` into the top-level program setup anchor.
 
-   Core fields:
+   Current fields to preserve:
    - program name
-   - carrier id
-   - writing company id if needed
-   - line of business
-   - states
-   - status
-   - effective dates
-   - billing mode
-   - authority summary
-   - default policy number assignment
+   - program code
+   - active/inactive status
+   - notes
+
+   Missing relationships or child setup rows to add:
+   - program-carrier participation
+   - program-carrier LOB availability
+   - program-carrier-LOB state availability
+   - writing company assignment where needed
+   - effective date windows for setup rows
+   - billing mode at the program or setup-row level
+   - authority summary by program/carrier/LOB where applicable
+   - default policy number assignment by program/carrier/LOB/state
 
 2. Link program to setup modules.
+
+   Program should become the preferred lookup path for:
    - Rating assignment.
    - Policy forms/package.
    - Application forms/package.
@@ -807,29 +824,68 @@ Carrier + LOB is not enough. MGA work is program-driven. Program should connect 
    - Commissions.
    - Authority rules.
    - Appetite rules.
-   - Bordereaux profile.
+   - Document checklist rules.
+   - Bordereaux profile placeholder.
 
-3. Update quote creation to select program.
+   Do not duplicate existing setup tables unless a join table is needed. Preserve existing carrier/LOB/state history while adding program as the top-level operational umbrella.
 
-   Quote should know:
-   - carrier
+3. Update quote and policy workflows to use program.
+
    - program
+   - carrier
    - LOB
+   - state
    - effective date
    - rating assignment
    - forms package
    - fees/commission setup
 
-4. Keep migration gentle.
+   Existing quote and policy records can stay nullable. New business should select an active program first after setup migration is complete, then constrain carrier, LOB, and state setup from that program. Any temporary "Unassigned" path must be explicit in reports and admin cleanup views.
 
-   Existing quotes/policies can have nullable program initially.
-   New business should require program once setup is complete.
+4. Complete Phase 6 deferred control hardening in this phase.
+
+   These items were intentionally deferred from Phase 6 and should be made up in Phase 7 rather than left as generic hardening:
+   - Full deterministic authority thresholds for quote bind, policy issue, endorsement issue, cancellation completion, reinstatement, rewrite, and non-renewal.
+   - Rule-version input snapshots for appetite and authority outcomes beyond the published-control enforcement records already stored.
+   - Transaction artifact panels that show related referrals, authority approvals, checklist blockers, and tasks inline for every transaction type.
+   - Conservative historical backfill from old UW writeups only where the original decision can be proven.
+
+5. Add the Phase 7 operational reports created by the deferred control work.
+
+   Required Phase 7 reports:
+   - approval turnaround
+   - authority overrides
+   - decline reasons
+   - clearance overrides
+   - open/unassigned program cleanup
+
+   Broader production dashboards, carrier/program performance dashboards, and executive reporting remain Phase 9.
+
+6. Document forward-deferred adjacent work.
+
+   Forward-deferred items should have named destinations:
+   - Bordereaux export implementation moves to Phase 8; Phase 7 only stores the program-level bordereaux profile reference or placeholder.
+   - Broad production dashboards move to Phase 9 after the Phase 7 operational reports define the source data.
+   - AI institutional intelligence remains in the AI underwriting plan after 6+ months of scoring data, but program appetite thresholds should move from prompt text into Program Configuration during Phase 7.
+   - Claims and shared job/outbox scale work remain Phase 10 and Phase 11.
+
+### Section Review and Missing Items
+
+- Why section: accurate, but the current code already has a program foundation. Phase 7 must be framed as expansion and consolidation.
+- Existing pieces: missing the already-built program, guideline/control, authority approval, manager queue, and program reporting pieces; these are now listed.
+- Planned changes: previously missed Phase 6 deferred authority thresholds, rule snapshots, transaction artifact polish, reporting, and backfill; these are now included.
+- Hierarchy correction: Program is the umbrella, but carrier/LOB/state remain the matching dimensions for setup and enforcement. Existing underwriting-control setup already follows this shape; rating, forms, fees, commissions, and policy numbering still need the program umbrella added in Phase 7.
+- Migration: keep nullable historical records, but require a cleanup/reporting path for unassigned records.
+- Forward documentation: bordereaux, broader dashboards, AI institutional intelligence, claims, and scale work now have explicit destinations.
 
 ### Acceptance Criteria
 
-- New quote setup is program-based.
-- Forms/rating/fees/commissions can be derived from program.
+- New quote setup selects Program first and resolves available Carrier, LOB, and State setup underneath it.
+- Forms/rating/fees/commissions can be derived from the selected Program > Carrier > LOB > State setup path.
 - Existing records remain readable.
+- Phase 6 deferred authority thresholds, rule snapshots, artifact panels, control reports, and conservative backfill are either complete in Phase 7 or explicitly moved to Phase 8/9/AI/10/11 with a named reason.
+- Underwriting controls and authority approvals can be evaluated and reported by program without losing historical carrier/LOB/state context.
+- No item remains only labeled "Phase 7 / hardening" without a concrete implementation section or forward destination.
 
 ## Phase 7A: Rating Model Deepening
 
@@ -849,13 +905,22 @@ Instead, keep the actual premium formulas in C# and deepen the configurable, ver
 - `CarrierRatingAssignment`
 - `QuoteRatingSnapshot`
 - `QuoteRatingLine`
-- rating fixture tests
+- rating fixture tests, including `backend/tests/SIMS.Application.Rating.Tests` and IM v1 fixtures
 - shadow rating results
 - impact preview framework
 - quote rating panel
 - carrier rating assignment UI
+- rating admin pages for plan/version detail, factor import/edit, impact preview, promote, and retire
+- maker/checker fields on rating plan versions
 
 ### Planned Changes
+
+0. Treat already-built rating polish as baseline.
+
+   Do not re-plan or rebuild these already-covered items:
+   - IM v1 fixture/parity test harness.
+   - Rating plan list, version detail, factor table viewing, factor import/edit, impact preview, promote, retire, and maker/checker enforcement.
+   - Versioned schedule min/max and minimum premium fields.
 
 1. Inventory hardcoded and configurable rating values.
 
@@ -948,6 +1013,15 @@ Instead, keep the actual premium formulas in C# and deepen the configurable, ver
    - impact preview page
    - promote/retire actions
 
+8. Cover rating polish that was deferred outside the main roadmap text.
+
+   Remaining rating items to either complete in Phase 7A or document forward with a named destination:
+   - Per-role schedule modifier authority, tied to program/rating authority rules rather than only plan min/max clamping.
+   - Rating worksheet PDF generated from the immutable snapshot and line-level factors.
+   - Renewal rate-version policy, defaulting to rates active on the renewal effective date unless SMM confirms otherwise.
+   - Endorsement rating policy, defaulting to the bound policy version with pro-rata calculation for mid-term changes.
+   - Additional LOB parity fixtures whenever AL/APD/GL formula work is added.
+
 ### Acceptance Criteria
 
 - Routine rate, factor, fee, endorsement, minimum premium, and eligibility changes can be made through versioned rating data rather than code.
@@ -955,6 +1029,9 @@ Instead, keep the actual premium formulas in C# and deepen the configurable, ver
 - Every rated quote can explain which version, factors, fees, endorsements, and eligibility decisions produced the premium.
 - A draft rating version can be previewed before activation.
 - Bound quote snapshots remain immutable and reproducible.
+- Role-based schedule modifier authority is enforced or explicitly assigned to the Phase 7 authority matrix.
+- Renewal and endorsement rate-version policies are documented and covered by tests before those flows rely on automated rating.
+- Rating worksheet PDF work is either delivered from snapshots or moved to the document-artifact backlog with a named follow-up.
 
 ## Phase 8: Bordereaux and Carrier Reporting
 
@@ -1547,9 +1624,11 @@ Detailed execution plan: `docs/phase-6-underwriting-control-layer-plan.md`.
 
 Scope:
 
-- Add program entity.
-- Link program to carrier, LOB, rating, forms, fees, commissions, authority, appetite, and policy number setup.
+- Expand the existing `ProgramConfiguration` entity from a label into the top-level program setup anchor.
+- Link program to carrier, LOB, state, rating, forms, fees, commissions, authority, appetite, and policy number setup without flattening those carrier/LOB/state dimensions into Program itself.
 - Require program on new quotes after migration.
+- Complete the Phase 6 deferred authority thresholds, rule snapshots, transaction artifact panels, operational control reports, and conservative UW writeup backfill.
+- Leave bordereaux exports, broad production dashboards, AI institutional intelligence, claims, and shared job/outbox work in their named later phases.
 
 ## Recommended Fifth-A Work Package
 
@@ -1562,6 +1641,8 @@ Scope:
 - Expand structured eligibility rules without introducing a free-form formula language.
 - Improve rating snapshots so they preserve factors, charges, selected endorsements, warnings, and calculation explanations.
 - Strengthen draft-version impact preview and promotion gates.
+- Treat the existing IM fixture/parity tests, rating admin UI, factor import/edit, impact preview, and maker/checker gates as baseline.
+- Close or explicitly forward-document per-role schedule modifier authority, rating worksheet PDF, renewal rate-version policy, endorsement rating policy, and additional LOB fixture coverage.
 - Keep premium formulas in C#.
 
 Do not include in this work package:

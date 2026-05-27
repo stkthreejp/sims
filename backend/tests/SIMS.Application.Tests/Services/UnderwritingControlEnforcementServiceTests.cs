@@ -39,6 +39,61 @@ public class UnderwritingControlEnforcementServiceTests
     }
 
     [Fact]
+    public async Task EvaluateQuoteAsync_DoesNotApplyProgramSpecificControlsForDifferentCarrier()
+    {
+        await using var db = CreateDb();
+        var programId = Guid.NewGuid();
+        var fixture = await CreateQuoteFixtureAsync(db, programId);
+        var otherCarrier = new Carrier { Name = "Other Insurance Company", IsActive = true };
+        db.Add(otherCarrier);
+        await db.SaveChangesAsync();
+        await AddPublishedControlAsync(db, programId, otherCarrier.Id, isBlocking: true);
+
+        var summary = await new UnderwritingControlEnforcementService(db)
+            .EvaluateQuoteAsync(fixture.Quote.Id, UnderwritingControlStage.Bind, Guid.NewGuid());
+
+        Assert.Empty(summary.Results);
+    }
+
+    [Fact]
+    public async Task EvaluateQuoteAsync_DoesNotApplyProgramSpecificControlsForDifferentLineOfBusiness()
+    {
+        await using var db = CreateDb();
+        var programId = Guid.NewGuid();
+        var fixture = await CreateQuoteFixtureAsync(db, programId);
+        await AddPublishedControlAsync(
+            db,
+            programId,
+            fixture.Carrier.Id,
+            isBlocking: true,
+            lineOfBusiness: PolicyLineOfBusiness.GeneralLiability);
+
+        var summary = await new UnderwritingControlEnforcementService(db)
+            .EvaluateQuoteAsync(fixture.Quote.Id, UnderwritingControlStage.Bind, Guid.NewGuid());
+
+        Assert.Empty(summary.Results);
+    }
+
+    [Fact]
+    public async Task EvaluateQuoteAsync_DoesNotApplyProgramSpecificControlsForDifferentState()
+    {
+        await using var db = CreateDb();
+        var programId = Guid.NewGuid();
+        var fixture = await CreateQuoteFixtureAsync(db, programId);
+        await AddPublishedControlAsync(
+            db,
+            programId,
+            fixture.Carrier.Id,
+            isBlocking: true,
+            stateCode: "NC");
+
+        var summary = await new UnderwritingControlEnforcementService(db)
+            .EvaluateQuoteAsync(fixture.Quote.Id, UnderwritingControlStage.Bind, Guid.NewGuid());
+
+        Assert.Empty(summary.Results);
+    }
+
+    [Fact]
     public async Task EvaluateQuoteAsync_KeepsLegacyScopeMatchingForControlsWithoutProgram()
     {
         await using var db = CreateDb();
@@ -130,15 +185,17 @@ public class UnderwritingControlEnforcementServiceTests
         Guid? programId,
         Guid carrierId,
         bool isBlocking,
-        UnderwritingControlStage stage = UnderwritingControlStage.Bind)
+        UnderwritingControlStage stage = UnderwritingControlStage.Bind,
+        PolicyLineOfBusiness lineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+        string stateCode = "TX")
     {
         var document = new UnderwritingGuidelineDocument
         {
             ProgramId = programId,
             ProgramName = "Longleaf Inland Marine",
             CarrierId = carrierId,
-            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
-            StateCode = "TX",
+            LineOfBusiness = lineOfBusiness,
+            StateCode = stateCode,
             Title = "Longleaf Guidelines",
             CreatedByUserId = Guid.NewGuid()
         };
@@ -149,8 +206,8 @@ public class UnderwritingControlEnforcementServiceTests
             ProgramId = programId,
             ProgramName = document.ProgramName,
             CarrierId = carrierId,
-            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
-            StateCode = "TX",
+            LineOfBusiness = lineOfBusiness,
+            StateCode = stateCode,
             ItemType = UnderwritingControlItemType.AppetiteRule,
             Stage = stage,
             Severity = UnderwritingControlSeverity.HardBlock,
