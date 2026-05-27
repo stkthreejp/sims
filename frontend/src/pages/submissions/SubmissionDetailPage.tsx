@@ -13,12 +13,12 @@ import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { usersApi } from '@/api/users.api'
 import { agentsApi } from '@/api/agents.api'
-import { submissionDriversApi, submissionVehiclesApi, submissionPriorCarriersApi, submissionAdditionalInterestsApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
+import { submissionDriversApi, submissionVehiclesApi, submissionLocationsApi, submissionPriorCarriersApi, submissionAdditionalInterestsApi, submissionSupplementalApi, submissionGLApi, submissionIMApi, imLookupsApi } from '@/api/submissionLob.api'
 import { submissionLossHistoryApi } from '@/api/submissionLossHistory.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS, GL_CLASS_CODE_OPTIONS } from '@/types/submissionLob.types'
-import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipment, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
+import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionLocation, SubmissionLocationCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipment, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
 import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission, type UnderwritingClearanceEvaluation, type UnderwritingClearanceStatus, type UnderwritingClearanceCheckType, type UnderwritingReferralSummary, type UnderwritingReferralStatus } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
@@ -219,6 +219,10 @@ export function SubmissionDetailPage() {
   const [showVehicleForm, setShowVehicleForm] = useState(false)
   const [vehicleForm, setVehicleForm] = useState<SubmissionVehicleCreate>(emptyVehicleForm())
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
+  const emptyLocationForm = (): SubmissionLocationCreate => ({ locationNumber: 1, address: '', country: 'USA', isPrimary: false })
+  const [showLocationForm, setShowLocationForm] = useState(false)
+  const [locationForm, setLocationForm] = useState<SubmissionLocationCreate>(emptyLocationForm())
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
   const emptyCarrierForm = (): SubmissionPriorCarrierCreate => ({ carrierName: '' })
   const [showCarrierForm, setShowCarrierForm] = useState(false)
   const [carrierForm, setCarrierForm] = useState<SubmissionPriorCarrierCreate>(emptyCarrierForm())
@@ -307,6 +311,12 @@ export function SubmissionDetailPage() {
   const { data: vehicles = [] } = useQuery({
     queryKey: ['submission-vehicles', id],
     queryFn: () => submissionVehiclesApi.getAll(id!),
+    enabled: !!id && activeTab === 'exposures',
+  })
+
+  const { data: locations = [] } = useQuery({
+    queryKey: ['submission-locations', id],
+    queryFn: () => submissionLocationsApi.getAll(id!),
     enabled: !!id && activeTab === 'exposures',
   })
 
@@ -410,6 +420,48 @@ export function SubmissionDetailPage() {
     )
     return match?.code
   }, [insured?.state, imTerritories])
+
+  const prepareLocationPayload = (form: SubmissionLocationCreate): SubmissionLocationCreate => ({
+    locationNumber: form.locationNumber || 1,
+    address: form.address.trim(),
+    city: form.city?.trim() || undefined,
+    state: form.state?.trim().toUpperCase() || undefined,
+    county: form.county?.trim() || undefined,
+    zipCode: form.zipCode?.trim() || undefined,
+    country: form.country?.trim().toUpperCase() || undefined,
+    isPrimary: form.isPrimary,
+  })
+
+  const openNewLocationForm = () => {
+    const lastLocationNumber = locations.reduce((max, item) => Math.max(max, item.locationNumber), 0)
+    setLocationForm({
+      locationNumber: lastLocationNumber + 1,
+      address: insured?.addressLine1 ?? '',
+      city: insured?.city || undefined,
+      state: insured?.state || undefined,
+      county: insured?.county || undefined,
+      zipCode: insured?.zipCode || undefined,
+      country: 'USA',
+      isPrimary: locations.length === 0,
+    })
+    setEditingLocationId(null)
+    setShowLocationForm(true)
+  }
+
+  const openEditLocationForm = (riskLocation: SubmissionLocation) => {
+    setLocationForm({
+      locationNumber: riskLocation.locationNumber,
+      address: riskLocation.address,
+      city: riskLocation.city ?? undefined,
+      state: riskLocation.state ?? undefined,
+      county: riskLocation.county ?? undefined,
+      zipCode: riskLocation.zipCode ?? undefined,
+      country: riskLocation.country ?? undefined,
+      isPrimary: riskLocation.isPrimary,
+    })
+    setEditingLocationId(riskLocation.id)
+    setShowLocationForm(true)
+  }
 
   const prepareEquipmentPayload = (form: SubmissionEquipmentCreate): SubmissionEquipmentCreate => ({
     itemNumber: form.itemNumber || 1,
@@ -530,6 +582,7 @@ export function SubmissionDetailPage() {
         qc.invalidateQueries({ queryKey: ['submissions', id] })
         qc.invalidateQueries({ queryKey: ['submission-drivers', id] })
         qc.invalidateQueries({ queryKey: ['submission-vehicles', id] })
+        qc.invalidateQueries({ queryKey: ['submission-locations', id] })
         qc.invalidateQueries({ queryKey: ['submission-prior-carriers', id] })
         qc.invalidateQueries({ queryKey: ['submission-additional-interests', id] })
         qc.invalidateQueries({ queryKey: ['submission-supplemental', id] })
@@ -649,6 +702,26 @@ export function SubmissionDetailPage() {
   const deleteVehicleMutation = useMutation({
     mutationFn: (vId: string) => submissionVehiclesApi.delete(id!, vId),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['submission-vehicles', id] }); toast.success('Vehicle removed') },
+  })
+
+  const saveLocationMutation = useMutation({
+    mutationFn: (dto: SubmissionLocationCreate) =>
+      editingLocationId
+        ? submissionLocationsApi.update(id!, editingLocationId, dto)
+        : submissionLocationsApi.create(id!, dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-locations', id] })
+      setShowLocationForm(false); setLocationForm(emptyLocationForm()); setEditingLocationId(null)
+      toast.success('Risk location saved')
+    },
+    onError: (e: any) => toast.error(getSaveErrorMessage(e, 'Failed to save risk location')),
+  })
+  const deleteLocationMutation = useMutation({
+    mutationFn: (locationId: string) => submissionLocationsApi.delete(id!, locationId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission-locations', id] })
+      toast.success('Risk location removed')
+    },
   })
 
   const savePriorCarrierMutation = useMutation({
@@ -1671,7 +1744,7 @@ export function SubmissionDetailPage() {
       <div className="sd-tabs" style={{ marginBottom: 14 }}>
         {([
           { key: 'quotes', label: 'Quotes', count: quotes.length },
-          { key: 'exposures', label: 'Exposures', count: drivers.length + vehicles.length + equipment.length + glClassifications.length > 0 ? drivers.length + vehicles.length + equipment.length + glClassifications.length : undefined },
+          { key: 'exposures', label: 'Exposures', count: drivers.length + vehicles.length + locations.length + equipment.length + glClassifications.length > 0 ? drivers.length + vehicles.length + locations.length + equipment.length + glClassifications.length : undefined },
           { key: 'additional-interests', label: 'Additional interests', count: additionalInterests.length > 0 ? additionalInterests.length : undefined },
           { key: 'prior-carriers', label: 'Prior carriers', count: priorCarriers.length > 0 ? priorCarriers.length : undefined },
           { key: 'documents', label: 'Documents' },
@@ -1720,6 +1793,62 @@ export function SubmissionDetailPage() {
               </div>
             </div>
           )}
+
+          <div style={{ borderTop: expLobList.length > 1 ? '1px solid var(--line)' : 0 }}>
+            {showLocationForm && (
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)', background: 'var(--surface-2)' }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>{editingLocationId ? 'Edit Risk Location' : 'Add Risk Location'}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+                  <div><label style={labelStyle}>Location #</label><input type="number" value={locationForm.locationNumber} onChange={(e) => setLocationForm((f) => ({ ...f, locationNumber: parseInt(e.target.value) || 1 }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Address *</label><input value={locationForm.address} onChange={(e) => setLocationForm((f) => ({ ...f, address: e.target.value }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>City</label><input value={locationForm.city ?? ''} onChange={(e) => setLocationForm((f) => ({ ...f, city: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>State</label><input maxLength={2} value={locationForm.state ?? ''} onChange={(e) => setLocationForm((f) => ({ ...f, state: e.target.value.toUpperCase() || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>County</label><input value={locationForm.county ?? ''} onChange={(e) => setLocationForm((f) => ({ ...f, county: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>ZIP</label><input value={locationForm.zipCode ?? ''} onChange={(e) => setLocationForm((f) => ({ ...f, zipCode: e.target.value || undefined }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Country</label><input value={locationForm.country ?? ''} onChange={(e) => setLocationForm((f) => ({ ...f, country: e.target.value.toUpperCase() || undefined }))} style={inputStyle} /></div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, marginTop: 10 }}>
+                  <input type="checkbox" checked={locationForm.isPrimary} onChange={(e) => setLocationForm((f) => ({ ...f, isPrimary: e.target.checked }))} />
+                  Primary risk location
+                </label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button onClick={() => saveLocationMutation.mutate(prepareLocationPayload(locationForm))} disabled={!locationForm.address.trim() || saveLocationMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save</button>
+                  <button onClick={() => { setShowLocationForm(false); setLocationForm(emptyLocationForm()); setEditingLocationId(null) }} className="sd-btn outline sm"><X size={13} /> Cancel</button>
+                </div>
+              </div>
+            )}
+            <div className="exp-h">
+              <div className="exp-h-l">Risk locations <span className="c">{locations.length}</span></div>
+              <button type="button" className="sd-btn ghost sm" onClick={openNewLocationForm}><Plus size={12} /> Add</button>
+            </div>
+            {locations.length === 0 && !showLocationForm ? (
+              <EmptyState icon={FileText} title="No risk locations added yet" description="Add the primary location used for bordereaux and rating setup." />
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="sd-table">
+                  <thead><tr><th>Primary</th><th>Loc.</th><th>Address</th><th>City / State / ZIP</th><th>County</th><th>Country</th><th /></tr></thead>
+                  <tbody>
+                    {locations.map((riskLocation) => (
+                      <tr key={riskLocation.id}>
+                        <td>{riskLocation.isPrimary ? <span className="sd-lob">Primary</span> : '-'}</td>
+                        <td className="id">{riskLocation.locationNumber}</td>
+                        <td className="primary-cell">{riskLocation.address}</td>
+                        <td>{[riskLocation.city, riskLocation.state, riskLocation.zipCode].filter(Boolean).join(', ') || '-'}</td>
+                        <td>{riskLocation.county ?? '-'}</td>
+                        <td>{riskLocation.country ?? '-'}</td>
+                        <td style={{ padding: '8px 14px' }}>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button type="button" onClick={() => openEditLocationForm(riskLocation)} className="sims-icon-btn hover:text-sky-600" title="Edit risk location"><Pencil size={12} /></button>
+                            <button type="button" onClick={() => { if (confirm('Remove risk location?')) deleteLocationMutation.mutate(riskLocation.id) }} disabled={deleteLocationMutation.isPending} className="sims-icon-btn hover:text-red-500" title="Remove risk location"><Trash2 size={12} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           {activeLob === 'auto' && (
             <>

@@ -161,14 +161,24 @@ export interface SubmissionLocation {
   submissionId: string
   locationNumber: number
   address: string
+  city: string | null
+  state: string | null
+  county: string | null
   zipCode: string | null
+  country: string | null
+  isPrimary: boolean
   createdAt: string
 }
 
 export interface SubmissionLocationCreate {
   locationNumber: number
   address: string
+  city?: string
+  state?: string
+  county?: string
   zipCode?: string
+  country?: string
+  isPrimary: boolean
 }
 
 export interface SubmissionPriorCarrier {
