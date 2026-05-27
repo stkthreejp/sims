@@ -30,6 +30,7 @@ public class InsuredsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AppPermissions.InsuredsCreate)]
     public async Task<IActionResult> Create([FromBody] InsuredCreateDto dto)
     {
         var result = await _insuredService.CreateAsync(dto, CurrentUserId);
@@ -38,6 +39,7 @@ public class InsuredsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPermissions.InsuredsEdit)]
     public async Task<IActionResult> Update(Guid id, [FromBody] InsuredUpdateDto dto)
     {
         var result = await _insuredService.UpdateAsync(id, dto);
@@ -45,6 +47,7 @@ public class InsuredsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPermissions.InsuredsDelete)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _insuredService.DeleteAsync(id);

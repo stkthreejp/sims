@@ -11,7 +11,7 @@ public interface IQuoteService
     Task<IEnumerable<QuoteListItemDto>> GetBySubmissionAsync(Guid submissionId, UserAccessScope access);
     Task<IEnumerable<QuoteListItemDto>> GetBoundByInsuredAsync(Guid insuredId);
     Task<Result<QuoteDto>> GetByIdAsync(Guid id, UserAccessScope access);
-    Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById);
+    Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById, UserAccessScope? access = null);
     Task<Result<QuoteDto>> UpdateAsync(Guid id, QuoteUpdateDto dto, UserAccessScope access);
     Task<Result<InvoicePreviewDto>> GetInvoicePreviewAsync(Guid id, UserAccessScope access);
     Task<Result<QuoteDto>> BindAsync(Guid id, QuoteBindDto dto, UserAccessScope access);

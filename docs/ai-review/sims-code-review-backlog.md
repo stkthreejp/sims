@@ -2,6 +2,8 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
+Last updated on 2026-05-27 after the first auth-hardening pass.
+
 ## P0 Immediate Security / Secret Response
 
 ### Hardcoded production-looking PostgreSQL credential
@@ -16,6 +18,7 @@ Generated from a read-only multi-agent audit on 2026-05-27.
 
 ### Quote and submission write workflows are authenticated-only
 
+- Status: Partially remediated on 2026-05-27. Quote/submission write routes now require explicit policies, and quote creation checks the referenced submission against the caller's business-data access scope.
 - Evidence: `backend/src/SIMS.API/Controllers/QuotesController.cs`, `backend/src/SIMS.API/Controllers/SubmissionsController.cs`, `backend/src/SIMS.Application/Services/QuoteService.cs` `CreateAsync`.
 - Risk: low-privilege authenticated users can create/update/delete/bind quotes and submissions. Quote creation loads `SubmissionId` without access-scope validation, then grants quote access through `CreatedById`.
 - Impact: unauthorized quote creation, policy binding, policy-number use, and invoice creation.
@@ -24,6 +27,7 @@ Generated from a read-only multi-agent audit on 2026-05-27.
 
 ### Core party CRUD is authenticated-only
 
+- Status: Partially remediated on 2026-05-27. Insured create/update/delete now require insured permissions; agent/carrier mutation routes now require system-admin permission.
 - Evidence: `backend/src/SIMS.API/Controllers/InsuredsController.cs`, `backend/src/SIMS.API/Controllers/AgentsController.cs`, `backend/src/SIMS.API/Controllers/CarriersController.cs`.
 - Risk: any authenticated user can create/update/delete insureds, agents, carriers, locations, and contacts.
 - Impact: unauthorized tampering with data used by underwriting, documents, submissions, and downstream workflows.
@@ -32,6 +36,7 @@ Generated from a read-only multi-agent audit on 2026-05-27.
 
 ### Party attachment downloads are globally accessible to authenticated users
 
+- Status: Partially remediated on 2026-05-27. Attachment list/download-url endpoints now require `policies.view`; object-level party attachment rules still need a dedicated pass.
 - Evidence: `backend/src/SIMS.API/Controllers/AttachmentsController.cs`; `backend/src/SIMS.Application/Services/AttachmentService.cs` `CanAccessEntityAsync`.
 - Risk: for agent/carrier/insured attachments, access checks only confirm entity existence.
 - Impact: sensitive uploaded documents can be exposed through signed blob URLs.
@@ -40,6 +45,7 @@ Generated from a read-only multi-agent audit on 2026-05-27.
 
 ### Legal requirements admin surface allows compliance tampering and SSRF
 
+- Status: Partially remediated on 2026-05-27. Legal source mutation, scan, import, simulate, approve, and reject routes now require system-admin permission; URL allowlisting and private-address blocking remain open.
 - Evidence: `backend/src/SIMS.API/Controllers/LegalRequirementsController.cs`; `backend/src/SIMS.API/Services/OpenLawsClient.cs`.
 - Risk: any authenticated user can create/update tracked legal sources with arbitrary absolute URLs, trigger scans, and approve/reject results.
 - Impact: regulatory source-of-truth tampering and server-side requests to attacker-selected URLs with a bearer API key.
@@ -48,6 +54,7 @@ Generated from a read-only multi-agent audit on 2026-05-27.
 
 ### User list/details expose staff metadata to all authenticated users
 
+- Status: Remediated on 2026-05-27 for full list/detail endpoints. `GET /api/v1/users` and `GET /api/v1/users/{id}` now require `admin.users.view`.
 - Evidence: `backend/src/SIMS.API/Controllers/UsersController.cs`; `backend/src/SIMS.Application/DTOs/Users/UserDto.cs`.
 - Risk: `GET /api/v1/users` and `GET /api/v1/users/{id}` only require authentication while returning emails, status, password-change flag, and roles.
 - Impact: non-admin users can enumerate staff/user metadata.
@@ -56,6 +63,7 @@ Generated from a read-only multi-agent audit on 2026-05-27.
 
 ### Frontend routes are authenticated but not permission-protected
 
+- Status: Partially remediated on 2026-05-27. Permission route guards were added for admin, billing, reports, users, core policy/insured/submission, document, compliance, agent, and carrier pages; browser-level role checks still need automation.
 - Evidence: `frontend/src/App.tsx` `ProtectedRoute`.
 - Risk: sidebar hides links, but direct URLs to admin, billing, reports, users, and document routes remain reachable by any authenticated user.
 - Impact: confusing 403s at best; possible data/action exposure where backend checks are incomplete.

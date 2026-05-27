@@ -141,6 +141,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     [HttpPost("sources")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<ActionResult<LegalTrackedSourceDto>> CreateSource([FromBody] LegalTrackedSourceUpsertDto dto)
     {
         var validationError = ValidateSource(dto);
@@ -179,6 +180,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     [HttpPut("sources/{sourceId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<ActionResult<LegalTrackedSourceDto>> UpdateSource(Guid sourceId, [FromBody] LegalTrackedSourceUpsertDto dto)
     {
         var source = await _db.LegalTrackedSources.FirstOrDefaultAsync(s => s.Id == sourceId);
@@ -219,6 +221,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     [HttpPost("sources/{sourceId:guid}/scan")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<ActionResult<LegalSourceScanRunDto>> ScanSource(Guid sourceId)
     {
         var source = await _db.LegalTrackedSources.FirstOrDefaultAsync(s => s.Id == sourceId);
@@ -473,6 +476,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     [HttpPost("imports/oden")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     [RequestSizeLimit(10_000_000)]
     public async Task<ActionResult<LegalSourceScanRunDto>> ImportOden([FromForm] IFormFile file)
     {
@@ -584,6 +588,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     [HttpPost("scan-runs/simulate-change")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<ActionResult<LegalSourceScanResultDto>> SimulateChange()
     {
         var requirement = await _db.LegalRequirementSections
@@ -650,6 +655,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     [HttpPost("scan-results/{scanResultId:guid}/approve")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> ApproveScanResult(Guid scanResultId, [FromBody] LegalScanResultReviewDto dto)
     {
         var result = await _db.LegalSourceScanResults
@@ -756,6 +762,7 @@ public class LegalRequirementsController : ControllerBase
     }
 
     [HttpPost("scan-results/{scanResultId:guid}/reject")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> RejectScanResult(Guid scanResultId, [FromBody] LegalScanResultReviewDto dto)
     {
         var result = await _db.LegalSourceScanResults.FirstOrDefaultAsync(r => r.Id == scanResultId);

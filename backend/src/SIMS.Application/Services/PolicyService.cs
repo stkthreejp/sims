@@ -1222,7 +1222,7 @@ public class PolicyService : IPolicyService
             Limit = policy.BoundQuote?.Limit,
             UninsuredMotoristLimit = policy.BoundQuote?.UninsuredMotoristLimit,
             MedicalPaymentsLimit = policy.BoundQuote?.MedicalPaymentsLimit,
-        }, access.UserId);
+        }, access.UserId, access);
         if (!rewriteQuote.IsSuccess || rewriteQuote.Value == null)
             return Result<PolicyTransactionDto>.Failure(rewriteQuote.ErrorCode ?? "REWRITE_QUOTE_FAILED", rewriteQuote.ErrorMessage ?? "Rewrite quote could not be created.");
 

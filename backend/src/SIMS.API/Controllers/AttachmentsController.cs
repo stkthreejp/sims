@@ -22,18 +22,23 @@ public class AttachmentsController : ControllerBase
     //      GET /api/v1/agents/{id}/attachments
 
     [HttpGet("api/v1/submissions/{entityId:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public Task<IActionResult> GetSubmission(Guid entityId) => GetAll(DocumentEntityType.Submission, entityId);
 
     [HttpGet("api/v1/quotes/{entityId:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public Task<IActionResult> GetQuote(Guid entityId) => GetAll(DocumentEntityType.Policy, entityId);
 
     [HttpGet("api/v1/carriers/{entityId:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public Task<IActionResult> GetCarrier(Guid entityId) => GetAll(DocumentEntityType.Carrier, entityId);
 
     [HttpGet("api/v1/agents/{entityId:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public Task<IActionResult> GetAgent(Guid entityId) => GetAll(DocumentEntityType.Agent, entityId);
 
     [HttpGet("api/v1/insureds/{entityId:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public Task<IActionResult> GetInsured(Guid entityId) => GetAll(DocumentEntityType.Insured, entityId);
 
     private async Task<IActionResult> GetAll(DocumentEntityType entityType, Guid entityId)
@@ -80,6 +85,7 @@ public class AttachmentsController : ControllerBase
     // ── Download (signed URL) ─────────────────────────────────────────────────
 
     [HttpGet("api/v1/attachments/{id:guid}/download-url")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public async Task<IActionResult> GetDownloadUrl(Guid id)
     {
         var result = await _attachmentService.GetDownloadUrlAsync(id, CurrentUserId);

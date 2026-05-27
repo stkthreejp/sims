@@ -104,6 +104,28 @@ const PageFallback = () => (
   </div>
 )
 
+const Permissions = {
+  InsuredsView: 'insureds.view',
+  InsuredsCreate: 'insureds.create',
+  InsuredsEdit: 'insureds.edit',
+  PoliciesView: 'policies.view',
+  AdminUsersView: 'admin.users.view',
+  AdminRolesManage: 'admin.roles.manage',
+  AdminSystemManage: 'admin.system.manage',
+  AdminUnderwritingControlsManage: 'admin.underwriting-controls.manage',
+  UnderwritingManage: 'underwriting.manage',
+  AccountingManage: 'accounting.manage',
+  RatingManage: 'rating.manage',
+  RatingAdmin: 'rating.admin',
+  ReportsView: 'reports.view',
+  NavSubmissions: 'nav.submissions',
+  NavInbox: 'nav.inbox',
+  NavAgents: 'nav.agents',
+  NavCarriers: 'nav.carriers',
+  NavDocumentLibrary: 'nav.document-library',
+  NavComplianceDocumentation: 'nav.compliance-documentation',
+} as const
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -139,6 +161,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+function PermissionRoute({ permission, children }: { permission: string | string[]; children: React.ReactNode }) {
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const required = Array.isArray(permission) ? permission : [permission]
+
+  return required.some(hasPermission) ? <>{children}</> : <Navigate to="/dashboard" replace />
+}
+
+const withPermission = (permission: string | string[], children: React.ReactNode) => (
+  <PermissionRoute permission={permission}>{children}</PermissionRoute>
+)
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -168,72 +201,72 @@ export default function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
 
-              <Route path="/insureds" element={<InsuredsPage />} />
-              <Route path="/insureds/new" element={<InsuredCreatePage />} />
-              <Route path="/insureds/:id" element={<InsuredDetailPage />} />
-              <Route path="/insureds/:id/edit" element={<InsuredEditPage />} />
+              <Route path="/insureds" element={withPermission(Permissions.InsuredsView, <InsuredsPage />)} />
+              <Route path="/insureds/new" element={withPermission(Permissions.InsuredsCreate, <InsuredCreatePage />)} />
+              <Route path="/insureds/:id" element={withPermission(Permissions.InsuredsView, <InsuredDetailPage />)} />
+              <Route path="/insureds/:id/edit" element={withPermission(Permissions.InsuredsEdit, <InsuredEditPage />)} />
 
-              <Route path="/submissions/new" element={<SubmissionCreatePage />} />
-              <Route path="/submissions/:id/loss-history" element={<SubmissionLossHistoryPage />} />
-              <Route path="/submissions/:id" element={<SubmissionDetailPage />} />
-              <Route path="/submissions" element={<SubmissionsPage />} />
+              <Route path="/submissions/new" element={withPermission(Permissions.UnderwritingManage, <SubmissionCreatePage />)} />
+              <Route path="/submissions/:id/loss-history" element={withPermission(Permissions.UnderwritingManage, <SubmissionLossHistoryPage />)} />
+              <Route path="/submissions/:id" element={withPermission(Permissions.NavSubmissions, <SubmissionDetailPage />)} />
+              <Route path="/submissions" element={withPermission(Permissions.NavSubmissions, <SubmissionsPage />)} />
 
-              <Route path="/policies" element={<PoliciesPage />} />
-              <Route path="/policies/:id" element={<PolicyDetailPage />} />
+              <Route path="/policies" element={withPermission(Permissions.PoliciesView, <PoliciesPage />)} />
+              <Route path="/policies/:id" element={withPermission(Permissions.PoliciesView, <PolicyDetailPage />)} />
 
-              <Route path="/agents" element={<AgentsPage />} />
-              <Route path="/agents/:id" element={<AgentDetailPage />} />
-              <Route path="/carriers" element={<CarriersPage />} />
-              <Route path="/carriers/:id" element={<CarrierDetailPage />} />
-              <Route path="/users" element={<UsersPage />} />
+              <Route path="/agents" element={withPermission(Permissions.NavAgents, <AgentsPage />)} />
+              <Route path="/agents/:id" element={withPermission(Permissions.NavAgents, <AgentDetailPage />)} />
+              <Route path="/carriers" element={withPermission(Permissions.NavCarriers, <CarriersPage />)} />
+              <Route path="/carriers/:id" element={withPermission(Permissions.NavCarriers, <CarrierDetailPage />)} />
+              <Route path="/users" element={withPermission(Permissions.AdminUsersView, <UsersPage />)} />
 
-              <Route path="/inbox" element={<InboxPage />} />
-              <Route path="/inbox/:id" element={<InboxDetailPage />} />
+              <Route path="/inbox" element={withPermission(Permissions.NavInbox, <InboxPage />)} />
+              <Route path="/inbox/:id" element={withPermission(Permissions.NavInbox, <InboxDetailPage />)} />
 
-              <Route path="/document-library" element={<DocumentLibraryPage />} />
-              <Route path="/document-library/new" element={<TemplateEditorPage />} />
-              <Route path="/document-library/:id" element={<TemplateEditorPage />} />
-              <Route path="/compliance-documentation" element={<ComplianceDocumentationPage />} />
-              <Route path="/compliance-documentation/attestations" element={<ComplianceAttestationsPage />} />
-              <Route path="/compliance-documentation/reviews" element={<ComplianceReviewsPage />} />
-              <Route path="/compliance-documentation/:id/report" element={<ComplianceEvidenceReportPage />} />
-              <Route path="/compliance-documentation/:id" element={<ComplianceDocumentDetailPage />} />
+              <Route path="/document-library" element={withPermission(Permissions.NavDocumentLibrary, <DocumentLibraryPage />)} />
+              <Route path="/document-library/new" element={withPermission(Permissions.NavDocumentLibrary, <TemplateEditorPage />)} />
+              <Route path="/document-library/:id" element={withPermission(Permissions.NavDocumentLibrary, <TemplateEditorPage />)} />
+              <Route path="/compliance-documentation" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceDocumentationPage />)} />
+              <Route path="/compliance-documentation/attestations" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceAttestationsPage />)} />
+              <Route path="/compliance-documentation/reviews" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceReviewsPage />)} />
+              <Route path="/compliance-documentation/:id/report" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceEvidenceReportPage />)} />
+              <Route path="/compliance-documentation/:id" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceDocumentDetailPage />)} />
 
               <Route path="/tasks" element={<TaskQueuePage />} />
 
-              <Route path="/admin/task-types" element={<TaskTypesAdminPage />} />
-              <Route path="/admin/workflows" element={<WorkflowsAdminPage />} />
-              <Route path="/admin/holiday-calendar" element={<HolidayCalendarAdminPage />} />
-              <Route path="/admin/escalation-rules" element={<EscalationRulesAdminPage />} />
-              <Route path="/admin/fees" element={<FeesAdminPage />} />
-              <Route path="/admin/policy-forms" element={<PolicyFormsAdminPage />} />
-              <Route path="/admin/policy-numbers" element={<PolicyNumbersAdminPage />} />
-              <Route path="/admin/rating" element={<AdminRatingPage />} />
-              <Route path="/admin/rating/plans/:planId" element={<AdminRatingPlanDetailPage />} />
-              <Route path="/admin/rating/versions/:versionId" element={<AdminRatingPlanVersionPage />} />
-              <Route path="/admin/rating/shadow" element={<AdminShadowRatingPage />} />
-              <Route path="/admin/role-permissions" element={<RolePermissionsPage />} />
-              <Route path="/admin/database-status" element={<DatabaseStatusPage />} />
-              <Route path="/admin/jobs" element={<AdminJobsPage />} />
-              <Route path="/admin/legal-requirements" element={<LegalRequirementsPage />} />
-              <Route path="/admin/ai-settings" element={<AiSettingsAdminPage />} />
-              <Route path="/admin/programs" element={<ProgramConfigurationAdminPage />} />
-              <Route path="/admin/intermediaries" element={<IntermediariesAdminPage />} />
-              <Route path="/admin/underwriting-controls" element={<UnderwritingControlsAdminPage />} />
-              <Route path="/admin/surplus-lines" element={<SurplusLinesAdminPage />} />
-              <Route path="/quotes/:quoteId" element={<QuoteDetailPage />} />
-              <Route path="/quotes/:quoteId/writeup" element={<QuoteWriteupPage />} />
-              <Route path="/billing/invoices" element={<InvoicesPage />} />
-              <Route path="/billing/receipts" element={<ReceiptsPage />} />
-              <Route path="/billing/cash-application" element={<CashApplicationPage />} />
-              <Route path="/billing/cash-distribution" element={<CashDistributionPage />} />
-              <Route path="/billing/disbursements" element={<DisbursementsPage />} />
-              <Route path="/billing/statement-reconciliation" element={<StatementReconciliationPage />} />
-              <Route path="/billing/activity" element={<ActivityPage />} />
-              <Route path="/billing/period-close" element={<PeriodClosePage />} />
-              <Route path="/billing/sync-health" element={<SyncHealthPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/reports/bordereaux" element={<BordereauxWorkbenchPage />} />
+              <Route path="/admin/task-types" element={withPermission(Permissions.AdminSystemManage, <TaskTypesAdminPage />)} />
+              <Route path="/admin/workflows" element={withPermission(Permissions.AdminSystemManage, <WorkflowsAdminPage />)} />
+              <Route path="/admin/holiday-calendar" element={withPermission(Permissions.AdminSystemManage, <HolidayCalendarAdminPage />)} />
+              <Route path="/admin/escalation-rules" element={withPermission(Permissions.AdminSystemManage, <EscalationRulesAdminPage />)} />
+              <Route path="/admin/fees" element={withPermission(Permissions.AdminSystemManage, <FeesAdminPage />)} />
+              <Route path="/admin/policy-forms" element={withPermission(Permissions.UnderwritingManage, <PolicyFormsAdminPage />)} />
+              <Route path="/admin/policy-numbers" element={withPermission(Permissions.UnderwritingManage, <PolicyNumbersAdminPage />)} />
+              <Route path="/admin/rating" element={withPermission(Permissions.RatingAdmin, <AdminRatingPage />)} />
+              <Route path="/admin/rating/plans/:planId" element={withPermission(Permissions.RatingAdmin, <AdminRatingPlanDetailPage />)} />
+              <Route path="/admin/rating/versions/:versionId" element={withPermission([Permissions.RatingManage, Permissions.RatingAdmin], <AdminRatingPlanVersionPage />)} />
+              <Route path="/admin/rating/shadow" element={withPermission(Permissions.RatingAdmin, <AdminShadowRatingPage />)} />
+              <Route path="/admin/role-permissions" element={withPermission(Permissions.AdminRolesManage, <RolePermissionsPage />)} />
+              <Route path="/admin/database-status" element={withPermission(Permissions.AdminSystemManage, <DatabaseStatusPage />)} />
+              <Route path="/admin/jobs" element={withPermission(Permissions.AdminSystemManage, <AdminJobsPage />)} />
+              <Route path="/admin/legal-requirements" element={withPermission(Permissions.AdminSystemManage, <LegalRequirementsPage />)} />
+              <Route path="/admin/ai-settings" element={withPermission(Permissions.AdminSystemManage, <AiSettingsAdminPage />)} />
+              <Route path="/admin/programs" element={withPermission(Permissions.AdminUnderwritingControlsManage, <ProgramConfigurationAdminPage />)} />
+              <Route path="/admin/intermediaries" element={withPermission(Permissions.AdminSystemManage, <IntermediariesAdminPage />)} />
+              <Route path="/admin/underwriting-controls" element={withPermission(Permissions.AdminUnderwritingControlsManage, <UnderwritingControlsAdminPage />)} />
+              <Route path="/admin/surplus-lines" element={withPermission(Permissions.AdminSystemManage, <SurplusLinesAdminPage />)} />
+              <Route path="/quotes/:quoteId" element={withPermission(Permissions.PoliciesView, <QuoteDetailPage />)} />
+              <Route path="/quotes/:quoteId/writeup" element={withPermission(Permissions.PoliciesView, <QuoteWriteupPage />)} />
+              <Route path="/billing/invoices" element={withPermission(Permissions.AccountingManage, <InvoicesPage />)} />
+              <Route path="/billing/receipts" element={withPermission(Permissions.AccountingManage, <ReceiptsPage />)} />
+              <Route path="/billing/cash-application" element={withPermission(Permissions.AccountingManage, <CashApplicationPage />)} />
+              <Route path="/billing/cash-distribution" element={withPermission(Permissions.AccountingManage, <CashDistributionPage />)} />
+              <Route path="/billing/disbursements" element={withPermission(Permissions.AccountingManage, <DisbursementsPage />)} />
+              <Route path="/billing/statement-reconciliation" element={withPermission(Permissions.AccountingManage, <StatementReconciliationPage />)} />
+              <Route path="/billing/activity" element={withPermission(Permissions.AccountingManage, <ActivityPage />)} />
+              <Route path="/billing/period-close" element={withPermission(Permissions.AccountingManage, <PeriodClosePage />)} />
+              <Route path="/billing/sync-health" element={withPermission(Permissions.AccountingManage, <SyncHealthPage />)} />
+              <Route path="/reports" element={withPermission(Permissions.ReportsView, <ReportsPage />)} />
+              <Route path="/reports/bordereaux" element={withPermission(Permissions.ReportsView, <BordereauxWorkbenchPage />)} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

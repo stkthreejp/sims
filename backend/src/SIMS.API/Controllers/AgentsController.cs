@@ -28,6 +28,7 @@ public class AgentsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> Create([FromBody] AgentCreateDto dto)
     {
         var result = await _agentService.CreateAsync(dto);
@@ -36,6 +37,7 @@ public class AgentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> Update(Guid id, [FromBody] AgentUpdateDto dto)
     {
         var result = await _agentService.UpdateAsync(id, dto);
@@ -43,6 +45,7 @@ public class AgentsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _agentService.DeleteAsync(id);
@@ -52,6 +55,7 @@ public class AgentsController : ControllerBase
     // ─── Locations ────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/locations")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> AddLocation(Guid id, [FromBody] AgentLocationInputDto dto)
     {
         var result = await _agentService.AddLocationAsync(id, dto);
@@ -59,6 +63,7 @@ public class AgentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/locations/{locationId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> UpdateLocation(Guid id, Guid locationId, [FromBody] AgentLocationInputDto dto)
     {
         var result = await _agentService.UpdateLocationAsync(id, locationId, dto);
@@ -66,6 +71,7 @@ public class AgentsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}/locations/{locationId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> DeleteLocation(Guid id, Guid locationId)
     {
         var result = await _agentService.DeleteLocationAsync(id, locationId);
@@ -75,6 +81,7 @@ public class AgentsController : ControllerBase
     // ─── Contacts ─────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/locations/{locationId:guid}/contacts")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> AddContact(Guid id, Guid locationId, [FromBody] AgentContactInputDto dto)
     {
         var result = await _agentService.AddContactAsync(id, locationId, dto);
@@ -82,6 +89,7 @@ public class AgentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/locations/{locationId:guid}/contacts/{contactId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> UpdateContact(Guid id, Guid locationId, Guid contactId, [FromBody] AgentContactInputDto dto)
     {
         var result = await _agentService.UpdateContactAsync(id, locationId, contactId, dto);
@@ -89,6 +97,7 @@ public class AgentsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}/locations/{locationId:guid}/contacts/{contactId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> DeleteContact(Guid id, Guid locationId, Guid contactId)
     {
         var result = await _agentService.DeleteContactAsync(id, locationId, contactId);

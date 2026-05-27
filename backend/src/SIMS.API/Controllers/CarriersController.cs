@@ -28,6 +28,7 @@ public class CarriersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> Create([FromBody] CarrierCreateDto dto)
     {
         var result = await _carrierService.CreateAsync(dto);
@@ -36,6 +37,7 @@ public class CarriersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> Update(Guid id, [FromBody] CarrierUpdateDto dto)
     {
         var result = await _carrierService.UpdateAsync(id, dto);
@@ -43,6 +45,7 @@ public class CarriersController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _carrierService.DeleteAsync(id);
@@ -52,6 +55,7 @@ public class CarriersController : ControllerBase
     // ─── Contacts ─────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/contacts")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> AddContact(Guid id, [FromBody] CarrierContactInputDto dto)
     {
         var result = await _carrierService.AddContactAsync(id, dto);
@@ -59,6 +63,7 @@ public class CarriersController : ControllerBase
     }
 
     [HttpPut("{id:guid}/contacts/{contactId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> UpdateContact(Guid id, Guid contactId, [FromBody] CarrierContactInputDto dto)
     {
         var result = await _carrierService.UpdateContactAsync(id, contactId, dto);
@@ -66,6 +71,7 @@ public class CarriersController : ControllerBase
     }
 
     [HttpDelete("{id:guid}/contacts/{contactId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
     public async Task<IActionResult> DeleteContact(Guid id, Guid contactId)
     {
         var result = await _carrierService.DeleteContactAsync(id, contactId);

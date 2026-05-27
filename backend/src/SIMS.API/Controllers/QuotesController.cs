@@ -54,14 +54,16 @@ public class QuotesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AppPermissions.PoliciesCreate)]
     public async Task<IActionResult> Create([FromBody] QuoteCreateDto dto)
     {
-        var result = await _quoteService.CreateAsync(dto, CurrentUserId);
+        var result = await _quoteService.CreateAsync(dto, CurrentUserId, CurrentAccess);
         if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPermissions.PoliciesEdit)]
     public async Task<IActionResult> Update(Guid id, [FromBody] QuoteUpdateDto dto)
     {
         var result = await _quoteService.UpdateAsync(id, dto, CurrentAccess);
@@ -69,6 +71,7 @@ public class QuotesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/rate")]
+    [Authorize(Policy = AppPermissions.PoliciesEdit)]
     public async Task<IActionResult> Rate(Guid id, [FromBody] RateQuoteRequest request)
     {
         var quote = await _quoteService.GetByIdAsync(id, CurrentAccess);
@@ -153,6 +156,7 @@ public class QuotesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/bind")]
+    [Authorize(Policy = AppPermissions.PoliciesBind)]
     public async Task<IActionResult> Bind(Guid id, [FromBody] QuoteBindDto dto)
     {
         var result = await _quoteService.BindAsync(id, dto, CurrentAccess);
@@ -217,6 +221,7 @@ public class QuotesController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPermissions.PoliciesDelete)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _quoteService.DeleteAsync(id, CurrentAccess);

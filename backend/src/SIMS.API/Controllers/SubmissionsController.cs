@@ -74,6 +74,7 @@ public class SubmissionsController : ControllerBase
         => Ok(await _referrals.GetSubmissionSummaryAsync(id, ct));
 
     [HttpPost]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> Create([FromBody] SubmissionCreateDto dto)
     {
         var result = await _submissionService.CreateAsync(dto, CurrentUserId);
@@ -82,6 +83,7 @@ public class SubmissionsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> Update(Guid id, [FromBody] SubmissionUpdateDto dto)
     {
         var result = await _submissionService.UpdateAsync(id, dto, CurrentAccess);
@@ -89,6 +91,7 @@ public class SubmissionsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/lines-of-business")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> SetLinesOfBusiness(Guid id, [FromBody] SetLinesOfBusinessRequest request)
     {
         var result = await _submissionService.SetLinesOfBusinessAsync(id, request.LinesOfBusiness, CurrentAccess);
@@ -96,6 +99,7 @@ public class SubmissionsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _submissionService.DeleteAsync(id, CurrentAccess);

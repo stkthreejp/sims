@@ -47,7 +47,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function Sidebar() {
   const perms = usePermissions()
-  const { isAdmin } = perms
 
   return (
     <aside style={{
@@ -98,22 +97,22 @@ export function Sidebar() {
           </>
         )}
 
-        {(isAdmin || perms.canViewRatingAdmin || perms.canViewTaskAdmin || perms.canViewFeesAdmin || perms.canViewDocumentLibrary) && (
+        {(perms.canViewUsers || perms.canManageRoles || perms.canManageSystem || perms.canManageUnderwritingControls || perms.canManageUnderwriting || perms.canViewRatingAdmin || perms.canViewTaskAdmin || perms.canViewFeesAdmin || perms.canViewDocumentLibrary) && (
           <>
             <SectionLabel>Admin</SectionLabel>
-            {isAdmin && <NavItem to="/users" label="Users" icon={Users} />}
-            {isAdmin && <NavItem to="/admin/role-permissions" label="Role Permissions" icon={KeyRound} />}
-            {isAdmin && <NavItem to="/admin/database-status" label="Database Status" icon={Database} />}
-            {isAdmin && <NavItem to="/admin/jobs" label="Jobs" icon={Settings2} />}
-            {isAdmin && <NavItem to="/admin/ai-settings" label="AI Settings" icon={Bot} />}
-            {isAdmin && <NavItem to="/admin/programs" label="Programs" icon={Boxes} />}
-            {isAdmin && <NavItem to="/admin/intermediaries" label="Intermediaries" icon={Handshake} />}
-            {isAdmin && <NavItem to="/admin/underwriting-controls" label="UW Controls" icon={ShieldCheck} />}
-            {isAdmin && <NavItem to="/admin/surplus-lines" label="Surplus Lines" icon={FileCheck2} />}
-            {isAdmin && <NavItem to="/admin/legal-requirements" label="Legal Tracker" icon={BookOpenCheck} />}
+            {perms.canViewUsers && <NavItem to="/users" label="Users" icon={Users} />}
+            {perms.canManageRoles && <NavItem to="/admin/role-permissions" label="Role Permissions" icon={KeyRound} />}
+            {perms.canManageSystem && <NavItem to="/admin/database-status" label="Database Status" icon={Database} />}
+            {perms.canManageSystem && <NavItem to="/admin/jobs" label="Jobs" icon={Settings2} />}
+            {perms.canManageSystem && <NavItem to="/admin/ai-settings" label="AI Settings" icon={Bot} />}
+            {perms.canManageUnderwritingControls && <NavItem to="/admin/programs" label="Programs" icon={Boxes} />}
+            {perms.canManageSystem && <NavItem to="/admin/intermediaries" label="Intermediaries" icon={Handshake} />}
+            {perms.canManageUnderwritingControls && <NavItem to="/admin/underwriting-controls" label="UW Controls" icon={ShieldCheck} />}
+            {perms.canManageSystem && <NavItem to="/admin/surplus-lines" label="Surplus Lines" icon={FileCheck2} />}
+            {perms.canManageSystem && <NavItem to="/admin/legal-requirements" label="Legal Tracker" icon={BookOpenCheck} />}
             {perms.canViewDocumentLibrary && <NavItem to="/document-library" label="Doc Library" icon={LayoutTemplate} />}
-            {perms.canViewDocumentLibrary && <NavItem to="/admin/policy-forms" label="Policy Forms" icon={LayoutTemplate} />}
-            {perms.canViewDocumentLibrary && <NavItem to="/admin/policy-numbers" label="Policy Numbers" icon={Hash} />}
+            {perms.canManageUnderwriting && <NavItem to="/admin/policy-forms" label="Policy Forms" icon={LayoutTemplate} />}
+            {perms.canManageUnderwriting && <NavItem to="/admin/policy-numbers" label="Policy Numbers" icon={Hash} />}
             {perms.canViewFeesAdmin && <NavItem to="/admin/fees" label="Charges & Fees" icon={Receipt} />}
             {perms.canViewRatingAdmin && <NavItem to="/admin/rating" label="Rating Plans" icon={Sliders} />}
             {perms.canViewRatingAdmin && <NavItem to="/admin/rating/shadow" label="Shadow Mode" icon={FlaskConical} />}

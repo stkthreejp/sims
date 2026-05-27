@@ -136,13 +136,20 @@ public class QuoteService : IQuoteService
             : Result<QuoteDto>.Success(await MapToDtoWithPolicyAsync(quote));
     }
 
-    public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById)
+    public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById, UserAccessScope? access = null)
     {
-        var submission = await Db.Set<Submission>()
+        var submissionQuery = Db.Set<Submission>()
             .Include(s => s.Insured)
-            .FirstOrDefaultAsync(s => s.Id == dto.SubmissionId && !s.IsDeleted);
+            .Where(s => s.Id == dto.SubmissionId && !s.IsDeleted);
+
+        if (access.HasValue)
+            submissionQuery = submissionQuery.ForAccessScope(access.Value);
+
+        var submission = await submissionQuery.FirstOrDefaultAsync();
         if (submission == null)
-            return Result<QuoteDto>.Failure("INVALID_SUBMISSION", "Submission not found.");
+            return access.HasValue
+                ? Result<QuoteDto>.Failure(BusinessDataAccess.AccessDeniedCode, BusinessDataAccess.AccessDeniedMessage)
+                : Result<QuoteDto>.Failure("INVALID_SUBMISSION", "Submission not found.");
 
         ProgramConfiguration? program = null;
         var carrierId = dto.CarrierId;

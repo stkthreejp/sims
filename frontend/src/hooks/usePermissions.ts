@@ -40,8 +40,15 @@ export function usePermissions() {
     canManageUsers: hasPermission('admin.users.manage'),
     canViewRoles: hasPermission('admin.roles.view'),
     canManageRoles: hasPermission('admin.roles.manage'),
+    canManageSystem: hasPermission('admin.system.manage'),
+    canManageUnderwritingControls: hasPermission('admin.underwriting-controls.manage'),
     canManageUnderwriting: hasPermission('underwriting.manage'),
     canOverrideClearance: hasPermission('underwriting.clearance.override'),
+    canManageAccounting: hasPermission('accounting.manage'),
+    canAdminAccounting: hasPermission('accounting.admin'),
+    canManageRating: hasPermission('rating.manage'),
+    canAdminRating: hasPermission('rating.admin'),
+    canViewReportData: hasPermission('reports.view'),
 
     // Navigation sections (control sidebar visibility)
     canViewSubmissions: hasPermission('nav.submissions'),
@@ -50,11 +57,11 @@ export function usePermissions() {
     canViewCarriers: hasPermission('nav.carriers'),
     canViewDocumentLibrary: hasPermission('nav.document-library'),
     canViewComplianceDocumentation: hasPermission('nav.compliance-documentation'),
-    canViewReports: hasPermission('nav.reports'),
-    canViewBilling: hasPermission('nav.billing'),
-    canViewRatingAdmin: hasPermission('nav.admin.rating'),
-    canViewTaskAdmin: hasPermission('nav.admin.tasks'),
-    canViewFeesAdmin: hasPermission('nav.admin.fees'),
+    canViewReports: hasPermission('nav.reports') && hasPermission('reports.view'),
+    canViewBilling: hasPermission('nav.billing') && hasPermission('accounting.manage'),
+    canViewRatingAdmin: hasPermission('nav.admin.rating') && hasPermission('rating.admin'),
+    canViewTaskAdmin: hasPermission('nav.admin.tasks') && hasPermission('admin.system.manage'),
+    canViewFeesAdmin: hasPermission('nav.admin.fees') && hasPermission('admin.system.manage'),
 
     isAdmin,
   }

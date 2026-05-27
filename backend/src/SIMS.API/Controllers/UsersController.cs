@@ -16,6 +16,7 @@ public class UsersController : ControllerBase
     public UsersController(IUserService userService) => _userService = userService;
 
     [HttpGet]
+    [Authorize(Policy = AppPermissions.AdminUsersView)]
     public async Task<IActionResult> GetAll([FromQuery] QueryParameters query)
     {
         var result = await _userService.GetAllAsync(query);
@@ -23,6 +24,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AppPermissions.AdminUsersView)]
     public async Task<IActionResult> GetById(Guid id)
     {
         var result = await _userService.GetByIdAsync(id);

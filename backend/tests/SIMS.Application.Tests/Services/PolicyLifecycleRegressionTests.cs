@@ -2922,7 +2922,7 @@ public class PolicyLifecycleRegressionTests
     {
         public List<QuoteCreateDto> CreateRequests { get; } = [];
 
-        public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById)
+        public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById, UserAccessScope? access = null)
         {
             CreateRequests.Add(dto);
             var quote = new Quote
