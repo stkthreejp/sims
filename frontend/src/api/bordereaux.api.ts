@@ -20,6 +20,11 @@ export interface BordereauxProfileQuery {
 export const getBordereauxProfiles = (params?: BordereauxProfileQuery): Promise<BordereauxProfile[]> =>
   apiClient.get<BordereauxProfile[]>(BASE, { params }).then((r) => r.data)
 
+export const createBordereauxProfile = (
+  request: UpsertBordereauxProfileRequest,
+): Promise<BordereauxProfile> =>
+  apiClient.post<BordereauxProfile>(BASE, request).then((r) => r.data)
+
 export const updateBordereauxProfile = (
   profileId: string,
   request: UpsertBordereauxProfileRequest,

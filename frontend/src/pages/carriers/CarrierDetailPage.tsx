@@ -26,6 +26,7 @@ import {
 } from '@/api/carrierCommissions.api'
 import {
   getBordereauxProfiles,
+  createBordereauxProfile,
   updateBordereauxProfile,
 } from '@/api/bordereaux.api'
 import type { CarrierCommission } from '@/types/carrierCommission.types'
@@ -203,6 +204,14 @@ type AdditionalInterestRateForm = {
   isActive: boolean
 }
 
+type BordereauxProfileForm = {
+  name: string
+  programConfigurationId: string
+  lineOfBusiness: PolicyLineOfBusiness | ''
+  stateCode: string
+  requiresAccountCurrent: boolean
+}
+
 const emptyAdditionalInterestRateForm = (): AdditionalInterestRateForm => ({
   lineOfBusiness: '',
   coverageType: 'AdditionalInsured',
@@ -215,6 +224,14 @@ const emptyAdditionalInterestRateForm = (): AdditionalInterestRateForm => ({
   effectiveDate: '',
   expirationDate: '',
   isActive: true,
+})
+
+const emptyBordereauxProfileForm = (): BordereauxProfileForm => ({
+  name: '',
+  programConfigurationId: '',
+  lineOfBusiness: '',
+  stateCode: '',
+  requiresAccountCurrent: true,
 })
 
 export function CarrierDetailPage() {
@@ -247,6 +264,8 @@ export function CarrierDetailPage() {
   const [ratingForm, setRatingForm] = useState<{ programConfigurationId: string; lineOfBusiness: PolicyLineOfBusiness | ''; ratingPlanVersionId: string }>({ programConfigurationId: '', lineOfBusiness: '', ratingPlanVersionId: '' })
   const [ratingPickerLob, setRatingPickerLob] = useState<PolicyLineOfBusiness | null>(null)
   const [selectedBordereauxProfileId, setSelectedBordereauxProfileId] = useState('')
+  const [showBordereauxProfileForm, setShowBordereauxProfileForm] = useState(false)
+  const [bordereauxProfileForm, setBordereauxProfileForm] = useState<BordereauxProfileForm>(emptyBordereauxProfileForm())
 
   const { data: carrier, isLoading } = useQuery({
     queryKey: ['carriers', id],
@@ -364,6 +383,39 @@ export function CarrierDetailPage() {
       qc.invalidateQueries({ queryKey: ['bordereaux', 'profiles'] })
     },
     onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Could not save BDX profile setup'),
+  })
+
+  const createBordereauxProfileMutation = useMutation({
+    mutationFn: () => createBordereauxProfile({
+      name: bordereauxProfileForm.name.trim(),
+      programConfigurationId: bordereauxProfileForm.programConfigurationId,
+      carrierId: id!,
+      lineOfBusiness: bordereauxProfileForm.lineOfBusiness || null,
+      stateCode: bordereauxProfileForm.stateCode.trim().toUpperCase() || null,
+      reportType: 'Premium',
+      frequency: 'Monthly',
+      outputFormat: 'Xlsx',
+      dateBasis: 'EffectiveOrBoundDateGreater',
+      requiresAccountCurrent: bordereauxProfileForm.requiresAccountCurrent,
+      isActive: true,
+      requiredTabsJson: '[]',
+      requiredColumnsJson: '[]',
+      mappingRulesJson: '{}',
+      staticValuesJson: '{}',
+      validationRulesJson: '{}',
+      includedTransactionTypesJson: '[]',
+      notes: null,
+    }),
+    onSuccess: (created) => {
+      toast.success('BDX profile created')
+      qc.setQueryData(['bordereaux', 'profiles', 'carrier', id], (current: BordereauxProfile[] | undefined) =>
+        current ? [...current, created] : [created])
+      qc.invalidateQueries({ queryKey: ['bordereaux', 'profiles'] })
+      setSelectedBordereauxProfileId(created.id)
+      setShowBordereauxProfileForm(false)
+      setBordereauxProfileForm(emptyBordereauxProfileForm())
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Could not create BDX profile'),
   })
 
   const { data: ratingAssignments = [] } = useQuery({
@@ -575,11 +627,41 @@ export function CarrierDetailPage() {
         .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
         .map((lob) => lob.lineOfBusiness)))
     : carrier.linesOfBusiness
+  const bordereauxProgramOptions = programs.filter((program) =>
+    program.carriers.some((programCarrier) => programCarrier.carrierId === carrier.id && programCarrier.isActive)
+  )
+  const selectedBordereauxProgram = programs.find((program) => program.id === bordereauxProfileForm.programConfigurationId)
+  const selectedBordereauxProgramCarrier = selectedBordereauxProgram?.carriers.find((programCarrier) =>
+    programCarrier.carrierId === carrier.id && programCarrier.isActive
+  )
+  const createBordereauxLobOptions = bordereauxProfileForm.programConfigurationId
+    ? Array.from(new Set((selectedBordereauxProgramCarrier?.linesOfBusiness ?? [])
+        .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
+        .map((lob) => lob.lineOfBusiness)))
+    : carrier.linesOfBusiness
   const bordereauxLobOptions = Array.from(new Set([
     ...carrier.linesOfBusiness,
     ...bordereauxProfiles.map((profile) => profile.lineOfBusiness).filter((lob): lob is PolicyLineOfBusiness => Boolean(lob)),
   ])).map((lob) => ({ value: lob, label: LOB_LABELS[lob] ?? lob }))
   const selectedBordereauxProfile = bordereauxProfiles.find((profile) => profile.id === selectedBordereauxProfileId)
+
+  const openBordereauxProfileForm = () => {
+    const programId = bordereauxProgramOptions[0]?.id ?? ''
+    const programCarrier = bordereauxProgramOptions[0]?.carriers.find((programCarrier) =>
+      programCarrier.carrierId === carrier.id && programCarrier.isActive
+    )
+    const firstLob = programCarrier?.linesOfBusiness.find((lob) =>
+      lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness)
+    )?.lineOfBusiness ?? carrier.linesOfBusiness[0] ?? ''
+
+    setBordereauxProfileForm({
+      ...emptyBordereauxProfileForm(),
+      name: `${carrier.name} Premium BDX`,
+      programConfigurationId: programId,
+      lineOfBusiness: firstLob,
+    })
+    setShowBordereauxProfileForm(true)
+  }
 
   return (
     <div className="space-y-5">
@@ -757,6 +839,16 @@ export function CarrierDetailPage() {
             <FileSpreadsheet className="h-4 w-4 text-slate-400" />
             Bordereaux Profiles
           </h2>
+          {!showBordereauxProfileForm && (
+            <button
+              type="button"
+              onClick={openBordereauxProfileForm}
+              disabled={bordereauxProgramOptions.length === 0}
+              className="sd-btn primary sm"
+            >
+              <Plus className="h-3.5 w-3.5" /> New Profile
+            </button>
+          )}
           {bordereauxProfiles.length > 0 && (
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <span>{bordereauxProfiles.length} profile{bordereauxProfiles.length === 1 ? '' : 's'}</span>
@@ -766,13 +858,112 @@ export function CarrierDetailPage() {
           )}
         </div>
 
-        {bordereauxProfiles.length === 0 ? (
+        {showBordereauxProfileForm && (
+          <div className="rounded-lg p-3 space-y-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-slate-600 mb-1">Profile Name *</label>
+                <input
+                  value={bordereauxProfileForm.name}
+                  onChange={(event) => setBordereauxProfileForm((form) => ({ ...form, name: event.target.value }))}
+                  className="sims-input"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Program *</label>
+                <select
+                  value={bordereauxProfileForm.programConfigurationId}
+                  onChange={(event) => setBordereauxProfileForm((form) => ({
+                    ...form,
+                    programConfigurationId: event.target.value,
+                    lineOfBusiness: '',
+                  }))}
+                  className="sims-select"
+                >
+                  <option value="">Select...</option>
+                  {bordereauxProgramOptions.map((program) => (
+                    <option key={program.id} value={program.id}>{program.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
+                <select
+                  value={bordereauxProfileForm.lineOfBusiness}
+                  onChange={(event) => setBordereauxProfileForm((form) => ({ ...form, lineOfBusiness: event.target.value as PolicyLineOfBusiness | '' }))}
+                  className="sims-select"
+                >
+                  <option value="">All lines</option>
+                  {createBordereauxLobOptions.map((lob) => (
+                    <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                <input
+                  value={bordereauxProfileForm.stateCode}
+                  maxLength={2}
+                  onChange={(event) => setBordereauxProfileForm((form) => ({ ...form, stateCode: event.target.value.toUpperCase() }))}
+                  placeholder="All"
+                  className="sims-input uppercase"
+                />
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={bordereauxProfileForm.requiresAccountCurrent}
+                    onChange={(event) => setBordereauxProfileForm((form) => ({ ...form, requiresAccountCurrent: event.target.checked }))}
+                    className="rounded"
+                  />
+                  Account Current
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!bordereauxProfileForm.name.trim()) { toast.error('Profile name is required'); return }
+                  if (!bordereauxProfileForm.programConfigurationId) { toast.error('Select a program'); return }
+                  if (bordereauxProfileForm.stateCode.trim() && bordereauxProfileForm.stateCode.trim().length !== 2) {
+                    toast.error('State must be two characters')
+                    return
+                  }
+                  createBordereauxProfileMutation.mutate()
+                }}
+                disabled={createBordereauxProfileMutation.isPending}
+                className="sd-btn primary sm"
+              >
+                <Check className="h-3.5 w-3.5" /> Save Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBordereauxProfileForm(false)
+                  setBordereauxProfileForm(emptyBordereauxProfileForm())
+                }}
+                className="sd-btn outline sm"
+              >
+                <X className="h-3.5 w-3.5" /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {bordereauxProfiles.length === 0 && !showBordereauxProfileForm ? (
           <EmptyState
             icon={FileSpreadsheet}
             title="No BDX profiles for this carrier"
-            description="Create profiles from the BDX foundation setup, then maintain carrier-specific tabs and London values here."
+            description={bordereauxProgramOptions.length === 0
+              ? 'Add this carrier to an active program before creating a BDX profile.'
+              : 'Create the first carrier BDX profile here, choosing the program and LOB before setup.'}
+            action={bordereauxProgramOptions.length > 0
+              ? <button type="button" onClick={openBordereauxProfileForm} className="sd-btn outline sm">Create first profile</button>
+              : undefined}
           />
-        ) : (
+        ) : bordereauxProfiles.length > 0 ? (
           <div className="grid gap-4 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
             <div className="grid gap-2">
               {bordereauxProfiles.map((profile) => {
@@ -823,7 +1014,7 @@ export function CarrierDetailPage() {
               )}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Commission Schedules */}

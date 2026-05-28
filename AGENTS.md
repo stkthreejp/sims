@@ -2,8 +2,8 @@
 
 ## Stack
 - **Backend:** ASP.NET Core 8, Entity Framework Core, PostgreSQL, Azure Blob Storage
-- **Frontend:** React + TypeScript + Vite, running on port 5173
-- **API:** runs on port 5000
+- **Frontend:** React + TypeScript + Vite, deployed to Azure from Git
+- **API:** Azure App Service for normal testing; local port 5000 only when explicitly requested
 - **Auth:** Microsoft/Azure AD (MSAL)
 - **Docs editor:** TipTap + Mammoth
 
@@ -29,18 +29,32 @@ cd backend && dotnet build
 ~/.dotnet/tools/dotnet-ef migrations add <Name> --project src/SIMS.Infrastructure --startup-project src/SIMS.API
 ~/.dotnet/tools/dotnet-ef database update --project src/SIMS.Infrastructure --startup-project src/SIMS.API
 
-# Frontend
+# Frontend checks
+cd frontend && npx tsc --noEmit
+cd frontend && npm run build
+
+# Local-only debugging, when explicitly requested
 cd frontend && npm run dev
-npx tsc --noEmit   # type check
 ```
 
 ## Git workflow
 This is a solo developer project. **Commit directly to `main`** — do not create feature branches or worktrees. Use `git push origin main` for all changes.
+After each completed scoped step, commit and push to `main` as long as only Codex-owned files for that step are staged.
+When the worktree contains unrelated changes, stage explicit files only and leave unrelated files untouched.
 
-## Dev server startup
-Use the backend_ms.log and frontend_ms.log files in the root to check server status.
-Backend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\backend_ms.log' -Tail 20"`
-Frontend: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\frontend_ms.log' -Tail 15"`
+## Deployment / smoke testing
+Do not use the local frontend or local backend for normal SIMS smoke tests.
+The normal flow is: commit to `main`, push to `origin/main`, then smoke test the Azure frontend and Azure API.
+Git deployment sends frontend changes to Azure; the local frontend is not the source of truth for pushed changes.
+
+- Frontend app: `sims-frontend-test`
+- API app: `sims-api-test`
+- Resource group: `simes-test-rg`
+- Known API host: `sims-api-test-f9htbma5aee5babz.eastus2-01.azurewebsites.net`
+
+Local dev servers and logs are only for explicit local debugging.
+Backend local log: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\backend_ms.log' -Tail 20"`
+Frontend local log: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonovan\SIMS\frontend_ms.log' -Tail 15"`
 
 ## Codex workspace notes
 - Keep project helper scripts in `C:\Users\JeremiahPODonovan\SIMS\scripts`.
