@@ -16,12 +16,32 @@ namespace SIMS.Application.Services;
 public class BordereauxService : IBordereauxService
 {
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private const string SetupConfigured = "Configured";
+    private const string SetupDefault = "Default";
+    private const string SetupMissing = "Missing";
     private readonly DbContext _db;
     private readonly IBlobStorageService? _blobStorage;
     private static readonly JsonSerializerOptions SnapshotJsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
     };
+    private static readonly SetupExpectation[] PremiumRequiredColumnExpectations =
+    [
+        new("Certificate Ref", "Certificate Ref"),
+        new("Gross premium paid this time", "Gross premium paid this time"),
+        new("Net Premium to London in original currency", "Net Premium to London in original currency"),
+    ];
+    private static readonly SetupExpectation[] PremiumStaticValueExpectations =
+    [
+        new("umr", "Unique Market Reference (UMR)"),
+        new("yearOfAccount", "Year of Account"),
+        new("coverholderName", "Coverholder Name", "Specialty Market Managers, LLC"),
+        new("coverholderPin", "Coverholder PIN", "USA00060"),
+    ];
+    private static readonly SetupExpectation[] PremiumMappingRuleExpectations =
+    [
+        new("commissionBasis", "Commission Basis"),
+    ];
 
     public BordereauxService(DbContext db) : this(db, null)
     {
@@ -511,7 +531,96 @@ public class BordereauxService : IBordereauxService
         p.StaticValuesJson,
         p.ValidationRulesJson,
         p.IncludedTransactionTypesJson,
-        p.Notes);
+        p.Notes,
+        BuildSetupStatus(p));
+
+    private static BordereauxProfileSetupStatusDto BuildSetupStatus(BordereauxProfile profile)
+    {
+        if (profile.ReportType != BordereauxReportType.Premium)
+        {
+            return new BordereauxProfileSetupStatusDto(
+                true,
+                0,
+                [],
+                [],
+                [],
+                []);
+        }
+
+        var tabItems = BuildArraySetupItems(RequiredTabsFor(profile), profile.RequiredTabsJson).ToList();
+        var columnItems = BuildArraySetupItems(PremiumRequiredColumnExpectations, profile.RequiredColumnsJson).ToList();
+        var staticItems = BuildObjectSetupItems(PremiumStaticValueExpectations, profile.StaticValuesJson).ToList();
+        var mappingItems = BuildObjectSetupItems(PremiumMappingRuleExpectations, profile.MappingRulesJson).ToList();
+        var missingItems = tabItems.Concat(columnItems).Concat(staticItems).Concat(mappingItems)
+            .Count(item => item.Status == SetupMissing);
+
+        return new BordereauxProfileSetupStatusDto(
+            missingItems == 0,
+            missingItems,
+            tabItems,
+            columnItems,
+            staticItems,
+            mappingItems);
+    }
+
+    private static IReadOnlyList<SetupExpectation> RequiredTabsFor(BordereauxProfile profile)
+    {
+        var tabs = new List<SetupExpectation>();
+
+        if (profile.LineOfBusiness is null or PolicyLineOfBusiness.GeneralLiability)
+            tabs.Add(new("General Liability (Section 1)", "General Liability (Section 1)"));
+        if (profile.LineOfBusiness is null or PolicyLineOfBusiness.AutoLiability or PolicyLineOfBusiness.AutoPhysicalDamage)
+        {
+            tabs.Add(new("Commercial Auto (Section 2)", "Commercial Auto (Section 2)"));
+            tabs.Add(new("Auto Veh Info", "Auto Veh Info"));
+        }
+        if (profile.LineOfBusiness is null or PolicyLineOfBusiness.InlandMarine)
+        {
+            tabs.Add(new("Inland Marine (Section 3)", "Inland Marine (Section 3)"));
+            tabs.Add(new("IM Unit Info", "IM Unit Info"));
+        }
+        if (profile.RequiresAccountCurrent)
+            tabs.Add(new("Acct Current", "Acct Current"));
+
+        return tabs;
+    }
+
+    private static IEnumerable<BordereauxProfileSetupItemDto> BuildArraySetupItems(
+        IEnumerable<SetupExpectation> expectations,
+        string json)
+    {
+        var values = ParseStringArray(json).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return expectations.Select(expectation => values.Contains(expectation.Key)
+            ? BuildSetupItem(expectation, SetupConfigured, expectation.Key)
+            : BuildSetupItem(expectation, SetupMissing));
+    }
+
+    private static IEnumerable<BordereauxProfileSetupItemDto> BuildObjectSetupItems(
+        IEnumerable<SetupExpectation> expectations,
+        string json)
+    {
+        var values = ParseJsonObject(json);
+        return expectations.Select(expectation =>
+        {
+            if (values.TryGetValue(expectation.Key, out var value) && !string.IsNullOrWhiteSpace(value))
+                return BuildSetupItem(expectation, SetupConfigured, value.Trim());
+
+            return expectation.DefaultValue is null
+                ? BuildSetupItem(expectation, SetupMissing)
+                : BuildSetupItem(expectation, SetupDefault, expectation.DefaultValue);
+        });
+    }
+
+    private static BordereauxProfileSetupItemDto BuildSetupItem(
+        SetupExpectation expectation,
+        string status,
+        string? value = null)
+        => new(
+            expectation.Key,
+            expectation.Label,
+            status,
+            value,
+            expectation.DefaultValue);
 
     private static BordereauxRunDto MapRun(BordereauxRun run, string profileName) => new(
         run.Id,
@@ -1210,6 +1319,7 @@ public class BordereauxService : IBordereauxService
         return string.IsNullOrWhiteSpace(cleaned) ? "bordereaux" : cleaned;
     }
 
+    private sealed record SetupExpectation(string Key, string Label, string? DefaultValue = null);
     private sealed record PreviewSourceRow(Invoice Invoice, PolicyTransaction Transaction);
     private sealed record LondonDetailRows(
         string PrimaryRiskLocationAddress,

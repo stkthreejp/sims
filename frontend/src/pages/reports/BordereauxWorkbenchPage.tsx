@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCcw, Save, Search } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCcw, Save, Search, Settings2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createBordereauxPremiumRun,
@@ -12,13 +12,16 @@ import {
   getBordereauxRuns,
   getLondonBordereauxDownloadUrl,
   reconcileBordereauxRun,
+  updateBordereauxProfile,
 } from '@/api/bordereaux.api'
 import type {
   BordereauxPremiumPreview,
   BordereauxPremiumPreviewRow,
   BordereauxProfile,
+  BordereauxProfileSetupItem,
   BordereauxRun,
   ReconcileBordereauxRunRequest,
+  UpsertBordereauxProfileRequest,
 } from '@/types/bordereaux.types'
 
 function money(value: number) {
@@ -99,6 +102,236 @@ function profileLabel(profile: BordereauxProfile) {
     .filter(Boolean)
     .join(' / ')
   return scope ? `${profile.name} (${scope})` : profile.name
+}
+
+function parseStringArray(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === 'string' && value.trim().length > 0).map((value) => value.trim())
+      : []
+  } catch {
+    return []
+  }
+}
+
+function parseStringRecord(json: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(json)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([, value]) => typeof value === 'string')
+        .map(([key, value]) => [key, String(value)]),
+    )
+  } catch {
+    return {}
+  }
+}
+
+function profileToRequest(profile: BordereauxProfile): UpsertBordereauxProfileRequest {
+  return {
+    name: profile.name,
+    programConfigurationId: profile.programConfigurationId,
+    carrierId: profile.carrierId,
+    lineOfBusiness: profile.lineOfBusiness,
+    stateCode: profile.stateCode,
+    reportType: profile.reportType,
+    frequency: profile.frequency,
+    outputFormat: profile.outputFormat,
+    dateBasis: profile.dateBasis,
+    requiresAccountCurrent: profile.requiresAccountCurrent,
+    isActive: profile.isActive,
+    requiredTabsJson: profile.requiredTabsJson,
+    requiredColumnsJson: profile.requiredColumnsJson,
+    mappingRulesJson: profile.mappingRulesJson,
+    staticValuesJson: profile.staticValuesJson,
+    validationRulesJson: profile.validationRulesJson,
+    includedTransactionTypesJson: profile.includedTransactionTypesJson,
+    notes: profile.notes,
+  }
+}
+
+function setupBadgeColors(status: string) {
+  if (status === 'Configured') return { background: '#f0fdf4', color: '#166534', border: '#bbf7d0' }
+  if (status === 'Default') return { background: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }
+  if (status === 'Missing') return { background: '#fffbeb', color: '#92400e', border: '#fde68a' }
+  return { background: 'var(--surface-2)', color: 'var(--ink-3)', border: 'var(--line)' }
+}
+
+function SetupBadge({ status }: { status: string }) {
+  const colors = setupBadgeColors(status)
+  return (
+    <span style={{
+      border: `1px solid ${colors.border}`,
+      borderRadius: 6,
+      background: colors.background,
+      color: colors.color,
+      padding: '2px 6px',
+      fontSize: 10.5,
+      fontWeight: 750,
+      lineHeight: 1.2,
+    }}>
+      {status}
+    </span>
+  )
+}
+
+function SetupItemList({ title, items }: { title: string; items: BordereauxProfileSetupItem[] }) {
+  return (
+    <div style={setupGroupStyle}>
+      <div style={setupGroupTitle}>{title}</div>
+      <div style={{ display: 'grid', gap: 7 }}>
+        {items.map((item) => (
+          <div key={item.key} style={setupRowStyle}>
+            <span style={{ color: 'var(--ink)', fontSize: 12.5, fontWeight: 650 }}>{item.label}</span>
+            <SetupBadge status={item.status} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ProfileSetupPanel({
+  profile,
+  isSaving,
+  onSave,
+}: {
+  profile: BordereauxProfile
+  isSaving: boolean
+  onSave: (profile: BordereauxProfile) => void
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [selectedTabs, setSelectedTabs] = useState<Set<string>>(new Set())
+  const [staticForm, setStaticForm] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setSelectedTabs(new Set(parseStringArray(profile.requiredTabsJson).map((tab) => tab.toLowerCase())))
+    const staticValues = parseStringRecord(profile.staticValuesJson)
+    setStaticForm(Object.fromEntries(profile.setupStatus.staticValues.map((item) => [item.key, staticValues[item.key] ?? ''])))
+    setIsEditing(false)
+  }, [profile.id, profile.requiredTabsJson, profile.staticValuesJson, profile.setupStatus.staticValues])
+
+  function toggleTab(tab: string) {
+    const key = tab.toLowerCase()
+    setSelectedTabs((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function saveSetup() {
+    const knownTabs = new Set(profile.setupStatus.requiredTabs.map((item) => item.key.toLowerCase()))
+    const existingTabs = parseStringArray(profile.requiredTabsJson)
+    const otherTabs = existingTabs.filter((tab) => !knownTabs.has(tab.toLowerCase()))
+    const requiredTabs = [
+      ...otherTabs,
+      ...profile.setupStatus.requiredTabs.filter((item) => selectedTabs.has(item.key.toLowerCase())).map((item) => item.key),
+    ]
+
+    const staticValues = parseStringRecord(profile.staticValuesJson)
+    profile.setupStatus.staticValues.forEach((item) => {
+      const value = staticForm[item.key]?.trim() ?? ''
+      if (value) staticValues[item.key] = value
+      else delete staticValues[item.key]
+    })
+
+    onSave({
+      ...profile,
+      requiredTabsJson: JSON.stringify(requiredTabs),
+      staticValuesJson: JSON.stringify(staticValues),
+    })
+  }
+
+  const hasIssues = !profile.setupStatus.isReadyForExport
+
+  return (
+    <section style={section}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {hasIssues ? <AlertTriangle size={16} color="#92400e" /> : <CheckCircle2 size={16} color="#166534" />}
+          <div>
+            <div style={sectionTitle}>Profile Setup</div>
+            <div style={{ marginTop: 2, color: hasIssues ? '#92400e' : '#166534', fontSize: 12, fontWeight: 700 }}>
+              {hasIssues ? `${profile.setupStatus.missingItems} missing setup item${profile.setupStatus.missingItems === 1 ? '' : 's'}` : 'Ready for export'}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {isEditing && (
+            <button type="button" className="sd-btn outline" disabled={isSaving} onClick={() => setIsEditing(false)}>
+              <X size={14} />
+              Cancel
+            </button>
+          )}
+          <button
+            type="button"
+            className={isEditing ? 'sd-btn primary' : 'sd-btn outline'}
+            disabled={isSaving}
+            onClick={() => (isEditing ? saveSetup() : setIsEditing(true))}
+          >
+            {isEditing ? <Save size={14} /> : <Settings2 size={14} />}
+            {isEditing ? 'Save Setup' : 'Edit Setup'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+        <div style={setupGroupStyle}>
+          <div style={setupGroupTitle}>Required Tabs</div>
+          <div style={{ display: 'grid', gap: 7 }}>
+            {profile.setupStatus.requiredTabs.map((item) => (
+              <label key={item.key} style={setupRowStyle}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  {isEditing && (
+                    <input
+                      type="checkbox"
+                      checked={selectedTabs.has(item.key.toLowerCase())}
+                      onChange={() => toggleTab(item.key)}
+                    />
+                  )}
+                  <span style={{ color: 'var(--ink)', fontSize: 12.5, fontWeight: 650 }}>{item.label}</span>
+                </span>
+                <SetupBadge status={selectedTabs.has(item.key.toLowerCase()) ? 'Configured' : 'Missing'} />
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={setupGroupStyle}>
+          <div style={setupGroupTitle}>Static Values</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {profile.setupStatus.staticValues.map((item) => (
+              <div key={item.key} style={{ display: 'grid', gap: 5 }}>
+                <div style={setupRowStyle}>
+                  <span style={{ color: 'var(--ink)', fontSize: 12.5, fontWeight: 650 }}>{item.label}</span>
+                  <SetupBadge status={item.status} />
+                </div>
+                {isEditing ? (
+                  <input
+                    value={staticForm[item.key] ?? ''}
+                    placeholder={item.defaultValue ?? ''}
+                    onChange={(event) => setStaticForm((form) => ({ ...form, [item.key]: event.target.value }))}
+                    style={inputStyle}
+                  />
+                ) : (
+                  <div style={{ color: 'var(--ink-3)', fontSize: 12, overflowWrap: 'anywhere' }}>
+                    {item.value ?? item.defaultValue ?? '-'}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <SetupItemList title="Required Columns" items={profile.setupStatus.requiredColumns} />
+        <SetupItemList title="Mapping Rules" items={profile.setupStatus.mappingRules} />
+      </div>
+    </section>
+  )
 }
 
 function ValidationPanel({ run }: { run: BordereauxRun }) {
@@ -366,6 +599,16 @@ export function BordereauxWorkbenchPage() {
     onError: () => toast.error('Could not get the download link'),
   })
 
+  const updateProfile = useMutation({
+    mutationFn: (profile: BordereauxProfile) => updateBordereauxProfile(profile.id, profileToRequest(profile)),
+    onSuccess: (updated) => {
+      toast.success('BDX profile setup saved')
+      queryClient.setQueryData(['bordereaux', 'profiles'], (current: BordereauxProfile[] | undefined) =>
+        current?.map((profile) => (profile.id === updated.id ? updated : profile)) ?? [updated])
+    },
+    onError: () => toast.error('Could not save BDX profile setup'),
+  })
+
   const selectedProfile = premiumProfiles.find((profile) => profile.id === profileId)
   const selectedRun = selectedRunQuery.data
   const rows = previewQuery.data?.rows ?? []
@@ -415,6 +658,14 @@ export function BordereauxWorkbenchPage() {
           </div>
         )}
       </section>
+
+      {selectedProfile && (
+        <ProfileSetupPanel
+          profile={selectedProfile}
+          isSaving={updateProfile.isPending}
+          onSave={(profile) => updateProfile.mutate(profile)}
+        />
+      )}
 
       <section style={section}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
@@ -593,6 +844,27 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--ink)',
   padding: '0 10px',
   fontSize: 12.5,
+}
+
+const setupGroupStyle: React.CSSProperties = {
+  borderTop: '1px solid var(--line-2)',
+  paddingTop: 10,
+}
+
+const setupGroupTitle: React.CSSProperties = {
+  color: 'var(--ink-3)',
+  fontSize: 11,
+  fontWeight: 800,
+  marginBottom: 8,
+  textTransform: 'uppercase',
+}
+
+const setupRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  minHeight: 24,
 }
 
 const th: React.CSSProperties = {

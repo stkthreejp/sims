@@ -23,7 +23,23 @@ public record BordereauxProfileDto(
     string StaticValuesJson,
     string ValidationRulesJson,
     string IncludedTransactionTypesJson,
-    string? Notes);
+    string? Notes,
+    BordereauxProfileSetupStatusDto SetupStatus);
+
+public record BordereauxProfileSetupStatusDto(
+    bool IsReadyForExport,
+    int MissingItems,
+    IReadOnlyList<BordereauxProfileSetupItemDto> RequiredTabs,
+    IReadOnlyList<BordereauxProfileSetupItemDto> RequiredColumns,
+    IReadOnlyList<BordereauxProfileSetupItemDto> StaticValues,
+    IReadOnlyList<BordereauxProfileSetupItemDto> MappingRules);
+
+public record BordereauxProfileSetupItemDto(
+    string Key,
+    string Label,
+    string Status,
+    string? Value,
+    string? DefaultValue);
 
 public record UpsertBordereauxProfileRequest(
     string Name,

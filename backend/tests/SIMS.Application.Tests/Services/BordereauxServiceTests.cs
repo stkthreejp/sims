@@ -130,6 +130,49 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task CreateProfileAsync_FlagsMissingBdxSetupItems()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            RequiredTabsJson = """["General Liability (Section 1)"]""",
+            RequiredColumnsJson = """["Certificate Ref"]""",
+            MappingRulesJson = "{}",
+            StaticValuesJson = "{}",
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.SetupStatus.IsReadyForExport);
+        Assert.Contains(result.Value.SetupStatus.RequiredTabs, item => item.Key == "Acct Current" && item.Status == "Missing");
+        Assert.Contains(result.Value.SetupStatus.RequiredColumns, item => item.Key == "Gross premium paid this time" && item.Status == "Missing");
+        Assert.Contains(result.Value.SetupStatus.MappingRules, item => item.Key == "commissionBasis" && item.Status == "Missing");
+        Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "umr" && item.Status == "Missing");
+        Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "coverholderName" && item.Status == "Default");
+    }
+
+    [Fact]
+    public async Task CreateProfileAsync_ReportsConfiguredBdxSetupItems()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            StaticValuesJson = """{"umr":"BRACE-SMM-2025-LOGGING","yearOfAccount":"2025","coverholderPin":"USA00060"}""",
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.SetupStatus.IsReadyForExport);
+        Assert.Equal(0, result.Value.SetupStatus.MissingItems);
+        Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "yearOfAccount" && item.Status == "Configured" && item.Value == "2025");
+        Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "coverholderName" && item.Status == "Default");
+    }
+
+    [Fact]
     public async Task GetPremiumPreviewAsync_IncludesLateProcessedEndorsementInBillingMonth()
     {
         await using var db = CreateDb();

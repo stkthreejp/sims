@@ -20,6 +20,45 @@ export interface BordereauxProfile {
   validationRulesJson: string
   includedTransactionTypesJson: string
   notes: string | null
+  setupStatus: BordereauxProfileSetupStatus
+}
+
+export interface BordereauxProfileSetupStatus {
+  isReadyForExport: boolean
+  missingItems: number
+  requiredTabs: BordereauxProfileSetupItem[]
+  requiredColumns: BordereauxProfileSetupItem[]
+  staticValues: BordereauxProfileSetupItem[]
+  mappingRules: BordereauxProfileSetupItem[]
+}
+
+export interface BordereauxProfileSetupItem {
+  key: string
+  label: string
+  status: 'Configured' | 'Default' | 'Missing' | string
+  value: string | null
+  defaultValue: string | null
+}
+
+export interface UpsertBordereauxProfileRequest {
+  name: string
+  programConfigurationId: string
+  carrierId: string
+  lineOfBusiness: string | null
+  stateCode: string | null
+  reportType: string
+  frequency: string
+  outputFormat: string
+  dateBasis: string
+  requiresAccountCurrent: boolean
+  isActive: boolean
+  requiredTabsJson: string
+  requiredColumnsJson: string
+  mappingRulesJson: string
+  staticValuesJson: string
+  validationRulesJson: string
+  includedTransactionTypesJson: string
+  notes: string | null
 }
 
 export interface BordereauxPremiumPreviewRow {

@@ -4,12 +4,19 @@ import type {
   BordereauxProfile,
   BordereauxRun,
   ReconcileBordereauxRunRequest,
+  UpsertBordereauxProfileRequest,
 } from '@/types/bordereaux.types'
 
 const BASE = '/admin/bordereaux-profiles'
 
 export const getBordereauxProfiles = (): Promise<BordereauxProfile[]> =>
   apiClient.get<BordereauxProfile[]>(BASE).then((r) => r.data)
+
+export const updateBordereauxProfile = (
+  profileId: string,
+  request: UpsertBordereauxProfileRequest,
+): Promise<BordereauxProfile> =>
+  apiClient.put<BordereauxProfile>(`${BASE}/${profileId}`, request).then((r) => r.data)
 
 export const getBordereauxPremiumPreview = (
   profileId: string,
