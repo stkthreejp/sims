@@ -9,8 +9,16 @@ import type {
 
 const BASE = '/admin/bordereaux-profiles'
 
-export const getBordereauxProfiles = (): Promise<BordereauxProfile[]> =>
-  apiClient.get<BordereauxProfile[]>(BASE).then((r) => r.data)
+export interface BordereauxProfileQuery {
+  includeInactive?: boolean
+  programId?: string
+  carrierId?: string
+  reportType?: string
+  outputFormat?: string
+}
+
+export const getBordereauxProfiles = (params?: BordereauxProfileQuery): Promise<BordereauxProfile[]> =>
+  apiClient.get<BordereauxProfile[]>(BASE, { params }).then((r) => r.data)
 
 export const updateBordereauxProfile = (
   profileId: string,

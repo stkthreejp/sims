@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, Phone, Mail,
   Star, UserCircle, Globe, MapPin, Percent, BanknoteIcon, ShieldCheck,
+  FileSpreadsheet, AlertTriangle, CheckCircle2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
@@ -23,7 +24,16 @@ import {
   createCarrierCommission,
   disableCarrierCommission,
 } from '@/api/carrierCommissions.api'
+import {
+  getBordereauxProfiles,
+  updateBordereauxProfile,
+} from '@/api/bordereaux.api'
 import type { CarrierCommission } from '@/types/carrierCommission.types'
+import type { BordereauxProfile } from '@/types/bordereaux.types'
+import {
+  BordereauxProfileSetupPanel,
+  bordereauxProfileToRequest,
+} from '@/components/bordereaux/BordereauxProfileSetupPanel'
 import { ratingApi } from '@/api/rating.api'
 import type { CarrierRatingAssignment, RatingPlanVersionPicker } from '@/types/rating.types'
 import { carrierAdditionalInterestRatesApi } from '@/api/carrierAdditionalInterestRates.api'
@@ -153,6 +163,15 @@ function LobCheckboxes({ selected, onChange }: { selected: PolicyLineOfBusiness[
   )
 }
 
+function bordereauxProfileLabel(profile: BordereauxProfile) {
+  const scope = [
+    profile.programName,
+    profile.lineOfBusiness ? LOB_LABELS[profile.lineOfBusiness as PolicyLineOfBusiness] ?? profile.lineOfBusiness : null,
+    profile.stateCode,
+  ].filter(Boolean).join(' / ')
+  return scope ? `${profile.name} (${scope})` : profile.name
+}
+
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
 type InfoFormData = {
@@ -227,6 +246,7 @@ export function CarrierDetailPage() {
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
   const [ratingForm, setRatingForm] = useState<{ programConfigurationId: string; lineOfBusiness: PolicyLineOfBusiness | ''; ratingPlanVersionId: string }>({ programConfigurationId: '', lineOfBusiness: '', ratingPlanVersionId: '' })
   const [ratingPickerLob, setRatingPickerLob] = useState<PolicyLineOfBusiness | null>(null)
+  const [selectedBordereauxProfileId, setSelectedBordereauxProfileId] = useState('')
 
   const { data: carrier, isLoading } = useQuery({
     queryKey: ['carriers', id],
@@ -245,11 +265,27 @@ export function CarrierDetailPage() {
     queryFn: () => programConfigurationsApi.getAll(false),
   })
 
+  const { data: bordereauxProfiles = [] } = useQuery({
+    queryKey: ['bordereaux', 'profiles', 'carrier', id],
+    queryFn: () => getBordereauxProfiles({ includeInactive: true, carrierId: id!, reportType: 'Premium' }),
+    enabled: !!id,
+  })
+
   const { data: additionalInterestRates = [] } = useQuery<CarrierAdditionalInterestRate[]>({
     queryKey: ['carrier-additional-interest-rates', id],
     queryFn: () => carrierAdditionalInterestRatesApi.getAll(id!),
     enabled: !!id,
   })
+
+  useEffect(() => {
+    if (bordereauxProfiles.length === 0) {
+      if (selectedBordereauxProfileId) setSelectedBordereauxProfileId('')
+      return
+    }
+    if (!selectedBordereauxProfileId || !bordereauxProfiles.some((profile) => profile.id === selectedBordereauxProfileId)) {
+      setSelectedBordereauxProfileId(bordereauxProfiles[0].id)
+    }
+  }, [bordereauxProfiles, selectedBordereauxProfileId])
 
   const addCommissionMutation = useMutation({
     mutationFn: () => createCarrierCommission(id!, {
@@ -318,6 +354,17 @@ export function CarrierDetailPage() {
   })
 
   // ─── Rating plan queries + mutations ────────────────────────────────────────
+
+  const updateBordereauxProfileMutation = useMutation({
+    mutationFn: (profile: BordereauxProfile) => updateBordereauxProfile(profile.id, bordereauxProfileToRequest(profile)),
+    onSuccess: (updated) => {
+      toast.success('BDX profile setup saved')
+      qc.setQueryData(['bordereaux', 'profiles', 'carrier', id], (current: BordereauxProfile[] | undefined) =>
+        current?.map((profile) => (profile.id === updated.id ? updated : profile)) ?? [updated])
+      qc.invalidateQueries({ queryKey: ['bordereaux', 'profiles'] })
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Could not save BDX profile setup'),
+  })
 
   const { data: ratingAssignments = [] } = useQuery({
     queryKey: ['carrier-rating-assignments', id],
@@ -528,6 +575,11 @@ export function CarrierDetailPage() {
         .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
         .map((lob) => lob.lineOfBusiness)))
     : carrier.linesOfBusiness
+  const bordereauxLobOptions = Array.from(new Set([
+    ...carrier.linesOfBusiness,
+    ...bordereauxProfiles.map((profile) => profile.lineOfBusiness).filter((lob): lob is PolicyLineOfBusiness => Boolean(lob)),
+  ])).map((lob) => ({ value: lob, label: LOB_LABELS[lob] ?? lob }))
+  const selectedBordereauxProfile = bordereauxProfiles.find((profile) => profile.id === selectedBordereauxProfileId)
 
   return (
     <div className="space-y-5">
@@ -697,6 +749,82 @@ export function CarrierDetailPage() {
 
       {/* Documents */}
       <DocumentsSection entityType="Carrier" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
+
+      {/* Bordereaux Profiles */}
+      <div className="sd-card p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4 text-slate-400" />
+            Bordereaux Profiles
+          </h2>
+          {bordereauxProfiles.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>{bordereauxProfiles.length} profile{bordereauxProfiles.length === 1 ? '' : 's'}</span>
+              <span>·</span>
+              <span>{bordereauxProfiles.filter((profile) => !profile.setupStatus.isReadyForExport).length} need setup</span>
+            </div>
+          )}
+        </div>
+
+        {bordereauxProfiles.length === 0 ? (
+          <EmptyState
+            icon={FileSpreadsheet}
+            title="No BDX profiles for this carrier"
+            description="Create profiles from the BDX foundation setup, then maintain carrier-specific tabs and London values here."
+          />
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
+            <div className="grid gap-2">
+              {bordereauxProfiles.map((profile) => {
+                const selected = profile.id === selectedBordereauxProfileId
+                const ready = profile.setupStatus.isReadyForExport
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => setSelectedBordereauxProfileId(profile.id)}
+                    className={`rounded-lg border p-3 text-left transition ${selected ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-800">{profile.name}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {[profile.programName, profile.lineOfBusiness ? LOB_LABELS[profile.lineOfBusiness as PolicyLineOfBusiness] ?? profile.lineOfBusiness : null, profile.stateCode]
+                            .filter(Boolean)
+                            .join(' / ')}
+                        </div>
+                      </div>
+                      {ready ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />}
+                    </div>
+                    <div className={`mt-2 text-xs font-semibold ${ready ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {ready ? 'Ready for export' : `${profile.setupStatus.missingItems} missing setup item${profile.setupStatus.missingItems === 1 ? '' : 's'}`}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              {selectedBordereauxProfile && (
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">{bordereauxProfileLabel(selectedBordereauxProfile)}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {selectedBordereauxProfile.requiresAccountCurrent ? 'London BDX and Account Current' : 'London BDX'}
+                    </div>
+                  </div>
+                  <BordereauxProfileSetupPanel
+                    profile={selectedBordereauxProfile}
+                    isSaving={updateBordereauxProfileMutation.isPending}
+                    lineOfBusinessOptions={bordereauxLobOptions}
+                    onSave={(profile) => updateBordereauxProfileMutation.mutate(profile)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Commission Schedules */}
       <div className="sd-card p-5 space-y-4">
