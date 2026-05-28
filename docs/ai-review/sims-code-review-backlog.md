@@ -10,7 +10,7 @@ Last updated on 2026-05-28 during targeted auth/security re-audit.
 
 - Scope: commits `5315244`, `93fbf25`, and `4f0cc2a`, plus nearby access-control surfaces affected by the hardening work.
 - Result: original quote/submission, party CRUD, party attachment, legal source, user list/detail, and frontend permission-gate fixes still look directionally sound from static review and targeted tests.
-- New residual findings: legacy policy attachment routes and quote/policy note routes still bypass action-level backend permissions. Added as P2 authorization backlog items below.
+- Follow-up: legacy policy attachment routes and quote/policy note routes were remediated on 2026-05-28 with backend action policies, policy-to-bound-quote attachment resolution, and focused controller tests.
 - Audit artifacts: scan notes were generated under ignored workspace diagnostics at `temp/codex-security-scans/SIMS/4f0cc2a_20260528-063707/`.
 
 ## P0 Immediate Security / Secret Response
@@ -82,16 +82,16 @@ Last updated on 2026-05-28 during targeted auth/security re-audit.
 
 ### Legacy policy attachment routes bypass action-level attachment permissions
 
-- Status: New from 2026-05-28 targeted auth/security re-audit.
+- Status: Remediated on 2026-05-28. Legacy policy attachment routes now require backend action policies, resolve policy ids to bound quote ids, and reject download/delete requests for attachments outside the requested policy context.
 - Evidence: `backend/src/SIMS.API/Controllers/PoliciesController.cs` legacy attachment methods; `backend/src/SIMS.Application/Services/AttachmentService.cs` `GetDownloadUrlAsync` and `DeleteAsync`.
 - Risk: legacy `/api/v1/policies/{id}/attachments...` endpoints rely on class-level authentication and object-scope checks, while the hardened attachment controller requires explicit view/upload/delete policies.
 - Impact: an authenticated user with object access can list, upload, download, or delete attachments without the action-level attachment permission expected by the newer route family.
 - Fix: add explicit policies to the legacy policy attachment routes, normalize policy ids to bound quote ids, and ensure download/delete belong to the requested policy context.
-- Verification: controller policy tests cover policy attachment list/upload/download/delete; role tests assert object-scoped users without attachment action permissions receive `403`.
+- Verification: controller policy tests cover policy attachment list/upload/download/delete; focused controller tests assert policy attachment routes use bound quote ids and do not download/delete attachments outside the requested policy.
 
 ### Quote and policy note routes bypass action-level note permissions
 
-- Status: New from 2026-05-28 targeted auth/security re-audit.
+- Status: Remediated on 2026-05-28. Quote and policy note routes now require backend read/create/edit/delete note policies aligned with the existing permission model.
 - Evidence: `backend/src/SIMS.API/Controllers/NotesController.cs`; `backend/src/SIMS.API/Controllers/PoliciesController.cs` note methods; `backend/src/SIMS.Application/Services/NoteService.cs`.
 - Risk: note routes rely on class-level authentication and quote object-scope checks, but do not require `policies.view`, `policies.notes.create`, `policies.notes.edit`, or `policies.notes.delete`.
 - Impact: an authenticated user with object access can read, create, edit, pin, or delete notes despite lacking the matching note action permission.
@@ -309,7 +309,7 @@ Last updated on 2026-05-28 during targeted auth/security re-audit.
 ## Recommended Fix Order
 
 1. Done: rotate and remove the hardcoded database credential.
-2. Continue auth/security: close residual policy attachment and quote/policy note action-permission gaps.
+2. Done: close residual policy attachment and quote/policy note action-permission gaps.
 3. Fix financial atomicity and ledger reversal behavior.
 4. Fix endorsement invoicing, mixed-payee disbursements, policy-number bind date, and London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.

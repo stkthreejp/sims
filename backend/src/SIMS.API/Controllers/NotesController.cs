@@ -1,5 +1,6 @@
 using SIMS.Application.DTOs.Notes;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -19,10 +20,12 @@ public class NotesController : ControllerBase
     private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
 
     [HttpGet]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public async Task<IActionResult> GetAll(Guid quoteId)
         => Ok(await _noteService.GetByQuoteAsync(quoteId, CurrentAccess));
 
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public async Task<IActionResult> GetById(Guid quoteId, Guid id)
     {
         var result = await _noteService.GetByIdAsync(quoteId, id, CurrentAccess);
@@ -30,6 +33,7 @@ public class NotesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AppPermissions.NotesCreate)]
     public async Task<IActionResult> Create(Guid quoteId, [FromBody] NoteCreateDto dto)
     {
         var result = await _noteService.CreateAsync(quoteId, dto, CurrentAccess);
@@ -38,6 +42,7 @@ public class NotesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPermissions.NotesEdit)]
     public async Task<IActionResult> Update(Guid quoteId, Guid id, [FromBody] NoteUpdateDto dto)
     {
         var result = await _noteService.UpdateAsync(quoteId, id, dto, CurrentAccess);
@@ -45,6 +50,7 @@ public class NotesController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPermissions.NotesDelete)]
     public async Task<IActionResult> Delete(Guid quoteId, Guid id)
     {
         var result = await _noteService.DeleteAsync(quoteId, id, CurrentAccess);
@@ -52,6 +58,7 @@ public class NotesController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/pin")]
+    [Authorize(Policy = AppPermissions.NotesEdit)]
     public async Task<IActionResult> TogglePin(Guid quoteId, Guid id)
     {
         var result = await _noteService.TogglePinAsync(quoteId, id, CurrentAccess);

@@ -47,31 +47,31 @@ public class AttachmentsController : ControllerBase
     // ── Upload ────────────────────────────────────────────────────────────────
 
     [HttpPost("api/v1/submissions/{entityId:guid}/attachments")]
-    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [Authorize(Policy = AppPermissions.AttachmentsUpload)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadSubmission(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Submission, entityId, file, documentType, description, null);
 
     [HttpPost("api/v1/quotes/{entityId:guid}/attachments")]
-    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [Authorize(Policy = AppPermissions.AttachmentsUpload)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadQuote(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description, [FromForm] Guid? policyTransactionId)
         => Upload(DocumentEntityType.Policy, entityId, file, documentType, description, policyTransactionId);
 
     [HttpPost("api/v1/carriers/{entityId:guid}/attachments")]
-    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [Authorize(Policy = AppPermissions.AttachmentsUpload)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadCarrier(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Carrier, entityId, file, documentType, description, null);
 
     [HttpPost("api/v1/agents/{entityId:guid}/attachments")]
-    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [Authorize(Policy = AppPermissions.AttachmentsUpload)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadAgent(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Agent, entityId, file, documentType, description, null);
 
     [HttpPost("api/v1/insureds/{entityId:guid}/attachments")]
-    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [Authorize(Policy = AppPermissions.AttachmentsUpload)]
     [RequestSizeLimit(52_428_800)]
     public Task<IActionResult> UploadInsured(Guid entityId, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
         => Upload(DocumentEntityType.Insured, entityId, file, documentType, description, null);
@@ -95,7 +95,7 @@ public class AttachmentsController : ControllerBase
     // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpDelete("api/v1/attachments/{id:guid}")]
-    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    [Authorize(Policy = AppPermissions.AttachmentsDelete)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _attachmentService.DeleteAsync(id, CurrentUserId);

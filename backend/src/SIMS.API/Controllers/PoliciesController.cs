@@ -252,6 +252,7 @@ public class PoliciesController : ControllerBase
     // --- Notes (delegate to NoteService using the bound quote ID) ---
 
     [HttpGet("{id:guid}/notes")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public async Task<IActionResult> GetNotes(Guid id)
     {
         var policy = await _policies.GetByIdAsync(id, CurrentAccess);
@@ -260,6 +261,7 @@ public class PoliciesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/notes")]
+    [Authorize(Policy = AppPermissions.NotesCreate)]
     public async Task<IActionResult> CreateNote(Guid id, [FromBody] NoteCreateDto dto)
     {
         var policy = await _policies.GetByIdAsync(id, CurrentAccess);
@@ -269,6 +271,7 @@ public class PoliciesController : ControllerBase
     }
 
     [HttpPut("{id:guid}/notes/{noteId:guid}")]
+    [Authorize(Policy = AppPermissions.NotesEdit)]
     public async Task<IActionResult> UpdateNote(Guid id, Guid noteId, [FromBody] NoteUpdateDto dto)
     {
         var policy = await _policies.GetByIdAsync(id, CurrentAccess);
@@ -278,6 +281,7 @@ public class PoliciesController : ControllerBase
     }
 
     [HttpDelete("{id:guid}/notes/{noteId:guid}")]
+    [Authorize(Policy = AppPermissions.NotesDelete)]
     public async Task<IActionResult> DeleteNote(Guid id, Guid noteId)
     {
         var policy = await _policies.GetByIdAsync(id, CurrentAccess);
@@ -287,6 +291,7 @@ public class PoliciesController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/notes/{noteId:guid}/pin")]
+    [Authorize(Policy = AppPermissions.NotesEdit)]
     public async Task<IActionResult> TogglePinNote(Guid id, Guid noteId)
     {
         var policy = await _policies.GetByIdAsync(id, CurrentAccess);
@@ -298,33 +303,69 @@ public class PoliciesController : ControllerBase
     // --- Attachments ---
 
     [HttpGet("{id:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public async Task<IActionResult> GetAttachments(Guid id)
-        => Ok(await _attachments.GetByEntityAsync(DocumentEntityType.Policy, id, CurrentUserId));
+    {
+        var quoteId = await ResolveBoundQuoteIdAsync(id);
+        if (!quoteId.IsSuccess) return NotFound(new { quoteId.ErrorCode, quoteId.ErrorMessage });
+
+        return Ok(await _attachments.GetByEntityAsync(DocumentEntityType.Policy, quoteId.Value, CurrentUserId));
+    }
 
     [HttpPost("{id:guid}/attachments")]
+    [Authorize(Policy = AppPermissions.AttachmentsUpload)]
     public async Task<IActionResult> UploadAttachment(
         Guid id, IFormFile file, [FromForm] DocumentType documentType, [FromForm] string? description)
     {
-        var result = await _attachments.UploadAsync(DocumentEntityType.Policy, id, file, documentType, description, CurrentUserId);
+        var quoteId = await ResolveBoundQuoteIdAsync(id);
+        if (!quoteId.IsSuccess) return NotFound(new { quoteId.ErrorCode, quoteId.ErrorMessage });
+
+        var result = await _attachments.UploadAsync(DocumentEntityType.Policy, quoteId.Value, file, documentType, description, CurrentUserId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpGet("{id:guid}/attachments/{attachmentId:guid}/download")]
+    [Authorize(Policy = AppPermissions.PoliciesView)]
     public async Task<IActionResult> DownloadAttachment(Guid id, Guid attachmentId)
     {
+        var quoteId = await ResolveBoundQuoteIdAsync(id);
+        if (!quoteId.IsSuccess) return NotFound(new { quoteId.ErrorCode, quoteId.ErrorMessage });
+        if (!await AttachmentBelongsToBoundQuoteAsync(quoteId.Value, attachmentId))
+            return NotFound(new { ErrorCode = "NOT_FOUND", ErrorMessage = "Attachment not found." });
+
         var result = await _attachments.GetDownloadUrlAsync(attachmentId, CurrentUserId);
         if (!result.IsSuccess) return result.ErrorCode == "ATTACHMENT_ACCESS_DENIED" ? Forbid() : NotFound();
         return Redirect(result.Value!);
     }
 
     [HttpDelete("{id:guid}/attachments/{attachmentId:guid}")]
+    [Authorize(Policy = AppPermissions.AttachmentsDelete)]
     public async Task<IActionResult> DeleteAttachment(Guid id, Guid attachmentId)
     {
+        var quoteId = await ResolveBoundQuoteIdAsync(id);
+        if (!quoteId.IsSuccess) return NotFound(new { quoteId.ErrorCode, quoteId.ErrorMessage });
+        if (!await AttachmentBelongsToBoundQuoteAsync(quoteId.Value, attachmentId))
+            return NotFound(new { ErrorCode = "NOT_FOUND", ErrorMessage = "Attachment not found." });
+
         var result = await _attachments.DeleteAsync(attachmentId, CurrentUserId);
         return result.IsSuccess
             ? NoContent()
             : result.ErrorCode == "ATTACHMENT_ACCESS_DENIED"
                 ? Forbid()
                 : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    private async Task<Result<Guid>> ResolveBoundQuoteIdAsync(Guid policyId)
+    {
+        var policy = await _policies.GetByIdAsync(policyId, CurrentAccess);
+        return policy.IsSuccess && policy.Value is not null
+            ? Result<Guid>.Success(policy.Value.BoundQuoteId)
+            : Result<Guid>.Failure(policy.ErrorCode ?? "NOT_FOUND", policy.ErrorMessage ?? "Policy not found.");
+    }
+
+    private async Task<bool> AttachmentBelongsToBoundQuoteAsync(Guid boundQuoteId, Guid attachmentId)
+    {
+        var attachments = await _attachments.GetByEntityAsync(DocumentEntityType.Policy, boundQuoteId, CurrentUserId);
+        return attachments.Any(a => a.Id == attachmentId);
     }
 }

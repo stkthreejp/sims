@@ -61,6 +61,50 @@ public class AuthHardeningControllerTests
     }
 
     [Theory]
+    [InlineData(nameof(AttachmentsController.UploadSubmission))]
+    [InlineData(nameof(AttachmentsController.UploadQuote))]
+    [InlineData(nameof(AttachmentsController.UploadCarrier))]
+    [InlineData(nameof(AttachmentsController.UploadAgent))]
+    [InlineData(nameof(AttachmentsController.UploadInsured))]
+    public void AttachmentUploadEndpoints_RequireAttachmentUploadPermission(string methodName)
+    {
+        Assert.Equal(AppPermissions.AttachmentsUpload, GetMethodPolicy(typeof(AttachmentsController), methodName));
+    }
+
+    [Fact]
+    public void AttachmentDeleteEndpoint_RequiresAttachmentDeletePermission()
+    {
+        Assert.Equal(AppPermissions.AttachmentsDelete, GetMethodPolicy(typeof(AttachmentsController), nameof(AttachmentsController.Delete)));
+    }
+
+    [Theory]
+    [InlineData(nameof(PoliciesController.GetAttachments), AppPermissions.PoliciesView)]
+    [InlineData(nameof(PoliciesController.UploadAttachment), AppPermissions.AttachmentsUpload)]
+    [InlineData(nameof(PoliciesController.DownloadAttachment), AppPermissions.PoliciesView)]
+    [InlineData(nameof(PoliciesController.DeleteAttachment), AppPermissions.AttachmentsDelete)]
+    public void LegacyPolicyAttachmentEndpoints_RequireExpectedPermission(string methodName, string expectedPolicy)
+    {
+        Assert.Equal(expectedPolicy, GetMethodPolicy(typeof(PoliciesController), methodName));
+    }
+
+    [Theory]
+    [InlineData(typeof(NotesController), nameof(NotesController.GetAll), AppPermissions.PoliciesView)]
+    [InlineData(typeof(NotesController), nameof(NotesController.GetById), AppPermissions.PoliciesView)]
+    [InlineData(typeof(NotesController), nameof(NotesController.Create), AppPermissions.NotesCreate)]
+    [InlineData(typeof(NotesController), nameof(NotesController.Update), AppPermissions.NotesEdit)]
+    [InlineData(typeof(NotesController), nameof(NotesController.TogglePin), AppPermissions.NotesEdit)]
+    [InlineData(typeof(NotesController), nameof(NotesController.Delete), AppPermissions.NotesDelete)]
+    [InlineData(typeof(PoliciesController), nameof(PoliciesController.GetNotes), AppPermissions.PoliciesView)]
+    [InlineData(typeof(PoliciesController), nameof(PoliciesController.CreateNote), AppPermissions.NotesCreate)]
+    [InlineData(typeof(PoliciesController), nameof(PoliciesController.UpdateNote), AppPermissions.NotesEdit)]
+    [InlineData(typeof(PoliciesController), nameof(PoliciesController.TogglePinNote), AppPermissions.NotesEdit)]
+    [InlineData(typeof(PoliciesController), nameof(PoliciesController.DeleteNote), AppPermissions.NotesDelete)]
+    public void NoteEndpoints_RequireExpectedPermission(Type controllerType, string methodName, string expectedPolicy)
+    {
+        Assert.Equal(expectedPolicy, GetMethodPolicy(controllerType, methodName));
+    }
+
+    [Theory]
     [InlineData(nameof(LegalRequirementsController.CreateSource))]
     [InlineData(nameof(LegalRequirementsController.UpdateSource))]
     [InlineData(nameof(LegalRequirementsController.ScanSource))]
