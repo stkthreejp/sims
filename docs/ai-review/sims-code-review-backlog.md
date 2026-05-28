@@ -2,12 +2,22 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-27 during auth-hardening follow-up.
+Last updated on 2026-05-28 during targeted auth/security re-audit.
+
+## Audit Checkpoints
+
+### 2026-05-28 targeted auth/security re-audit
+
+- Scope: commits `5315244`, `93fbf25`, and `4f0cc2a`, plus nearby access-control surfaces affected by the hardening work.
+- Result: original quote/submission, party CRUD, party attachment, legal source, user list/detail, and frontend permission-gate fixes still look directionally sound from static review and targeted tests.
+- New residual findings: legacy policy attachment routes and quote/policy note routes still bypass action-level backend permissions. Added as P2 authorization backlog items below.
+- Audit artifacts: scan notes were generated under ignored workspace diagnostics at `temp/codex-security-scans/SIMS/4f0cc2a_20260528-063707/`.
 
 ## P0 Immediate Security / Secret Response
 
 ### Hardcoded production-looking PostgreSQL credential
 
+- Status: Remediated on 2026-05-27. The literal connection string was removed from the EF design-time factory, and the database password was rotated by the operator.
 - Evidence: `backend/src/SIMS.Infrastructure/Data/DesignTimeDbContextFactory.cs` `DesignTimeDbContextFactory`.
 - Risk: repo access may expose a live database host, username, and password.
 - Impact: possible database compromise if the credential is still valid.
@@ -69,6 +79,24 @@ Last updated on 2026-05-27 during auth-hardening follow-up.
 - Impact: confusing 403s at best; possible data/action exposure where backend checks are incomplete.
 - Fix: add route-level permission wrappers aligned with `usePermissions` and sidebar gates.
 - Verification: low-privilege role cannot directly open `/billing/invoices` or `/admin/role-permissions`.
+
+### Legacy policy attachment routes bypass action-level attachment permissions
+
+- Status: New from 2026-05-28 targeted auth/security re-audit.
+- Evidence: `backend/src/SIMS.API/Controllers/PoliciesController.cs` legacy attachment methods; `backend/src/SIMS.Application/Services/AttachmentService.cs` `GetDownloadUrlAsync` and `DeleteAsync`.
+- Risk: legacy `/api/v1/policies/{id}/attachments...` endpoints rely on class-level authentication and object-scope checks, while the hardened attachment controller requires explicit view/upload/delete policies.
+- Impact: an authenticated user with object access can list, upload, download, or delete attachments without the action-level attachment permission expected by the newer route family.
+- Fix: add explicit policies to the legacy policy attachment routes, normalize policy ids to bound quote ids, and ensure download/delete belong to the requested policy context.
+- Verification: controller policy tests cover policy attachment list/upload/download/delete; role tests assert object-scoped users without attachment action permissions receive `403`.
+
+### Quote and policy note routes bypass action-level note permissions
+
+- Status: New from 2026-05-28 targeted auth/security re-audit.
+- Evidence: `backend/src/SIMS.API/Controllers/NotesController.cs`; `backend/src/SIMS.API/Controllers/PoliciesController.cs` note methods; `backend/src/SIMS.Application/Services/NoteService.cs`.
+- Risk: note routes rely on class-level authentication and quote object-scope checks, but do not require `policies.view`, `policies.notes.create`, `policies.notes.edit`, or `policies.notes.delete`.
+- Impact: an authenticated user with object access can read, create, edit, pin, or delete notes despite lacking the matching note action permission.
+- Fix: add `policies.view` to note reads, `policies.notes.create` to creates, `policies.notes.edit` to updates/pin toggles, and `policies.notes.delete` to deletes across quote and policy note routes.
+- Verification: controller policy tests cover `NotesController` and policy note methods; role tests assert object-scoped users without note action permissions receive `403`.
 
 ## P1 Financial / Data Integrity
 
@@ -280,8 +308,8 @@ Last updated on 2026-05-27 during auth-hardening follow-up.
 
 ## Recommended Fix Order
 
-1. Rotate and remove the hardcoded database credential.
-2. Lock down quote/submission write routes, party CRUD, attachment access, legal requirements, user list/details, and frontend route gates.
+1. Done: rotate and remove the hardcoded database credential.
+2. Continue auth/security: close residual policy attachment and quote/policy note action-permission gaps.
 3. Fix financial atomicity and ledger reversal behavior.
 4. Fix endorsement invoicing, mixed-payee disbursements, policy-number bind date, and London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.
