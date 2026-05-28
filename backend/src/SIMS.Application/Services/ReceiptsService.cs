@@ -48,6 +48,10 @@ public class ReceiptsService : IReceiptsService
             CreatedAt = DateTime.UtcNow
         };
 
+        await using var dbTransaction = db.Database.IsRelational() && db.Database.CurrentTransaction == null
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+
         db.Set<Receipt>().Add(receipt);
         await db.SaveChangesAsync(ct);
 
@@ -56,6 +60,9 @@ public class ReceiptsService : IReceiptsService
 
         receipt.LedgerTransactionId = txnId;
         await db.SaveChangesAsync(ct);
+
+        if (dbTransaction != null)
+            await dbTransaction.CommitAsync(ct);
 
         return Result<ReceiptDetailDto>.Success(await LoadDetailAsync(receipt.Id, ct));
     }

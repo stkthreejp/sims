@@ -92,6 +92,10 @@ public class CashApplicationService : ICashApplicationService
             return Result<ApplyCashResultDto>.Failure("EXCEEDS_RECEIPT",
                 $"Gross applied ({totalGrossApplied:F2}) exceeds receipt remaining balance ({remainingCapacity:F2})");
 
+        await using var dbTransaction = db.Database.IsRelational() && db.Database.CurrentTransaction == null
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+
         var newApplications = new List<CashApplication>();
 
         foreach (var line in req.Lines)
@@ -144,6 +148,9 @@ public class CashApplicationService : ICashApplicationService
                 await _dist.GenerateInstructionsForApplicationAsync(
                     app, invoices[app.InvoiceId], trustAccount.Id, userId, ct);
         }
+
+        if (dbTransaction != null)
+            await dbTransaction.CommitAsync(ct);
 
         // Reload for response
         var updatedReceipt = await db.Set<Receipt>()

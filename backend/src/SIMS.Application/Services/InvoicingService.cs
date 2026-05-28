@@ -134,6 +134,10 @@ public class InvoicingService : IInvoicingService
             }).ToList()
         };
 
+        await using var dbTransaction = db.Database.IsRelational() && db.Database.CurrentTransaction == null
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+
         db.Set<Invoice>().Add(invoice);
         await db.SaveChangesAsync(ct);
 
@@ -219,6 +223,9 @@ public class InvoicingService : IInvoicingService
 
             await db.SaveChangesAsync(ct);
         }
+
+        if (dbTransaction != null)
+            await dbTransaction.CommitAsync(ct);
 
         return Result<InvoiceDetailDto>.Success(await LoadDetailAsync(invoice.Id, ct));
     }

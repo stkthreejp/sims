@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-28 during P1 ledger reversal remediation.
+Last updated on 2026-05-28 during P1 financial posting atomicity remediation.
 
 ## Audit Checkpoints
 
@@ -18,6 +18,12 @@ Last updated on 2026-05-28 during P1 ledger reversal remediation.
 - Scope: `ApplicationDbContext` ledger immutability guard and `LedgerService.ReverseTransactionGroupAsync`.
 - Result: ledger rows remain immutable except for the specific posted-to-voided metadata transition required to link original rows to reversal rows.
 - Verification: focused ledger service regression tests cover successful reversal rows plus continued rejection of amount mutation.
+
+### 2026-05-28 P1 financial posting atomicity remediation
+
+- Scope: invoice bind/posting, receipt create/posting, and cash application/distribution instruction workflows.
+- Result: each workflow now opens a database transaction when it owns the unit of work and reuses any existing outer transaction when called from a larger bind/issue flow.
+- Verification: SQLite-backed rollback regression tests simulate ledger/distribution failures and assert no partial invoice, receipt, application, ledger, payable, or status changes remain.
 
 ## P0 Immediate Security / Secret Response
 
@@ -117,6 +123,7 @@ Last updated on 2026-05-28 during P1 ledger reversal remediation.
 
 ### Financial posting is not atomic
 
+- Status: Remediated on 2026-05-28. Invoice binding, receipt creation, and cash application now wrap ledger posting and related parent/payable/status updates in one database transaction when no outer transaction exists.
 - Evidence: `backend/src/SIMS.Application/Services/InvoicingService.cs`, `ReceiptsService.cs`, `CashApplicationService.cs`.
 - Risk: invoice/receipt/cash application rows, ledger rows, payables, and statuses are saved in separate steps without one explicit transaction.
 - Impact: failures can leave partial financial data, such as posted ledger rows without matching invoice/payable/application state.
@@ -317,7 +324,7 @@ Last updated on 2026-05-28 during P1 ledger reversal remediation.
 
 1. Done: rotate and remove the hardcoded database credential.
 2. Done: close residual policy attachment and quote/policy note action-permission gaps.
-3. Continue P1 financial/data integrity: fix financial atomicity; ledger reversal behavior is done.
+3. Done: fix ledger reversal behavior and financial posting atomicity.
 4. Fix endorsement invoicing, mixed-payee disbursements, policy-number bind date, and London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.
 6. Add soft-delete filters and nullable fallback uniqueness enforcement.
