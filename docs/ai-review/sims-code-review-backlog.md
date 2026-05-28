@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-28 during targeted auth/security re-audit.
+Last updated on 2026-05-28 during P1 ledger reversal remediation.
 
 ## Audit Checkpoints
 
@@ -12,6 +12,12 @@ Last updated on 2026-05-28 during targeted auth/security re-audit.
 - Result: original quote/submission, party CRUD, party attachment, legal source, user list/detail, and frontend permission-gate fixes still look directionally sound from static review and targeted tests.
 - Follow-up: legacy policy attachment routes and quote/policy note routes were remediated on 2026-05-28 with backend action policies, policy-to-bound-quote attachment resolution, and focused controller tests.
 - Audit artifacts: scan notes were generated under ignored workspace diagnostics at `temp/codex-security-scans/SIMS/4f0cc2a_20260528-063707/`.
+
+### 2026-05-28 P1 ledger reversal remediation
+
+- Scope: `ApplicationDbContext` ledger immutability guard and `LedgerService.ReverseTransactionGroupAsync`.
+- Result: ledger rows remain immutable except for the specific posted-to-voided metadata transition required to link original rows to reversal rows.
+- Verification: focused ledger service regression tests cover successful reversal rows plus continued rejection of amount mutation.
 
 ## P0 Immediate Security / Secret Response
 
@@ -102,6 +108,7 @@ Last updated on 2026-05-28 during targeted auth/security re-audit.
 
 ### Ledger reversals are blocked by ledger immutability guard
 
+- Status: Remediated on 2026-05-28. The ledger immutability guard now allows only the required void metadata update and continues to reject other ledger mutations/deletes.
 - Evidence: `backend/src/SIMS.Infrastructure/Data/ApplicationDbContext.cs` `UpdateTimestamps`; `backend/src/SIMS.Application/Services/LedgerService.cs` `ReverseTransactionGroupAsync`.
 - Risk: reversal/void workflows mark original ledger rows modified, but the DbContext throws for modified `LedgerTransaction` rows.
 - Impact: invoice, receipt, and disbursement voids may fail.
@@ -310,7 +317,7 @@ Last updated on 2026-05-28 during targeted auth/security re-audit.
 
 1. Done: rotate and remove the hardcoded database credential.
 2. Done: close residual policy attachment and quote/policy note action-permission gaps.
-3. Fix financial atomicity and ledger reversal behavior.
+3. Continue P1 financial/data integrity: fix financial atomicity; ledger reversal behavior is done.
 4. Fix endorsement invoicing, mixed-payee disbursements, policy-number bind date, and London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.
 6. Add soft-delete filters and nullable fallback uniqueness enforcement.

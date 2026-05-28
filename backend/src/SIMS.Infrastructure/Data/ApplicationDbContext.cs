@@ -6,6 +6,7 @@ using SIMS.Domain.Entities.Rating;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace SIMS.Infrastructure.Data;
 
@@ -13,6 +14,15 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     IdentityUserClaim<Guid>, IdentityUserRole<Guid>, IdentityUserLogin<Guid>,
     IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>
 {
+    private static readonly HashSet<string> LedgerVoidMetadataProperties = new(StringComparer.Ordinal)
+    {
+        nameof(LedgerTransaction.PostingStatus),
+        nameof(LedgerTransaction.VoidedByTransactionId),
+        nameof(LedgerTransaction.VoidedAt),
+        nameof(LedgerTransaction.VoidedBy),
+        nameof(LedgerTransaction.VoidReason)
+    };
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -300,7 +310,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     {
         foreach (var entry in ChangeTracker.Entries<LedgerTransaction>())
         {
-            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            if (entry.State == EntityState.Deleted ||
+                (entry.State == EntityState.Modified && !IsAllowedLedgerVoidMetadataUpdate(entry)))
                 throw new InvalidOperationException(
                     "LedgerTransaction rows are immutable. Use a reversing entry.");
         }
@@ -314,5 +325,37 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
             if (entry.State == EntityState.Added)
                 entry.Entity.CreatedAt = DateTime.UtcNow;
         }
+    }
+
+    private static bool IsAllowedLedgerVoidMetadataUpdate(EntityEntry<LedgerTransaction> entry)
+    {
+        var modifiedProperties = entry.Properties
+            .Where(property => property.IsModified)
+            .ToList();
+
+        if (modifiedProperties.Count == 0 ||
+            modifiedProperties.Any(property => !LedgerVoidMetadataProperties.Contains(property.Metadata.Name)))
+            return false;
+
+        var status = entry.Property(transaction => transaction.PostingStatus);
+        if (!status.IsModified || status.OriginalValue != "Posted" || status.CurrentValue != "Voided")
+            return false;
+
+        var voidedByTransactionId = entry.Property(transaction => transaction.VoidedByTransactionId);
+        if (!voidedByTransactionId.IsModified ||
+            voidedByTransactionId.OriginalValue is not null ||
+            voidedByTransactionId.CurrentValue is null)
+            return false;
+
+        var voidedAt = entry.Property(transaction => transaction.VoidedAt);
+        if (!voidedAt.IsModified || voidedAt.OriginalValue is not null || voidedAt.CurrentValue is null)
+            return false;
+
+        var voidedBy = entry.Property(transaction => transaction.VoidedBy);
+        if (!voidedBy.IsModified || voidedBy.OriginalValue is not null || voidedBy.CurrentValue is null)
+            return false;
+
+        var voidReason = entry.Property(transaction => transaction.VoidReason);
+        return !voidReason.IsModified || !string.IsNullOrWhiteSpace(voidReason.CurrentValue);
     }
 }
