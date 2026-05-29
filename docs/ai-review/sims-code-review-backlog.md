@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 quote money/date validation remediation.
+Last updated on 2026-05-29 during P1 user IdentityResult remediation.
 
 ## Audit Checkpoints
 
@@ -66,6 +66,12 @@ Last updated on 2026-05-29 during P1 quote money/date validation remediation.
 - Scope: `QuoteService` create, update, and bind paths.
 - Result: quote create/update now rejects negative premium or taxes/fees and default or inverted effective/expiration dates before saving; quote bind rejects invalid bound/coverage dates and pre-existing negative quote amounts before policy, transaction, or invoice work starts.
 - Verification: focused quote service regressions cover invalid create inputs leaving no quote, invalid update inputs leaving the existing quote unchanged, and invalid bind inputs leaving quote/policy state unchanged.
+
+### 2026-05-29 P1 user IdentityResult remediation
+
+- Scope: `UserService` create, update, and delete paths.
+- Result: requested roles are validated before user mutation, Identity create/update/remove/add/delete results are checked and returned as controlled failures, and multi-step user create/update operations use a transaction when the database provider supports one.
+- Verification: focused Identity-backed user service regressions cover missing-role create and update failures leaving no created user or partial role/user changes.
 
 ## P0 Immediate Security / Secret Response
 
@@ -328,6 +334,7 @@ Last updated on 2026-05-29 during P1 quote money/date validation remediation.
 
 ### User updates ignore Identity operation failures
 
+- Status: Remediated on 2026-05-29. User create/update/delete now check Identity operation results; role assignment changes validate requested roles first and run inside a transaction where supported.
 - Evidence: `backend/src/SIMS.Application/Services/UserService.cs`.
 - Risk: `UpdateAsync`, `RemoveFromRolesAsync`, and `AddToRolesAsync` results are not checked.
 - Impact: admins can see successful saves after failed or partial role updates.
@@ -379,7 +386,7 @@ Last updated on 2026-05-29 during P1 quote money/date validation remediation.
 4. Done: fix policy-number bind date and London bordereaux commission source.
 5. Done: fix QBO retry failure/idempotency behavior.
 6. Done: add soft-delete filters and nullable fallback uniqueness enforcement.
-7. In progress: quote money/date validation is done; user IdentityResult handling remains.
+7. Done: add quote money/date validation and user IdentityResult handling.
 8. Fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
 9. Add targeted regression tests listed above.
 10. Add readiness/liveness health checks and tighten scheduled job retry behavior.
