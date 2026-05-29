@@ -23,7 +23,9 @@ public class CarrierCommissionConfiguration : IEntityTypeConfiguration<CarrierCo
             .HasForeignKey(e => e.CarrierId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(e => new { e.ProgramConfigurationId, e.CarrierId, e.LineOfBusiness, e.EffectiveDate }).IsUnique();
+        builder.HasIndex(e => new { e.ProgramConfigurationId, e.CarrierId, e.LineOfBusiness, e.EffectiveDate })
+            .IsUnique()
+            .AreNullsDistinct(false);
         builder.HasIndex(e => new { e.CarrierId, e.DisabledDate });
     }
 }

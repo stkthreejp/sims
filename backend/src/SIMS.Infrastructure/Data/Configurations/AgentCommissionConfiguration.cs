@@ -29,7 +29,9 @@ public class AgentCommissionConfiguration : IEntityTypeConfiguration<AgentCommis
             .HasForeignKey(e => e.AgentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(e => new { e.ProgramConfigurationId, e.CarrierId, e.AgentId, e.LineOfBusiness, e.StateCode, e.EffectiveDate }).IsUnique();
+        builder.HasIndex(e => new { e.ProgramConfigurationId, e.CarrierId, e.AgentId, e.LineOfBusiness, e.StateCode, e.EffectiveDate })
+            .IsUnique()
+            .AreNullsDistinct(false);
         builder.HasIndex(e => new { e.AgentId, e.DisabledDate });
     }
 }

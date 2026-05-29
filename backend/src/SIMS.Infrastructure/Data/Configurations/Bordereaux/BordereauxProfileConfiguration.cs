@@ -28,7 +28,9 @@ public class BordereauxProfileConfiguration : IEntityTypeConfiguration<Bordereau
             x.LineOfBusiness,
             x.StateCode,
             x.IsActive,
-        }).IsUnique();
+        })
+            .IsUnique()
+            .AreNullsDistinct(false);
         builder.HasIndex(x => x.IsActive);
 
         builder.HasOne(x => x.ProgramConfiguration)

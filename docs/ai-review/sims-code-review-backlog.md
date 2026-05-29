@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 QBO retry/idempotency remediation.
+Last updated on 2026-05-29 during P1 soft-delete and fallback uniqueness remediation.
 
 ## Audit Checkpoints
 
@@ -54,6 +54,12 @@ Last updated on 2026-05-29 during P1 QBO retry/idempotency remediation.
 - Scope: `QboSyncRetryWorker`.
 - Result: QBO retry rows are claimed with a conditional database update before resync, in-flight claims use `Processing`, stale processing claims can be retried, and failed rollup results no longer mark pending sync rows `Done`.
 - Verification: focused worker regressions cover failed rollup results staying retryable, concurrent workers not processing the same row twice, and stale `Processing` rows being reclaimed.
+
+### 2026-05-29 P1 soft-delete and fallback uniqueness remediation
+
+- Scope: `ApplicationDbContext`, carrier/agent commission indexes, and bordereaux profile fallback indexes.
+- Result: `BaseEntity` types that were missed by the manual filter list now get a global `IsDeleted = false` query filter backstop, and nullable fallback unique indexes use PostgreSQL `NULLS NOT DISTINCT`.
+- Verification: metadata regressions assert every soft-deletable `BaseEntity` has a query filter and each nullable fallback unique index treats null scope values as not distinct.
 
 ## P0 Immediate Security / Secret Response
 
@@ -180,6 +186,7 @@ Last updated on 2026-05-29 during P1 QBO retry/idempotency remediation.
 
 ### Nullable unique indexes do not enforce fallback uniqueness
 
+- Status: Remediated on 2026-05-29. Carrier commission, agent commission, and bordereaux profile fallback unique indexes now use PostgreSQL `NULLS NOT DISTINCT` through EF's Npgsql index annotation and migration.
 - Evidence: `CarrierCommissionConfiguration.cs`, `AgentCommissionConfiguration.cs`, `BordereauxProfileConfiguration.cs`.
 - Risk: PostgreSQL treats `NULL` values as distinct in unique indexes.
 - Impact: duplicate fallback commission/profile rows can exist, making rate/profile selection nondeterministic.
@@ -188,6 +195,7 @@ Last updated on 2026-05-29 during P1 QBO retry/idempotency remediation.
 
 ### Soft-delete filters are missing for some soft-deletable entities
 
+- Status: Remediated on 2026-05-29. `ApplicationDbContext` now applies a generic fallback query filter to soft-deletable `BaseEntity` types that do not already have an explicit filter.
 - Evidence: `backend/src/SIMS.Infrastructure/Data/ApplicationDbContext.cs`; rating, proposal document, and quote writeup configurations map `IsDeleted`.
 - Risk: deleted rating plans/snapshots, UW writeups, and proposal document configs can leak into normal queries.
 - Impact: stale rating/document/writeup records can be selected unless every service remembers manual predicates.
@@ -363,7 +371,7 @@ Last updated on 2026-05-29 during P1 QBO retry/idempotency remediation.
 3. Done: fix ledger reversal behavior and financial posting atomicity.
 4. Done: fix policy-number bind date and London bordereaux commission source.
 5. Done: fix QBO retry failure/idempotency behavior.
-6. Add soft-delete filters and nullable fallback uniqueness enforcement.
+6. Done: add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Add quote money/date validation and user IdentityResult handling.
 8. Fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
 9. Add targeted regression tests listed above.

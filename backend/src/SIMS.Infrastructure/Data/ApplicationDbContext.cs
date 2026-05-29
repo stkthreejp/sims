@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
 using SIMS.Domain.Entities.Bordereaux;
@@ -292,6 +293,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<FmcsaCrash>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaScoringRun>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<FmcsaBasicScore>().HasQueryFilter(e => !e.IsDeleted);
+
+        ApplyMissingSoftDeleteQueryFilters(builder);
     }
 
     public override int SaveChanges()
@@ -324,6 +327,30 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
             entry.Entity.UpdatedAt = DateTime.UtcNow;
             if (entry.State == EntityState.Added)
                 entry.Entity.CreatedAt = DateTime.UtcNow;
+        }
+    }
+
+    private static void ApplyMissingSoftDeleteQueryFilters(ModelBuilder builder)
+    {
+        foreach (var entityType in builder.Model.GetEntityTypes())
+        {
+            if (!typeof(BaseEntity).IsAssignableFrom(entityType.ClrType) ||
+                entityType.FindProperty(nameof(BaseEntity.IsDeleted)) is null ||
+                entityType.GetQueryFilter() is not null)
+            {
+                continue;
+            }
+
+            var parameter = Expression.Parameter(entityType.ClrType, "entity");
+            var isDeleted = Expression.Call(
+                typeof(EF),
+                nameof(EF.Property),
+                new[] { typeof(bool) },
+                parameter,
+                Expression.Constant(nameof(BaseEntity.IsDeleted)));
+            var filter = Expression.Lambda(Expression.Not(isDeleted), parameter);
+
+            builder.Entity(entityType.ClrType).HasQueryFilter(filter);
         }
     }
 
