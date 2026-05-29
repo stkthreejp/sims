@@ -18,6 +18,7 @@ public class IntermediaryService : IIntermediaryService
     {
         var query = _db.Set<Intermediary>()
             .Include(i => i.ProgramCarrierLobSetups)
+            .AsNoTracking()
             .AsQueryable();
 
         if (!includeInactive)
@@ -42,7 +43,7 @@ public class IntermediaryService : IIntermediaryService
 
     public async Task<Result<IntermediaryDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var intermediary = await FindIntermediaryAsync(id, ct);
+        var intermediary = await FindIntermediaryForReadAsync(id, ct);
         return intermediary is null
             ? Result<IntermediaryDto>.Failure("INTERMEDIARY_NOT_FOUND", "Intermediary was not found.")
             : Result<IntermediaryDto>.Success(Map(intermediary));
@@ -224,6 +225,17 @@ public class IntermediaryService : IIntermediaryService
                 .ThenInclude(s => s.Carrier)
             .Include(i => i.ProgramCarrierLobSetups)
                 .ThenInclude(s => s.PayablePayee)
+            .SingleOrDefaultAsync(i => i.Id == id, ct);
+
+    private async Task<Intermediary?> FindIntermediaryForReadAsync(Guid id, CancellationToken ct) =>
+        await _db.Set<Intermediary>()
+            .Include(i => i.ProgramCarrierLobSetups)
+                .ThenInclude(s => s.ProgramConfiguration)
+            .Include(i => i.ProgramCarrierLobSetups)
+                .ThenInclude(s => s.Carrier)
+            .Include(i => i.ProgramCarrierLobSetups)
+                .ThenInclude(s => s.PayablePayee)
+            .AsNoTracking()
             .SingleOrDefaultAsync(i => i.Id == id, ct);
 
     private async Task<Result<SetupReferences>> ValidateSetupRequestAsync(UpsertIntermediaryBrokerageSetupRequest request, CancellationToken ct)

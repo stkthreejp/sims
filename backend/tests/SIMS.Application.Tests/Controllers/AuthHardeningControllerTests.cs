@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using SIMS.API.Controllers;
+using SIMS.API.Controllers.Admin;
 using SIMS.Application.Security;
 using Xunit;
 
@@ -116,6 +117,19 @@ public class AuthHardeningControllerTests
     {
         Assert.Equal(AppPermissions.AdminSystemManage, GetMethodPolicy(typeof(LegalRequirementsController), methodName));
     }
+
+    [Fact]
+    public void IntermediariesController_RequiresAdminSystemManagePolicy()
+    {
+        Assert.Equal(AppPermissions.AdminSystemManage, GetClassPolicy(typeof(IntermediariesController)));
+    }
+
+    private static string? GetClassPolicy(Type controllerType) =>
+        controllerType
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+            .Cast<AuthorizeAttribute>()
+            .SingleOrDefault()
+            ?.Policy;
 
     private static string? GetMethodPolicy(Type controllerType, string methodName)
     {

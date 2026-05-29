@@ -290,6 +290,28 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task CreatePremiumRunSnapshotAsync_RecordsClearValidationWhenAllSetupsMatch()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        await SeedSurplusLinesSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability, "MS");
+        var service = new BordereauxService(db);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        Assert.True(run.IsSuccess);
+        Assert.Contains("\"status\":\"clear\"", run.Value!.ValidationSummaryJson);
+        Assert.Contains("\"warnings\":0", run.Value.ValidationSummaryJson);
+        Assert.Contains("\"missingLondonLobSetupRows\":0", run.Value.ValidationSummaryJson);
+        Assert.Contains("\"missingSurplusLinesSetupRows\":0", run.Value.ValidationSummaryJson);
+        Assert.DoesNotContain("MISSING_LONDON_LOB_SETUP", run.Value.ValidationSummaryJson);
+        Assert.DoesNotContain("MISSING_SURPLUS_LINES_SETUP", run.Value.ValidationSummaryJson);
+    }
+
+    [Fact]
     public async Task CreatePremiumRunSnapshotAsync_CreatesNextRunNumberWithoutOverwritingPriorRun()
     {
         await using var db = CreateDb();
@@ -791,6 +813,47 @@ public class BordereauxServiceTests
         Assert.Contains(">AP<", londonText);
     }
 
+    [Fact]
+    public async Task GeneratePremiumExportPackageAsync_IgnoresDeletedIntermediaryBrokerageSetups()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        var intermediary = new Intermediary
+        {
+            Name = "Deleted Broker Ltd",
+            IsActive = true,
+        };
+        db.Add(intermediary);
+        db.Add(new IntermediaryProgramCarrierLobSetup
+        {
+            Intermediary = intermediary,
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            BrokerageRate = 0.015m,
+            CreatePayable = false,
+            IsActive = true,
+            IsDeleted = true,
+            DeletedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        var londonText = blob.Uploads[0].Text;
+        Assert.Contains("1088.25", londonText);
+        Assert.DoesNotContain("0.015", londonText);
+        Assert.DoesNotContain("21.77", londonText);
+        Assert.DoesNotContain("1066.48", londonText);
+    }
+
     [Theory]
     [InlineData(TransactionType.Cancellation, "CP")]
     [InlineData(TransactionType.Reinstatement, "RN")]
@@ -912,6 +975,35 @@ public class BordereauxServiceTests
             LondonInsuranceType = "DIRECT",
         });
         db.Add(programCarrier);
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedSurplusLinesSetupAsync(
+        ApplicationDbContext db,
+        ProgramConfiguration program,
+        Carrier carrier,
+        PolicyLineOfBusiness lineOfBusiness,
+        string stateCode)
+    {
+        db.Add(new SurplusLinesStateSetup
+        {
+            StateCode = stateCode,
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = lineOfBusiness,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            IsActive = true,
+            FilingRequired = true,
+            LicenseHolderType = "Broker",
+            FilingBrokerName = "SMM Filing",
+            LicenseNumber = "SL-100",
+            LicenseState = stateCode,
+            BrokerAddressLine1 = "100 Filing St",
+            BrokerCity = "Jackson",
+            BrokerState = stateCode,
+            BrokerZipCode = "39000",
+            BrokerCountry = "USA",
+        });
         await db.SaveChangesAsync();
     }
 

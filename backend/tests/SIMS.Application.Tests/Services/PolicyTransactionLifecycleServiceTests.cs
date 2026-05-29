@@ -92,6 +92,37 @@ public class PolicyTransactionLifecycleServiceTests
     }
 
     [Fact]
+    public async Task TransitionAsync_StampsStatusSpecificAuditFields()
+    {
+        await using var db = CreateDb();
+        var userId = Guid.NewGuid();
+        var transaction = CreateTransaction(userId, PolicyTransactionStatus.Submitted);
+        db.AddRange(CreateUser(userId), transaction);
+        await db.SaveChangesAsync();
+        var workflow = new RecordingWorkflowEngineService();
+        var lifecycle = new PolicyTransactionLifecycleService(db, workflow);
+
+        var issued = await lifecycle.TransitionAsync(transaction, PolicyTransactionStatus.Issued, userId, "issued");
+        var issuedAt = transaction.IssuedAt;
+        var completed = await lifecycle.TransitionAsync(transaction, PolicyTransactionStatus.Completed, userId, "completed");
+
+        Assert.True(issued.IsSuccess);
+        Assert.True(completed.IsSuccess);
+        Assert.Equal(userId, transaction.RequestedById);
+        Assert.NotNull(transaction.RequestedAt);
+        Assert.Null(transaction.ReviewedById);
+        Assert.Null(transaction.ReviewedAt);
+        Assert.Null(transaction.ApprovedById);
+        Assert.Null(transaction.ApprovedAt);
+        Assert.Equal(userId, transaction.IssuedById);
+        Assert.NotNull(issuedAt);
+        Assert.Equal(issuedAt, transaction.IssuedAt);
+        Assert.Equal(userId, transaction.CompletedById);
+        Assert.NotNull(transaction.CompletedAt);
+        Assert.True(transaction.CompletedAt >= issuedAt);
+    }
+
+    [Fact]
     public async Task RecordCreatedAsync_RecordsCreatedAndStatusEvents()
     {
         await using var db = CreateDb();

@@ -48,6 +48,45 @@ public class InvoicingProgramScopeTests
         Assert.Equal(75m, result.Value.TotalFees);
     }
 
+    [Fact]
+    public async Task BindAsync_CreatesEntityFeePayableForConfiguredPayee()
+    {
+        await using var db = CreateDb();
+        SeedLedgerAccounts(db);
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var payee = new Payee { Id = 91, Name = "MS Surplus Lines Office", PayeeType = "State", IsActive = true };
+        var fee = new FeeDefinition
+        {
+            Code = "MS_SL",
+            DisplayName = "MS Surplus Lines Fee",
+            FeeCategory = "PolicyFee",
+            IsTaxable = false,
+            CalculationOrder = 100,
+            LedgerAccountId = 4200,
+        };
+        db.AddRange(program, payee, fee);
+        await db.SaveChangesAsync();
+
+        var rule = BuildFlatFeeRule(fee.Id, program.Id, 75m);
+        rule.PayableRouting = "Entity";
+        rule.PayablePayeeId = payee.Id;
+        db.Add(rule);
+        await db.SaveChangesAsync();
+        var service = new InvoicingService(
+            new TestServiceProvider(db),
+            new FeeCalculationService(new TestServiceProvider(db)),
+            new RecordingLedgerService());
+
+        var result = await service.BindAsync(BuildInvoiceRequest(program.Id), Guid.NewGuid());
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        var entityPayable = await db.Set<Payable>().SingleAsync(p => p.PayeeId == payee.Id);
+        Assert.Null(entityPayable.CarrierId);
+        Assert.Equal("MS Surplus Lines Office", entityPayable.PayeeName);
+        Assert.Equal(75m, entityPayable.Amount);
+        Assert.Equal(4200, entityPayable.GlAccountId);
+    }
+
     private static CreateInvoiceRequest BuildInvoiceRequest(Guid? programId) =>
         new(
             EffectiveDate: new DateOnly(2026, 1, 1),

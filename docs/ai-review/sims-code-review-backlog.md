@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P2 frontend task queue remediation.
+Last updated on 2026-05-29 during P2 targeted regression test remediation.
 
 ## Audit Checkpoints
 
@@ -78,6 +78,12 @@ Last updated on 2026-05-29 during P2 frontend task queue remediation.
 - Scope: task queue empty-state handling plus static verification of role-permission hook order, quote bind permission gating, and submission add-quote gating.
 - Result: empty task queues now render true empty metrics and an empty-state message instead of sample production-looking task rows.
 - Verification: source check confirms no runtime sample fallback remains in `TaskQueuePage`; frontend typecheck and production build pass.
+
+### 2026-05-29 P2 targeted regression tests
+
+- Scope: intermediary deleted brokerage setup visibility, bordereaux validation/export setup coverage, entity-fee payable routing, policy transaction audit stamping, and intermediary admin authorization coverage.
+- Result: added regression coverage for all listed P2 targeted test gaps. The intermediary test exposed a stale EF tracking read path, now fixed with no-tracking read queries.
+- Verification: focused tests for each added regression pass; full application test suite passes.
 
 ## P0 Immediate Security / Secret Response
 
@@ -366,11 +372,11 @@ Last updated on 2026-05-29 during P2 frontend task queue remediation.
 
 ## P2 Targeted Test Gaps
 
-- `IntermediaryServiceTests.DeleteBrokerageSetupAsync_HidesDeletedSetupFromDetailsAndCounts`: deleted brokerage setup must not appear in details/counts or BDX mapping.
-- `BordereauxServiceTests.CreatePremiumRunSnapshotAsync_RecordsClearValidationWhenAllSetupsMatch`: validation summary should be clear when London and surplus-lines setup exists.
-- `InvoicingProgramScopeTests.BindAsync_CreatesEntityFeePayableForConfiguredPayee`: entity fee routing should create a payable for configured payee.
-- `PolicyTransactionLifecycleServiceTests.TransitionAsync_StampsStatusSpecificAuditFields`: issued/completed transitions stamp the right metadata only.
-- `IntermediariesControllerTests.IntermediariesController_RequiresAdminSystemManagePolicy`: intermediary setup API remains admin-only.
+- Done: `IntermediaryServiceTests.DeleteBrokerageSetupAsync_HidesDeletedSetupFromDetailsAndCounts` and `BordereauxServiceTests.GeneratePremiumExportPackageAsync_IgnoresDeletedIntermediaryBrokerageSetups`: deleted brokerage setup must not appear in details/counts or BDX mapping.
+- Done: `BordereauxServiceTests.CreatePremiumRunSnapshotAsync_RecordsClearValidationWhenAllSetupsMatch`: validation summary should be clear when London and surplus-lines setup exists.
+- Done: `InvoicingProgramScopeTests.BindAsync_CreatesEntityFeePayableForConfiguredPayee`: entity fee routing should create a payable for configured payee.
+- Done: `PolicyTransactionLifecycleServiceTests.TransitionAsync_StampsStatusSpecificAuditFields`: issued/completed transitions stamp the right metadata only.
+- Done: `AuthHardeningControllerTests.IntermediariesController_RequiresAdminSystemManagePolicy`: intermediary setup API remains admin-only.
 
 ## Open Business-Rule Questions
 
@@ -395,5 +401,5 @@ Last updated on 2026-05-29 during P2 frontend task queue remediation.
 6. Done: add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Done: add quote money/date validation and user IdentityResult handling.
 8. Done: fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
-9. Add targeted regression tests listed above.
+9. Done: add targeted regression tests listed above.
 10. Add readiness/liveness health checks and tighten scheduled job retry behavior.

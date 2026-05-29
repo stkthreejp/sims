@@ -188,6 +188,43 @@ public class IntermediaryServiceTests
         Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
     }
 
+    [Fact]
+    public async Task DeleteBrokerageSetupAsync_HidesDeletedSetupFromDetailsAndCounts()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedSetupFixtureAsync(db);
+        var service = new IntermediaryService(db);
+        var setup = await service.CreateBrokerageSetupAsync(
+            fixture.Intermediary.Id,
+            new UpsertIntermediaryBrokerageSetupRequest(
+                ProgramConfigurationId: fixture.Program.Id,
+                CarrierId: fixture.Carrier.Id,
+                LineOfBusiness: PolicyLineOfBusiness.InlandMarine,
+                EffectiveDate: new DateOnly(2026, 4, 1),
+                ExpirationDate: null,
+                BrokerageRate: 0.075m,
+                CreatePayable: false,
+                PayablePayeeId: null,
+                IsActive: true,
+                Notes: null));
+
+        var delete = await service.DeleteBrokerageSetupAsync(fixture.Intermediary.Id, setup.Value!.Id);
+        var detail = await service.GetByIdAsync(fixture.Intermediary.Id);
+        var list = await service.GetAsync(includeInactive: true);
+        var deletedRow = await db.Set<IntermediaryProgramCarrierLobSetup>()
+            .IgnoreQueryFilters()
+            .SingleAsync(s => s.Id == setup.Value.Id);
+
+        Assert.True(setup.IsSuccess);
+        Assert.True(delete.IsSuccess);
+        Assert.True(detail.IsSuccess);
+        Assert.Empty(detail.Value!.BrokerageSetups);
+        var item = Assert.Single(list);
+        Assert.Equal(0, item.BrokerageSetupCount);
+        Assert.Equal(0, item.ActiveBrokerageSetupCount);
+        Assert.True(deletedRow.IsDeleted);
+    }
+
     private static async Task<SetupFixture> SeedSetupFixtureAsync(ApplicationDbContext db, params PolicyLineOfBusiness[] configuredLines)
     {
         var intermediary = new Intermediary { Name = "Bridge Specialty Brokers", IsActive = true };
