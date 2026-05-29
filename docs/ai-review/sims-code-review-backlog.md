@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 soft-delete and fallback uniqueness remediation.
+Last updated on 2026-05-29 during P1 quote money/date validation remediation.
 
 ## Audit Checkpoints
 
@@ -60,6 +60,12 @@ Last updated on 2026-05-29 during P1 soft-delete and fallback uniqueness remedia
 - Scope: `ApplicationDbContext`, carrier/agent commission indexes, and bordereaux profile fallback indexes.
 - Result: `BaseEntity` types that were missed by the manual filter list now get a global `IsDeleted = false` query filter backstop, and nullable fallback unique indexes use PostgreSQL `NULLS NOT DISTINCT`.
 - Verification: metadata regressions assert every soft-deletable `BaseEntity` has a query filter and each nullable fallback unique index treats null scope values as not distinct.
+
+### 2026-05-29 P1 quote money/date validation remediation
+
+- Scope: `QuoteService` create, update, and bind paths.
+- Result: quote create/update now rejects negative premium or taxes/fees and default or inverted effective/expiration dates before saving; quote bind rejects invalid bound/coverage dates and pre-existing negative quote amounts before policy, transaction, or invoice work starts.
+- Verification: focused quote service regressions cover invalid create inputs leaving no quote, invalid update inputs leaving the existing quote unchanged, and invalid bind inputs leaving quote/policy state unchanged.
 
 ## P0 Immediate Security / Secret Response
 
@@ -222,6 +228,7 @@ Last updated on 2026-05-29 during P1 soft-delete and fallback uniqueness remedia
 
 ### Quote create/update/bind accepts invalid money and date ranges
 
+- Status: Remediated on 2026-05-29. `QuoteService` now validates premium, taxes/fees, and coverage/bound dates before create, update, or bind mutation.
 - Evidence: `backend/src/SIMS.Application/DTOs/Quotes/QuoteDto.cs`; `backend/src/SIMS.Application/Services/QuoteService.cs`.
 - Risk: negative premium/fees and invalid effective/expiration date ranges can persist.
 - Impact: bad quote data can flow into policies, invoices, and reports.
@@ -372,7 +379,7 @@ Last updated on 2026-05-29 during P1 soft-delete and fallback uniqueness remedia
 4. Done: fix policy-number bind date and London bordereaux commission source.
 5. Done: fix QBO retry failure/idempotency behavior.
 6. Done: add soft-delete filters and nullable fallback uniqueness enforcement.
-7. Add quote money/date validation and user IdentityResult handling.
+7. In progress: quote money/date validation is done; user IdentityResult handling remains.
 8. Fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
 9. Add targeted regression tests listed above.
 10. Add readiness/liveness health checks and tighten scheduled job retry behavior.

@@ -138,6 +138,10 @@ public class QuoteService : IQuoteService
 
     public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById, UserAccessScope? access = null)
     {
+        var validation = ValidateQuoteCreateOrUpdate(dto);
+        if (validation is not null)
+            return Result<QuoteDto>.Failure(validation.Value.Code, validation.Value.Message);
+
         var submissionQuery = Db.Set<Submission>()
             .Include(s => s.Insured)
             .Where(s => s.Id == dto.SubmissionId && !s.IsDeleted);
@@ -240,6 +244,9 @@ public class QuoteService : IQuoteService
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot edit a bound policy.");
+        var validation = ValidateQuoteCreateOrUpdate(dto);
+        if (validation is not null)
+            return Result<QuoteDto>.Failure(validation.Value.Code, validation.Value.Message);
 
         ProgramConfiguration? program = null;
         var carrierId = dto.CarrierId;
@@ -341,6 +348,12 @@ public class QuoteService : IQuoteService
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Quote is already bound.");
+        var amountValidation = ValidateQuoteAmounts(quote.PremiumAmount, quote.TaxesAndFees);
+        if (amountValidation is not null)
+            return Result<QuoteDto>.Failure(amountValidation.Value.Code, amountValidation.Value.Message);
+        var dateValidation = ValidateBindDates(dto);
+        if (dateValidation is not null)
+            return Result<QuoteDto>.Failure(dateValidation.Value.Code, dateValidation.Value.Message);
         if (!await HasIncludedPolicyFormsAsync(quote.Id))
             return Result<QuoteDto>.Failure("POLICY_FORMS_REQUIRED", "Select the policy forms for this quote before binding.");
         var clearance = await _clearance.EvaluateSubmissionAsync(quote.SubmissionId, access.UserId);
@@ -661,6 +674,40 @@ public class QuoteService : IQuoteService
             .IgnoreQueryFilters()
             .CountAsync(t => t.TransactionNumber.StartsWith(prefix));
         return $"{prefix}{(count + 1):D5}";
+    }
+
+    private static (string Code, string Message)? ValidateQuoteCreateOrUpdate(QuoteCreateDto dto)
+    {
+        var amountValidation = ValidateQuoteAmounts(dto.PremiumAmount, dto.TaxesAndFees);
+        if (amountValidation is not null)
+            return amountValidation;
+
+        return ValidateCoverageDates(dto.EffectiveDate, dto.ExpirationDate);
+    }
+
+    private static (string Code, string Message)? ValidateQuoteAmounts(decimal premiumAmount, decimal taxesAndFees)
+    {
+        return premiumAmount < 0m || taxesAndFees < 0m
+            ? ("INVALID_QUOTE_AMOUNT", "Premium amount and taxes/fees cannot be negative.")
+            : null;
+    }
+
+    private static (string Code, string Message)? ValidateBindDates(QuoteBindDto dto)
+    {
+        if (dto.BoundDate == default)
+            return ("INVALID_QUOTE_DATES", "Bound date is required.");
+
+        return ValidateCoverageDates(dto.EffectiveDate, dto.ExpirationDate);
+    }
+
+    private static (string Code, string Message)? ValidateCoverageDates(DateOnly effectiveDate, DateOnly expirationDate)
+    {
+        if (effectiveDate == default || expirationDate == default)
+            return ("INVALID_QUOTE_DATES", "Effective date and expiration date are required.");
+
+        return expirationDate <= effectiveDate
+            ? ("INVALID_QUOTE_DATES", "Expiration date must be after the effective date.")
+            : null;
     }
 
     private async Task<(string Code, string Message)?> ValidateProgramSetupPathAsync(

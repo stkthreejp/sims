@@ -17,6 +17,23 @@ namespace SIMS.Application.Tests.Services;
 
 public class QuoteServiceAccessTests
 {
+    public static TheoryData<QuoteCreateDto, string> InvalidQuoteCreateRequests
+    {
+        get
+        {
+            var data = new TheoryData<QuoteCreateDto, string>();
+            data.Add(ValidCreateRequest(dto => dto.PremiumAmount = -1m), "INVALID_QUOTE_AMOUNT");
+            data.Add(ValidCreateRequest(dto => dto.TaxesAndFees = -1m), "INVALID_QUOTE_AMOUNT");
+            data.Add(ValidCreateRequest(dto => dto.EffectiveDate = default), "INVALID_QUOTE_DATES");
+            data.Add(ValidCreateRequest(dto =>
+            {
+                dto.EffectiveDate = new DateOnly(2026, 1, 2);
+                dto.ExpirationDate = new DateOnly(2026, 1, 1);
+            }), "INVALID_QUOTE_DATES");
+            return data;
+        }
+    }
+
     [Fact]
     public async Task CreateAsync_DeniesSubmissionOutsideUserAccessScope()
     {
@@ -68,6 +85,152 @@ public class QuoteServiceAccessTests
         Assert.Empty(await db.Set<Quote>().ToListAsync());
     }
 
+    [Theory]
+    [MemberData(nameof(InvalidQuoteCreateRequests))]
+    public async Task CreateAsync_RejectsInvalidMoneyAndDatesWithoutCreatingQuote(QuoteCreateDto request, string expectedCode)
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, request.CarrierId, currentUserId);
+        request.SubmissionId = submission.Id;
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreateAsync(request, currentUserId, new UserAccessScope(currentUserId, true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(expectedCode, result.ErrorCode);
+        Assert.Empty(await db.Set<Quote>().ToListAsync());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_RejectsInvalidMoneyAndDatesWithoutChangingQuote()
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, carrierId, currentUserId);
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "QTE-2026-0001",
+            SubmissionId = submission.Id,
+            CarrierId = carrierId,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+            PremiumAmount = 1000m,
+            TaxesAndFees = 100m,
+            TotalPremium = 1100m,
+            CreatedById = currentUserId,
+        };
+        db.Add(quote);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).UpdateAsync(quote.Id, new QuoteUpdateDto
+        {
+            SubmissionId = submission.Id,
+            CarrierId = carrierId,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = new DateOnly(2027, 1, 1),
+            ExpirationDate = new DateOnly(2026, 1, 1),
+            PremiumAmount = -100m,
+            TaxesAndFees = 25m,
+            Status = QuoteStatus.Quoted,
+        }, new UserAccessScope(currentUserId, true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_QUOTE_AMOUNT", result.ErrorCode);
+        var saved = await db.Set<Quote>().SingleAsync(q => q.Id == quote.Id);
+        Assert.Equal(1000m, saved.PremiumAmount);
+        Assert.Equal(100m, saved.TaxesAndFees);
+        Assert.Equal(1100m, saved.TotalPremium);
+        Assert.Equal(new DateOnly(2026, 1, 1), saved.EffectiveDate);
+        Assert.Equal(new DateOnly(2027, 1, 1), saved.ExpirationDate);
+        Assert.Equal(QuoteStatus.Draft, saved.Status);
+    }
+
+    [Fact]
+    public async Task BindAsync_RejectsInvalidDatesBeforeMutatingQuote()
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, carrierId, currentUserId);
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "QTE-2026-0001",
+            SubmissionId = submission.Id,
+            CarrierId = carrierId,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+            PremiumAmount = 1000m,
+            TaxesAndFees = 100m,
+            TotalPremium = 1100m,
+            CreatedById = currentUserId,
+        };
+        db.Add(quote);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).BindAsync(quote.Id, new QuoteBindDto
+        {
+            BoundDate = default,
+            EffectiveDate = new DateOnly(2027, 1, 1),
+            ExpirationDate = new DateOnly(2026, 1, 1),
+        }, new UserAccessScope(currentUserId, true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_QUOTE_DATES", result.ErrorCode);
+        var saved = await db.Set<Quote>().SingleAsync(q => q.Id == quote.Id);
+        Assert.Equal(QuoteStatus.Draft, saved.Status);
+        Assert.Null(saved.PolicyNumber);
+        Assert.Null(saved.BoundDate);
+        Assert.Equal(new DateOnly(2026, 1, 1), saved.EffectiveDate);
+        Assert.Equal(new DateOnly(2027, 1, 1), saved.ExpirationDate);
+        Assert.Empty(await db.Set<Policy>().ToListAsync());
+    }
+
+    [Fact]
+    public async Task BindAsync_RejectsInvalidExistingQuoteAmountsBeforeMutatingQuote()
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, carrierId, currentUserId);
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "QTE-2026-0001",
+            SubmissionId = submission.Id,
+            CarrierId = carrierId,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+            PremiumAmount = -1000m,
+            TaxesAndFees = 100m,
+            TotalPremium = -900m,
+            CreatedById = currentUserId,
+        };
+        db.Add(quote);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).BindAsync(quote.Id, new QuoteBindDto
+        {
+            BoundDate = new DateOnly(2026, 1, 1),
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+        }, new UserAccessScope(currentUserId, true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_QUOTE_AMOUNT", result.ErrorCode);
+        var saved = await db.Set<Quote>().SingleAsync(q => q.Id == quote.Id);
+        Assert.Equal(QuoteStatus.Draft, saved.Status);
+        Assert.Null(saved.PolicyNumber);
+        Assert.Null(saved.BoundDate);
+        Assert.Empty(await db.Set<Policy>().ToListAsync());
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -75,6 +238,52 @@ public class QuoteServiceAccessTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+
+    private static QuoteCreateDto ValidCreateRequest(Action<QuoteCreateDto>? configure = null)
+    {
+        var request = new QuoteCreateDto
+        {
+            CarrierId = Guid.NewGuid(),
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+            PremiumAmount = 1000m,
+            TaxesAndFees = 100m,
+        };
+
+        configure?.Invoke(request);
+        return request;
+    }
+
+    private static Submission SeedSubmissionWithCarrier(ApplicationDbContext db, Guid carrierId, Guid userId)
+    {
+        var carrier = new Carrier
+        {
+            Id = carrierId,
+            Name = "Test Carrier",
+            IsActive = true,
+        };
+        var insured = new Insured
+        {
+            Id = Guid.NewGuid(),
+            CompanyName = "Test Account",
+            InsuredType = InsuredType.Commercial,
+            State = "NC",
+            CreatedById = userId,
+        };
+        var submission = new Submission
+        {
+            Id = Guid.NewGuid(),
+            SubmissionNumber = "SUB-VALID",
+            InsuredId = insured.Id,
+            Insured = insured,
+            UnderwriterId = userId,
+            CreatedById = userId,
+        };
+        db.AddRange(carrier, insured, submission);
+
+        return submission;
     }
 
     private static QuoteService CreateService(ApplicationDbContext db)
