@@ -1,4 +1,5 @@
 using Azure.Identity;
+using SIMS.Application.Configuration;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
@@ -29,10 +30,8 @@ public class EmailIngestionService : IEmailIngestionService
         _blobStorage = blobStorage;
         _logger = logger;
 
-        var tenantId = config["MicrosoftAuth:TenantId"]
-            ?? throw new InvalidOperationException("MicrosoftAuth:TenantId is not configured.");
-        var clientId = config["MicrosoftAuth:ClientId"]
-            ?? throw new InvalidOperationException("MicrosoftAuth:ClientId is not configured.");
+        var tenantId = MicrosoftAuthConfiguration.GetTenantId(config);
+        var clientId = MicrosoftAuthConfiguration.GetClientId(config);
         var clientSecret = config["GraphApi:ClientSecret"]
             ?? throw new InvalidOperationException("GraphApi:ClientSecret is not configured.");
 

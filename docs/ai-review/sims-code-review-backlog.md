@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P2 health and FMCSA retry remediation.
+Last updated on 2026-05-29 during auth smoke test remediation.
 
 ## Audit Checkpoints
 
@@ -90,6 +90,12 @@ Last updated on 2026-05-29 during P2 health and FMCSA retry remediation.
 - Scope: API health endpoints and FMCSA scheduled worker retry markers.
 - Result: added anonymous `/health/live` and `/health/ready` endpoints; readiness checks the application database and optional safety analytics database. FMCSA daily/monthly run markers now advance only after successful service results, so transient failures retry on the next poll.
 - Verification: health registration test and FMCSA failed-result marker tests pass; full application test suite and API build pass.
+
+### 2026-05-29 auth smoke test remediation
+
+- Scope: deployed login smoke test after remediation push.
+- Result: default admin login succeeds through the deployed frontend API path. Microsoft/Graph auth configuration now accepts the deployed `AzureAd:*` setting names as a fallback to the existing `MicrosoftAuth:*` names.
+- Verification: Microsoft auth configuration alias tests pass; full application test suite and API build pass.
 
 ## P0 Immediate Security / Secret Response
 

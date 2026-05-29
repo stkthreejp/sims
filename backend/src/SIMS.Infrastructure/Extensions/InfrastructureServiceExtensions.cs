@@ -56,7 +56,7 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(sp =>
         {
             var cfg = sp.GetRequiredService<IConfiguration>();
-            var tenantId = cfg["MicrosoftAuth:TenantId"]!;
+            var tenantId = MicrosoftAuthConfiguration.GetTenantId(cfg);
             var metadataAddress = $"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration";
             return new ConfigurationManager<OpenIdConnectConfiguration>(
                 metadataAddress, new OpenIdConnectConfigurationRetriever());

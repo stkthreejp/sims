@@ -1,5 +1,6 @@
 using Azure.Identity;
 using DomainUser = SIMS.Domain.Entities.User;
+using SIMS.Application.Configuration;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 using SIMS.Infrastructure.Data;
@@ -53,8 +54,8 @@ public class TaskEscalationWorker : BackgroundService
         var userManager = sp.GetRequiredService<UserManager<DomainUser>>();
         var config      = sp.GetRequiredService<IConfiguration>();
 
-        var tenantId     = config["MicrosoftAuth:TenantId"]  ?? throw new InvalidOperationException("MicrosoftAuth:TenantId not configured.");
-        var clientId     = config["MicrosoftAuth:ClientId"]  ?? throw new InvalidOperationException("MicrosoftAuth:ClientId not configured.");
+        var tenantId     = MicrosoftAuthConfiguration.GetTenantId(config);
+        var clientId     = MicrosoftAuthConfiguration.GetClientId(config);
         var clientSecret = config["GraphApi:ClientSecret"]   ?? throw new InvalidOperationException("GraphApi:ClientSecret not configured.");
         var mailbox      = config["GraphApi:MailboxAddress"] ?? throw new InvalidOperationException("GraphApi:MailboxAddress not configured.");
         var frontendBase = config["AppSettings:FrontendBaseUrl"] ?? "http://localhost:5173";

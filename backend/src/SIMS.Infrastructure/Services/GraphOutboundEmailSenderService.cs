@@ -67,8 +67,8 @@ public class GraphOutboundEmailSenderService : IOutboundEmailSenderService
 
     private (GraphServiceClient GraphClient, string MailboxAddress) CreateGraphClient()
     {
-        var tenantId = GetRequiredConfig("GraphApi:TenantId", "MicrosoftAuth:TenantId");
-        var clientId = GetRequiredConfig("GraphApi:ClientId", "MicrosoftAuth:ClientId");
+        var tenantId = GetRequiredConfig("GraphApi:TenantId", "MicrosoftAuth:TenantId", "AzureAd:TenantId");
+        var clientId = GetRequiredConfig("GraphApi:ClientId", "MicrosoftAuth:ClientId", "AzureAd:ClientId");
         var clientSecret = GetRequiredConfig("GraphApi:ClientSecret");
 
         var mailboxAddress = GetRequiredConfig("GraphApi:MailboxAddress");

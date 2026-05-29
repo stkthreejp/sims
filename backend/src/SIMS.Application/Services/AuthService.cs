@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using SIMS.Application.Common;
+using SIMS.Application.Configuration;
 using SIMS.Application.DTOs.Auth;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
@@ -86,8 +87,8 @@ public class AuthService : IAuthService
     public async Task<Result<LoginResponseDto>> LoginWithMicrosoftAsync(MicrosoftLoginRequestDto dto, string ipAddress)
     {
         // ── 1. Validate the Microsoft ID token ───────────────────────────────
-        var tenantId = _config["MicrosoftAuth:TenantId"]!;
-        var clientId = _config["MicrosoftAuth:ClientId"]!;
+        var tenantId = MicrosoftAuthConfiguration.GetTenantId(_config);
+        var clientId = MicrosoftAuthConfiguration.GetClientId(_config);
 
         OpenIdConnectConfiguration oidcConfig;
         try

@@ -1,4 +1,5 @@
 using Azure.Identity;
+using SIMS.Application.Configuration;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
@@ -30,8 +31,8 @@ public class TaskNotificationService : ITaskNotificationService
         _db = db;
         _logger = logger;
 
-        var tenantId     = config["MicrosoftAuth:TenantId"]     ?? throw new InvalidOperationException("MicrosoftAuth:TenantId not configured.");
-        var clientId     = config["MicrosoftAuth:ClientId"]     ?? throw new InvalidOperationException("MicrosoftAuth:ClientId not configured.");
+        var tenantId     = MicrosoftAuthConfiguration.GetTenantId(config);
+        var clientId     = MicrosoftAuthConfiguration.GetClientId(config);
         var clientSecret = config["GraphApi:ClientSecret"]      ?? throw new InvalidOperationException("GraphApi:ClientSecret not configured.");
         _mailboxAddress  = config["GraphApi:MailboxAddress"]    ?? throw new InvalidOperationException("GraphApi:MailboxAddress not configured.");
         _frontendBaseUrl = config["AppSettings:FrontendBaseUrl"] ?? "http://localhost:5173";
