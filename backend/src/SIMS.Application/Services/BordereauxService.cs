@@ -711,12 +711,6 @@ public class BordereauxService : IBordereauxService
                 && l.ProgramCarrier.IsActive
                 && l.IsActive)
             .ToListAsync(ct);
-        var commissionRows = await _db.Set<CarrierCommission>()
-            .Where(c => c.CarrierId == run.Profile.CarrierId
-                && (c.ProgramConfigurationId == run.Profile.ProgramConfigurationId || c.ProgramConfigurationId == null)
-                && c.EffectiveDate <= run.PeriodEnd
-                && (c.DisabledDate == null || c.DisabledDate > run.PeriodStart))
-            .ToListAsync(ct);
         var surplusLinesSetups = await _db.Set<SurplusLinesStateSetup>()
             .Where(s => s.IsActive
                 && s.EffectiveDate <= run.PeriodEnd
@@ -740,9 +734,8 @@ public class BordereauxService : IBordereauxService
             var setup = ResolveLobSetup(lobSetups, row.LineOfBusiness, row.ReportingDate);
             var surplusLinesSetup = ResolveSurplusLinesSetup(surplusLinesSetups, row, row.ReportingDate, run.Profile.ProgramConfigurationId);
             var intermediarySetup = ResolveIntermediarySetup(intermediarySetups, row.LineOfBusiness, row.ReportingDate);
-            var commissionRate = ResolveCarrierCommissionRate(commissionRows, row.LineOfBusiness, row.ReportingDate, run.Profile.ProgramConfigurationId)
-                ?? (row.GrossPremium == 0 ? 0 : decimal.Round(row.GrossCommission / row.GrossPremium, 6));
-            var commissionAmount = decimal.Round(row.GrossPremium * commissionRate, 2, MidpointRounding.AwayFromZero);
+            var commissionRate = row.GrossPremium == 0 ? 0 : decimal.Round(row.GrossCommission / row.GrossPremium, 6);
+            var commissionAmount = row.GrossCommission;
             var brokerageRate = intermediarySetup?.BrokerageRate;
             var brokerageAmount = brokerageRate.HasValue
                 ? decimal.Round(row.GrossPremium * brokerageRate.Value, 2, MidpointRounding.AwayFromZero)
@@ -1204,21 +1197,6 @@ public class BordereauxService : IBordereauxService
                 && l.ProgramCarrier.EffectiveDate <= asOfDate
                 && (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= asOfDate))
             .OrderByDescending(l => l.EffectiveDate)
-            .FirstOrDefault();
-
-    private static decimal? ResolveCarrierCommissionRate(
-        IReadOnlyList<CarrierCommission> commissions,
-        PolicyLineOfBusiness lineOfBusiness,
-        DateOnly asOfDate,
-        Guid programConfigurationId)
-        => commissions
-            .Where(c => (c.LineOfBusiness == lineOfBusiness.ToString() || c.LineOfBusiness == null)
-                && c.EffectiveDate <= asOfDate
-                && (c.DisabledDate == null || c.DisabledDate > asOfDate))
-            .OrderByDescending(c => c.ProgramConfigurationId == programConfigurationId ? 1 : 0)
-            .ThenByDescending(c => c.LineOfBusiness == lineOfBusiness.ToString() ? 1 : 0)
-            .ThenByDescending(c => c.EffectiveDate)
-            .Select(c => (decimal?)c.CommissionRate)
             .FirstOrDefault();
 
     private static IntermediaryProgramCarrierLobSetup? ResolveIntermediarySetup(

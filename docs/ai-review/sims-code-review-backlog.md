@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 policy-number bind-date remediation.
+Last updated on 2026-05-29 during P1 London bordereaux commission remediation.
 
 ## Audit Checkpoints
 
@@ -42,6 +42,12 @@ Last updated on 2026-05-29 during P1 policy-number bind-date remediation.
 - Scope: `QuoteService.BindAsync` and `PolicyNumberService.GenerateForBindAsync`.
 - Result: quote bind now generates assigned policy numbers from the bind request's effective date, so annual sequence reset and `{YYYY}` / `{YY}` tokens match the issued policy term.
 - Verification: regression test covers a quote effective `2026-12-31` bound effective `2027-01-01` and asserts the generated policy number, sequence reset year, and usage row use `2027`.
+
+### 2026-05-29 P1 London bordereaux commission remediation
+
+- Scope: `BordereauxService.GeneratePremiumExportPackageAsync` London premium rows.
+- Result: London bordereaux commission rate, commission amount, and net premium now come from the frozen invoice/account-current source row instead of re-resolving current carrier commission setup.
+- Verification: regression tests cover current carrier commission setup disagreeing with the invoice-stamped commission and assert the London export uses the invoice-stamped rate, commission amount, and net due carrier.
 
 ## P0 Immediate Security / Secret Response
 
@@ -193,6 +199,7 @@ Last updated on 2026-05-29 during P1 policy-number bind-date remediation.
 
 ### London bordereaux export can disagree with invoice/account-current commission
 
+- Status: Remediated on 2026-05-29. London rows now use frozen invoice/account-current commission values from the run snapshot.
 - Evidence: `backend/src/SIMS.Application/Services/BordereauxService.cs`.
 - Risk: account-current rows use invoice-stamped commission, while London rows re-resolve current commission setup.
 - Impact: commission overrides or later setup changes can make exported bordereaux disagree with posted invoice/reconciliation totals.
@@ -346,7 +353,7 @@ Last updated on 2026-05-29 during P1 policy-number bind-date remediation.
 1. Done: rotate and remove the hardcoded database credential.
 2. Done: close residual policy attachment and quote/policy note action-permission gaps.
 3. Done: fix ledger reversal behavior and financial posting atomicity.
-4. Continue P1 financial/data integrity: fix London bordereaux commission source.
+4. Done: fix policy-number bind date and London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.
 6. Add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Add quote money/date validation and user IdentityResult handling.

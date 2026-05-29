@@ -442,7 +442,50 @@ public class BordereauxServiceTests
     }
 
     [Fact]
-    public async Task GeneratePremiumExportPackageAsync_UsesCarrierLobLondonSetupAndCarrierCommission()
+    public async Task GeneratePremiumExportPackageAsync_UsesInvoiceStampedCommissionForLondonRows()
+    {
+        await using var db = CreateDb();
+        var blob = new FakeBlobStorageService();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobSetupAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability);
+        db.Add(new CarrierCommission
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability.ToString(),
+            CommissionRate = 0.24m,
+            SMMRetentionRate = 0.05m,
+            EffectiveDate = new DateOnly(2025, 1, 1),
+            CreatedBy = Guid.NewGuid(),
+        });
+        await db.SaveChangesAsync();
+        var service = new BordereauxService(db, blob);
+        var profile = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+        await SeedPolicyTransactionWithInvoiceAsync(
+            db,
+            program,
+            carrier,
+            TransactionType.NewBusiness,
+            new DateOnly(2026, 4, 8),
+            new DateOnly(2026, 4, 8),
+            "LL-GL-000145-00",
+            "MS",
+            1451m,
+            362.75m);
+        var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
+
+        await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
+
+        var londonText = blob.Uploads[0].Text;
+        Assert.Contains("0.25", londonText);
+        Assert.Contains("362.75", londonText);
+        Assert.Contains("1088.25", londonText);
+        Assert.DoesNotContain("348.24", londonText);
+        Assert.DoesNotContain("1102.76", londonText);
+    }
+
+    [Fact]
+    public async Task GeneratePremiumExportPackageAsync_UsesCarrierLobLondonSetupAndInvoiceCommission()
     {
         await using var db = CreateDb();
         var blob = new FakeBlobStorageService();
@@ -492,8 +535,8 @@ public class BordereauxServiceTests
         Assert.Contains("LOGGING LUMBERING", londonText);
         Assert.Contains("DIRECT", londonText);
         Assert.Contains("USD", londonText);
-        Assert.Contains("0.24", londonText);
-        Assert.Contains("348.24", londonText);
+        Assert.Contains("0.25", londonText);
+        Assert.Contains("362.75", londonText);
         Assert.Contains("Specialty Market Managers, LLC", londonText);
         Assert.Contains("MS-SL-12345", londonText);
         Assert.Contains("456 Filing Ave", londonText);
