@@ -9,7 +9,7 @@ import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { surplusLinesApi } from '@/api/surplusLines.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
-import type { FeeDefinition } from '@/types/fee.types'
+import type { FeeDefinition, PayeeOption } from '@/types/fee.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { SurplusLinesStateSetup, SurplusLinesStateSetupUpsert } from '@/types/surplusLines.types'
 
@@ -43,6 +43,18 @@ const emptySetup = (): SurplusLinesStateSetupUpsert => ({
   surplusLinesTaxFeeDefinitionId: null,
   stampingFeeDefinitionId: null,
   filingFeeDefinitionId: null,
+  filingPayeeId: null,
+  createFilingPayable: false,
+  filingPaymentTermsDays: 30,
+  filingFrequency: 'Monthly',
+  filingDueDayOfMonth: null,
+  filingMethod: null,
+  filingPortalUrl: null,
+  requiredFilingFormsJson: '[]',
+  diligentSearchRequired: false,
+  diligentSearchNotes: null,
+  affidavitRequired: false,
+  affidavitNotes: null,
 })
 
 const inputCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
@@ -70,6 +82,10 @@ export function SurplusLinesAdminPage() {
   const { data: fees = [] } = useQuery({
     queryKey: ['admin', 'fees', 'definitions'],
     queryFn: feesApi.getDefinitions,
+  })
+  const { data: payees = [] } = useQuery({
+    queryKey: ['admin', 'fees', 'payees'],
+    queryFn: feesApi.getPayees,
   })
 
   const selectedSetup = useMemo(
@@ -137,6 +153,18 @@ export function SurplusLinesAdminPage() {
       surplusLinesTaxFeeDefinitionId: setup.surplusLinesTaxFeeDefinitionId,
       stampingFeeDefinitionId: setup.stampingFeeDefinitionId,
       filingFeeDefinitionId: setup.filingFeeDefinitionId,
+      filingPayeeId: setup.filingPayeeId,
+      createFilingPayable: setup.createFilingPayable,
+      filingPaymentTermsDays: setup.filingPaymentTermsDays,
+      filingFrequency: setup.filingFrequency,
+      filingDueDayOfMonth: setup.filingDueDayOfMonth,
+      filingMethod: setup.filingMethod,
+      filingPortalUrl: setup.filingPortalUrl,
+      requiredFilingFormsJson: setup.requiredFilingFormsJson,
+      diligentSearchRequired: setup.diligentSearchRequired,
+      diligentSearchNotes: setup.diligentSearchNotes,
+      affidavitRequired: setup.affidavitRequired,
+      affidavitNotes: setup.affidavitNotes,
     })
   }
 
@@ -216,6 +244,59 @@ export function SurplusLinesAdminPage() {
               <FeeSelect label="Filing fee" value={form.filingFeeDefinitionId} fees={fees} onChange={(value) => setForm((f) => ({ ...f, filingFeeDefinitionId: value }))} />
             </div>
 
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Filing vendor / payable</div>
+              <div className="grid grid-cols-2 gap-3">
+                <CheckInput label="Create filing payable" checked={form.createFilingPayable} onChange={(value) => setForm((f) => ({ ...f, createFilingPayable: value }))} />
+                <PayeeSelect label="Filing payee" value={form.filingPayeeId} payees={payees} onChange={(value) => setForm((f) => ({ ...f, filingPayeeId: value }))} />
+                <TextInput
+                  label="Payment terms days"
+                  type="number"
+                  value={form.filingPaymentTermsDays?.toString() ?? ''}
+                  onChange={(value) => setForm((f) => ({ ...f, filingPaymentTermsDays: value ? Number(value) : null }))}
+                />
+                <SelectField label="Filing frequency" value={form.filingFrequency ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingFrequency: value || null }))}>
+                  <option value="">Not set</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                  <option value="Annual">Annual</option>
+                  <option value="Transaction">Per transaction</option>
+                </SelectField>
+                <TextInput
+                  label="Due day of month"
+                  type="number"
+                  value={form.filingDueDayOfMonth?.toString() ?? ''}
+                  onChange={(value) => setForm((f) => ({ ...f, filingDueDayOfMonth: value ? Number(value) : null }))}
+                />
+                <SelectField label="Filing method" value={form.filingMethod ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingMethod: value || null }))}>
+                  <option value="">Not set</option>
+                  <option value="Portal">Portal</option>
+                  <option value="Email">Email</option>
+                  <option value="Paper">Paper</option>
+                  <option value="Vendor">Vendor</option>
+                  <option value="Other">Other</option>
+                </SelectField>
+              </div>
+              <div className="mt-3">
+                <TextInput label="Filing portal URL" value={form.filingPortalUrl ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingPortalUrl: value || null }))} />
+              </div>
+            </div>
+
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">State paperwork</div>
+              <TextArea
+                label="Required filing forms"
+                value={formsJsonToText(form.requiredFilingFormsJson)}
+                onChange={(value) => setForm((f) => ({ ...f, requiredFilingFormsJson: formsTextToJson(value) }))}
+              />
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <CheckInput label="Diligent search required" checked={form.diligentSearchRequired} onChange={(value) => setForm((f) => ({ ...f, diligentSearchRequired: value }))} />
+                <CheckInput label="Affidavit required" checked={form.affidavitRequired} onChange={(value) => setForm((f) => ({ ...f, affidavitRequired: value }))} />
+                <TextArea label="Diligent search notes" value={form.diligentSearchNotes ?? ''} onChange={(value) => setForm((f) => ({ ...f, diligentSearchNotes: value }))} />
+                <TextArea label="Affidavit notes" value={form.affidavitNotes ?? ''} onChange={(value) => setForm((f) => ({ ...f, affidavitNotes: value }))} />
+              </div>
+            </div>
+
             <TextArea label="Stamping wording" value={form.stampingWording ?? ''} onChange={(value) => setForm((f) => ({ ...f, stampingWording: value }))} />
             <TextArea label="Required notice" value={form.requiredNoticeText ?? ''} onChange={(value) => setForm((f) => ({ ...f, requiredNoticeText: value }))} />
             <div className="grid grid-cols-2 gap-3">
@@ -226,7 +307,7 @@ export function SurplusLinesAdminPage() {
             <button
               type="button"
               onClick={() => saveSetup.mutate()}
-              disabled={saveSetup.isPending || !form.stateCode || !form.licenseNumber.trim() || !form.filingBrokerName.trim()}
+              disabled={saveSetup.isPending || !form.stateCode || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable && !form.filingPayeeId)}
               className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -277,6 +358,9 @@ export function SurplusLinesAdminPage() {
                       </td>
                       <td className="text-xs text-slate-600">
                         {[setup.surplusLinesTaxFeeName, setup.stampingFeeName, setup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'}
+                        {setup.createFilingPayable && (
+                          <div className="mt-1 text-slate-500">Payable: {setup.filingPayeeName ?? 'No payee selected'}</div>
+                        )}
                         {setup.feeValidationMessages.length > 0 && (
                           <div className="mt-1 font-medium text-amber-700">{setup.feeValidationMessages.length} fee setup issue{setup.feeValidationMessages.length === 1 ? '' : 's'}</div>
                         )}
@@ -311,6 +395,10 @@ export function SurplusLinesAdminPage() {
                 <DetailBlock label="License" value={`${selectedSetup.licenseNumber} (${selectedSetup.licenseState})`} />
                 <DetailBlock label="Address" value={[selectedSetup.brokerAddressLine1, selectedSetup.brokerAddressLine2, selectedSetup.brokerCity, selectedSetup.brokerState, selectedSetup.brokerZipCode, selectedSetup.brokerCountry].filter(Boolean).join(', ')} />
                 <DetailBlock label="Linked fees" value={[selectedSetup.surplusLinesTaxFeeName, selectedSetup.stampingFeeName, selectedSetup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'} />
+                <DetailBlock label="Filing payable" value={selectedSetup.createFilingPayable ? `${selectedSetup.filingPayeeName ?? 'No payee'}${selectedSetup.filingPaymentTermsDays != null ? ` / Net ${selectedSetup.filingPaymentTermsDays}` : ''}` : 'No filing payable'} />
+                <DetailBlock label="Filing cadence" value={[selectedSetup.filingFrequency, selectedSetup.filingDueDayOfMonth ? `Due day ${selectedSetup.filingDueDayOfMonth}` : null, selectedSetup.filingMethod].filter(Boolean).join(' / ') || 'Not set'} />
+                <DetailBlock label="Filing portal" value={selectedSetup.filingPortalUrl || 'None'} />
+                <DetailBlock label="Required forms" value={formsJsonToText(selectedSetup.requiredFilingFormsJson) || 'None'} />
                 {selectedSetup.feeValidationMessages.length > 0 && (
                   <div className="rounded border border-amber-200 bg-amber-50 p-3 md:col-span-2">
                     <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Fee setup issues</div>
@@ -321,6 +409,8 @@ export function SurplusLinesAdminPage() {
                 )}
                 <DetailBlock label="Stamping wording" value={selectedSetup.stampingWording || 'None'} />
                 <DetailBlock label="Required notice" value={selectedSetup.requiredNoticeText || 'None'} />
+                <DetailBlock label="Diligent search" value={selectedSetup.diligentSearchRequired ? selectedSetup.diligentSearchNotes || 'Required' : 'Not required'} />
+                <DetailBlock label="Affidavit" value={selectedSetup.affidavitRequired ? selectedSetup.affidavitNotes || 'Required' : 'Not required'} />
                 <DetailBlock label="Paperwork notes" value={selectedSetup.paperworkNotes || 'None'} />
                 <DetailBlock label="Filing notes" value={selectedSetup.filingNotes || 'None'} />
               </div>
@@ -370,6 +460,15 @@ function FeeSelect({ label, value, fees, onChange }: { label: string; value: num
   )
 }
 
+function PayeeSelect({ label, value, payees, onChange }: { label: string; value: number | null; payees: PayeeOption[]; onChange: (value: number | null) => void }) {
+  return (
+    <SelectField label={label} value={value?.toString() ?? ''} onChange={(raw) => onChange(raw ? Number(raw) : null)}>
+      <option value="">None</option>
+      {payees.map((payee) => <option key={payee.id} value={payee.id}>{payee.name} ({payee.payeeType})</option>)}
+    </SelectField>
+  )
+}
+
 function CheckInput({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <label className="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
@@ -414,6 +513,12 @@ function cleanSetup(setup: SurplusLinesStateSetupUpsert): SurplusLinesStateSetup
     requiredNoticeText: trimToNull(setup.requiredNoticeText),
     paperworkNotes: trimToNull(setup.paperworkNotes),
     filingNotes: trimToNull(setup.filingNotes),
+    filingFrequency: trimToNull(setup.filingFrequency),
+    filingMethod: trimToNull(setup.filingMethod),
+    filingPortalUrl: trimToNull(setup.filingPortalUrl),
+    requiredFilingFormsJson: setup.requiredFilingFormsJson || '[]',
+    diligentSearchNotes: trimToNull(setup.diligentSearchNotes),
+    affidavitNotes: trimToNull(setup.affidavitNotes),
   }
 }
 
@@ -429,4 +534,25 @@ function getApiErrorMessage(e: unknown, fallback: string) {
   }
   if (e instanceof Error) return e.message
   return fallback
+}
+
+function formsJsonToText(json: string | null) {
+  if (!json) return ''
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === 'string').join('\n')
+      : ''
+  } catch {
+    return ''
+  }
+}
+
+function formsTextToJson(text: string) {
+  const forms = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  return JSON.stringify(forms)
 }

@@ -26,6 +26,14 @@ public class SurplusLinesStateSetupConfiguration : IEntityTypeConfiguration<Surp
         builder.Property(s => s.RequiredNoticeText).HasMaxLength(2000);
         builder.Property(s => s.PaperworkNotes).HasMaxLength(2000);
         builder.Property(s => s.FilingNotes).HasMaxLength(2000);
+        builder.Property(s => s.FilingFrequency).HasMaxLength(30);
+        builder.Property(s => s.FilingMethod).HasMaxLength(50);
+        builder.Property(s => s.FilingPortalUrl).HasMaxLength(500);
+        builder.Property(s => s.RequiredFilingFormsJson)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb");
+        builder.Property(s => s.DiligentSearchNotes).HasMaxLength(2000);
+        builder.Property(s => s.AffidavitNotes).HasMaxLength(2000);
 
         builder.HasIndex(s => new
         {
@@ -59,6 +67,11 @@ public class SurplusLinesStateSetupConfiguration : IEntityTypeConfiguration<Surp
         builder.HasOne(s => s.FilingFeeDefinition)
             .WithMany()
             .HasForeignKey(s => s.FilingFeeDefinitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.FilingPayee)
+            .WithMany()
+            .HasForeignKey(s => s.FilingPayeeId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

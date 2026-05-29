@@ -35,6 +35,19 @@ public record SurplusLinesStateSetupDto(
     string? StampingFeeName,
     long? FilingFeeDefinitionId,
     string? FilingFeeName,
+    long? FilingPayeeId,
+    string? FilingPayeeName,
+    bool CreateFilingPayable,
+    int? FilingPaymentTermsDays,
+    string? FilingFrequency,
+    int? FilingDueDayOfMonth,
+    string? FilingMethod,
+    string? FilingPortalUrl,
+    string RequiredFilingFormsJson,
+    bool DiligentSearchRequired,
+    string? DiligentSearchNotes,
+    bool AffidavitRequired,
+    string? AffidavitNotes,
     IReadOnlyList<string> FeeValidationMessages,
     DateTime CreatedAt,
     DateTime UpdatedAt
@@ -65,7 +78,19 @@ public record UpsertSurplusLinesStateSetupRequest(
     string? FilingNotes,
     long? SurplusLinesTaxFeeDefinitionId,
     long? StampingFeeDefinitionId,
-    long? FilingFeeDefinitionId
+    long? FilingFeeDefinitionId,
+    long? FilingPayeeId = null,
+    bool CreateFilingPayable = false,
+    int? FilingPaymentTermsDays = null,
+    string? FilingFrequency = null,
+    int? FilingDueDayOfMonth = null,
+    string? FilingMethod = null,
+    string? FilingPortalUrl = null,
+    string RequiredFilingFormsJson = "[]",
+    bool DiligentSearchRequired = false,
+    string? DiligentSearchNotes = null,
+    bool AffidavitRequired = false,
+    string? AffidavitNotes = null
 );
 
 public record CopySurplusLinesStateSetupRequest(string TargetStateCode);

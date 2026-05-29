@@ -147,6 +147,44 @@ public class SurplusLinesSetupAdminServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_RejectsFilingPayableWithoutPayee()
+    {
+        await using var db = CreateDb();
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "TX",
+            null,
+            null,
+            null,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "TX-SL-1",
+            "TX",
+            "123 Main",
+            null,
+            "Dallas",
+            "TX",
+            "75201",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            CreateFilingPayable: true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("FILING_PAYEE_REQUIRED", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task CreateAsync_ReturnsValidationMessageWhenLinkedFeeHasNoMatchingRule()
     {
         await using var db = CreateDb();

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.SurplusLines;
 using SIMS.Application.Interfaces.Services;
@@ -112,7 +113,19 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             FilingNotes = source.FilingNotes,
             SurplusLinesTaxFeeDefinitionId = source.SurplusLinesTaxFeeDefinitionId,
             StampingFeeDefinitionId = source.StampingFeeDefinitionId,
-            FilingFeeDefinitionId = source.FilingFeeDefinitionId
+            FilingFeeDefinitionId = source.FilingFeeDefinitionId,
+            FilingPayeeId = source.FilingPayeeId,
+            CreateFilingPayable = source.CreateFilingPayable,
+            FilingPaymentTermsDays = source.FilingPaymentTermsDays,
+            FilingFrequency = source.FilingFrequency,
+            FilingDueDayOfMonth = source.FilingDueDayOfMonth,
+            FilingMethod = source.FilingMethod,
+            FilingPortalUrl = source.FilingPortalUrl,
+            RequiredFilingFormsJson = source.RequiredFilingFormsJson,
+            DiligentSearchRequired = source.DiligentSearchRequired,
+            DiligentSearchNotes = source.DiligentSearchNotes,
+            AffidavitRequired = source.AffidavitRequired,
+            AffidavitNotes = source.AffidavitNotes
         };
 
         _db.Set<SurplusLinesStateSetup>().Add(copy);
@@ -127,7 +140,8 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             .Include(s => s.Carrier)
             .Include(s => s.SurplusLinesTaxFeeDefinition)
             .Include(s => s.StampingFeeDefinition)
-            .Include(s => s.FilingFeeDefinition);
+            .Include(s => s.FilingFeeDefinition)
+            .Include(s => s.FilingPayee);
 
     private async Task<(string Code, string Message)?> ValidateAsync(UpsertSurplusLinesStateSetupRequest request, CancellationToken ct)
     {
@@ -139,6 +153,14 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             return ("BROKER_STATE_INVALID", "Broker state must be two characters.");
         if (request.ExpirationDate.HasValue && request.ExpirationDate.Value < request.EffectiveDate)
             return ("INVALID_DATE_RANGE", "Expiration date cannot be before effective date.");
+        if (request.CreateFilingPayable && !request.FilingPayeeId.HasValue)
+            return ("FILING_PAYEE_REQUIRED", "Select a filing payee before creating filing payables.");
+        if (request.FilingPaymentTermsDays is < 0 or > 365)
+            return ("INVALID_PAYMENT_TERMS", "Filing payment terms must be between 0 and 365 days.");
+        if (request.FilingDueDayOfMonth is < 1 or > 31)
+            return ("INVALID_DUE_DAY", "Filing due day must be between 1 and 31.");
+        if (!IsValidJsonArray(request.RequiredFilingFormsJson))
+            return ("INVALID_REQUIRED_FORMS", "Required filing forms must be a JSON array.");
         if (string.IsNullOrWhiteSpace(request.LicenseHolderType))
             return ("LICENSE_HOLDER_REQUIRED", "License holder type is required.");
         if (string.IsNullOrWhiteSpace(request.FilingBrokerName))
@@ -181,6 +203,14 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
                 return ("FEE_DEFINITION_NOT_FOUND", "One or more linked fee definitions were not found.");
         }
 
+        if (request.FilingPayeeId.HasValue)
+        {
+            var payeeExists = await _db.Set<Payee>()
+                .AnyAsync(p => p.Id == request.FilingPayeeId.Value && p.TenantId == 1 && p.IsActive, ct);
+            if (!payeeExists)
+                return ("FILING_PAYEE_NOT_FOUND", "Filing payee was not found or inactive.");
+        }
+
         return null;
     }
 
@@ -211,6 +241,18 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         setup.SurplusLinesTaxFeeDefinitionId = request.SurplusLinesTaxFeeDefinitionId;
         setup.StampingFeeDefinitionId = request.StampingFeeDefinitionId;
         setup.FilingFeeDefinitionId = request.FilingFeeDefinitionId;
+        setup.FilingPayeeId = request.FilingPayeeId;
+        setup.CreateFilingPayable = request.CreateFilingPayable;
+        setup.FilingPaymentTermsDays = request.FilingPaymentTermsDays;
+        setup.FilingFrequency = TrimToNull(request.FilingFrequency);
+        setup.FilingDueDayOfMonth = request.FilingDueDayOfMonth;
+        setup.FilingMethod = TrimToNull(request.FilingMethod);
+        setup.FilingPortalUrl = TrimToNull(request.FilingPortalUrl);
+        setup.RequiredFilingFormsJson = NormalizeJsonArray(request.RequiredFilingFormsJson);
+        setup.DiligentSearchRequired = request.DiligentSearchRequired;
+        setup.DiligentSearchNotes = TrimToNull(request.DiligentSearchNotes);
+        setup.AffidavitRequired = request.AffidavitRequired;
+        setup.AffidavitNotes = TrimToNull(request.AffidavitNotes);
     }
 
     private static Result<string> NormalizeStateCode(string stateCode)
@@ -258,6 +300,19 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             setup.StampingFeeDefinition?.DisplayName,
             setup.FilingFeeDefinitionId,
             setup.FilingFeeDefinition?.DisplayName,
+            setup.FilingPayeeId,
+            setup.FilingPayee?.Name,
+            setup.CreateFilingPayable,
+            setup.FilingPaymentTermsDays,
+            setup.FilingFrequency,
+            setup.FilingDueDayOfMonth,
+            setup.FilingMethod,
+            setup.FilingPortalUrl,
+            setup.RequiredFilingFormsJson,
+            setup.DiligentSearchRequired,
+            setup.DiligentSearchNotes,
+            setup.AffidavitRequired,
+            setup.AffidavitNotes,
             await GetFeeValidationMessagesAsync(setup, ct),
             setup.CreatedAt,
             setup.UpdatedAt);
@@ -304,4 +359,29 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
 
     private static string TrimToEmpty(string? value) => value?.Trim() ?? string.Empty;
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool IsValidJsonArray(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            return document.RootElement.ValueKind == JsonValueKind.Array;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string NormalizeJsonArray(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "[]";
+
+        using var document = JsonDocument.Parse(value);
+        return JsonSerializer.Serialize(document.RootElement);
+    }
 }

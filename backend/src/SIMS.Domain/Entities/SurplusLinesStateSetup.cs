@@ -30,10 +30,23 @@ public class SurplusLinesStateSetup : BaseEntity
     public long? SurplusLinesTaxFeeDefinitionId { get; set; }
     public long? StampingFeeDefinitionId { get; set; }
     public long? FilingFeeDefinitionId { get; set; }
+    public long? FilingPayeeId { get; set; }
+    public bool CreateFilingPayable { get; set; }
+    public int? FilingPaymentTermsDays { get; set; }
+    public string? FilingFrequency { get; set; }
+    public int? FilingDueDayOfMonth { get; set; }
+    public string? FilingMethod { get; set; }
+    public string? FilingPortalUrl { get; set; }
+    public string RequiredFilingFormsJson { get; set; } = "[]";
+    public bool DiligentSearchRequired { get; set; }
+    public string? DiligentSearchNotes { get; set; }
+    public bool AffidavitRequired { get; set; }
+    public string? AffidavitNotes { get; set; }
 
     public ProgramConfiguration? ProgramConfiguration { get; set; }
     public Carrier? Carrier { get; set; }
     public FeeDefinition? SurplusLinesTaxFeeDefinition { get; set; }
     public FeeDefinition? StampingFeeDefinition { get; set; }
     public FeeDefinition? FilingFeeDefinition { get; set; }
+    public Payee? FilingPayee { get; set; }
 }

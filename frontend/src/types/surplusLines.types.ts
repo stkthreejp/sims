@@ -33,6 +33,19 @@ export interface SurplusLinesStateSetup {
   stampingFeeName: string | null
   filingFeeDefinitionId: number | null
   filingFeeName: string | null
+  filingPayeeId: number | null
+  filingPayeeName: string | null
+  createFilingPayable: boolean
+  filingPaymentTermsDays: number | null
+  filingFrequency: string | null
+  filingDueDayOfMonth: number | null
+  filingMethod: string | null
+  filingPortalUrl: string | null
+  requiredFilingFormsJson: string
+  diligentSearchRequired: boolean
+  diligentSearchNotes: string | null
+  affidavitRequired: boolean
+  affidavitNotes: string | null
   feeValidationMessages: string[]
   createdAt: string
   updatedAt: string
@@ -64,4 +77,16 @@ export interface SurplusLinesStateSetupUpsert {
   surplusLinesTaxFeeDefinitionId: number | null
   stampingFeeDefinitionId: number | null
   filingFeeDefinitionId: number | null
+  filingPayeeId: number | null
+  createFilingPayable: boolean
+  filingPaymentTermsDays: number | null
+  filingFrequency: string | null
+  filingDueDayOfMonth: number | null
+  filingMethod: string | null
+  filingPortalUrl: string | null
+  requiredFilingFormsJson: string
+  diligentSearchRequired: boolean
+  diligentSearchNotes: string | null
+  affidavitRequired: boolean
+  affidavitNotes: string | null
 }
