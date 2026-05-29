@@ -722,9 +722,25 @@ public class PolicyService : IPolicyService
         }
         txn.PremiumAfter ??= txn.NewTotalPremium;
 
+        if (txn.PremiumChange < 0)
+            return Result<PolicyTransactionDto>.Failure(
+                "RETURN_PREMIUM_ENDORSEMENT_ACCOUNTING_REQUIRED",
+                "Return-premium endorsements cannot be issued until return-premium accounting is configured.");
+
+        var quote = txn.Policy.BoundQuote;
+        var submission = txn.Policy.Submission;
+        if (quote == null || submission == null)
+            return Result<PolicyTransactionDto>.Failure(
+                "INVOICE_CONTEXT_MISSING",
+                "Endorsement invoice context is missing.");
+
         var authorityGate = await EnsureLargeEndorsementAuthorityAsync(txn, access.UserId, currentUserPermissions ?? Array.Empty<string>());
         if (!authorityGate.IsSuccess)
             return Result<PolicyTransactionDto>.Failure(authorityGate.ErrorCode!, authorityGate.ErrorMessage!);
+
+        await using var dbTransaction = Db.Database.IsRelational() && Db.Database.CurrentTransaction == null
+            ? await Db.Database.BeginTransactionAsync()
+            : null;
 
         var priorVersion = await _policyVersions.EnsureCurrentVersionAsync(txn.Policy, access.UserId);
         var transitionResult = await _transactionLifecycle.TransitionAsync(txn, PolicyTransactionStatus.Issued, access.UserId, "Endorsement issued.");
@@ -736,30 +752,32 @@ public class PolicyService : IPolicyService
         await Db.SaveChangesAsync();
 
         // Auto-create invoice
-        var quote = txn.Policy.BoundQuote;
-        var submission = txn.Policy.Submission;
-        if (quote != null && submission != null)
-        {
-            var req = new CreateInvoiceRequest(
-                EffectiveDate: txn.EffectiveDate,
-                GrossPremium: txn.PremiumChange,
-                StateCode: submission.Insured?.State ?? "",
-                IsEndorsement: true,
-                IsFilingState: quote.IsFilingState,
-                CarrierId: txn.Policy.CarrierId,
-                CompanyId: quote.CompanyId,
-                ProducerId: quote.ProducerId,
-                LineOfBusiness: quote.LineOfBusiness.ToString(),
-                City: null,
-                LicenseType: null,
-                LocationCount: submission.Locations?.Count(l => !l.IsDeleted) ?? 1,
-                VehicleCount: submission.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
-                PolicyTransactionId: txn.Id,
-                PolicyVersionId: policyVersion.Id,
-                ProgramConfigurationId: quote.ProgramId
-            );
-            await _invoicing.BindAsync(req, access.UserId);
-        }
+        var req = new CreateInvoiceRequest(
+            EffectiveDate: txn.EffectiveDate,
+            GrossPremium: txn.PremiumChange,
+            StateCode: submission.Insured?.State ?? "",
+            IsEndorsement: true,
+            IsFilingState: quote.IsFilingState,
+            CarrierId: txn.Policy.CarrierId,
+            CompanyId: quote.CompanyId,
+            ProducerId: quote.ProducerId,
+            LineOfBusiness: quote.LineOfBusiness.ToString(),
+            City: null,
+            LicenseType: null,
+            LocationCount: submission.Locations?.Count(l => !l.IsDeleted) ?? 1,
+            VehicleCount: submission.Vehicles?.Count(v => !v.IsDeleted) ?? 1,
+            PolicyTransactionId: txn.Id,
+            PolicyVersionId: policyVersion.Id,
+            ProgramConfigurationId: quote.ProgramId
+        );
+        var invoiceResult = await _invoicing.BindAsync(req, access.UserId);
+        if (!invoiceResult.IsSuccess)
+            return Result<PolicyTransactionDto>.Failure(
+                invoiceResult.ErrorCode ?? "INVOICE_FAILED",
+                invoiceResult.ErrorMessage ?? "Endorsement invoice could not be created.");
+
+        if (dbTransaction != null)
+            await dbTransaction.CommitAsync();
 
         return Result<PolicyTransactionDto>.Success(MapToTransactionDto(txn));
     }

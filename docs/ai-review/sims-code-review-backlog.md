@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-28 during P1 financial posting atomicity remediation.
+Last updated on 2026-05-29 during P1 endorsement invoicing remediation.
 
 ## Audit Checkpoints
 
@@ -24,6 +24,12 @@ Last updated on 2026-05-28 during P1 financial posting atomicity remediation.
 - Scope: invoice bind/posting, receipt create/posting, and cash application/distribution instruction workflows.
 - Result: each workflow now opens a database transaction when it owns the unit of work and reuses any existing outer transaction when called from a larger bind/issue flow.
 - Verification: SQLite-backed rollback regression tests simulate ledger/distribution failures and assert no partial invoice, receipt, application, ledger, payable, or status changes remain.
+
+### 2026-05-29 P1 endorsement invoicing remediation
+
+- Scope: `PolicyService.IssueEndorsementAsync` and endorsement invoice creation.
+- Result: endorsement issue now treats invoice creation failure as a blocking failure inside the issue transaction; return-premium endorsements are blocked before issue until valid return-premium accounting is implemented.
+- Verification: regression tests cover invoice-failure rollback and return-premium rejection without issuing or changing policy premium.
 
 ## P0 Immediate Security / Secret Response
 
@@ -132,6 +138,7 @@ Last updated on 2026-05-28 during P1 financial posting atomicity remediation.
 
 ### Issued endorsements can end up without a valid invoice
 
+- Status: Remediated on 2026-05-29. Positive-premium endorsement issue and invoice creation now share one transaction and propagate invoice failures; return-premium endorsements fail before issue instead of creating invalid negative ledger entries.
 - Evidence: `backend/src/SIMS.Application/Services/PolicyService.cs` `IssueEndorsementAsync`; `backend/src/SIMS.Application/Services/LedgerService.cs`.
 - Risk: endorsement status, policy premium, and policy version are updated before invoicing, and invoice creation result is not checked.
 - Impact: an endorsement may be issued without a valid invoice or ledger result, especially for return-premium endorsements.
@@ -325,7 +332,7 @@ Last updated on 2026-05-28 during P1 financial posting atomicity remediation.
 1. Done: rotate and remove the hardcoded database credential.
 2. Done: close residual policy attachment and quote/policy note action-permission gaps.
 3. Done: fix ledger reversal behavior and financial posting atomicity.
-4. Fix endorsement invoicing, mixed-payee disbursements, policy-number bind date, and London bordereaux commission source.
+4. Continue P1 financial/data integrity: fix mixed-payee disbursements, policy-number bind date, and London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.
 6. Add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Add quote money/date validation and user IdentityResult handling.

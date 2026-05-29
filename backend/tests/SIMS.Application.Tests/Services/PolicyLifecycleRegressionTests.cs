@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Data.Sqlite;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs;
 using SIMS.Application.DTOs.Accounting;
@@ -792,6 +793,89 @@ public class PolicyLifecycleRegressionTests
         Assert.Equal(PolicyStatus.Active, transactionDto.ResultingVersion.Status);
         Assert.Equal(1000m, transactionDto.PriorVersion.TotalPremium);
         Assert.Equal(1125m, transactionDto.ResultingVersion.TotalPremium);
+    }
+
+    [Fact]
+    public async Task IssueEndorsement_RollsBackWhenInvoiceCreationFails()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new SqlitePolicyLifecycleDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var invoicing = new RecordingInvoicingService
+        {
+            BindResult = Result<InvoiceDetailDto>.Failure("INVOICE_FAILED", "Invoice could not be created.")
+        };
+        var policyService = CreatePolicyService(db, invoicing);
+        var createResult = await policyService.AddEndorsementAsync(fixture.Policy.Id, new CreateEndorsementDto
+        {
+            EffectiveDate = new DateOnly(2026, 6, 1),
+            PremiumChange = 125m,
+            EndorsementDescription = "Add scheduled equipment",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(createResult.IsSuccess);
+
+        var issueResult = await policyService.IssueEndorsementAsync(
+            fixture.Policy.Id,
+            createResult.Value!.Id,
+            new IssueEndorsementDto(),
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.False(issueResult.IsSuccess);
+        Assert.Equal("INVOICE_FAILED", issueResult.ErrorCode);
+
+        await using var verifyDb = new SqlitePolicyLifecycleDbContext(options);
+        var transaction = await verifyDb.Set<PolicyTransaction>().SingleAsync(t => t.Id == createResult.Value.Id);
+        Assert.Equal(PolicyTransactionStatus.Submitted, transaction.Status);
+        Assert.Null(transaction.PriorPolicyVersionId);
+        Assert.Null(transaction.ResultingPolicyVersionId);
+        Assert.Equal(1000m, await verifyDb.Set<Policy>()
+            .Where(p => p.Id == fixture.Policy.Id)
+            .Select(p => p.TotalPremium)
+            .SingleAsync());
+        Assert.Equal(0, await verifyDb.Set<PolicyVersion>().CountAsync(v => v.PolicyId == fixture.Policy.Id));
+        Assert.DoesNotContain(
+            await verifyDb.Set<PolicyTransactionStatusHistory>()
+                .Where(h => h.PolicyTransactionId == createResult.Value.Id)
+                .Select(h => h.EventName)
+                .ToListAsync(),
+            eventName => eventName == "policy.transaction.issued");
+    }
+
+    [Fact]
+    public async Task IssueEndorsement_RejectsReturnPremiumWithoutIssuing()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBoundPolicyAsync(db);
+        var invoicing = new RecordingInvoicingService();
+        var policyService = CreatePolicyService(db, invoicing);
+        var createResult = await policyService.AddEndorsementAsync(fixture.Policy.Id, new CreateEndorsementDto
+        {
+            EffectiveDate = new DateOnly(2026, 6, 1),
+            PremiumChange = -125m,
+            EndorsementDescription = "Remove scheduled equipment",
+        }, UserAccessScope.All(fixture.UserId));
+        Assert.True(createResult.IsSuccess);
+
+        var issueResult = await policyService.IssueEndorsementAsync(
+            fixture.Policy.Id,
+            createResult.Value!.Id,
+            new IssueEndorsementDto(),
+            UserAccessScope.All(fixture.UserId));
+
+        Assert.False(issueResult.IsSuccess);
+        Assert.Equal("RETURN_PREMIUM_ENDORSEMENT_ACCOUNTING_REQUIRED", issueResult.ErrorCode);
+        Assert.Empty(invoicing.BindRequests);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync(t => t.Id == createResult.Value.Id);
+        Assert.Equal(PolicyTransactionStatus.Submitted, transaction.Status);
+        Assert.Equal(1000m, await db.Set<Policy>()
+            .Where(p => p.Id == fixture.Policy.Id)
+            .Select(p => p.TotalPremium)
+            .SingleAsync());
     }
 
     [Fact]
@@ -2389,6 +2473,19 @@ public class PolicyLifecycleRegressionTests
         return new ApplicationDbContext(options);
     }
 
+    private sealed class SqlitePolicyLifecycleDbContext(DbContextOptions<ApplicationDbContext> options)
+        : ApplicationDbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+            builder.Entity<Quote>()
+                .HasIndex(q => q.PolicyNumber)
+                .IsUnique()
+                .HasFilter(null);
+        }
+    }
+
     private static QuoteService CreateQuoteService(
         ApplicationDbContext db,
         RecordingInvoicingService invoicing,
@@ -2774,10 +2871,14 @@ public class PolicyLifecycleRegressionTests
     private sealed class RecordingInvoicingService : IInvoicingService
     {
         public List<CreateInvoiceRequest> BindRequests { get; } = [];
+        public Result<InvoiceDetailDto>? BindResult { get; set; }
 
         public Task<Result<InvoiceDetailDto>> BindAsync(CreateInvoiceRequest req, Guid userId, CancellationToken ct = default)
         {
             BindRequests.Add(req);
+            if (BindResult != null)
+                return Task.FromResult(BindResult);
+
             return Task.FromResult(Result<InvoiceDetailDto>.Success(new InvoiceDetailDto(
                 BindRequests.Count,
                 $"INV-{BindRequests.Count:000}",
