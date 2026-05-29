@@ -18,11 +18,12 @@ public class PolicyNumberService : IPolicyNumberService
         _db = db;
     }
 
-    public async Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById)
+    public async Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById, DateOnly? effectiveDate = null)
     {
         if (quote.PolicyNumber != null)
             return Result<PolicyNumberGenerationResult>.Failure("POLICY_NUMBER_EXISTS", "This quote already has a policy number.");
 
+        var policyEffectiveDate = effectiveDate ?? quote.EffectiveDate;
         var state = quote.Submission?.Insured?.State?.Trim().ToUpperInvariant();
         var assignment = await FindAssignmentAsync(quote.ProgramId, quote.CarrierId, quote.LineOfBusiness, state);
 
@@ -43,10 +44,10 @@ public class PolicyNumberService : IPolicyNumberService
             if (sequence == null)
                 return Result<PolicyNumberGenerationResult>.Failure("POLICY_NUMBER_SEQUENCE_NOT_FOUND", "The assigned policy number sequence is inactive or missing.");
 
-            ResetAnnualSequenceIfNeeded(sequence, quote.EffectiveDate.Year);
+            ResetAnnualSequenceIfNeeded(sequence, policyEffectiveDate.Year);
 
             var sequenceValue = sequence.NextNumber;
-            var baseNumber = BuildBaseNumber(sequence.Format, sequenceValue, quote, state);
+            var baseNumber = BuildBaseNumber(sequence.Format, sequenceValue, quote, state, policyEffectiveDate);
             var termNumber = 1;
             var fullNumber = baseNumber + BuildTermSuffix(sequence.TermSuffixFormat, termNumber);
 
@@ -132,9 +133,9 @@ public class PolicyNumberService : IPolicyNumberService
         sequence.LastResetYear = effectiveYear;
     }
 
-    private static string BuildBaseNumber(string format, long sequenceValue, Quote quote, string? state)
+    private static string BuildBaseNumber(string format, long sequenceValue, Quote quote, string? state, DateOnly effectiveDate)
     {
-        var effectiveYear = quote.EffectiveDate.Year;
+        var effectiveYear = effectiveDate.Year;
         var result = format
             .Replace("{YYYY}", effectiveYear.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{YY}", (effectiveYear % 100).ToString("D2"), StringComparison.OrdinalIgnoreCase)

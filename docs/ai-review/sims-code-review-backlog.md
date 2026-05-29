@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 mixed-payee disbursement remediation.
+Last updated on 2026-05-29 during P1 policy-number bind-date remediation.
 
 ## Audit Checkpoints
 
@@ -36,6 +36,12 @@ Last updated on 2026-05-29 during P1 mixed-payee disbursement remediation.
 - Scope: `DisbursementService.CreateDisbursementAsync`.
 - Result: draft disbursement creation now rejects selected payables whose entity payee, carrier, or fallback payee name do not resolve to the same payee identity.
 - Verification: focused disbursement service regressions cover mixed carrier payees, mixed entity payees, and same-carrier success.
+
+### 2026-05-29 P1 policy-number bind-date remediation
+
+- Scope: `QuoteService.BindAsync` and `PolicyNumberService.GenerateForBindAsync`.
+- Result: quote bind now generates assigned policy numbers from the bind request's effective date, so annual sequence reset and `{YYYY}` / `{YY}` tokens match the issued policy term.
+- Verification: regression test covers a quote effective `2026-12-31` bound effective `2027-01-01` and asserts the generated policy number, sequence reset year, and usage row use `2027`.
 
 ## P0 Immediate Security / Secret Response
 
@@ -178,6 +184,7 @@ Last updated on 2026-05-29 during P1 mixed-payee disbursement remediation.
 
 ### Policy number year/sequence can use stale quote effective date
 
+- Status: Remediated on 2026-05-29. Quote bind now passes the bind effective date into policy-number generation before policy creation.
 - Evidence: `backend/src/SIMS.Application/Services/QuoteService.cs` bind flow; `PolicyNumberService.cs`.
 - Risk: policy number generation occurs before applying the bind effective date.
 - Impact: annual resets and `{YYYY}` / `{YY}` tokens can use the old quote year.
@@ -339,7 +346,7 @@ Last updated on 2026-05-29 during P1 mixed-payee disbursement remediation.
 1. Done: rotate and remove the hardcoded database credential.
 2. Done: close residual policy attachment and quote/policy note action-permission gaps.
 3. Done: fix ledger reversal behavior and financial posting atomicity.
-4. Continue P1 financial/data integrity: fix policy-number bind date and London bordereaux commission source.
+4. Continue P1 financial/data integrity: fix London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.
 6. Add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Add quote money/date validation and user IdentityResult handling.

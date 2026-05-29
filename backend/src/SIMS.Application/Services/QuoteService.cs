@@ -354,7 +354,7 @@ public class QuoteService : IQuoteService
 
         await using var dbTransaction = await Db.Database.BeginTransactionAsync();
 
-        var policyNumberResult = await _policyNumbers.GenerateForBindAsync(quote, access.UserId);
+        var policyNumberResult = await _policyNumbers.GenerateForBindAsync(quote, access.UserId, dto.EffectiveDate);
         if (!policyNumberResult.IsSuccess || policyNumberResult.Value == null)
             return Result<QuoteDto>.Failure(policyNumberResult.ErrorCode ?? "POLICY_NUMBER_ERROR", policyNumberResult.ErrorMessage ?? "Policy number could not be assigned.");
         var policyNumber = policyNumberResult.Value;

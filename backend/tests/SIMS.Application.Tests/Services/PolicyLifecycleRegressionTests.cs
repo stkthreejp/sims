@@ -42,6 +42,58 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteBind_GeneratesPolicyNumberFromBindEffectiveDate()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        fixture.Quote.EffectiveDate = new DateOnly(2026, 12, 31);
+        fixture.Quote.ExpirationDate = new DateOnly(2027, 12, 31);
+        var sequence = new PolicyNumberSequence
+        {
+            Id = Guid.NewGuid(),
+            Name = "Annual bind date",
+            Format = "{YYYY}-{SEQ:000}",
+            TermSuffixFormat = "-{TERM:00}",
+            NextNumber = 88,
+            ResetAnnually = true,
+            LastResetYear = 2026,
+            IsActive = true,
+        };
+        var assignment = new PolicyNumberAssignment
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumberSequenceId = sequence.Id,
+            PolicyNumberSequence = sequence,
+            CarrierId = fixture.Carrier.Id,
+            Carrier = fixture.Carrier,
+            LineOfBusiness = fixture.Quote.LineOfBusiness,
+            IsActive = true,
+        };
+        db.AddRange(sequence, assignment);
+        await db.SaveChangesAsync();
+        var invoicing = new RecordingInvoicingService();
+        var quoteService = CreateQuoteService(db, invoicing, policyNumbers: new PolicyNumberService(db));
+        var bindRequest = new QuoteBindDto
+        {
+            BoundDate = new DateOnly(2027, 1, 1),
+            EffectiveDate = new DateOnly(2027, 1, 1),
+            ExpirationDate = new DateOnly(2028, 1, 1),
+        };
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, bindRequest, UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess, $"{result.ErrorCode}: {result.ErrorMessage}");
+        var policy = await db.Set<Policy>().SingleAsync();
+        Assert.Equal("2027-001-01", policy.PolicyNumber);
+        Assert.Equal("2027-001", policy.BasePolicyNumber);
+        Assert.Equal(2027, sequence.LastResetYear);
+        Assert.Equal(2, sequence.NextNumber);
+        var usage = await db.Set<PolicyNumberSequenceUsage>().SingleAsync();
+        Assert.Equal("2027-001-01", usage.FullPolicyNumber);
+        Assert.Equal(1, usage.SequenceValue);
+    }
+
+    [Fact]
     public async Task QuoteCreate_RejectsProgramCarrierLobStatePathThatIsNotConfigured()
     {
         await using var db = CreateDb();
@@ -2489,9 +2541,11 @@ public class PolicyLifecycleRegressionTests
     private static QuoteService CreateQuoteService(
         ApplicationDbContext db,
         RecordingInvoicingService invoicing,
-        RecordingWorkflowEngineService? workflow = null)
+        RecordingWorkflowEngineService? workflow = null,
+        IPolicyNumberService? policyNumbers = null)
     {
         workflow ??= new RecordingWorkflowEngineService();
+        policyNumbers ??= new StubPolicyNumberService();
         var services = new ServiceCollection()
             .AddSingleton<DbContext>(db)
             .AddSingleton<IInvoicingService>(invoicing)
@@ -2503,7 +2557,7 @@ public class PolicyLifecycleRegressionTests
             new NoOpCarrierCommissionService(),
             new NoOpAgentCommissionService(),
             new NoOpQuoteChecklistService(),
-            new StubPolicyNumberService(),
+            policyNumbers,
             new PolicyTransactionLifecycleService(db, workflow),
             new PolicyVersionService(db),
             new UnderwritingClearanceService(db),
@@ -2858,7 +2912,7 @@ public class PolicyLifecycleRegressionTests
 
     private sealed class StubPolicyNumberService : IPolicyNumberService
     {
-        public Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById)
+        public Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById, DateOnly? effectiveDate = null)
             => Task.FromResult(Result<PolicyNumberGenerationResult>.Success(new PolicyNumberGenerationResult(
                 "POL-TEST-0001",
                 "POL-TEST-0001",

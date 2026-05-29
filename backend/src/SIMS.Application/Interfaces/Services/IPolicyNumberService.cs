@@ -5,7 +5,7 @@ namespace SIMS.Application.Interfaces.Services;
 
 public interface IPolicyNumberService
 {
-    Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById);
+    Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById, DateOnly? effectiveDate = null);
 }
 
 public sealed record PolicyNumberGenerationResult(

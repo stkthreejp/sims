@@ -150,7 +150,7 @@ public class QuoteServiceAccessTests
 
     private sealed class NoOpPolicyNumberService : IPolicyNumberService
     {
-        public Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById)
+        public Task<Result<PolicyNumberGenerationResult>> GenerateForBindAsync(Quote quote, Guid assignedById, DateOnly? effectiveDate = null)
             => throw new NotSupportedException();
     }
 
