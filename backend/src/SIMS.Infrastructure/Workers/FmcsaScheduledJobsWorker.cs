@@ -74,13 +74,17 @@ public class FmcsaScheduledJobsWorker : BackgroundService
 
         using var scope = _scopeFactory.CreateScope();
         var analytics = scope.ServiceProvider.GetRequiredService<IFmcsaSafetyAnalyticsService>();
+        var allSucceeded = true;
 
         if (_settings.RunImportedCarrierAnalytics && !await AnalyticsBatchStartedTodayAsync(scope, "SIMS imported FMCSA carriers", ct))
         {
             _logger.LogInformation("Running scheduled FMCSA imported carrier analytics refresh.");
             var result = await analytics.RefreshImportedCarrierAnalyticsAsync(null, ct);
             if (!result.IsSuccess)
+            {
+                allSucceeded = false;
                 _logger.LogWarning("Scheduled FMCSA imported carrier analytics refresh failed: {Code} {Message}", result.ErrorCode, result.ErrorMessage);
+            }
         }
 
         if (_settings.RunInspectionEnrichment)
@@ -89,10 +93,14 @@ public class FmcsaScheduledJobsWorker : BackgroundService
             var enrichment = scope.ServiceProvider.GetRequiredService<IFmcsaInspectionEnrichmentService>();
             var result = await enrichment.EnrichRecentInspectionsAsync(_settings.InspectionEnrichmentMaxRows, ct);
             if (!result.IsSuccess)
+            {
+                allSucceeded = false;
                 _logger.LogWarning("Scheduled FMCSA inspection enrichment failed: {Code} {Message}", result.ErrorCode, result.ErrorMessage);
+            }
         }
 
-        _lastDailyRun = runDate;
+        if (allSucceeded)
+            _lastDailyRun = runDate;
     }
 
     private async Task RunMonthlySmsImportAsync(string snapshotMonth, CancellationToken ct)
@@ -111,7 +119,10 @@ public class FmcsaScheduledJobsWorker : BackgroundService
         var analytics = scope.ServiceProvider.GetRequiredService<IFmcsaSafetyAnalyticsService>();
         var result = await analytics.RefreshOfficialSmsPeerAnalyticsAsync(snapshotMonth, null, ct);
         if (!result.IsSuccess)
+        {
             _logger.LogWarning("Scheduled FMCSA official SMS peer import failed: {Code} {Message}", result.ErrorCode, result.ErrorMessage);
+            return;
+        }
 
         _lastMonthlySmsRun = snapshotMonth;
     }

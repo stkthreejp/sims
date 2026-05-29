@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P2 targeted regression test remediation.
+Last updated on 2026-05-29 during P2 health and FMCSA retry remediation.
 
 ## Audit Checkpoints
 
@@ -84,6 +84,12 @@ Last updated on 2026-05-29 during P2 targeted regression test remediation.
 - Scope: intermediary deleted brokerage setup visibility, bordereaux validation/export setup coverage, entity-fee payable routing, policy transaction audit stamping, and intermediary admin authorization coverage.
 - Result: added regression coverage for all listed P2 targeted test gaps. The intermediary test exposed a stale EF tracking read path, now fixed with no-tracking read queries.
 - Verification: focused tests for each added regression pass; full application test suite passes.
+
+### 2026-05-29 P2 health and FMCSA retry remediation
+
+- Scope: API health endpoints and FMCSA scheduled worker retry markers.
+- Result: added anonymous `/health/live` and `/health/ready` endpoints; readiness checks the application database and optional safety analytics database. FMCSA daily/monthly run markers now advance only after successful service results, so transient failures retry on the next poll.
+- Verification: health registration test and FMCSA failed-result marker tests pass; full application test suite and API build pass.
 
 ## P0 Immediate Security / Secret Response
 
@@ -283,6 +289,7 @@ Last updated on 2026-05-29 during P2 targeted regression test remediation.
 
 ### FMCSA scheduled jobs suppress retries after failed service results
 
+- Status: Remediated on 2026-05-29. Daily/monthly in-memory markers are now set only when enabled scheduled work succeeds or has already started for the period.
 - Evidence: `backend/src/SIMS.Infrastructure/Workers/FmcsaScheduledJobsWorker.cs`.
 - Risk: daily/monthly run markers are set even when service returns failure.
 - Impact: transient failures wait until the next day/month instead of retrying; multi-instance behavior is inconsistent because state is in memory.
@@ -364,6 +371,7 @@ Last updated on 2026-05-29 during P2 targeted regression test remediation.
 
 ### No readiness/liveness health endpoints for dependencies
 
+- Status: Remediated on 2026-05-29. `/health/live` reports process liveness and `/health/ready` checks the application database plus optional safety analytics database.
 - Evidence: `backend/src/SIMS.API/Program.cs`.
 - Risk: deployment can report process running while DB, blob storage, Graph, QBO, FMCSA, LegiScan, geocoding, or AI providers are broken.
 - Impact: production incidents are harder to detect and route.
@@ -402,4 +410,4 @@ Last updated on 2026-05-29 during P2 targeted regression test remediation.
 7. Done: add quote money/date validation and user IdentityResult handling.
 8. Done: fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
 9. Done: add targeted regression tests listed above.
-10. Add readiness/liveness health checks and tighten scheduled job retry behavior.
+10. Done: add readiness/liveness health checks and tighten scheduled job retry behavior.

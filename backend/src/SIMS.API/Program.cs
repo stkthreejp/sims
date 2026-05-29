@@ -1,6 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using SIMS.API.Configuration;
+using SIMS.API.Health;
 using SIMS.API.Middleware;
 using SIMS.API.Services;
 using SIMS.Application.Interfaces.Services;
@@ -20,6 +21,7 @@ Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
 
 // Infrastructure (EF Core, Identity, services)
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSimsHealthChecks();
 builder.Services.AddScoped<IOpenLawsClient, OpenLawsClient>();
 builder.Services.AddHttpClient("openlaws", c => c.Timeout = TimeSpan.FromSeconds(
     int.TryParse(builder.Configuration["HttpClients:OpenLawsTimeoutSeconds"], out var openLawsTimeout) ? openLawsTimeout : 30));
@@ -141,6 +143,7 @@ app.UseCors("ImsPolicy");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapSimsHealthChecks();
 app.MapControllers();
 
 app.Run();

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Data.Sqlite;
 using SIMS.Application.Common;
@@ -2531,10 +2532,46 @@ public class PolicyLifecycleRegressionTests
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            RemoveNpgsqlAnnotations(builder.Model);
+            foreach (var entity in builder.Model.GetEntityTypes())
+            {
+                RemoveNpgsqlAnnotations(entity);
+                foreach (var property in entity.GetProperties())
+                {
+                    RemoveNpgsqlAnnotations(property);
+                    NormalizeSqliteProperty(property);
+                }
+                foreach (var key in entity.GetKeys())
+                    RemoveNpgsqlAnnotations(key);
+                foreach (var index in entity.GetIndexes())
+                    RemoveNpgsqlAnnotations(index);
+                foreach (var foreignKey in entity.GetForeignKeys())
+                    RemoveNpgsqlAnnotations(foreignKey);
+            }
+
             builder.Entity<Quote>()
                 .HasIndex(q => q.PolicyNumber)
                 .IsUnique()
                 .HasFilter(null);
+        }
+
+        private static void RemoveNpgsqlAnnotations(IMutableAnnotatable annotatable)
+        {
+            foreach (var annotation in annotatable.GetAnnotations()
+                .Where(annotation => annotation.Name.StartsWith("Npgsql:", StringComparison.Ordinal))
+                .ToList())
+            {
+                annotatable.RemoveAnnotation(annotation.Name);
+            }
+        }
+
+        private static void NormalizeSqliteProperty(IMutableProperty property)
+        {
+            if (property.GetColumnType() is "jsonb" or "text[]")
+                property.SetColumnType("TEXT");
+
+            if (property.GetDefaultValueSql()?.Contains("::", StringComparison.Ordinal) == true)
+                property.SetDefaultValueSql(null);
         }
     }
 
