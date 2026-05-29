@@ -174,62 +174,123 @@ export function SurplusLinesAdminPage() {
     <div className="space-y-5 p-6">
       <PageHeader
         title="Surplus Lines Setup"
-        subtitle="State filing broker, license, wording, paperwork, and linked fee setup for reporting and monthly vendor payables"
+        subtitle="State filing broker, license, wording, paperwork, fee setup, and vendor filing details"
       />
 
-      <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
-        <section className="rounded-lg border bg-white">
-          <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-800">{editingId ? 'Edit setup' : 'New setup'}</h2>
-            {editingId && (
-              <button type="button" className={iconBtn} title="Cancel edit" onClick={() => { setEditingId(null); setForm(emptySetup()) }}>
-                <X className="h-4 w-4" />
-              </button>
-            )}
+      <section className="rounded-lg border bg-white">
+        <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
+          <h2 className="text-sm font-semibold text-slate-800">Configured states <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{setups.length}</span></h2>
+          <div className="flex items-center gap-2">
+            <select value={copyTarget} onChange={(e) => setCopyTarget(e.target.value)} className="rounded border border-slate-300 px-2 py-1 text-xs">
+              {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+            </select>
+            <button type="button" className={iconBtn} title="Copy selected setup to state" disabled={!selectedSetup || copySetup.isPending || selectedSetup.stateCode === copyTarget} onClick={() => copySetup.mutate()}>
+              <Copy className="h-4 w-4" />
+            </button>
           </div>
-          <div className="space-y-4 p-5">
-            <div className="grid grid-cols-2 gap-3">
-              <SelectField label="State" value={form.stateCode} onChange={(value) => setForm((f) => ({ ...f, stateCode: value, licenseState: value, brokerState: value }))}>
-                {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
-              </SelectField>
-              <TextInput label="Effective" type="date" value={form.effectiveDate} onChange={(value) => setForm((f) => ({ ...f, effectiveDate: value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <TextInput label="Expiration" type="date" value={form.expirationDate ?? ''} onChange={(value) => setForm((f) => ({ ...f, expirationDate: value || null }))} />
-              <SelectField label="License holder" value={form.licenseHolderType} onChange={(value) => setForm((f) => ({ ...f, licenseHolderType: value }))}>
-                <option value="SMM">SMM</option>
-                <option value="Jeremiah">Jeremiah</option>
-                <option value="Vendor">Vendor</option>
-                <option value="Other">Other</option>
-              </SelectField>
-            </div>
+        </div>
+        <div className="overflow-auto">
+          <table className="sd-table">
+            <thead>
+              <tr>
+                <th>State</th>
+                <th>Scope</th>
+                <th>Broker</th>
+                <th>Fees / Filing</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {setups.map((setup) => (
+                <tr key={setup.id} className={selectedSetup?.id === setup.id ? 'bg-blue-50/60' : ''}>
+                  <td className="primary-cell">
+                    <button type="button" onClick={() => setSelectedId(setup.id)} className="font-medium text-blue-700 hover:underline">{setup.stateCode}</button>
+                    <div className="text-xs text-slate-500">{dateRange(setup.effectiveDate, setup.expirationDate)}</div>
+                  </td>
+                  <td>
+                    <div>{[setup.programName ?? 'All programs', setup.carrierName ?? 'All carriers'].join(' / ')}</div>
+                    <div className="text-xs text-slate-500">{setup.lineOfBusinessLabel ?? 'All LOBs'}</div>
+                  </td>
+                  <td>
+                    <div>{setup.filingBrokerName}</div>
+                    <div className="text-xs text-slate-500">{setup.licenseHolderType} / {setup.licenseNumber}</div>
+                  </td>
+                  <td className="text-xs text-slate-600">
+                    <div>{[setup.surplusLinesTaxFeeName, setup.stampingFeeName, setup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'}</div>
+                    <div className="mt-1 text-slate-500">{filingHandlingText(setup)}</div>
+                    {setup.feeValidationMessages.length > 0 && (
+                      <div className="mt-1 font-medium text-amber-700">{setup.feeValidationMessages.length} fee setup issue{setup.feeValidationMessages.length === 1 ? '' : 's'}</div>
+                    )}
+                  </td>
+                  <td><StatusPill active={setup.isActive} filingRequired={setup.filingRequired} /></td>
+                  <td>
+                    <div className="flex justify-end">
+                      <button type="button" className={iconBtn} title="Edit setup" onClick={() => editSetup(setup)}>
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {setups.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-sm text-slate-500">No surplus lines setups configured yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-white">
+        <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
+          <h2 className="text-sm font-semibold text-slate-800">{editingId ? 'Edit setup' : 'New setup'}</h2>
+          {editingId && (
+            <button type="button" className={iconBtn} title="Cancel edit" onClick={() => { setEditingId(null); setForm(emptySetup()) }}>
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="space-y-5 p-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <SelectField label="State" value={form.stateCode} onChange={(value) => setForm((f) => ({ ...f, stateCode: value, licenseState: value, brokerState: value }))}>
+              {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+            </SelectField>
+            <TextInput label="Effective" type="date" value={form.effectiveDate} onChange={(value) => setForm((f) => ({ ...f, effectiveDate: value }))} />
+            <TextInput label="Expiration" type="date" value={form.expirationDate ?? ''} onChange={(value) => setForm((f) => ({ ...f, expirationDate: value || null }))} />
+            <SelectField label="License holder" value={form.licenseHolderType} onChange={(value) => setForm((f) => ({ ...f, licenseHolderType: value }))}>
+              <option value="SMM">SMM</option>
+              <option value="Jeremiah">Jeremiah</option>
+              <option value="Vendor">Vendor</option>
+              <option value="Other">Other</option>
+            </SelectField>
             <SelectField label="Program" value={form.programConfigurationId ?? ''} onChange={(value) => setForm((f) => ({ ...f, programConfigurationId: value || null }))}>
               <option value="">All programs</option>
               {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
             </SelectField>
-            <div className="grid grid-cols-2 gap-3">
-              <SelectField label="Carrier" value={form.carrierId ?? ''} onChange={(value) => setForm((f) => ({ ...f, carrierId: value || null }))}>
-                <option value="">All carriers</option>
-                {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
-              </SelectField>
-              <SelectField label="LOB" value={form.lineOfBusiness ?? ''} onChange={(value) => setForm((f) => ({ ...f, lineOfBusiness: value ? value as PolicyLineOfBusiness : null }))}>
-                <option value="">All LOBs</option>
-                {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
-              </SelectField>
-            </div>
-
+            <SelectField label="Carrier" value={form.carrierId ?? ''} onChange={(value) => setForm((f) => ({ ...f, carrierId: value || null }))}>
+              <option value="">All carriers</option>
+              {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+            </SelectField>
+            <SelectField label="LOB" value={form.lineOfBusiness ?? ''} onChange={(value) => setForm((f) => ({ ...f, lineOfBusiness: value ? value as PolicyLineOfBusiness : null }))}>
+              <option value="">All LOBs</option>
+              {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+            </SelectField>
             <div className="grid grid-cols-2 gap-3">
               <CheckInput label="Active" checked={form.isActive} onChange={(value) => setForm((f) => ({ ...f, isActive: value }))} />
               <CheckInput label="Filing required" checked={form.filingRequired} onChange={(value) => setForm((f) => ({ ...f, filingRequired: value }))} />
             </div>
+          </div>
 
-            <TextInput label="Filing broker" value={form.filingBrokerName} onChange={(value) => setForm((f) => ({ ...f, filingBrokerName: value }))} />
-            <div className="grid grid-cols-2 gap-3">
+          <div className="border-t pt-5">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Broker / license</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="xl:col-span-2">
+                <TextInput label="Filing broker" value={form.filingBrokerName} onChange={(value) => setForm((f) => ({ ...f, filingBrokerName: value }))} />
+              </div>
               <TextInput label="License number" value={form.licenseNumber} onChange={(value) => setForm((f) => ({ ...f, licenseNumber: value }))} />
               <TextInput label="License state" value={form.licenseState} onChange={(value) => setForm((f) => ({ ...f, licenseState: value.toUpperCase().slice(0, 2) }))} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <TextInput label="Address line 1" value={form.brokerAddressLine1} onChange={(value) => setForm((f) => ({ ...f, brokerAddressLine1: value }))} />
               <TextInput label="Address line 2" value={form.brokerAddressLine2 ?? ''} onChange={(value) => setForm((f) => ({ ...f, brokerAddressLine2: value || null }))} />
               <TextInput label="City" value={form.brokerCity} onChange={(value) => setForm((f) => ({ ...f, brokerCity: value }))} />
@@ -237,187 +298,137 @@ export function SurplusLinesAdminPage() {
               <TextInput label="Zip" value={form.brokerZipCode} onChange={(value) => setForm((f) => ({ ...f, brokerZipCode: value }))} />
               <TextInput label="Country" value={form.brokerCountry} onChange={(value) => setForm((f) => ({ ...f, brokerCountry: value.toUpperCase() }))} />
             </div>
+          </div>
 
-            <div className="grid grid-cols-3 gap-3">
+          <div className="border-t pt-5">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Fees</div>
+            <div className="grid gap-3 md:grid-cols-3">
               <FeeSelect label="SL tax fee" value={form.surplusLinesTaxFeeDefinitionId} fees={taxFees} onChange={(value) => setForm((f) => ({ ...f, surplusLinesTaxFeeDefinitionId: value }))} />
               <FeeSelect label="Stamp fee" value={form.stampingFeeDefinitionId} fees={stampingFees} onChange={(value) => setForm((f) => ({ ...f, stampingFeeDefinitionId: value }))} />
               <FeeSelect label="Filing fee" value={form.filingFeeDefinitionId} fees={fees} onChange={(value) => setForm((f) => ({ ...f, filingFeeDefinitionId: value }))} />
             </div>
+          </div>
 
-            <div className="rounded border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Filing vendor / payable</div>
-              <div className="grid grid-cols-2 gap-3">
-                <CheckInput label="Create filing payable" checked={form.createFilingPayable} onChange={(value) => setForm((f) => ({ ...f, createFilingPayable: value }))} />
-                <PayeeSelect label="Filing payee" value={form.filingPayeeId} payees={payees} onChange={(value) => setForm((f) => ({ ...f, filingPayeeId: value }))} />
-                <TextInput
-                  label="Payment terms days"
-                  type="number"
-                  value={form.filingPaymentTermsDays?.toString() ?? ''}
-                  onChange={(value) => setForm((f) => ({ ...f, filingPaymentTermsDays: value ? Number(value) : null }))}
-                />
-                <SelectField label="Filing frequency" value={form.filingFrequency ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingFrequency: value || null }))}>
-                  <option value="">Not set</option>
-                  <option value="Monthly">Monthly</option>
-                  <option value="Quarterly">Quarterly</option>
-                  <option value="Annual">Annual</option>
-                  <option value="Transaction">Per transaction</option>
-                </SelectField>
-                <TextInput
-                  label="Due day of month"
-                  type="number"
-                  value={form.filingDueDayOfMonth?.toString() ?? ''}
-                  onChange={(value) => setForm((f) => ({ ...f, filingDueDayOfMonth: value ? Number(value) : null }))}
-                />
-                <SelectField label="Filing method" value={form.filingMethod ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingMethod: value || null }))}>
-                  <option value="">Not set</option>
-                  <option value="Portal">Portal</option>
-                  <option value="Email">Email</option>
-                  <option value="Paper">Paper</option>
-                  <option value="Vendor">Vendor</option>
-                  <option value="Other">Other</option>
-                </SelectField>
-              </div>
-              <div className="mt-3">
-                <TextInput label="Filing portal URL" value={form.filingPortalUrl ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingPortalUrl: value || null }))} />
-              </div>
+          <div className="border-t pt-5">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Filing handling</div>
+            <div className="grid gap-3 md:grid-cols-4">
+              <CheckInput
+                label="Filed by vendor"
+                checked={form.createFilingPayable}
+                onChange={(value) => setForm((f) => ({ ...f, createFilingPayable: value, filingPayeeId: value ? f.filingPayeeId : null }))}
+              />
+              {!form.createFilingPayable ? (
+                <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 md:col-span-3">
+                  Handled by SMM; payable to state.
+                </div>
+              ) : (
+                <div className="grid gap-3 rounded border border-blue-100 bg-blue-50/40 p-3 md:col-span-4 md:grid-cols-4">
+                  <PayeeSelect label="Vendor payee" value={form.filingPayeeId} payees={payees} onChange={(value) => setForm((f) => ({ ...f, filingPayeeId: value }))} />
+                  <TextInput
+                    label="Payment terms days"
+                    type="number"
+                    value={form.filingPaymentTermsDays?.toString() ?? ''}
+                    onChange={(value) => setForm((f) => ({ ...f, filingPaymentTermsDays: value ? Number(value) : null }))}
+                  />
+                  <SelectField label="Filing frequency" value={form.filingFrequency ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingFrequency: value || null }))}>
+                    <option value="">Not set</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Annual">Annual</option>
+                    <option value="Transaction">Per transaction</option>
+                  </SelectField>
+                  <TextInput
+                    label="Due day of month"
+                    type="number"
+                    value={form.filingDueDayOfMonth?.toString() ?? ''}
+                    onChange={(value) => setForm((f) => ({ ...f, filingDueDayOfMonth: value ? Number(value) : null }))}
+                  />
+                  <SelectField label="Filing method" value={form.filingMethod ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingMethod: value || null }))}>
+                    <option value="">Not set</option>
+                    <option value="Portal">Portal</option>
+                    <option value="Email">Email</option>
+                    <option value="Paper">Paper</option>
+                    <option value="Vendor">Vendor</option>
+                    <option value="Other">Other</option>
+                  </SelectField>
+                  <div className="md:col-span-3">
+                    <TextInput label="Vendor portal URL" value={form.filingPortalUrl ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingPortalUrl: value || null }))} />
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
 
-            <div className="rounded border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">State paperwork</div>
+          <div className="border-t pt-5">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">State paperwork</div>
+            <div className="grid gap-3 lg:grid-cols-2">
               <TextArea
                 label="Required filing forms"
                 value={formsJsonToText(form.requiredFilingFormsJson)}
                 onChange={(value) => setForm((f) => ({ ...f, requiredFilingFormsJson: formsTextToJson(value) }))}
               />
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="grid gap-3 md:grid-cols-2">
                 <CheckInput label="Diligent search required" checked={form.diligentSearchRequired} onChange={(value) => setForm((f) => ({ ...f, diligentSearchRequired: value }))} />
                 <CheckInput label="Affidavit required" checked={form.affidavitRequired} onChange={(value) => setForm((f) => ({ ...f, affidavitRequired: value }))} />
                 <TextArea label="Diligent search notes" value={form.diligentSearchNotes ?? ''} onChange={(value) => setForm((f) => ({ ...f, diligentSearchNotes: value }))} />
                 <TextArea label="Affidavit notes" value={form.affidavitNotes ?? ''} onChange={(value) => setForm((f) => ({ ...f, affidavitNotes: value }))} />
               </div>
             </div>
+          </div>
 
-            <TextArea label="Stamping wording" value={form.stampingWording ?? ''} onChange={(value) => setForm((f) => ({ ...f, stampingWording: value }))} />
-            <TextArea label="Required notice" value={form.requiredNoticeText ?? ''} onChange={(value) => setForm((f) => ({ ...f, requiredNoticeText: value }))} />
-            <div className="grid grid-cols-2 gap-3">
+          <div className="border-t pt-5">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Wording / notes</div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <TextArea label="Stamping wording" value={form.stampingWording ?? ''} onChange={(value) => setForm((f) => ({ ...f, stampingWording: value }))} />
+              <TextArea label="Required notice" value={form.requiredNoticeText ?? ''} onChange={(value) => setForm((f) => ({ ...f, requiredNoticeText: value }))} />
               <TextArea label="Paperwork notes" value={form.paperworkNotes ?? ''} onChange={(value) => setForm((f) => ({ ...f, paperworkNotes: value }))} />
               <TextArea label="Filing notes" value={form.filingNotes ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingNotes: value }))} />
             </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => saveSetup.mutate()}
-              disabled={saveSetup.isPending || !form.stateCode || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable && !form.filingPayeeId)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {editingId ? 'Save Setup' : 'Add Setup'}
-            </button>
+          <button
+            type="button"
+            onClick={() => saveSetup.mutate()}
+            disabled={saveSetup.isPending || !form.stateCode || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable && !form.filingPayeeId)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {editingId ? 'Save Setup' : 'Add Setup'}
+          </button>
+        </div>
+      </section>
+
+      {selectedSetup && (
+        <section className="rounded-lg border bg-white">
+          <div className="border-b px-5 py-4">
+            <h2 className="text-sm font-semibold text-slate-800">{selectedSetup.stateCode} details</h2>
+          </div>
+          <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+            <DetailBlock label="Filing broker" value={selectedSetup.filingBrokerName} />
+            <DetailBlock label="License" value={`${selectedSetup.licenseNumber} (${selectedSetup.licenseState})`} />
+            <DetailBlock label="Address" value={[selectedSetup.brokerAddressLine1, selectedSetup.brokerAddressLine2, selectedSetup.brokerCity, selectedSetup.brokerState, selectedSetup.brokerZipCode, selectedSetup.brokerCountry].filter(Boolean).join(', ')} />
+            <DetailBlock label="Linked fees" value={[selectedSetup.surplusLinesTaxFeeName, selectedSetup.stampingFeeName, selectedSetup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'} />
+            <DetailBlock label="Filing handling" value={filingHandlingText(selectedSetup)} />
+            <DetailBlock label="Vendor cadence" value={selectedSetup.createFilingPayable ? [selectedSetup.filingFrequency, selectedSetup.filingDueDayOfMonth ? `Due day ${selectedSetup.filingDueDayOfMonth}` : null, selectedSetup.filingMethod].filter(Boolean).join(' / ') || 'Not set' : 'Not vendor-filed'} />
+            <DetailBlock label="Vendor portal" value={selectedSetup.createFilingPayable ? selectedSetup.filingPortalUrl || 'None' : 'Not vendor-filed'} />
+            <DetailBlock label="Required forms" value={formsJsonToText(selectedSetup.requiredFilingFormsJson) || 'None'} />
+            {selectedSetup.feeValidationMessages.length > 0 && (
+              <div className="rounded border border-amber-200 bg-amber-50 p-3 md:col-span-2 xl:col-span-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Fee setup issues</div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
+                  {selectedSetup.feeValidationMessages.map((message) => <li key={message}>{message}</li>)}
+                </ul>
+              </div>
+            )}
+            <DetailBlock label="Stamping wording" value={selectedSetup.stampingWording || 'None'} />
+            <DetailBlock label="Required notice" value={selectedSetup.requiredNoticeText || 'None'} />
+            <DetailBlock label="Diligent search" value={selectedSetup.diligentSearchRequired ? selectedSetup.diligentSearchNotes || 'Required' : 'Not required'} />
+            <DetailBlock label="Affidavit" value={selectedSetup.affidavitRequired ? selectedSetup.affidavitNotes || 'Required' : 'Not required'} />
+            <DetailBlock label="Paperwork notes" value={selectedSetup.paperworkNotes || 'None'} />
+            <DetailBlock label="Filing notes" value={selectedSetup.filingNotes || 'None'} />
           </div>
         </section>
-
-        <div className="space-y-5">
-          <section className="rounded-lg border bg-white">
-            <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-800">Configured states <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{setups.length}</span></h2>
-              <div className="flex items-center gap-2">
-                <select value={copyTarget} onChange={(e) => setCopyTarget(e.target.value)} className="rounded border border-slate-300 px-2 py-1 text-xs">
-                  {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
-                </select>
-                <button type="button" className={iconBtn} title="Copy selected setup to state" disabled={!selectedSetup || copySetup.isPending || selectedSetup.stateCode === copyTarget} onClick={() => copySetup.mutate()}>
-                  <Copy className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="overflow-auto">
-              <table className="sd-table">
-                <thead>
-                  <tr>
-                    <th>State</th>
-                    <th>Scope</th>
-                    <th>Broker</th>
-                    <th>Fees</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {setups.map((setup) => (
-                    <tr key={setup.id} className={selectedSetup?.id === setup.id ? 'bg-blue-50/60' : ''}>
-                      <td className="primary-cell">
-                        <button type="button" onClick={() => setSelectedId(setup.id)} className="font-medium text-blue-700 hover:underline">{setup.stateCode}</button>
-                        <div className="text-xs text-slate-500">{dateRange(setup.effectiveDate, setup.expirationDate)}</div>
-                      </td>
-                      <td>
-                        <div>{[setup.programName ?? 'All programs', setup.carrierName ?? 'All carriers'].join(' / ')}</div>
-                        <div className="text-xs text-slate-500">{setup.lineOfBusinessLabel ?? 'All LOBs'}</div>
-                      </td>
-                      <td>
-                        <div>{setup.filingBrokerName}</div>
-                        <div className="text-xs text-slate-500">{setup.licenseHolderType} / {setup.licenseNumber}</div>
-                      </td>
-                      <td className="text-xs text-slate-600">
-                        {[setup.surplusLinesTaxFeeName, setup.stampingFeeName, setup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'}
-                        {setup.createFilingPayable && (
-                          <div className="mt-1 text-slate-500">Payable: {setup.filingPayeeName ?? 'No payee selected'}</div>
-                        )}
-                        {setup.feeValidationMessages.length > 0 && (
-                          <div className="mt-1 font-medium text-amber-700">{setup.feeValidationMessages.length} fee setup issue{setup.feeValidationMessages.length === 1 ? '' : 's'}</div>
-                        )}
-                      </td>
-                      <td><StatusPill active={setup.isActive} filingRequired={setup.filingRequired} /></td>
-                      <td>
-                        <div className="flex justify-end">
-                          <button type="button" className={iconBtn} title="Edit setup" onClick={() => editSetup(setup)}>
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {setups.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-sm text-slate-500">No surplus lines setups configured yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {selectedSetup && (
-            <section className="rounded-lg border bg-white">
-              <div className="border-b px-5 py-4">
-                <h2 className="text-sm font-semibold text-slate-800">{selectedSetup.stateCode} details</h2>
-              </div>
-              <div className="grid gap-4 p-5 md:grid-cols-2">
-                <DetailBlock label="Filing broker" value={selectedSetup.filingBrokerName} />
-                <DetailBlock label="License" value={`${selectedSetup.licenseNumber} (${selectedSetup.licenseState})`} />
-                <DetailBlock label="Address" value={[selectedSetup.brokerAddressLine1, selectedSetup.brokerAddressLine2, selectedSetup.brokerCity, selectedSetup.brokerState, selectedSetup.brokerZipCode, selectedSetup.brokerCountry].filter(Boolean).join(', ')} />
-                <DetailBlock label="Linked fees" value={[selectedSetup.surplusLinesTaxFeeName, selectedSetup.stampingFeeName, selectedSetup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'} />
-                <DetailBlock label="Filing payable" value={selectedSetup.createFilingPayable ? `${selectedSetup.filingPayeeName ?? 'No payee'}${selectedSetup.filingPaymentTermsDays != null ? ` / Net ${selectedSetup.filingPaymentTermsDays}` : ''}` : 'No filing payable'} />
-                <DetailBlock label="Filing cadence" value={[selectedSetup.filingFrequency, selectedSetup.filingDueDayOfMonth ? `Due day ${selectedSetup.filingDueDayOfMonth}` : null, selectedSetup.filingMethod].filter(Boolean).join(' / ') || 'Not set'} />
-                <DetailBlock label="Filing portal" value={selectedSetup.filingPortalUrl || 'None'} />
-                <DetailBlock label="Required forms" value={formsJsonToText(selectedSetup.requiredFilingFormsJson) || 'None'} />
-                {selectedSetup.feeValidationMessages.length > 0 && (
-                  <div className="rounded border border-amber-200 bg-amber-50 p-3 md:col-span-2">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Fee setup issues</div>
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
-                      {selectedSetup.feeValidationMessages.map((message) => <li key={message}>{message}</li>)}
-                    </ul>
-                  </div>
-                )}
-                <DetailBlock label="Stamping wording" value={selectedSetup.stampingWording || 'None'} />
-                <DetailBlock label="Required notice" value={selectedSetup.requiredNoticeText || 'None'} />
-                <DetailBlock label="Diligent search" value={selectedSetup.diligentSearchRequired ? selectedSetup.diligentSearchNotes || 'Required' : 'Not required'} />
-                <DetailBlock label="Affidavit" value={selectedSetup.affidavitRequired ? selectedSetup.affidavitNotes || 'Required' : 'Not required'} />
-                <DetailBlock label="Paperwork notes" value={selectedSetup.paperworkNotes || 'None'} />
-                <DetailBlock label="Filing notes" value={selectedSetup.filingNotes || 'None'} />
-              </div>
-            </section>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -500,6 +511,13 @@ function dateRange(effectiveDate: string, expirationDate: string | null) {
   return `${effectiveDate}${expirationDate ? ` to ${expirationDate}` : ''}`
 }
 
+function filingHandlingText(setup: SurplusLinesStateSetup) {
+  if (!setup.createFilingPayable) return 'Direct filing by SMM; payable to state'
+
+  const terms = setup.filingPaymentTermsDays != null ? ` / Net ${setup.filingPaymentTermsDays}` : ''
+  return `Filed by vendor: ${setup.filingPayeeName ?? 'No vendor payee selected'}${terms}`
+}
+
 function cleanSetup(setup: SurplusLinesStateSetupUpsert): SurplusLinesStateSetupUpsert {
   return {
     ...setup,
@@ -513,9 +531,12 @@ function cleanSetup(setup: SurplusLinesStateSetupUpsert): SurplusLinesStateSetup
     requiredNoticeText: trimToNull(setup.requiredNoticeText),
     paperworkNotes: trimToNull(setup.paperworkNotes),
     filingNotes: trimToNull(setup.filingNotes),
-    filingFrequency: trimToNull(setup.filingFrequency),
-    filingMethod: trimToNull(setup.filingMethod),
-    filingPortalUrl: trimToNull(setup.filingPortalUrl),
+    filingPayeeId: setup.createFilingPayable ? setup.filingPayeeId : null,
+    filingPaymentTermsDays: setup.createFilingPayable ? setup.filingPaymentTermsDays : null,
+    filingFrequency: setup.createFilingPayable ? trimToNull(setup.filingFrequency) : null,
+    filingDueDayOfMonth: setup.createFilingPayable ? setup.filingDueDayOfMonth : null,
+    filingMethod: setup.createFilingPayable ? trimToNull(setup.filingMethod) : null,
+    filingPortalUrl: setup.createFilingPayable ? trimToNull(setup.filingPortalUrl) : null,
     requiredFilingFormsJson: setup.requiredFilingFormsJson || '[]',
     diligentSearchNotes: trimToNull(setup.diligentSearchNotes),
     affidavitNotes: trimToNull(setup.affidavitNotes),

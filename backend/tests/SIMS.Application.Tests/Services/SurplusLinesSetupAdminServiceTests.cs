@@ -147,7 +147,7 @@ public class SurplusLinesSetupAdminServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_RejectsFilingPayableWithoutPayee()
+    public async Task CreateAsync_RejectsVendorFilingWithoutVendorPayee()
     {
         await using var db = CreateDb();
         var service = new SurplusLinesSetupAdminService(db);
@@ -182,6 +182,7 @@ public class SurplusLinesSetupAdminServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("FILING_PAYEE_REQUIRED", result.ErrorCode);
+        Assert.Contains("vendor", result.ErrorMessage!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -154,7 +154,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         if (request.ExpirationDate.HasValue && request.ExpirationDate.Value < request.EffectiveDate)
             return ("INVALID_DATE_RANGE", "Expiration date cannot be before effective date.");
         if (request.CreateFilingPayable && !request.FilingPayeeId.HasValue)
-            return ("FILING_PAYEE_REQUIRED", "Select a filing payee before creating filing payables.");
+            return ("FILING_PAYEE_REQUIRED", "Select a vendor payee before marking the state as filed by vendor.");
         if (request.FilingPaymentTermsDays is < 0 or > 365)
             return ("INVALID_PAYMENT_TERMS", "Filing payment terms must be between 0 and 365 days.");
         if (request.FilingDueDayOfMonth is < 1 or > 31)
