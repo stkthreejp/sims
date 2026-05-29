@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 user IdentityResult remediation.
+Last updated on 2026-05-29 during P2 frontend task queue remediation.
 
 ## Audit Checkpoints
 
@@ -72,6 +72,12 @@ Last updated on 2026-05-29 during P1 user IdentityResult remediation.
 - Scope: `UserService` create, update, and delete paths.
 - Result: requested roles are validated before user mutation, Identity create/update/remove/add/delete results are checked and returned as controlled failures, and multi-step user create/update operations use a transaction when the database provider supports one.
 - Verification: focused Identity-backed user service regressions cover missing-role create and update failures leaving no created user or partial role/user changes.
+
+### 2026-05-29 P2 frontend workflow remediation
+
+- Scope: task queue empty-state handling plus static verification of role-permission hook order, quote bind permission gating, and submission add-quote gating.
+- Result: empty task queues now render true empty metrics and an empty-state message instead of sample production-looking task rows.
+- Verification: source check confirms no runtime sample fallback remains in `TaskQueuePage`; frontend typecheck and production build pass.
 
 ## P0 Immediate Security / Secret Response
 
@@ -308,6 +314,7 @@ Last updated on 2026-05-29 during P1 user IdentityResult remediation.
 
 ### Empty task queues show sample production-looking tasks
 
+- Status: Remediated on 2026-05-29. The task queue now uses only `/tasks/my-queue` results and renders a true empty state when the API returns no rows.
 - Evidence: `frontend/src/pages/tasks/TaskQueuePage.tsx`.
 - Risk: empty API result falls back to `SAMPLE_TASKS`.
 - Impact: users see fake overdue/blocked work and incorrect metrics.
@@ -387,6 +394,6 @@ Last updated on 2026-05-29 during P1 user IdentityResult remediation.
 5. Done: fix QBO retry failure/idempotency behavior.
 6. Done: add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Done: add quote money/date validation and user IdentityResult handling.
-8. Fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
+8. Done: fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
 9. Add targeted regression tests listed above.
 10. Add readiness/liveness health checks and tighten scheduled job retry behavior.
