@@ -22,7 +22,10 @@ public class UnderwritingControlEnforcementController : ControllerBase
 
     [HttpGet("{targetType}/{targetId:guid}")]
     public async Task<IActionResult> GetForTarget(UnderwritingControlTargetType targetType, Guid targetId, CancellationToken ct)
-        => Ok(await _enforcement.GetForTargetAsync(targetType, targetId, ct));
+    {
+        var results = await _enforcement.GetForTargetAsync(targetType, targetId, ct);
+        return Ok(new UnderwritingControlEvaluationSummaryDto(results));
+    }
 
     [HttpPost("quotes/{quoteId:guid}/evaluate/{stage}")]
     public async Task<IActionResult> EvaluateQuote(Guid quoteId, UnderwritingControlStage stage, CancellationToken ct)

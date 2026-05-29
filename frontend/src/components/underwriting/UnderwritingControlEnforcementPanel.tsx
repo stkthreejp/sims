@@ -26,15 +26,17 @@ export function UnderwritingControlEnforcementPanel({
   onOverride,
 }: {
   title: string
-  summary?: UnderwritingControlEvaluationSummary
+  summary?: UnderwritingControlEvaluationSummary | UnderwritingControlEnforcementResult[]
   canOverride: boolean
   isOverriding: boolean
   onOverride: (resultId: string, reason: string) => void
 }) {
   const [activeResultId, setActiveResultId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
-  const visibleResults = summary?.results.filter((result) => result.status !== 'NotApplicable' && result.status !== 'Passed') ?? []
-  const blockingCount = summary?.blockingResults.length ?? 0
+  const results = Array.isArray(summary) ? summary : summary?.results ?? []
+  const blockingResults = Array.isArray(summary) ? results.filter((result) => result.status === 'Blocked' && result.isBlocking) : summary?.blockingResults ?? []
+  const visibleResults = results.filter((result) => result.status !== 'NotApplicable' && result.status !== 'Passed')
+  const blockingCount = blockingResults.length
 
   if (visibleResults.length === 0) return null
 
