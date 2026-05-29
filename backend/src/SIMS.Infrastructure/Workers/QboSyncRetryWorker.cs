@@ -14,6 +14,8 @@ namespace SIMS.Infrastructure.Workers;
 public class QboSyncRetryWorker : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ProcessingTimeout = TimeSpan.FromMinutes(15);
+    private const string ProcessingStatus = "Processing";
     private static readonly TimeSpan[] BackoffSchedule =
     [
         TimeSpan.FromSeconds(30),
@@ -58,31 +60,45 @@ public class QboSyncRetryWorker : BackgroundService
     {
         var db = sp.GetRequiredService<ApplicationDbContext>();
         var now = DateTime.UtcNow;
+        var processingCutoff = now.Subtract(ProcessingTimeout);
 
-        var pending = await db.PendingQboSyncs
-            .Include(p => p.Rollup)
+        var pendingIds = await db.PendingQboSyncs
             .Where(p => p.TenantId == 1
-                && (p.Status == "Pending" || p.Status == "Retrying")
-                && (p.NextRetryAt == null || p.NextRetryAt <= now)
+                && (((p.Status == "Pending" || p.Status == "Retrying")
+                        && (p.NextRetryAt == null || p.NextRetryAt <= now))
+                    || (p.Status == ProcessingStatus && p.UpdatedAt <= processingCutoff))
                 && p.AttemptCount < MaxAttempts)
+            .OrderBy(p => p.NextRetryAt ?? p.CreatedAt)
+            .ThenBy(p => p.Id)
+            .Select(p => p.Id)
             .ToListAsync(ct);
 
-        if (pending.Count == 0) return;
+        if (pendingIds.Count == 0) return;
 
         var rollupService = sp.GetRequiredService<IRollupService>();
 
-        foreach (var sync in pending)
+        foreach (var syncId in pendingIds)
         {
-            sync.AttemptCount++;
-            sync.Status = "Retrying";
-            sync.UpdatedAt = now;
-            await db.SaveChangesAsync(ct);
+            var claimed = await TryClaimAsync(db, syncId, now, processingCutoff, ct);
+            if (!claimed)
+                continue;
+
+            var sync = await db.PendingQboSyncs
+                .Include(p => p.Rollup)
+                .SingleAsync(p => p.Id == syncId, ct);
 
             try
             {
-                await rollupService.ResyncAsync(sync.RollupId, Guid.Empty, ct);
+                var rollup = await rollupService.ResyncAsync(sync.RollupId, Guid.Empty, ct);
+                if (string.Equals(rollup.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException(rollup.ErrorMessage ?? "QBO sync failed.");
+                if (!string.Equals(rollup.Status, "Exported", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(rollup.Status, "Posted", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"QBO sync did not complete. Rollup status: {rollup.Status}.");
+
                 sync.Status = "Done";
                 sync.LastError = null;
+                sync.NextRetryAt = null;
                 _logger.LogInformation("QBO sync succeeded for rollup {RollupId} on attempt {Attempt}",
                     sync.RollupId, sync.AttemptCount);
             }
@@ -109,5 +125,22 @@ public class QboSyncRetryWorker : BackgroundService
             sync.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    private static async Task<bool> TryClaimAsync(ApplicationDbContext db, long syncId, DateTime now, DateTime processingCutoff, CancellationToken ct)
+    {
+        var claimed = await db.PendingQboSyncs
+            .Where(p => p.Id == syncId
+                && p.TenantId == 1
+                && (((p.Status == "Pending" || p.Status == "Retrying")
+                        && (p.NextRetryAt == null || p.NextRetryAt <= now))
+                    || (p.Status == ProcessingStatus && p.UpdatedAt <= processingCutoff))
+                && p.AttemptCount < MaxAttempts)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(p => p.Status, ProcessingStatus)
+                .SetProperty(p => p.AttemptCount, p => p.AttemptCount + 1)
+                .SetProperty(p => p.UpdatedAt, now), ct);
+
+        return claimed == 1;
     }
 }

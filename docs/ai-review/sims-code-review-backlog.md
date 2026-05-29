@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 London bordereaux commission remediation.
+Last updated on 2026-05-29 during P1 QBO retry/idempotency remediation.
 
 ## Audit Checkpoints
 
@@ -48,6 +48,12 @@ Last updated on 2026-05-29 during P1 London bordereaux commission remediation.
 - Scope: `BordereauxService.GeneratePremiumExportPackageAsync` London premium rows.
 - Result: London bordereaux commission rate, commission amount, and net premium now come from the frozen invoice/account-current source row instead of re-resolving current carrier commission setup.
 - Verification: regression tests cover current carrier commission setup disagreeing with the invoice-stamped commission and assert the London export uses the invoice-stamped rate, commission amount, and net due carrier.
+
+### 2026-05-29 P1 QBO retry/idempotency remediation
+
+- Scope: `QboSyncRetryWorker`.
+- Result: QBO retry rows are claimed with a conditional database update before resync, in-flight claims use `Processing`, stale processing claims can be retried, and failed rollup results no longer mark pending sync rows `Done`.
+- Verification: focused worker regressions cover failed rollup results staying retryable, concurrent workers not processing the same row twice, and stale `Processing` rows being reclaimed.
 
 ## P0 Immediate Security / Secret Response
 
@@ -218,6 +224,7 @@ Last updated on 2026-05-29 during P1 London bordereaux commission remediation.
 
 ### QBO failures can be marked done and stop retrying
 
+- Status: Remediated on 2026-05-29. Retry worker now treats `Failed` or incomplete rollup results as retry failures instead of success.
 - Evidence: `backend/src/SIMS.Infrastructure/Services/QboJournalDriver.cs`; `backend/src/SIMS.Infrastructure/Workers/QboSyncRetryWorker.cs`.
 - Risk: export failures are swallowed and retry worker can mark pending sync `Done`.
 - Impact: failed exports silently stop retrying.
@@ -226,6 +233,7 @@ Last updated on 2026-05-29 during P1 London bordereaux commission remediation.
 
 ### QBO retry rows are not atomically claimed
 
+- Status: Remediated on 2026-05-29. Retry worker now conditionally claims due rows with `Processing` before resync and ignores active in-flight claims.
 - Evidence: `backend/src/SIMS.Infrastructure/Workers/QboSyncRetryWorker.cs`.
 - Risk: multiple deployed API instances can select the same retry row and post duplicate QBO journals.
 - Impact: duplicate accounting entries.
@@ -354,7 +362,7 @@ Last updated on 2026-05-29 during P1 London bordereaux commission remediation.
 2. Done: close residual policy attachment and quote/policy note action-permission gaps.
 3. Done: fix ledger reversal behavior and financial posting atomicity.
 4. Done: fix policy-number bind date and London bordereaux commission source.
-5. Fix QBO retry failure/idempotency behavior.
+5. Done: fix QBO retry failure/idempotency behavior.
 6. Add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Add quote money/date validation and user IdentityResult handling.
 8. Fix frontend hook crash, bind permission, add-quote gating, and sample task fallback.
