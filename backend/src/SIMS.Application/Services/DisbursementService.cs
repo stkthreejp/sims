@@ -136,6 +136,16 @@ public class DisbursementService : IDisbursementService
                     $"Disbursement amount {line.Amount:F2} exceeds open balance {available:F2} on payable {line.PayableId}");
         }
 
+        var payeeIdentities = req.Lines
+            .Select(line => GetPayeeIdentity(payables[line.PayableId]))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (payeeIdentities.Count > 1)
+            return Result<DisbursementDetailDto>.Failure(
+                "MIXED_PAYEES",
+                "All selected payables must have the same payee.");
+
         // Derive payee from the payables (first payable's payee)
         var firstPayable = payables[req.Lines[0].PayableId];
         var payeeName = firstPayable.PayeeName;
@@ -274,5 +284,16 @@ public class DisbursementService : IDisbursementService
                     l.Amount))
                 .ToList()
         );
+    }
+
+    private static string GetPayeeIdentity(Payable payable)
+    {
+        if (payable.PayeeId.HasValue)
+            return $"payee:{payable.PayeeId.Value}";
+
+        if (payable.CarrierId.HasValue)
+            return $"carrier:{payable.CarrierId.Value}";
+
+        return $"name:{payable.PayeeName.Trim().ToUpperInvariant()}";
     }
 }

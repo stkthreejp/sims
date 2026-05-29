@@ -2,7 +2,7 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during P1 endorsement invoicing remediation.
+Last updated on 2026-05-29 during P1 mixed-payee disbursement remediation.
 
 ## Audit Checkpoints
 
@@ -30,6 +30,12 @@ Last updated on 2026-05-29 during P1 endorsement invoicing remediation.
 - Scope: `PolicyService.IssueEndorsementAsync` and endorsement invoice creation.
 - Result: endorsement issue now treats invoice creation failure as a blocking failure inside the issue transaction; return-premium endorsements are blocked before issue until valid return-premium accounting is implemented.
 - Verification: regression tests cover invoice-failure rollback and return-premium rejection without issuing or changing policy premium.
+
+### 2026-05-29 P1 mixed-payee disbursement remediation
+
+- Scope: `DisbursementService.CreateDisbursementAsync`.
+- Result: draft disbursement creation now rejects selected payables whose entity payee, carrier, or fallback payee name do not resolve to the same payee identity.
+- Verification: focused disbursement service regressions cover mixed carrier payees, mixed entity payees, and same-carrier success.
 
 ## P0 Immediate Security / Secret Response
 
@@ -147,6 +153,7 @@ Last updated on 2026-05-29 during P1 endorsement invoicing remediation.
 
 ### Disbursements can combine payables for different payees
 
+- Status: Remediated on 2026-05-29. Draft disbursement creation now validates one shared payee identity before creating disbursement rows.
 - Evidence: `backend/src/SIMS.Application/Services/DisbursementService.cs` draft disbursement creation.
 - Risk: selected payables are not verified to share the same payable identity.
 - Impact: one payment can be labeled for Carrier A while clearing Carrier B or fee-entity payables.
@@ -332,7 +339,7 @@ Last updated on 2026-05-29 during P1 endorsement invoicing remediation.
 1. Done: rotate and remove the hardcoded database credential.
 2. Done: close residual policy attachment and quote/policy note action-permission gaps.
 3. Done: fix ledger reversal behavior and financial posting atomicity.
-4. Continue P1 financial/data integrity: fix mixed-payee disbursements, policy-number bind date, and London bordereaux commission source.
+4. Continue P1 financial/data integrity: fix policy-number bind date and London bordereaux commission source.
 5. Fix QBO retry failure/idempotency behavior.
 6. Add soft-delete filters and nullable fallback uniqueness enforcement.
 7. Add quote money/date validation and user IdentityResult handling.
