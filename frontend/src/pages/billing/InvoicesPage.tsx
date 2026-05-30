@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChevronRight, ArrowLeft, Receipt, TrendingUp, FileText } from 'lucide-react'
+import { Plus, ArrowLeft, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { getInvoices, getInvoice, createInvoice } from '@/api/invoices.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { EmptyState } from '@/components/common/EmptyState'
+import { StatusBadge } from '@/components/common/StatusBadge'
 import type { CreateInvoiceRequest, InvoiceDetail } from '@/types/invoice.types'
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']
@@ -19,127 +21,100 @@ const EMPTY_FORM: CreateInvoiceRequest = {
   vehicleCount: 1,
 }
 
+const CATEGORY_PILL: Record<string, string> = {
+  Tax: 'warning',
+  StampingFee: 'inprogress',
+  PolicyFee: 'quoted',
+  BrokerFee: 'bound',
+  Inspection: 'submitted',
+  Other: 'draft',
+}
+
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
-const inputCls = 'w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
+// ---------- New Invoice Modal ----------
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-medium text-gray-600">{label}</span>
-      <div className="mt-1">{children}</div>
-    </label>
-  )
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const cls = status === 'Posted'
-    ? 'bg-green-100 text-green-800'
-    : 'bg-red-100 text-red-800'
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{status}</span>
-}
-
-function CategoryBadge({ category }: { category: string }) {
-  const colors: Record<string, string> = {
-    Tax: 'bg-orange-100 text-orange-800',
-    StampingFee: 'bg-purple-100 text-purple-800',
-    PolicyFee: 'bg-blue-100 text-blue-800',
-    BrokerFee: 'bg-teal-100 text-teal-800',
-    Inspection: 'bg-yellow-100 text-yellow-800',
-    Other: 'bg-gray-100 text-gray-700',
-  }
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[category] ?? colors.Other}`}>
-      {category}
-    </span>
-  )
-}
-
-// ---------- New Invoice Form ----------
-
-function NewInvoicePanel({ onClose, onCreated }: { onClose: () => void; onCreated: (inv: InvoiceDetail) => void }) {
+function NewInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreated: (inv: InvoiceDetail) => void }) {
   const [form, setForm] = useState<CreateInvoiceRequest>(EMPTY_FORM)
   const { mutate, isPending } = useMutation({
     mutationFn: () => createInvoice(form),
-    onSuccess: (inv) => {
-      toast.success(`Invoice ${inv.invoiceNumber} posted`)
-      onCreated(inv)
-    },
+    onSuccess: (inv) => { toast.success(`Invoice ${inv.invoiceNumber} posted`); onCreated(inv) },
     onError: () => toast.error('Failed to create invoice'),
   })
-
-  const set = (field: keyof CreateInvoiceRequest, value: unknown) =>
-    setForm(f => ({ ...f, [field]: value }))
+  const set = (field: keyof CreateInvoiceRequest, value: unknown) => setForm(f => ({ ...f, [field]: value }))
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">New Invoice</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+    <div className="sims-modal-backdrop">
+      <div className="sims-modal">
+        <div className="sims-modal-head">
+          <h2 className="sims-modal-title">New Invoice</h2>
+          <button onClick={onClose} className="sims-icon-btn">&times;</button>
         </div>
-        <div className="px-6 py-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Effective Date">
-              <input type="date" className={inputCls} value={form.effectiveDate}
+        <div className="sims-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="sims-field-label">Effective Date</label>
+              <input type="date" className="sims-input" value={form.effectiveDate}
                 onChange={e => set('effectiveDate', e.target.value)} />
-            </Field>
-            <Field label="State">
-              <select className={inputCls} value={form.stateCode}
+            </div>
+            <div>
+              <label className="sims-field-label">State</label>
+              <select className="sims-select" value={form.stateCode}
                 onChange={e => set('stateCode', e.target.value)}>
                 {US_STATES.map(s => <option key={s}>{s}</option>)}
               </select>
-            </Field>
+            </div>
           </div>
-          <Field label="Gross Premium">
-            <input type="number" step="0.01" min="0" className={inputCls}
+          <div>
+            <label className="sims-field-label">Gross Premium</label>
+            <input type="number" step="0.01" min="0" className="sims-input"
               value={form.grossPremium} onChange={e => set('grossPremium', parseFloat(e.target.value) || 0)} />
-          </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Line of Business">
-              <input type="text" className={inputCls} placeholder="e.g. GL, Commercial Auto"
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="sims-field-label">Line of Business</label>
+              <input type="text" className="sims-input" placeholder="e.g. GL, Commercial Auto"
                 value={form.lineOfBusiness ?? ''} onChange={e => set('lineOfBusiness', e.target.value || undefined)} />
-            </Field>
-            <Field label="License Type">
-              <select className={inputCls} value={form.licenseType ?? ''}
+            </div>
+            <div>
+              <label className="sims-field-label">License Type</label>
+              <select className="sims-select" value={form.licenseType ?? ''}
                 onChange={e => set('licenseType', e.target.value || undefined)}>
                 <option value="">— any —</option>
                 <option value="Admitted">Admitted</option>
                 <option value="Non-Admitted">Non-Admitted</option>
               </select>
-            </Field>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Locations">
-              <input type="number" min="1" className={inputCls}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="sims-field-label">Locations</label>
+              <input type="number" min="1" className="sims-input"
                 value={form.locationCount} onChange={e => set('locationCount', parseInt(e.target.value) || 1)} />
-            </Field>
-            <Field label="Vehicles">
-              <input type="number" min="1" className={inputCls}
+            </div>
+            <div>
+              <label className="sims-field-label">Vehicles</label>
+              <input type="number" min="1" className="sims-input"
                 value={form.vehicleCount} onChange={e => set('vehicleCount', parseInt(e.target.value) || 1)} />
-            </Field>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <label className="flex items-center gap-2 text-sm">
+          <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <input type="checkbox" checked={form.isFilingState}
                 onChange={e => set('isFilingState', e.target.checked)} />
               Filing state (surplus lines)
             </label>
-            <label className="flex items-center gap-2 text-sm">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <input type="checkbox" checked={form.isEndorsement}
                 onChange={e => set('isEndorsement', e.target.checked)} />
               Endorsement
             </label>
           </div>
         </div>
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
-          <button
-            onClick={() => mutate()}
-            disabled={isPending || form.grossPremium <= 0}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
+        <div className="sims-modal-foot">
+          <button onClick={onClose} className="sd-btn outline">Cancel</button>
+          <button onClick={() => mutate()} disabled={isPending || form.grossPremium <= 0} className="sd-btn primary">
             {isPending ? 'Posting…' : 'Post Invoice'}
           </button>
         </div>
@@ -163,132 +138,146 @@ function InvoiceDetailView({ id, onBack }: { id: number; onBack: () => void }) {
   const totalCredit = inv.ledgerEntries.reduce((s, r) => s + r.credit, 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-500 hover:text-gray-700">
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <h2 className="text-lg font-semibold text-gray-900">{inv.invoiceNumber}</h2>
-        <StatusBadge status={inv.status} />
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Invoice Date', value: fmtDate(inv.invoiceDate) },
-          { label: 'Effective Date', value: fmtDate(inv.effectiveDate) },
-          { label: 'Gross Premium', value: fmt.format(inv.grossPremium) },
-          { label: 'Invoice Total', value: fmt.format(inv.totalAmount) },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-gray-50 rounded-lg p-4">
-            <p className="text-xs text-gray-500">{label}</p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">{value}</p>
+    <div className="subs-wrap">
+      <header className="subs-page-head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onBack} className="sd-btn outline" style={{ padding: '6px 8px' }}>
+            <ArrowLeft size={14} />
+          </button>
+          <div>
+            <h1 className="subs-h1">{inv.invoiceNumber}</h1>
+            <div className="subs-sub">Invoice detail</div>
           </div>
-        ))}
+        </div>
+        <StatusBadge status={inv.status} />
+      </header>
+
+      {/* Summary metrics */}
+      <div className="sd-metrics" style={{ marginBottom: 18 }}>
+        <div className="sd-metric">
+          <div className="k">Invoice Date</div>
+          <div className="v">{fmtDate(inv.invoiceDate)}</div>
+        </div>
+        <div className="sd-metric">
+          <div className="k">Effective Date</div>
+          <div className="v">{fmtDate(inv.effectiveDate)}</div>
+        </div>
+        <div className="sd-metric">
+          <div className="k">Gross Premium</div>
+          <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(inv.grossPremium)}</div>
+        </div>
+        <div className="sd-metric accent">
+          <div className="k">Invoice Total</div>
+          <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(inv.totalAmount)}</div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-500">Policy Transaction</p>
-          <p className="mt-1 text-sm font-semibold text-gray-900">
+      {/* Transaction links */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
+        <div className="sd-card" style={{ padding: '13px 16px' }}>
+          <div className="k" style={{ fontSize: 10, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-4)', fontWeight: 600, marginBottom: 4 }}>Policy Transaction</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>
             {inv.policyTransactionNumber ?? 'Unlinked'}
-          </p>
+          </div>
           {inv.policyTransactionType && (
-            <p className="mt-1 text-xs text-gray-500">{inv.policyTransactionType}</p>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{inv.policyTransactionType}</div>
           )}
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-500">Policy Version</p>
-          <p className="mt-1 text-sm font-semibold text-gray-900">
+        <div className="sd-card" style={{ padding: '13px 16px' }}>
+          <div className="k" style={{ fontSize: 10, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-4)', fontWeight: 600, marginBottom: 4 }}>Policy Version</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>
             {inv.policyVersionNumber != null ? `v${inv.policyVersionNumber}` : 'Unlinked'}
-          </p>
+          </div>
           {inv.policyVersionId && (
-            <p className="mt-1 truncate font-mono text-xs text-gray-400">{inv.policyVersionId}</p>
+            <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 2, fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {inv.policyVersionId}
+            </div>
           )}
         </div>
       </div>
 
       {/* Fee Lines */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Fee Lines</h3>
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left">
-              <tr>
-                <th className="px-4 py-2 font-medium text-gray-600">Fee</th>
-                <th className="px-4 py-2 font-medium text-gray-600">Category</th>
-                <th className="px-4 py-2 font-medium text-gray-600">GL Account</th>
-                <th className="px-4 py-2 font-medium text-gray-600 text-right">Amount</th>
-                <th className="px-4 py-2 font-medium text-gray-600 text-center">Taxable</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {inv.lines.map(l => (
-                <tr key={l.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2">
-                    <div className="font-medium text-gray-900">{l.feeDisplayName}</div>
-                    <div className="text-xs text-gray-400">{l.feeCode}</div>
-                  </td>
-                  <td className="px-4 py-2"><CategoryBadge category={l.feeCategory} /></td>
-                  <td className="px-4 py-2 text-gray-600">{l.accountCode} — {l.accountLabel}</td>
-                  <td className="px-4 py-2 text-right font-mono text-gray-900">{fmt.format(l.amount)}</td>
-                  <td className="px-4 py-2 text-center text-xs">{l.isTaxable ? '✓' : '—'}</td>
-                </tr>
-              ))}
-              <tr className="bg-gray-50 font-medium">
-                <td colSpan={3} className="px-4 py-2 text-right text-gray-700">Total Fees</td>
-                <td className="px-4 py-2 text-right font-mono">{fmt.format(inv.totalFees)}</td>
-                <td />
-              </tr>
-            </tbody>
-          </table>
+      <div className="sd-card" style={{ marginBottom: 18, overflow: 'hidden' }}>
+        <div className="sd-card-head">
+          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Fee Lines</h3>
+          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{fmt.format(inv.totalFees)} total fees</span>
         </div>
+        <table className="sd-table">
+          <thead>
+            <tr>
+              <th>Fee</th>
+              <th>Category</th>
+              <th>GL Account</th>
+              <th className="num">Amount</th>
+              <th style={{ textAlign: 'center' }}>Taxable</th>
+            </tr>
+          </thead>
+          <tbody>
+            {inv.lines.map(l => (
+              <tr key={l.id}>
+                <td>
+                  <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{l.feeDisplayName}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>{l.feeCode}</div>
+                </td>
+                <td>
+                  <span className={`sd-pill ${CATEGORY_PILL[l.feeCategory] ?? 'draft'}`}>{l.feeCategory}</span>
+                </td>
+                <td style={{ color: 'var(--ink-3)' }}>{l.accountCode} — {l.accountLabel}</td>
+                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(l.amount)}</td>
+                <td style={{ textAlign: 'center', fontSize: 11 }}>{l.isTaxable ? '✓' : '—'}</td>
+              </tr>
+            ))}
+            <tr style={{ background: 'var(--surface-2)', fontWeight: 600 }}>
+              <td colSpan={3} style={{ textAlign: 'right', padding: '11px 14px', color: 'var(--ink-3)' }}>Total Fees</td>
+              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(inv.totalFees)}</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       {/* Ledger Postings */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-700">Ledger Postings</h3>
-          <span className="text-xs text-gray-400 font-mono">TXN {inv.ledgerTransactionId}</span>
+      <div className="sd-card" style={{ overflow: 'hidden' }}>
+        <div className="sd-card-head">
+          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Ledger Postings</h3>
+          <span style={{ fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>TXN {inv.ledgerTransactionId}</span>
         </div>
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left">
-              <tr>
-                <th className="px-4 py-2 font-medium text-gray-600">Account</th>
-                <th className="px-4 py-2 font-medium text-gray-600">Memo</th>
-                <th className="px-4 py-2 font-medium text-gray-600 text-right">Debit</th>
-                <th className="px-4 py-2 font-medium text-gray-600 text-right">Credit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {inv.ledgerEntries.map(e => (
-                <tr key={e.id} className={e.debit > 0 ? 'bg-blue-50/40' : ''}>
-                  <td className="px-4 py-2">
-                    <span className="font-mono text-xs text-gray-500 mr-2">{e.accountCode}</span>
-                    <span className="text-gray-700">{e.accountLabel}</span>
-                  </td>
-                  <td className="px-4 py-2 text-gray-500 text-xs">{e.memo}</td>
-                  <td className="px-4 py-2 text-right font-mono">{e.debit > 0 ? fmt.format(e.debit) : '—'}</td>
-                  <td className="px-4 py-2 text-right font-mono">{e.credit > 0 ? fmt.format(e.credit) : '—'}</td>
-                </tr>
-              ))}
-              <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                <td colSpan={2} className="px-4 py-2 text-right text-gray-700">Totals</td>
-                <td className="px-4 py-2 text-right font-mono">{fmt.format(totalDebit)}</td>
-                <td className="px-4 py-2 text-right font-mono">{fmt.format(totalCredit)}</td>
-              </tr>
-              <tr>
-                <td colSpan={4} className="px-4 py-1 text-right">
-                  {Math.abs(totalDebit - totalCredit) < 0.001
-                    ? <span className="text-xs text-green-600 font-medium">✓ Balanced</span>
-                    : <span className="text-xs text-red-600 font-medium">✗ Out of balance by {fmt.format(Math.abs(totalDebit - totalCredit))}</span>
-                  }
+        <table className="sd-table">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Memo</th>
+              <th className="num">Debit</th>
+              <th className="num">Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {inv.ledgerEntries.map(e => (
+              <tr key={e.id} style={e.debit > 0 ? { background: 'var(--accent-soft)' } : undefined}>
+                <td>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginRight: 8 }}>{e.accountCode}</span>
+                  <span style={{ color: 'var(--ink-2)' }}>{e.accountLabel}</span>
                 </td>
+                <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{e.memo}</td>
+                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{e.debit > 0 ? fmt.format(e.debit) : '—'}</td>
+                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{e.credit > 0 ? fmt.format(e.credit) : '—'}</td>
               </tr>
-            </tbody>
-          </table>
-        </div>
+            ))}
+            <tr style={{ background: 'var(--surface-2)', fontWeight: 600, borderTop: '2px solid var(--line)' }}>
+              <td colSpan={2} style={{ textAlign: 'right', padding: '11px 14px', color: 'var(--ink-3)' }}>Totals</td>
+              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(totalDebit)}</td>
+              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(totalCredit)}</td>
+            </tr>
+            <tr>
+              <td colSpan={4} style={{ textAlign: 'right', padding: '6px 14px' }}>
+                {Math.abs(totalDebit - totalCredit) < 0.001
+                  ? <span style={{ fontSize: 11, color: 'var(--pill-bound-fg)', fontWeight: 500 }}>✓ Balanced</span>
+                  : <span style={{ fontSize: 11, color: 'var(--bad-fg)', fontWeight: 500 }}>✗ Out of balance by {fmt.format(Math.abs(totalDebit - totalCredit))}</span>
+                }
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -314,108 +303,131 @@ export function InvoicesPage() {
   }
 
   if (selectedId !== null) {
-    return (
-      <div className="p-6">
-        <InvoiceDetailView id={selectedId} onBack={() => setSelectedId(null)} />
-      </div>
-    )
+    return <InvoiceDetailView id={selectedId} onBack={() => setSelectedId(null)} />
   }
 
-  return (
-    <div className="p-6 space-y-4">
-      <PageHeader
-        title="Invoices"
-        actions={
-          <button
-            onClick={() => setShowNew(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" />
-            New Invoice
-          </button>
-        }
-      />
+  const grossPremiumTotal = invoices.reduce((s, i) => s + i.grossPremium, 0)
+  const totalBilled = invoices.reduce((s, i) => s + i.totalAmount, 0)
+  const postedCount = invoices.filter(i => i.status === 'Posted').length
 
-      {/* Summary cards */}
-      {!isLoading && invoices.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <p className="text-xs text-gray-500">Total Invoices</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{invoices.length}</p>
+  return (
+    <div className="subs-wrap">
+      <header className="subs-page-head">
+        <div>
+          <h1 className="subs-h1">Invoices</h1>
+          <div className="subs-sub">{isLoading ? 'Loading…' : `${invoices.length} records`}</div>
+        </div>
+        <button onClick={() => setShowNew(true)} className="sd-btn primary">
+          <Plus size={14} /> New Invoice
+        </button>
+      </header>
+
+      {/* Metrics strip skeleton */}
+      {isLoading && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ height: 72, borderRadius: 'var(--r-lg)', background: 'var(--surface-2)', border: '1px solid var(--line)' }} />
+          ))}
+        </div>
+      )}
+
+      {/* Metrics strip */}
+      {!isLoading && (
+        <div className="sd-metrics" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="sd-metric accent">
+            <div className="k">Total Invoices</div>
+            <div className="v">{invoices.length}</div>
+            <div className="s">{postedCount} posted</div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <p className="text-xs text-gray-500">Total Premiums</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {fmt.format(invoices.reduce((s, i) => s + i.grossPremium, 0))}
-            </p>
+          <div className="sd-metric">
+            <div className="k">Gross Premium</div>
+            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(grossPremiumTotal)}</div>
+            <div className="s">Sum of all invoices</div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-start gap-3">
-            <TrendingUp className="h-5 w-5 text-green-600 mt-1 shrink-0" />
-            <div>
-              <p className="text-xs text-gray-500">Total Billed</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {fmt.format(invoices.reduce((s, i) => s + i.totalAmount, 0))}
-              </p>
-            </div>
+          <div className="sd-metric">
+            <div className="k">Total Billed</div>
+            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(totalBilled)}</div>
+            <div className="s">Premium + fees</div>
           </div>
         </div>
       )}
 
-      {/* Invoice list */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 flex justify-center"><LoadingSpinner /></div>
-        ) : invoices.length === 0 ? (
-          <div className="p-12 text-center">
-            <Receipt className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No invoices yet. Post the first one.</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 font-medium text-gray-600">Invoice #</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Transaction</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Invoice Date</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Effective Date</th>
-                <th className="px-4 py-3 font-medium text-gray-600 text-right">Gross Premium</th>
-                <th className="px-4 py-3 font-medium text-gray-600 text-right">Total Fees</th>
-                <th className="px-4 py-3 font-medium text-gray-600 text-right">Total Amount</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {invoices.map(inv => (
-                <tr
-                  key={inv.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => setSelectedId(inv.id)}
-                >
-                  <td className="px-4 py-3 font-mono font-medium text-blue-700">{inv.invoiceNumber}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    <div className="font-mono text-xs text-gray-800">{inv.policyTransactionNumber ?? 'Unlinked'}</div>
-                    {inv.policyVersionNumber != null && <div className="text-xs text-gray-400">v{inv.policyVersionNumber}</div>}
+      {/* Table skeleton */}
+      {isLoading && (
+        <div className="subs-table-card">
+          <table className="subs-table">
+            <tbody>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} className="subs-row" style={{ pointerEvents: 'none' }}>
+                  <td colSpan={8} style={{ padding: '12px 14px' }}>
+                    <div style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', width: `${55 + (i % 4) * 12}%` }} />
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{fmtDate(inv.invoiceDate)}</td>
-                  <td className="px-4 py-3 text-gray-600">{fmtDate(inv.effectiveDate)}</td>
-                  <td className="px-4 py-3 text-right font-mono">{fmt.format(inv.grossPremium)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-500">{fmt.format(inv.totalFees)}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold">{fmt.format(inv.totalAmount)}</td>
-                  <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
-                  <td className="px-4 py-3 text-gray-400"><ChevronRight className="h-4 w-4" /></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Table */}
+      {!isLoading && (
+        <div className="subs-table-card">
+          <table className="subs-table">
+            <thead>
+              <tr>
+                <th className="subs-th">Invoice #</th>
+                <th className="subs-th">Transaction</th>
+                <th className="subs-th">Invoice Date</th>
+                <th className="subs-th">Effective Date</th>
+                <th className="subs-th num">Gross Premium</th>
+                <th className="subs-th num">Fees</th>
+                <th className="subs-th num">Total</th>
+                <th className="subs-th">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.length === 0 && (
+                <tr>
+                  <td colSpan={8}>
+                    <EmptyState
+                      icon={Receipt}
+                      title="No invoices yet"
+                      description="Post the first invoice to get started."
+                      action={
+                        <button className="sd-btn primary sm" onClick={() => setShowNew(true)}>
+                          New Invoice
+                        </button>
+                      }
+                    />
+                  </td>
+                </tr>
+              )}
+              {invoices.map(inv => (
+                <tr key={inv.id} className="subs-row" onClick={() => setSelectedId(inv.id)}>
+                  <td className="subs-id">{inv.invoiceNumber}</td>
+                  <td>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-2)' }}>
+                      {inv.policyTransactionNumber ?? '—'}
+                    </div>
+                    {inv.policyVersionNumber != null && (
+                      <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>v{inv.policyVersionNumber}</div>
+                    )}
+                  </td>
+                  <td className="subs-eff">{fmtDate(inv.invoiceDate)}</td>
+                  <td className="subs-eff">{fmtDate(inv.effectiveDate)}</td>
+                  <td className="subs-eff num">{fmt.format(inv.grossPremium)}</td>
+                  <td className="subs-eff num subs-muted">{fmt.format(inv.totalFees)}</td>
+                  <td className="subs-eff num" style={{ fontWeight: 600 }}>{fmt.format(inv.totalAmount)}</td>
+                  <td><StatusBadge status={inv.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showNew && (
-        <NewInvoicePanel
-          onClose={() => setShowNew(false)}
-          onCreated={handleCreated}
-        />
+        <NewInvoiceModal onClose={() => setShowNew(false)} onCreated={handleCreated} />
       )}
     </div>
   )

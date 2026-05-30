@@ -9,6 +9,7 @@ import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { FeeDefinition, FeeRuleVersion } from '@/types/fee.types'
+import type { ProgramConfiguration } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import {
   ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS,
@@ -214,6 +215,53 @@ export function FeesAdminPage() {
     setForm(p => ({ ...p, [key]: val }))
   }
 
+  function setEffectiveDate(effectiveDate: string) {
+    setForm(p => {
+      if (!p.programConfigurationId) return { ...p, effectiveDate }
+
+      const program = programs.find(candidate => candidate.id === p.programConfigurationId) ?? null
+      const options = getFeeProgramScopeOptions(program, effectiveDate, p.carrierId, p.lineOfBusiness as PolicyLineOfBusiness | null)
+      const carrierValid = !p.carrierId || options.carriers.some(carrier => carrier.id === p.carrierId)
+      const lobValid = carrierValid && (!p.lineOfBusiness || options.linesOfBusiness.some(lob => lob.value === p.lineOfBusiness))
+      const stateValid = lobValid && (!p.stateCode || options.states.includes(p.stateCode))
+
+      return {
+        ...p,
+        effectiveDate,
+        carrierId: carrierValid ? p.carrierId : null,
+        lineOfBusiness: lobValid ? p.lineOfBusiness : null,
+        stateCode: stateValid ? p.stateCode : null,
+      }
+    })
+  }
+
+  function setProgramScope(programConfigurationId: string | null) {
+    setForm(p => ({
+      ...p,
+      programConfigurationId,
+      carrierId: null,
+      lineOfBusiness: null,
+      stateCode: null,
+    }))
+  }
+
+  function setCarrierScope(carrierId: string | null) {
+    setForm(p => ({
+      ...p,
+      carrierId,
+      lineOfBusiness: null,
+      stateCode: null,
+    }))
+  }
+
+  function setLobScope(lineOfBusiness: string | null) {
+    setForm(p => ({
+      ...p,
+      lineOfBusiness,
+      stateCode: null,
+    }))
+  }
+
   function setPayableRouting(value: VersionForm['payableRouting']) {
     setForm(p => ({
       ...p,
@@ -250,6 +298,19 @@ export function FeesAdminPage() {
   if (isLoading) return <LoadingSpinner />
 
   const missingVendorPayee = form.payableRouting === 'Entity' && !form.payablePayeeId
+  const selectedProgram = programs.find(program => program.id === form.programConfigurationId) ?? null
+  const programScopeOptions = getFeeProgramScopeOptions(
+    selectedProgram,
+    form.effectiveDate,
+    form.carrierId,
+    form.lineOfBusiness as PolicyLineOfBusiness | null,
+  )
+  const carrierOptions = selectedProgram ? programScopeOptions.carriers : carriers
+  const lobOptions = selectedProgram ? programScopeOptions.linesOfBusiness.map(lob => lob.value) : ACTIVE_LOBS
+  const stateOptions = selectedProgram ? programScopeOptions.states : US_STATES
+  const programScopeMissingCarrier = !!selectedProgram && (!!form.lineOfBusiness || !!form.stateCode) && !form.carrierId
+  const programScopeMissingLob = !!selectedProgram && !!form.stateCode && !form.lineOfBusiness
+  const incompleteProgramScope = programScopeMissingCarrier || programScopeMissingLob
 
   // ── VERSION EDITOR (shared by new + edit) ──────────────────────────────────
   const VersionEditor = (
@@ -271,7 +332,7 @@ export function FeesAdminPage() {
             <button onClick={() => { if (confirm('Disable this version as of today?')) disableVersion() }}
               className="px-3 py-1.5 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">Disable</button>
           )}
-          <button onClick={() => saveVersion()} disabled={savingVersion || missingVendorPayee}
+          <button onClick={() => saveVersion()} disabled={savingVersion || missingVendorPayee || incompleteProgramScope}
             className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
             {savingVersion ? 'Saving…' : 'Save Version'}
           </button>
@@ -283,7 +344,7 @@ export function FeesAdminPage() {
         <SectionHeader label="Effective Date" />
         <div className="grid grid-cols-2 gap-5">
           <Field label="Effective Date *">
-            <input type="date" value={form.effectiveDate} onChange={e => set('effectiveDate', e.target.value)} className={inputCls} />
+            <input type="date" value={form.effectiveDate} onChange={e => setEffectiveDate(e.target.value)} className={inputCls} />
           </Field>
         </div>
 
@@ -352,34 +413,46 @@ export function FeesAdminPage() {
         <SectionHeader label="Scope (blank = applies to all)" />
         <div className="grid grid-cols-3 gap-4">
           <Field label="Program">
-            <select value={form.programConfigurationId ?? ''} onChange={e => set('programConfigurationId', e.target.value || null)} className={selectCls}>
+            <select value={form.programConfigurationId ?? ''} onChange={e => setProgramScope(e.target.value || null)} className={selectCls}>
               <option value="">All Programs</option>
               {programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
             </select>
           </Field>
           <Field label="Carrier">
-            <select value={form.carrierId ?? ''} onChange={e => set('carrierId', e.target.value || null)} className={selectCls}>
-              <option value="">All Carriers</option>
-              {carriers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <select value={form.carrierId ?? ''} onChange={e => setCarrierScope(e.target.value || null)} className={selectCls}>
+              <option value="">{selectedProgram ? 'Program Carrier Default' : 'All Carriers'}</option>
+              {carrierOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            {programScopeMissingCarrier && <p className="mt-1 text-xs text-red-600">Select a carrier for this Program scope.</p>}
+          </Field>
+          <Field label="Line of Business">
+            <select
+              value={form.lineOfBusiness ?? ''}
+              onChange={e => setLobScope(e.target.value || null)}
+              disabled={!!selectedProgram && !form.carrierId}
+              className={selectCls}
+            >
+              <option value="">{selectedProgram ? 'All LOBs for Carrier' : 'All LOBs'}</option>
+              {lobOptions.map(lob => <option key={lob} value={lob}>{LOB_LABELS[lob as PolicyLineOfBusiness] ?? lob}</option>)}
             </select>
           </Field>
           <Field label="State">
-            <select value={form.stateCode ?? ''} onChange={e => set('stateCode', e.target.value || null)} className={selectCls}>
-              <option value="">All States</option>
-              {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+            <select
+              value={form.stateCode ?? ''}
+              onChange={e => set('stateCode', e.target.value || null)}
+              disabled={!!selectedProgram && (!form.carrierId || !form.lineOfBusiness)}
+              className={selectCls}
+            >
+              <option value="">{selectedProgram ? 'All States for LOB' : 'All States'}</option>
+              {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {programScopeMissingLob && <p className="mt-1 text-xs text-red-600">Select a line of business before choosing a state.</p>}
           </Field>
           <Field label="License Type">
             <select value={form.licenseType ?? ''} onChange={e => set('licenseType', e.target.value || null)} className={selectCls}>
               <option value="">All</option>
               <option value="Admitted">Admitted</option>
               <option value="Non-Admitted">Non-Admitted</option>
-            </select>
-          </Field>
-          <Field label="Line of Business">
-            <select value={form.lineOfBusiness ?? ''} onChange={e => set('lineOfBusiness', e.target.value || null)} className={selectCls}>
-              <option value="">All LOBs</option>
-              {ACTIVE_LOBS.map(lob => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
             </select>
           </Field>
         </div>
@@ -857,4 +930,52 @@ export function FeesAdminPage() {
       )}
     </div>
   )
+}
+
+function getFeeProgramScopeOptions(
+  program: ProgramConfiguration | null,
+  effectiveDate: string,
+  carrierId: string | null,
+  lineOfBusiness: PolicyLineOfBusiness | null,
+) {
+  const activeCarriers = (program?.carriers ?? []).filter((carrier) => isActiveOn(carrier, effectiveDate))
+  const matchingCarriers = carrierId
+    ? activeCarriers.filter((carrier) => carrier.carrierId === carrierId)
+    : activeCarriers
+  const activeLobs = matchingCarriers
+    .flatMap((carrier) => carrier.linesOfBusiness)
+    .filter((lob) => isActiveOn(lob, effectiveDate))
+  const matchingLobs = lineOfBusiness
+    ? activeLobs.filter((lob) => lob.lineOfBusiness === lineOfBusiness)
+    : activeLobs
+
+  return {
+    carriers: activeCarriers.map((carrier) => ({ id: carrier.carrierId, name: carrier.carrierName })),
+    linesOfBusiness: uniqueBy(
+      activeLobs.map((lob) => ({ value: lob.lineOfBusiness, label: lob.lineOfBusinessLabel })),
+      (lob) => lob.value,
+    ),
+    states: [...new Set(
+      matchingLobs
+        .flatMap((lob) => lob.states)
+        .filter((state) => isActiveOn(state, effectiveDate))
+        .map((state) => state.stateCode),
+    )].sort(),
+  }
+}
+
+function isActiveOn(item: { isActive: boolean; effectiveDate: string; expirationDate: string | null }, effectiveDate: string) {
+  if (!item.isActive) return false
+  if (!effectiveDate) return true
+  return item.effectiveDate <= effectiveDate && (!item.expirationDate || item.expirationDate >= effectiveDate)
+}
+
+function uniqueBy<T>(items: T[], getKey: (item: T) => string) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = getKey(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }

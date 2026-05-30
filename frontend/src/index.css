@@ -412,6 +412,9 @@
 .sd-pill.active     { background: var(--pill-bound-bg);    color: var(--pill-bound-fg); }
 .sd-pill.renewed    { background: var(--pill-inprog-bg);   color: var(--pill-inprog-fg); }
 .sd-pill.nonrenewed { background: var(--warn-bg);          color: var(--warn-fg); }
+.sd-pill.posted     { background: var(--pill-bound-bg);    color: var(--pill-bound-fg); }
+.sd-pill.voided     { background: var(--bad-bg);           color: var(--bad-fg); }
+.sd-pill.cancelled  { background: var(--bad-bg);           color: var(--bad-fg); }
 
 /* LOB chip */
 .sd-lob {
