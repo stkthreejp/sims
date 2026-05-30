@@ -21,6 +21,7 @@ public class SurplusLinesSetupAdminServiceTests
         var stampingFee = new FeeDefinition { Code = "MS_STAMP", DisplayName = "MS Stamping Fee", FeeCategory = "StampingFee", LedgerAccountId = 1 };
         db.AddRange(program, carrier, taxFee, stampingFee);
         await db.SaveChangesAsync();
+        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.GeneralLiability, "MS");
 
         var service = new SurplusLinesSetupAdminService(db);
 
@@ -63,6 +64,93 @@ public class SurplusLinesSetupAdminServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_RejectsSpecificScopeOutsideProgramSetupPath()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var configuredCarrier = new Carrier { Name = "Configured Carrier", IsActive = true };
+        var otherCarrier = new Carrier { Name = "Other Carrier", IsActive = true };
+        db.AddRange(program, configuredCarrier, otherCarrier);
+        await db.SaveChangesAsync();
+        await AddProgramPathAsync(db, program.Id, configuredCarrier.Id, PolicyLineOfBusiness.InlandMarine, "TX");
+
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "TX",
+            program.Id,
+            otherCarrier.Id,
+            PolicyLineOfBusiness.InlandMarine,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "TX-SL-1",
+            "TX",
+            "123 Main",
+            null,
+            "Dallas",
+            "TX",
+            "75201",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsStateOutsideProgramSetupPath()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "BRACE", IsActive = true };
+        db.AddRange(program, carrier);
+        await db.SaveChangesAsync();
+        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "TX");
+
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "SC",
+            program.Id,
+            carrier.Id,
+            PolicyLineOfBusiness.InlandMarine,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "SC-SL-1",
+            "SC",
+            "123 Main",
+            null,
+            "Charleston",
+            "SC",
+            "29401",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task CopyAsync_CopiesSetupToTargetState()
     {
         await using var db = CreateDb();
@@ -71,6 +159,8 @@ public class SurplusLinesSetupAdminServiceTests
         var fee = new FeeDefinition { Code = "SL_TAX", DisplayName = "Surplus Lines Tax", FeeCategory = "Tax", LedgerAccountId = 1 };
         db.AddRange(program, carrier, fee);
         await db.SaveChangesAsync();
+        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "NC");
+        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "SC");
 
         var service = new SurplusLinesSetupAdminService(db);
         var source = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
@@ -107,6 +197,50 @@ public class SurplusLinesSetupAdminServiceTests
         Assert.Equal("NC-SL-1", copy.Value.LicenseNumber);
         Assert.Equal("NC notice", copy.Value.RequiredNoticeText);
         Assert.Equal(fee.Id, copy.Value.SurplusLinesTaxFeeDefinitionId);
+    }
+
+    [Fact]
+    public async Task CopyAsync_RejectsTargetStateOutsideProgramSetupPath()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "BRACE", IsActive = true };
+        db.AddRange(program, carrier);
+        await db.SaveChangesAsync();
+        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "NC");
+
+        var service = new SurplusLinesSetupAdminService(db);
+        var source = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "NC",
+            program.Id,
+            carrier.Id,
+            PolicyLineOfBusiness.InlandMarine,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "NC-SL-1",
+            "NC",
+            "123 Main",
+            null,
+            "Charlotte",
+            "NC",
+            "28202",
+            "USA",
+            "NC wording",
+            "NC notice",
+            "NC paperwork",
+            "NC filing notes",
+            null,
+            null,
+            null));
+
+        var copy = await service.CopyAsync(source.Value!.Id, new CopySurplusLinesStateSetupRequest("SC"));
+
+        Assert.False(copy.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", copy.ErrorCode);
     }
 
     [Fact]
@@ -288,5 +422,38 @@ public class SurplusLinesSetupAdminServiceTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+
+    private static async Task AddProgramPathAsync(
+        ApplicationDbContext db,
+        Guid programId,
+        Guid carrierId,
+        PolicyLineOfBusiness lineOfBusiness,
+        string stateCode,
+        DateOnly? effectiveDate = null)
+    {
+        var programCarrier = new ProgramCarrier
+        {
+            ProgramConfigurationId = programId,
+            CarrierId = carrierId,
+            IsActive = true,
+            EffectiveDate = effectiveDate ?? new DateOnly(2026, 1, 1)
+        };
+        var lob = new ProgramCarrierLineOfBusiness
+        {
+            ProgramCarrier = programCarrier,
+            LineOfBusiness = lineOfBusiness,
+            IsActive = true,
+            EffectiveDate = programCarrier.EffectiveDate
+        };
+        lob.States.Add(new ProgramCarrierLobState
+        {
+            StateCode = stateCode,
+            IsActive = true,
+            EffectiveDate = programCarrier.EffectiveDate
+        });
+        programCarrier.LinesOfBusiness.Add(lob);
+        db.Add(programCarrier);
+        await db.SaveChangesAsync();
     }
 }

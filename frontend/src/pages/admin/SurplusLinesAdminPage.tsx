@@ -10,6 +10,7 @@ import { surplusLinesApi } from '@/api/surplusLines.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import type { FeeDefinition, PayeeOption } from '@/types/fee.types'
+import type { ProgramConfiguration } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { SurplusLinesStateSetup, SurplusLinesStateSetupUpsert } from '@/types/surplusLines.types'
 
@@ -94,6 +95,32 @@ export function SurplusLinesAdminPage() {
   )
   const taxFees = useMemo(() => fees.filter((fee) => fee.feeCategory === 'Tax'), [fees])
   const stampingFees = useMemo(() => fees.filter((fee) => fee.feeCategory === 'StampingFee' || fee.feeCategory === 'Other'), [fees])
+  const selectedProgram = useMemo(
+    () => programs.find((program) => program.id === form.programConfigurationId) ?? null,
+    [programs, form.programConfigurationId],
+  )
+  const programScopeOptions = useMemo(
+    () => getProgramScopeOptions(selectedProgram, form.effectiveDate, form.carrierId, form.lineOfBusiness),
+    [selectedProgram, form.effectiveDate, form.carrierId, form.lineOfBusiness],
+  )
+  const carrierOptions = useMemo(
+    () => selectedProgram
+      ? programScopeOptions.carriers
+      : carriers.map((carrier) => ({ id: carrier.id, name: carrier.name })),
+    [selectedProgram, programScopeOptions.carriers, carriers],
+  )
+  const lobOptions = useMemo(
+    () => selectedProgram
+      ? programScopeOptions.linesOfBusiness
+      : ACTIVE_LOBS.map((lob) => ({ value: lob, label: LOB_LABELS[lob] })),
+    [selectedProgram, programScopeOptions.linesOfBusiness],
+  )
+  const stateOptions = selectedProgram ? programScopeOptions.states : US_STATES
+  const programScopeAllowsCurrent = !selectedProgram || (
+    (!form.carrierId || carrierOptions.some((carrier) => carrier.id === form.carrierId)) &&
+    (!form.lineOfBusiness || lobOptions.some((lob) => lob.value === form.lineOfBusiness)) &&
+    stateOptions.includes(form.stateCode)
+  )
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin', 'surplus-lines', 'setups'] })
 
@@ -166,6 +193,51 @@ export function SurplusLinesAdminPage() {
       affidavitRequired: setup.affidavitRequired,
       affidavitNotes: setup.affidavitNotes,
     })
+  }
+
+  function changeProgram(programId: string) {
+    const nextProgram = programs.find((program) => program.id === programId) ?? null
+    const nextOptions = getProgramScopeOptions(nextProgram, form.effectiveDate, null, null)
+    const nextState = nextProgram ? nextOptions.states[0] ?? form.stateCode : form.stateCode
+
+    setForm((f) => ({
+      ...f,
+      programConfigurationId: programId || null,
+      carrierId: null,
+      lineOfBusiness: null,
+      stateCode: nextState,
+      licenseState: nextState,
+      brokerState: nextState,
+    }))
+  }
+
+  function changeCarrier(carrierId: string) {
+    const nextCarrierId = carrierId || null
+    const nextOptions = getProgramScopeOptions(selectedProgram, form.effectiveDate, nextCarrierId, null)
+    const nextState = selectedProgram ? nextOptions.states[0] ?? form.stateCode : form.stateCode
+
+    setForm((f) => ({
+      ...f,
+      carrierId: nextCarrierId,
+      lineOfBusiness: null,
+      stateCode: nextState,
+      licenseState: nextState,
+      brokerState: nextState,
+    }))
+  }
+
+  function changeLineOfBusiness(value: string) {
+    const nextLob = value ? value as PolicyLineOfBusiness : null
+    const nextOptions = getProgramScopeOptions(selectedProgram, form.effectiveDate, form.carrierId, nextLob)
+    const nextState = selectedProgram ? nextOptions.states[0] ?? form.stateCode : form.stateCode
+
+    setForm((f) => ({
+      ...f,
+      lineOfBusiness: nextLob,
+      stateCode: nextState,
+      licenseState: nextState,
+      brokerState: nextState,
+    }))
   }
 
   if (isLoading) return <LoadingSpinner />
@@ -254,8 +326,20 @@ export function SurplusLinesAdminPage() {
         </div>
         <div className="space-y-5 p-5">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <SelectField label="Program" value={form.programConfigurationId ?? ''} onChange={changeProgram}>
+              <option value="">All programs</option>
+              {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+            </SelectField>
+            <SelectField label="Carrier" value={form.carrierId ?? ''} onChange={changeCarrier}>
+              <option value="">All carriers</option>
+              {carrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+            </SelectField>
+            <SelectField label="LOB" value={form.lineOfBusiness ?? ''} onChange={changeLineOfBusiness}>
+              <option value="">All LOBs</option>
+              {lobOptions.map((lob) => <option key={lob.value} value={lob.value}>{lob.label}</option>)}
+            </SelectField>
             <SelectField label="State" value={form.stateCode} onChange={(value) => setForm((f) => ({ ...f, stateCode: value, licenseState: value, brokerState: value }))}>
-              {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+              {stateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
             </SelectField>
             <TextInput label="Effective" type="date" value={form.effectiveDate} onChange={(value) => setForm((f) => ({ ...f, effectiveDate: value }))} />
             <TextInput label="Expiration" type="date" value={form.expirationDate ?? ''} onChange={(value) => setForm((f) => ({ ...f, expirationDate: value || null }))} />
@@ -265,23 +349,16 @@ export function SurplusLinesAdminPage() {
               <option value="Vendor">Vendor</option>
               <option value="Other">Other</option>
             </SelectField>
-            <SelectField label="Program" value={form.programConfigurationId ?? ''} onChange={(value) => setForm((f) => ({ ...f, programConfigurationId: value || null }))}>
-              <option value="">All programs</option>
-              {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
-            </SelectField>
-            <SelectField label="Carrier" value={form.carrierId ?? ''} onChange={(value) => setForm((f) => ({ ...f, carrierId: value || null }))}>
-              <option value="">All carriers</option>
-              {carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
-            </SelectField>
-            <SelectField label="LOB" value={form.lineOfBusiness ?? ''} onChange={(value) => setForm((f) => ({ ...f, lineOfBusiness: value ? value as PolicyLineOfBusiness : null }))}>
-              <option value="">All LOBs</option>
-              {ACTIVE_LOBS.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
-            </SelectField>
             <div className="grid grid-cols-2 gap-3">
               <CheckInput label="Active" checked={form.isActive} onChange={(value) => setForm((f) => ({ ...f, isActive: value }))} />
               <CheckInput label="Filing required" checked={form.filingRequired} onChange={(value) => setForm((f) => ({ ...f, filingRequired: value }))} />
             </div>
           </div>
+          {!programScopeAllowsCurrent && (
+            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Select a carrier, LOB, and state that are active under this Program setup.
+            </div>
+          )}
 
           <div className="border-t pt-5">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Broker / license</div>
@@ -389,7 +466,7 @@ export function SurplusLinesAdminPage() {
           <button
             type="button"
             onClick={() => saveSetup.mutate()}
-            disabled={saveSetup.isPending || !form.stateCode || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable && !form.filingPayeeId)}
+            disabled={saveSetup.isPending || !form.stateCode || !programScopeAllowsCurrent || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable && !form.filingPayeeId)}
             className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -576,4 +653,50 @@ function formsTextToJson(text: string) {
     .filter(Boolean)
 
   return JSON.stringify(forms)
+}
+
+function getProgramScopeOptions(
+  program: ProgramConfiguration | null,
+  effectiveDate: string,
+  carrierId: string | null,
+  lineOfBusiness: PolicyLineOfBusiness | null,
+) {
+  const activeCarriers = (program?.carriers ?? []).filter((carrier) => isActiveOn(carrier, effectiveDate))
+  const matchingCarriers = carrierId
+    ? activeCarriers.filter((carrier) => carrier.carrierId === carrierId)
+    : activeCarriers
+  const activeLobs = matchingCarriers
+    .flatMap((carrier) => carrier.linesOfBusiness)
+    .filter((lob) => isActiveOn(lob, effectiveDate))
+  const matchingLobs = lineOfBusiness
+    ? activeLobs.filter((lob) => lob.lineOfBusiness === lineOfBusiness)
+    : activeLobs
+
+  return {
+    carriers: activeCarriers.map((carrier) => ({ id: carrier.carrierId, name: carrier.carrierName })),
+    linesOfBusiness: uniqueBy(
+      activeLobs.map((lob) => ({ value: lob.lineOfBusiness, label: lob.lineOfBusinessLabel })),
+      (lob) => lob.value,
+    ),
+    states: [...new Set(
+      matchingLobs
+        .flatMap((lob) => lob.states)
+        .filter((state) => isActiveOn(state, effectiveDate))
+        .map((state) => state.stateCode),
+    )].sort(),
+  }
+}
+
+function isActiveOn(item: { isActive: boolean; effectiveDate: string; expirationDate: string | null }, effectiveDate: string) {
+  return item.isActive && item.effectiveDate <= effectiveDate && (!item.expirationDate || item.expirationDate >= effectiveDate)
+}
+
+function uniqueBy<T>(items: T[], getKey: (item: T) => string) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = getKey(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }

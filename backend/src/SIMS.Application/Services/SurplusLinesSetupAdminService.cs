@@ -87,6 +87,19 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         if (source.StateCode == targetState.Value)
             return Result<SurplusLinesStateSetupDto>.Failure("SURPLUS_LINES_COPY_SAME_STATE", "Target state must be different from source state.");
 
+        if (source.ProgramConfigurationId.HasValue)
+        {
+            var pathValidation = await ValidateProgramSetupPathAsync(
+                source.ProgramConfigurationId.Value,
+                source.CarrierId,
+                source.LineOfBusiness,
+                targetState.Value!,
+                source.EffectiveDate,
+                ct);
+            if (pathValidation is not null)
+                return Result<SurplusLinesStateSetupDto>.Failure(pathValidation.Value.Code, pathValidation.Value.Message);
+        }
+
         var copy = new SurplusLinesStateSetup
         {
             StateCode = targetState.Value!,
@@ -145,7 +158,8 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
 
     private async Task<(string Code, string Message)?> ValidateAsync(UpsertSurplusLinesStateSetupRequest request, CancellationToken ct)
     {
-        if (!NormalizeStateCode(request.StateCode).IsSuccess)
+        var normalizedState = NormalizeStateCode(request.StateCode);
+        if (!normalizedState.IsSuccess)
             return ("STATE_CODE_INVALID", "State code must be two characters.");
         if (!NormalizeStateCode(request.LicenseState).IsSuccess)
             return ("LICENSE_STATE_INVALID", "License state must be two characters.");
@@ -171,7 +185,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         if (request.ProgramConfigurationId.HasValue)
         {
             var programExists = await _db.Set<ProgramConfiguration>()
-                .AnyAsync(p => p.Id == request.ProgramConfigurationId.Value, ct);
+                .AnyAsync(p => p.Id == request.ProgramConfigurationId.Value && p.IsActive, ct);
             if (!programExists)
                 return ("PROGRAM_NOT_FOUND", "Program was not found.");
         }
@@ -182,6 +196,19 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
                 .AnyAsync(c => c.Id == request.CarrierId.Value, ct);
             if (!carrierExists)
                 return ("CARRIER_NOT_FOUND", "Carrier was not found.");
+        }
+
+        if (request.ProgramConfigurationId.HasValue)
+        {
+            var pathValidation = await ValidateProgramSetupPathAsync(
+                request.ProgramConfigurationId.Value,
+                request.CarrierId,
+                request.LineOfBusiness,
+                normalizedState.Value!,
+                request.EffectiveDate,
+                ct);
+            if (pathValidation is not null)
+                return pathValidation.Value;
         }
 
         var feeIds = new[]
@@ -212,6 +239,39 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         }
 
         return null;
+    }
+
+    private async Task<(string Code, string Message)?> ValidateProgramSetupPathAsync(
+        Guid programConfigurationId,
+        Guid? carrierId,
+        PolicyLineOfBusiness? lineOfBusiness,
+        string stateCode,
+        DateOnly effectiveDate,
+        CancellationToken ct)
+    {
+        var query = _db.Set<ProgramCarrierLobState>()
+            .Where(s =>
+                s.StateCode == stateCode &&
+                s.IsActive &&
+                s.EffectiveDate <= effectiveDate &&
+                (s.ExpirationDate == null || s.ExpirationDate >= effectiveDate) &&
+                s.ProgramCarrierLineOfBusiness.IsActive &&
+                s.ProgramCarrierLineOfBusiness.EffectiveDate <= effectiveDate &&
+                (s.ProgramCarrierLineOfBusiness.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ExpirationDate >= effectiveDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsActive &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.EffectiveDate <= effectiveDate &&
+                (s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate >= effectiveDate));
+
+        if (carrierId.HasValue)
+            query = query.Where(s => s.ProgramCarrierLineOfBusiness.ProgramCarrier.CarrierId == carrierId.Value);
+
+        if (lineOfBusiness.HasValue)
+            query = query.Where(s => s.ProgramCarrierLineOfBusiness.LineOfBusiness == lineOfBusiness.Value);
+
+        return await query.AnyAsync(ct)
+            ? null
+            : ("INVALID_PROGRAM_SETUP_PATH", "Selected program, carrier, line of business, and state are not active in Program setup.");
     }
 
     private static void Apply(SurplusLinesStateSetup setup, UpsertSurplusLinesStateSetupRequest request)
