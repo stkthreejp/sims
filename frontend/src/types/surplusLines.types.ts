@@ -33,6 +33,8 @@ export interface SurplusLinesStateSetup {
   stampingFeeName: string | null
   filingFeeDefinitionId: number | null
   filingFeeName: string | null
+  statePayeeId: number | null
+  statePayeeName: string | null
   filingPayeeId: number | null
   filingPayeeName: string | null
   createFilingPayable: boolean
@@ -77,6 +79,7 @@ export interface SurplusLinesStateSetupUpsert {
   surplusLinesTaxFeeDefinitionId: number | null
   stampingFeeDefinitionId: number | null
   filingFeeDefinitionId: number | null
+  statePayeeId: number | null
   filingPayeeId: number | null
   createFilingPayable: boolean
   filingPaymentTermsDays: number | null

@@ -127,6 +127,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             SurplusLinesTaxFeeDefinitionId = source.SurplusLinesTaxFeeDefinitionId,
             StampingFeeDefinitionId = source.StampingFeeDefinitionId,
             FilingFeeDefinitionId = source.FilingFeeDefinitionId,
+            StatePayeeId = source.StatePayeeId,
             FilingPayeeId = source.FilingPayeeId,
             CreateFilingPayable = source.CreateFilingPayable,
             FilingPaymentTermsDays = source.FilingPaymentTermsDays,
@@ -154,6 +155,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             .Include(s => s.SurplusLinesTaxFeeDefinition)
             .Include(s => s.StampingFeeDefinition)
             .Include(s => s.FilingFeeDefinition)
+            .Include(s => s.StatePayee)
             .Include(s => s.FilingPayee);
 
     private async Task<(string Code, string Message)?> ValidateAsync(UpsertSurplusLinesStateSetupRequest request, CancellationToken ct)
@@ -230,7 +232,18 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
                 return ("FEE_DEFINITION_NOT_FOUND", "One or more linked fee definitions were not found.");
         }
 
-        if (request.FilingPayeeId.HasValue)
+        if (!request.CreateFilingPayable && request.FilingRequired && !request.StatePayeeId.HasValue)
+            return ("STATE_PAYEE_REQUIRED", "Select a state payable recipient for direct surplus lines filing.");
+
+        if (!request.CreateFilingPayable && request.StatePayeeId.HasValue)
+        {
+            var payeeExists = await _db.Set<Payee>()
+                .AnyAsync(p => p.Id == request.StatePayeeId.Value && p.TenantId == 1 && p.IsActive, ct);
+            if (!payeeExists)
+                return ("STATE_PAYEE_NOT_FOUND", "State payable recipient was not found or inactive.");
+        }
+
+        if (request.CreateFilingPayable && request.FilingPayeeId.HasValue)
         {
             var payeeExists = await _db.Set<Payee>()
                 .AnyAsync(p => p.Id == request.FilingPayeeId.Value && p.TenantId == 1 && p.IsActive, ct);
@@ -301,7 +314,8 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         setup.SurplusLinesTaxFeeDefinitionId = request.SurplusLinesTaxFeeDefinitionId;
         setup.StampingFeeDefinitionId = request.StampingFeeDefinitionId;
         setup.FilingFeeDefinitionId = request.FilingFeeDefinitionId;
-        setup.FilingPayeeId = request.FilingPayeeId;
+        setup.StatePayeeId = request.CreateFilingPayable ? null : request.StatePayeeId;
+        setup.FilingPayeeId = request.CreateFilingPayable ? request.FilingPayeeId : null;
         setup.CreateFilingPayable = request.CreateFilingPayable;
         setup.FilingPaymentTermsDays = request.FilingPaymentTermsDays;
         setup.FilingFrequency = TrimToNull(request.FilingFrequency);
@@ -360,6 +374,8 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             setup.StampingFeeDefinition?.DisplayName,
             setup.FilingFeeDefinitionId,
             setup.FilingFeeDefinition?.DisplayName,
+            setup.StatePayeeId,
+            setup.StatePayee?.Name,
             setup.FilingPayeeId,
             setup.FilingPayee?.Name,
             setup.CreateFilingPayable,

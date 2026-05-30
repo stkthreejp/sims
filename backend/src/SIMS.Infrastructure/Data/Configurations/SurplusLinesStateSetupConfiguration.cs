@@ -69,6 +69,11 @@ public class SurplusLinesStateSetupConfiguration : IEntityTypeConfiguration<Surp
             .HasForeignKey(s => s.FilingFeeDefinitionId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(s => s.StatePayee)
+            .WithMany()
+            .HasForeignKey(s => s.StatePayeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(s => s.FilingPayee)
             .WithMany()
             .HasForeignKey(s => s.FilingPayeeId)

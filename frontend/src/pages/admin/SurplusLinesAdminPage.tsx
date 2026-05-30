@@ -44,6 +44,7 @@ const emptySetup = (): SurplusLinesStateSetupUpsert => ({
   surplusLinesTaxFeeDefinitionId: null,
   stampingFeeDefinitionId: null,
   filingFeeDefinitionId: null,
+  statePayeeId: null,
   filingPayeeId: null,
   createFilingPayable: false,
   filingPaymentTermsDays: 30,
@@ -180,6 +181,7 @@ export function SurplusLinesAdminPage() {
       surplusLinesTaxFeeDefinitionId: setup.surplusLinesTaxFeeDefinitionId,
       stampingFeeDefinitionId: setup.stampingFeeDefinitionId,
       filingFeeDefinitionId: setup.filingFeeDefinitionId,
+      statePayeeId: setup.statePayeeId,
       filingPayeeId: setup.filingPayeeId,
       createFilingPayable: setup.createFilingPayable,
       filingPaymentTermsDays: setup.filingPaymentTermsDays,
@@ -392,11 +394,14 @@ export function SurplusLinesAdminPage() {
               <CheckInput
                 label="Filed by vendor"
                 checked={form.createFilingPayable}
-                onChange={(value) => setForm((f) => ({ ...f, createFilingPayable: value, filingPayeeId: value ? f.filingPayeeId : null }))}
+                onChange={(value) => setForm((f) => ({ ...f, createFilingPayable: value, statePayeeId: value ? null : f.statePayeeId, filingPayeeId: value ? f.filingPayeeId : null }))}
               />
               {!form.createFilingPayable ? (
-                <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 md:col-span-3">
-                  Handled by SMM; payable to state.
+                <div className="grid gap-3 rounded border border-slate-200 bg-slate-50 p-3 md:col-span-3 md:grid-cols-[minmax(260px,360px)_1fr]">
+                  <PayeeSelect label="State payable recipient" value={form.statePayeeId} payees={payees} onChange={(value) => setForm((f) => ({ ...f, statePayeeId: value }))} />
+                  <div className="self-end rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    Direct filing handled by SMM; payable to the selected state recipient.
+                  </div>
                 </div>
               ) : (
                 <div className="grid gap-3 rounded border border-blue-100 bg-blue-50/40 p-3 md:col-span-4 md:grid-cols-4">
@@ -466,7 +471,7 @@ export function SurplusLinesAdminPage() {
           <button
             type="button"
             onClick={() => saveSetup.mutate()}
-            disabled={saveSetup.isPending || !form.stateCode || !programScopeAllowsCurrent || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable && !form.filingPayeeId)}
+            disabled={saveSetup.isPending || !form.stateCode || !programScopeAllowsCurrent || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable ? !form.filingPayeeId : form.filingRequired && !form.statePayeeId)}
             className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -589,7 +594,7 @@ function dateRange(effectiveDate: string, expirationDate: string | null) {
 }
 
 function filingHandlingText(setup: SurplusLinesStateSetup) {
-  if (!setup.createFilingPayable) return 'Direct filing by SMM; payable to state'
+  if (!setup.createFilingPayable) return `Direct filing by SMM; payable to ${setup.statePayeeName ?? 'No state recipient selected'}`
 
   const terms = setup.filingPaymentTermsDays != null ? ` / Net ${setup.filingPaymentTermsDays}` : ''
   return `Filed by vendor: ${setup.filingPayeeName ?? 'No vendor payee selected'}${terms}`
@@ -608,6 +613,7 @@ function cleanSetup(setup: SurplusLinesStateSetupUpsert): SurplusLinesStateSetup
     requiredNoticeText: trimToNull(setup.requiredNoticeText),
     paperworkNotes: trimToNull(setup.paperworkNotes),
     filingNotes: trimToNull(setup.filingNotes),
+    statePayeeId: setup.createFilingPayable ? null : setup.statePayeeId,
     filingPayeeId: setup.createFilingPayable ? setup.filingPayeeId : null,
     filingPaymentTermsDays: setup.createFilingPayable ? setup.filingPaymentTermsDays : null,
     filingFrequency: setup.createFilingPayable ? trimToNull(setup.filingFrequency) : null,

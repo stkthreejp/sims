@@ -22,6 +22,7 @@ public class SurplusLinesSetupAdminServiceTests
         db.AddRange(program, carrier, taxFee, stampingFee);
         await db.SaveChangesAsync();
         await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.GeneralLiability, "MS");
+        var statePayee = await AddStatePayeeAsync(db, "MS");
 
         var service = new SurplusLinesSetupAdminService(db);
 
@@ -50,7 +51,8 @@ public class SurplusLinesSetupAdminServiceTests
             FilingNotes: "Filed by vendor",
             SurplusLinesTaxFeeDefinitionId: taxFee.Id,
             StampingFeeDefinitionId: stampingFee.Id,
-            FilingFeeDefinitionId: null));
+            FilingFeeDefinitionId: null,
+            StatePayeeId: statePayee.Id));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("MS", result.Value!.StateCode);
@@ -161,6 +163,7 @@ public class SurplusLinesSetupAdminServiceTests
         await db.SaveChangesAsync();
         await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "NC");
         await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "SC");
+        var statePayee = await AddStatePayeeAsync(db, "NC");
 
         var service = new SurplusLinesSetupAdminService(db);
         var source = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
@@ -188,7 +191,8 @@ public class SurplusLinesSetupAdminServiceTests
             "NC filing notes",
             fee.Id,
             null,
-            null));
+            null,
+            StatePayeeId: statePayee.Id));
 
         var copy = await service.CopyAsync(source.Value!.Id, new CopySurplusLinesStateSetupRequest("SC"));
 
@@ -197,6 +201,7 @@ public class SurplusLinesSetupAdminServiceTests
         Assert.Equal("NC-SL-1", copy.Value.LicenseNumber);
         Assert.Equal("NC notice", copy.Value.RequiredNoticeText);
         Assert.Equal(fee.Id, copy.Value.SurplusLinesTaxFeeDefinitionId);
+        Assert.Equal(statePayee.Id, copy.Value.StatePayeeId);
     }
 
     [Fact]
@@ -208,6 +213,7 @@ public class SurplusLinesSetupAdminServiceTests
         db.AddRange(program, carrier);
         await db.SaveChangesAsync();
         await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "NC");
+        var statePayee = await AddStatePayeeAsync(db, "NC");
 
         var service = new SurplusLinesSetupAdminService(db);
         var source = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
@@ -235,7 +241,8 @@ public class SurplusLinesSetupAdminServiceTests
             "NC filing notes",
             null,
             null,
-            null));
+            null,
+            StatePayeeId: statePayee.Id));
 
         var copy = await service.CopyAsync(source.Value!.Id, new CopySurplusLinesStateSetupRequest("SC"));
 
@@ -320,12 +327,96 @@ public class SurplusLinesSetupAdminServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_SavesDirectStatePayeeForDirectFiling()
+    {
+        await using var db = CreateDb();
+        var statePayee = new Payee { Name = "Texas Department of Insurance", PayeeType = "StateAuthority" };
+        db.Add(statePayee);
+        await db.SaveChangesAsync();
+
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "TX",
+            null,
+            null,
+            null,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "TX-SL-1",
+            "TX",
+            "123 Main",
+            null,
+            "Dallas",
+            "TX",
+            "75201",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            StatePayeeId: statePayee.Id,
+            FilingPayeeId: 999));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(statePayee.Id, result.Value!.StatePayeeId);
+        Assert.Equal("Texas Department of Insurance", result.Value.StatePayeeName);
+        Assert.Null(result.Value.FilingPayeeId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsDirectFilingWithoutStatePayee()
+    {
+        await using var db = CreateDb();
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "TX",
+            null,
+            null,
+            null,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "TX-SL-1",
+            "TX",
+            "123 Main",
+            null,
+            "Dallas",
+            "TX",
+            "75201",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("STATE_PAYEE_REQUIRED", result.ErrorCode);
+        Assert.Contains("state", result.ErrorMessage!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CreateAsync_ReturnsValidationMessageWhenLinkedFeeHasNoMatchingRule()
     {
         await using var db = CreateDb();
         var fee = new FeeDefinition { Code = "TX_SL_TAX", DisplayName = "TX Surplus Lines Tax", FeeCategory = "Tax", LedgerAccountId = 1 };
         db.Add(fee);
         await db.SaveChangesAsync();
+        var statePayee = await AddStatePayeeAsync(db, "TX");
 
         var service = new SurplusLinesSetupAdminService(db);
 
@@ -354,7 +445,8 @@ public class SurplusLinesSetupAdminServiceTests
             null,
             fee.Id,
             null,
-            null));
+            null,
+            StatePayeeId: statePayee.Id));
 
         Assert.True(result.IsSuccess);
         Assert.Contains(result.Value!.FeeValidationMessages, message => message.Contains("TX Surplus Lines Tax"));
@@ -367,6 +459,7 @@ public class SurplusLinesSetupAdminServiceTests
         var fee = new FeeDefinition { Code = "TX_SL_TAX", DisplayName = "TX Surplus Lines Tax", FeeCategory = "Tax", LedgerAccountId = 1 };
         db.Add(fee);
         await db.SaveChangesAsync();
+        var statePayee = await AddStatePayeeAsync(db, "TX");
         db.Add(new FeeRuleVersion
         {
             FeeDefinitionId = fee.Id,
@@ -409,7 +502,8 @@ public class SurplusLinesSetupAdminServiceTests
             null,
             fee.Id,
             null,
-            null));
+            null,
+            StatePayeeId: statePayee.Id));
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.FeeValidationMessages);
@@ -422,6 +516,14 @@ public class SurplusLinesSetupAdminServiceTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+
+    private static async Task<Payee> AddStatePayeeAsync(ApplicationDbContext db, string stateCode)
+    {
+        var payee = new Payee { Name = $"{stateCode} Department of Insurance", PayeeType = "StateAuthority" };
+        db.Add(payee);
+        await db.SaveChangesAsync();
+        return payee;
     }
 
     private static async Task AddProgramPathAsync(

@@ -30,6 +30,7 @@ public class SurplusLinesStateSetup : BaseEntity
     public long? SurplusLinesTaxFeeDefinitionId { get; set; }
     public long? StampingFeeDefinitionId { get; set; }
     public long? FilingFeeDefinitionId { get; set; }
+    public long? StatePayeeId { get; set; }
     public long? FilingPayeeId { get; set; }
     public bool CreateFilingPayable { get; set; }
     public int? FilingPaymentTermsDays { get; set; }
@@ -48,5 +49,6 @@ public class SurplusLinesStateSetup : BaseEntity
     public FeeDefinition? SurplusLinesTaxFeeDefinition { get; set; }
     public FeeDefinition? StampingFeeDefinition { get; set; }
     public FeeDefinition? FilingFeeDefinition { get; set; }
+    public Payee? StatePayee { get; set; }
     public Payee? FilingPayee { get; set; }
 }
