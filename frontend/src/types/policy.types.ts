@@ -107,6 +107,8 @@ export interface PolicyListItem {
   status: PolicyStatus
   boundDate: string
   createdAt: string
+  renewalSubmissionId: string | null
+  renewalSubmissionStatus: string | null
 }
 
 export interface PolicyTransaction {

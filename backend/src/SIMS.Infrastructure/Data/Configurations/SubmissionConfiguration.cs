@@ -28,5 +28,8 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
 
         builder.HasOne(s => s.CreatedBy).WithMany()
             .HasForeignKey(s => s.CreatedById).OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.RenewingPolicy).WithMany(p => p.RenewalSubmissions)
+            .HasForeignKey(s => s.RenewingPolicyId).OnDelete(DeleteBehavior.SetNull);
     }
 }

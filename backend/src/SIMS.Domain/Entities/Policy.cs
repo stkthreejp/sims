@@ -33,4 +33,5 @@ public class Policy : BaseEntity
     public Carrier Carrier { get; set; } = null!;
     public ICollection<PolicyTransaction> Transactions { get; set; } = new List<PolicyTransaction>();
     public ICollection<PolicyVersion> Versions { get; set; } = new List<PolicyVersion>();
+    public ICollection<Submission> RenewalSubmissions { get; set; } = new List<Submission>();
 }

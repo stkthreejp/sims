@@ -111,6 +111,7 @@ public class SubmissionService : ISubmissionService
             LinesOfBusiness = dto.LinesOfBusiness.Count > 0
                 ? JsonSerializer.Serialize(dto.LinesOfBusiness.Distinct().ToList())
                 : null,
+            RenewingPolicyId = dto.RenewingPolicyId,
             CreatedById = createdById
         };
 
@@ -293,6 +294,7 @@ public class SubmissionService : ISubmissionService
         LinesOfBusiness = string.IsNullOrWhiteSpace(s.LinesOfBusiness)
             ? []
             : JsonSerializer.Deserialize<List<string>>(s.LinesOfBusiness) ?? [],
+        RenewingPolicyId = s.RenewingPolicyId,
         QuoteCount = s.Quotes?.Count ?? 0,
         CreatedAt = s.CreatedAt
     };

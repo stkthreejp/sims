@@ -408,7 +408,10 @@
 .sd-pill.declined  { background: var(--pill-declined-bg); color: var(--pill-declined-fg); }
 .sd-pill.cancelled { background: var(--pill-declined-bg); color: var(--pill-declined-fg); }
 .sd-pill.expired   { background: var(--pill-draft-bg);    color: var(--pill-draft-fg); }
-.sd-pill.withdrawn { background: var(--pill-draft-bg);    color: var(--pill-draft-fg); }
+.sd-pill.withdrawn  { background: var(--pill-draft-bg);    color: var(--pill-draft-fg); }
+.sd-pill.active     { background: var(--pill-bound-bg);    color: var(--pill-bound-fg); }
+.sd-pill.renewed    { background: var(--pill-inprog-bg);   color: var(--pill-inprog-fg); }
+.sd-pill.nonrenewed { background: var(--warn-bg);          color: var(--warn-fg); }
 
 /* LOB chip */
 .sd-lob {
@@ -576,19 +579,21 @@
   gap: 10px;
   margin-bottom: 20px;
 }
-.sd-metric {
+.sd-metrics.five { grid-template-columns: repeat(5, 1fr); }
+.sd-metric,
+.subs-metric {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   padding: 12px 14px;
   box-shadow: var(--shadow-sm);
 }
-.sd-metric .k { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 4px; }
-.sd-metric .v { font-size: 20px; font-weight: 600; letter-spacing: -.015em; line-height: 1; font-variant-numeric: tabular-nums; }
-.sd-metric .s { color: var(--ink-3); font-size: 11.5px; margin-top: 5px; }
-.sd-metric.accent { background: var(--accent-soft); border-color: #cfe0ef; }
-.sd-metric.accent .v { color: var(--accent-ink); }
-.sd-metric.accent .k { color: var(--accent-ink); opacity: .75; }
+.sd-metric .k, .subs-metric .k { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 4px; }
+.sd-metric .v, .subs-metric .v { font-size: 20px; font-weight: 600; letter-spacing: -.015em; line-height: 1; font-variant-numeric: tabular-nums; }
+.sd-metric .s, .subs-metric .s { color: var(--ink-3); font-size: 11.5px; margin-top: 5px; }
+.sd-metric.accent, .subs-metric.accent { background: var(--accent-soft); border-color: #cfe0ef; }
+.sd-metric.accent .v, .subs-metric.accent .v { color: var(--accent-ink); }
+.sd-metric.accent .k, .subs-metric.accent .k { color: var(--accent-ink); opacity: .75; }
 
 /* Page header meta strip */
 .sd-ph-strip {
@@ -721,12 +726,6 @@
 .subs-sub { color: var(--ink-3); font-size: 13px; margin-top: 3px; }
 
 .subs-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
-.subs-metric { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 12px 14px; box-shadow: var(--shadow-sm); }
-.subs-metric .k { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 4px; }
-.subs-metric .v { font-size: 20px; font-weight: 600; letter-spacing: -.015em; line-height: 1; }
-.subs-metric .s { color: var(--ink-3); font-size: 11.5px; margin-top: 5px; }
-.subs-metric.accent { background: var(--accent-soft); border-color: #cfe0ef; }
-.subs-metric.accent .v { color: var(--accent-ink); }
 
 .subs-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl) var(--r-xl) 0 0; border-bottom: 0; }
 .subs-tabs { display: flex; gap: 2px; }

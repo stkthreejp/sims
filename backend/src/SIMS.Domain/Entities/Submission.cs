@@ -16,9 +16,11 @@ public class Submission : BaseEntity
     /// <summary>JSON-serialized array of PolicyLineOfBusiness values detected/set for this submission.</summary>
     public string? LinesOfBusiness { get; set; }
     public int? ProducerId { get; set; }
+    public Guid? RenewingPolicyId { get; set; }
     public Guid CreatedById { get; set; }
 
     // Navigation
+    public Policy? RenewingPolicy { get; set; }
     public Insured Insured { get; set; } = null!;
     public Agent? Agent { get; set; }
     public User Underwriter { get; set; } = null!;

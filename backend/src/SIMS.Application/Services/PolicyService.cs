@@ -51,6 +51,7 @@ public class PolicyService : IPolicyService
         var q = Db.Set<Policy>()
             .Include(p => p.Submission).ThenInclude(s => s.Insured)
             .Include(p => p.Carrier)
+            .Include(p => p.RenewalSubmissions)
             .Where(p => !p.IsDeleted)
             .ForAccessScope(access)
             .AsQueryable();
@@ -66,9 +67,9 @@ public class PolicyService : IPolicyService
 
         var total = await q.CountAsync();
 
-        q = query.SortDir.ToLower() == "asc"
-            ? q.OrderBy(p => p.BoundDate)
-            : q.OrderByDescending(p => p.BoundDate);
+        q = query.SortDir.ToLower() == "desc"
+            ? q.OrderByDescending(p => p.ExpirationDate)
+            : q.OrderBy(p => p.ExpirationDate);
 
         var items = await q
             .Skip((query.Page - 1) * query.PageSize)
@@ -1758,21 +1759,31 @@ public class PolicyService : IPolicyService
         return values.Any(v => !string.IsNullOrWhiteSpace(v) && v.Contains("test", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static PolicyListItemDto MapToListItemDto(Policy p) => new()
+    private static PolicyListItemDto MapToListItemDto(Policy p)
     {
-        Id = p.Id,
-        PolicyNumber = p.PolicyNumber,
-        SubmissionId = p.SubmissionId,
-        InsuredName = p.Submission?.Insured?.DisplayName ?? "",
-        CarrierName = p.Carrier?.Name ?? "",
-        LineOfBusiness = p.LineOfBusiness,
-        EffectiveDate = p.EffectiveDate,
-        ExpirationDate = p.ExpirationDate,
-        TotalPremium = p.TotalPremium,
-        Status = p.Status,
-        BoundDate = p.BoundDate,
-        CreatedAt = p.CreatedAt,
-    };
+        var renewal = p.RenewalSubmissions?
+            .Where(s => !s.IsDeleted)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefault();
+
+        return new()
+        {
+            Id = p.Id,
+            PolicyNumber = p.PolicyNumber,
+            SubmissionId = p.SubmissionId,
+            InsuredName = p.Submission?.Insured?.DisplayName ?? "",
+            CarrierName = p.Carrier?.Name ?? "",
+            LineOfBusiness = p.LineOfBusiness,
+            EffectiveDate = p.EffectiveDate,
+            ExpirationDate = p.ExpirationDate,
+            TotalPremium = p.TotalPremium,
+            Status = p.Status,
+            BoundDate = p.BoundDate,
+            CreatedAt = p.CreatedAt,
+            RenewalSubmissionId = renewal?.Id,
+            RenewalSubmissionStatus = renewal?.Status,
+        };
+    }
 
     private static PolicyDto MapToDto(Policy p)
     {

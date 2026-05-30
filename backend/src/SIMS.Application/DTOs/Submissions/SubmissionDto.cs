@@ -22,6 +22,7 @@ public class SubmissionDto
     public string? DescriptionOfOperations { get; set; }
     /// <summary>Detected/manually-set lines of business for this submission (e.g. ["CommercialAuto","GeneralLiability"]).</summary>
     public List<string> LinesOfBusiness { get; set; } = [];
+    public Guid? RenewingPolicyId { get; set; }
     public int QuoteCount { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -60,6 +61,7 @@ public class SubmissionCreateDto
     public string? DescriptionOfOperations { get; set; }
 
     public List<string> LinesOfBusiness { get; set; } = [];
+    public Guid? RenewingPolicyId { get; set; }
 }
 
 public class SubmissionUpdateDto : SubmissionCreateDto

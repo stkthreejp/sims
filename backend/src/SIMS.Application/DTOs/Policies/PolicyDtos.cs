@@ -21,6 +21,8 @@ public class PolicyListItemDto
     public PolicyStatus Status { get; set; }
     public DateOnly BoundDate { get; set; }
     public DateTime CreatedAt { get; set; }
+    public Guid? RenewalSubmissionId { get; set; }
+    public SubmissionStatus? RenewalSubmissionStatus { get; set; }
 }
 
 public class PolicyDto
