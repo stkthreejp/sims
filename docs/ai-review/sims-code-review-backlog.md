@@ -2,9 +2,21 @@
 
 Generated from a read-only multi-agent audit on 2026-05-27.
 
-Last updated on 2026-05-29 during auth smoke test remediation.
+Last updated on 2026-05-30 during Program SOT Fees pre-implementation review.
 
 ## Audit Checkpoints
+
+### 2026-05-30 Program SOT Fees implementation preflight
+
+- Scope: read-only specialist review of `docs/superpowers/specs/2026-05-30-program-sot-database-contract-design.md`, `docs/superpowers/plans/2026-05-30-fees-program-sot.md`, current Fees admin/service/model code, and next Program SOT surfaces.
+- Result: implementation can proceed after the plan correction committed on 2026-05-30, but the first draft's database contract was not strong enough by itself.
+- Accepted findings:
+  - Fee canonical FKs must be validated against denormalized Program/Carrier/LOB/State fields, not only checked for presence.
+  - Fee migration backfill must be date-aware and normalize Program-scoped StateCode/LineOfBusiness values.
+  - Fee tests must cover wrong Program/wrong parent paths, migration preflight/backfill behavior, controller error shape, all-state LOB fallback, and selected FeeRuleVersionId.
+  - Fees admin Program selector logic must not block valid Program/Carrier/LOB all-state or Program/Carrier/LOB/State rules.
+  - Program setup currently has path-only unique constraints; full historical interval/version support remains a later Program setup hardening item.
+- Next implementation order: Fees Program SOT, Bordereaux profiles Program SOT, Surplus Lines setup Program SOT, then Policy Number assignment and bind fallback tightening.
 
 ### 2026-05-28 targeted auth/security re-audit
 

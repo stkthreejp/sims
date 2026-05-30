@@ -4,7 +4,7 @@
 
 **Goal:** Make fee rule versions use Program setup as the source of truth for Program-scoped fee paths while preserving current global fee behavior.
 
-**Architecture:** Keep the existing loose fee scope columns for search, display, and fee calculation compatibility, but add canonical Program-path foreign keys for Program/Carrier, Program/Carrier/LOB, and Program/Carrier/LOB/State scopes. Fee admin save paths resolve and stamp the canonical IDs server-side; the database rejects Program-scoped child rows that are not attached to the matching Program setup level. The Fees admin UI becomes a cascading Program setup selector so users cannot choose a carrier, LOB, or state outside the selected Program path.
+**Architecture:** Keep the existing loose fee scope columns for search, display, and fee calculation compatibility, but add canonical Program-path foreign keys for Program/Carrier, Program/Carrier/LOB, and Program/Carrier/LOB/State scopes. Fee admin save paths resolve and stamp the canonical IDs server-side; the database rejects Program-scoped child rows that are not attached to the matching Program setup level and uses PostgreSQL trigger validation to prove the canonical row matches the denormalized Program/Carrier/LOB/State fields. The Fees admin UI becomes a cascading Program setup selector so users cannot choose a carrier, LOB, or state outside the selected Program path.
 
 **Tech Stack:** ASP.NET Core 8, EF Core, PostgreSQL, React, TypeScript, Vite, xUnit, EF Core InMemory and SQLite test providers.
 
@@ -39,6 +39,23 @@ The slice excludes:
 - Incoming API payloads do not get to choose canonical Program-path IDs directly. The server resolves them from `ProgramConfigurationId`, `CarrierId`, `LineOfBusiness`, `StateCode`, and `EffectiveDate`.
 - Existing fee rules without `ProgramConfigurationId` are global or non-Program scoped and do not need canonical Program-path IDs.
 
+## Agent Review Corrections
+
+These corrections supersede the initial task snippets below where they differ. They came from the read-only specialist review run after the first draft.
+
+- The canonical FK check constraint is shape-only. The migration must also add PostgreSQL trigger validation so `ProgramCarrierId`, `ProgramCarrierLineOfBusinessId`, and `ProgramCarrierLobStateId` are joined back to Program setup and proven to match the same `ProgramConfigurationId`, `CarrierId`, `LineOfBusiness`, and `StateCode` stored on the fee rule.
+- Migration backfill must be effective-date aware. Every ProgramCarrier, ProgramCarrierLineOfBusiness, and ProgramCarrierLobState join must require `EffectiveDate <= fee_rule_versions."EffectiveDate"` and `(ExpirationDate IS NULL OR ExpirationDate >= fee_rule_versions."EffectiveDate")`.
+- Migration preflight must normalize `StateCode = UPPER(TRIM(StateCode))` for Program-scoped fee rows, reject unsupported `LineOfBusiness` values before backfill, and fail clearly when a Program-scoped row cannot be resolved to an active Program path for the fee effective date.
+- Service validation must normalize and validate `LineOfBusiness` whenever it is provided, not only for Program-scoped rows. Store enum `ToString()` values so fee calculation matches consistently.
+- Service validation should use the existing state error convention: `STATE_CODE_INVALID` with message `State code must be two characters.`
+- Tests must include wrong-Program and wrong-parent paths, not only missing paths.
+- Tests must include a relational mismatch case where a canonical ID points at a different Program path and the database rejects it.
+- Tests must include migration/preflight coverage for date-window matching and state normalization.
+- The fee calculator tests must assert the selected `FeeRuleVersionId`, not just the calculated amount.
+- Frontend save blocking must test missing parents, not scope depth. A complete Program/Carrier/LOB all-state rule and a complete Program/Carrier/LOB/State rule must be saveable.
+- Frontend selector filtering must respect Program setup effective/expiration dates once `form.effectiveDate` is set.
+- Program setup currently has path-only unique constraints and cannot represent multiple historical intervals for the same Program path. Do not solve that in this Fees slice; document it as a follow-up identity/versioning task before claiming full historical Program setup versioning.
+
 ## Files
 
 - Modify: `backend/src/SIMS.Domain/Entities/Accounting/FeeRuleVersion.cs`
@@ -61,6 +78,12 @@ The slice excludes:
 
 - Modify: `backend/tests/SIMS.Application.Tests/Services/FeeCalculationServiceTests.cs`
   Add a fee resolution regression test for state-specific Program fees overriding all-state LOB defaults.
+
+- Create: `backend/tests/SIMS.Application.Tests/Infrastructure/FeeRuleProgramScopeMigrationTests.cs`
+  Add migration SQL/preflight coverage for trigger validation, date-window backfill, unsupported LOBs, and state normalization.
+
+- Create: `backend/tests/SIMS.Application.Tests/Controllers/FeesControllerProgramScopeTests.cs`
+  Add controller-level contract coverage for Program scope failures and normalized successful responses.
 
 - Modify: `frontend/src/pages/admin/FeesAdminPage.tsx`
   Filter Carrier, LOB, and State options from selected Program setup and clear invalid child selections when parents change.
@@ -607,9 +630,48 @@ Expected: EF creates a migration ending in `AddFeeRuleProgramScopeRefs.cs` and u
 
 In the generated migration file ending with `AddFeeRuleProgramScopeRefs.cs`, keep EF-generated `AddColumn`, `CreateIndex`, `AddForeignKey`, and `AddCheckConstraint` operations. Insert this SQL after columns and indexes are created and before the check constraint is added:
 
+The SQL below must be date-aware and consistency-safe:
+
+- Normalize Program-scoped `StateCode` before backfill.
+- Reject unsupported Program-scoped `LineOfBusiness` strings before backfill.
+- Add fee effective-date predicates to every Program setup join.
+- Add a PostgreSQL trigger that rejects canonical IDs pointing to a different Program path than the denormalized columns.
+
 ```csharp
         migrationBuilder.Sql(
             """
+            UPDATE fee_rule_versions
+            SET "StateCode" = UPPER(TRIM("StateCode"))
+            WHERE "ProgramConfigurationId" IS NOT NULL
+              AND "StateCode" IS NOT NULL;
+
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM fee_rule_versions v
+                    WHERE v."ProgramConfigurationId" IS NOT NULL
+                      AND v."LineOfBusiness" IS NOT NULL
+                      AND v."LineOfBusiness" NOT IN (
+                          'GeneralLiability',
+                          'InlandMarine',
+                          'AutoLiability',
+                          'AutoPhysicalDamage',
+                          'Property',
+                          'CommercialAuto',
+                          'BusinessOwners',
+                          'WorkersCompensation',
+                          'ProfessionalLiability',
+                          'Umbrella',
+                          'Cyber',
+                          'ExcessLiability',
+                          'Other'
+                      )
+                ) THEN
+                    RAISE EXCEPTION 'Cannot add fee Program SOT constraint: at least one Program-scoped fee rule has an unsupported LineOfBusiness value.';
+                END IF;
+            END $$;
+
             UPDATE fee_rule_versions v
             SET "ProgramCarrierId" = pc."Id"
             FROM program_carriers pc
@@ -620,7 +682,9 @@ In the generated migration file ending with `AddFeeRuleProgramScopeRefs.cs`, kee
               AND pc."ProgramConfigurationId" = v."ProgramConfigurationId"
               AND pc."CarrierId" = v."CarrierId"
               AND pc."IsActive" = TRUE
-              AND pc."IsDeleted" = FALSE;
+              AND pc."IsDeleted" = FALSE
+              AND pc."EffectiveDate" <= v."EffectiveDate"
+              AND (pc."ExpirationDate" IS NULL OR pc."ExpirationDate" >= v."EffectiveDate");
 
             UPDATE fee_rule_versions v
             SET "ProgramCarrierLineOfBusinessId" = pcl."Id"
@@ -651,7 +715,11 @@ In the generated migration file ending with `AddFeeRuleProgramScopeRefs.cs`, kee
               AND pc."IsActive" = TRUE
               AND pc."IsDeleted" = FALSE
               AND pcl."IsActive" = TRUE
-              AND pcl."IsDeleted" = FALSE;
+              AND pcl."IsDeleted" = FALSE
+              AND pc."EffectiveDate" <= v."EffectiveDate"
+              AND (pc."ExpirationDate" IS NULL OR pc."ExpirationDate" >= v."EffectiveDate")
+              AND pcl."EffectiveDate" <= v."EffectiveDate"
+              AND (pcl."ExpirationDate" IS NULL OR pcl."ExpirationDate" >= v."EffectiveDate");
 
             UPDATE fee_rule_versions v
             SET "ProgramCarrierLobStateId" = pcs."Id"
@@ -686,7 +754,13 @@ In the generated migration file ending with `AddFeeRuleProgramScopeRefs.cs`, kee
               AND pcl."IsActive" = TRUE
               AND pcl."IsDeleted" = FALSE
               AND pcs."IsActive" = TRUE
-              AND pcs."IsDeleted" = FALSE;
+              AND pcs."IsDeleted" = FALSE
+              AND pc."EffectiveDate" <= v."EffectiveDate"
+              AND (pc."ExpirationDate" IS NULL OR pc."ExpirationDate" >= v."EffectiveDate")
+              AND pcl."EffectiveDate" <= v."EffectiveDate"
+              AND (pcl."ExpirationDate" IS NULL OR pcl."ExpirationDate" >= v."EffectiveDate")
+              AND pcs."EffectiveDate" <= v."EffectiveDate"
+              AND (pcs."ExpirationDate" IS NULL OR pcs."ExpirationDate" >= v."EffectiveDate");
             """);
 
         migrationBuilder.Sql(
@@ -742,6 +816,87 @@ In the generated migration file ending with `AddFeeRuleProgramScopeRefs.cs`, kee
                 END IF;
             END $$;
             """);
+
+        migrationBuilder.Sql(
+            """
+            CREATE OR REPLACE FUNCTION validate_fee_rule_program_scope()
+            RETURNS trigger AS $$
+            DECLARE
+                lob_value integer;
+                mismatch_exists boolean;
+            BEGIN
+                lob_value := CASE NEW."LineOfBusiness"
+                    WHEN 'GeneralLiability' THEN 1
+                    WHEN 'InlandMarine' THEN 10
+                    WHEN 'AutoLiability' THEN 11
+                    WHEN 'AutoPhysicalDamage' THEN 12
+                    WHEN 'Property' THEN 2
+                    WHEN 'CommercialAuto' THEN 3
+                    WHEN 'BusinessOwners' THEN 4
+                    WHEN 'WorkersCompensation' THEN 5
+                    WHEN 'ProfessionalLiability' THEN 6
+                    WHEN 'Umbrella' THEN 7
+                    WHEN 'Cyber' THEN 8
+                    WHEN 'ExcessLiability' THEN 9
+                    WHEN 'Other' THEN 99
+                    ELSE NULL
+                END;
+
+                IF NEW."ProgramCarrierId" IS NOT NULL THEN
+                    SELECT NOT EXISTS (
+                        SELECT 1
+                        FROM program_carriers pc
+                        WHERE pc."Id" = NEW."ProgramCarrierId"
+                          AND pc."ProgramConfigurationId" = NEW."ProgramConfigurationId"
+                          AND pc."CarrierId" = NEW."CarrierId"
+                    ) INTO mismatch_exists;
+                    IF mismatch_exists THEN
+                        RAISE EXCEPTION 'Fee rule ProgramCarrierId does not match ProgramConfigurationId and CarrierId.';
+                    END IF;
+                END IF;
+
+                IF NEW."ProgramCarrierLineOfBusinessId" IS NOT NULL THEN
+                    SELECT NOT EXISTS (
+                        SELECT 1
+                        FROM program_carrier_lines_of_business pcl
+                        INNER JOIN program_carriers pc ON pc."Id" = pcl."ProgramCarrierId"
+                        WHERE pcl."Id" = NEW."ProgramCarrierLineOfBusinessId"
+                          AND pc."ProgramConfigurationId" = NEW."ProgramConfigurationId"
+                          AND pc."CarrierId" = NEW."CarrierId"
+                          AND pcl."LineOfBusiness" = lob_value
+                    ) INTO mismatch_exists;
+                    IF mismatch_exists THEN
+                        RAISE EXCEPTION 'Fee rule ProgramCarrierLineOfBusinessId does not match Program, Carrier, and LineOfBusiness.';
+                    END IF;
+                END IF;
+
+                IF NEW."ProgramCarrierLobStateId" IS NOT NULL THEN
+                    SELECT NOT EXISTS (
+                        SELECT 1
+                        FROM program_carrier_lob_states pcs
+                        INNER JOIN program_carrier_lines_of_business pcl ON pcl."Id" = pcs."ProgramCarrierLineOfBusinessId"
+                        INNER JOIN program_carriers pc ON pc."Id" = pcl."ProgramCarrierId"
+                        WHERE pcs."Id" = NEW."ProgramCarrierLobStateId"
+                          AND pc."ProgramConfigurationId" = NEW."ProgramConfigurationId"
+                          AND pc."CarrierId" = NEW."CarrierId"
+                          AND pcl."LineOfBusiness" = lob_value
+                          AND pcs."StateCode" = NEW."StateCode"
+                    ) INTO mismatch_exists;
+                    IF mismatch_exists THEN
+                        RAISE EXCEPTION 'Fee rule ProgramCarrierLobStateId does not match Program, Carrier, LineOfBusiness, and StateCode.';
+                    END IF;
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER trg_validate_fee_rule_program_scope
+            BEFORE INSERT OR UPDATE OF "ProgramConfigurationId", "CarrierId", "LineOfBusiness", "StateCode", "ProgramCarrierId", "ProgramCarrierLineOfBusinessId", "ProgramCarrierLobStateId"
+            ON fee_rule_versions
+            FOR EACH ROW
+            EXECUTE FUNCTION validate_fee_rule_program_scope();
+            """);
 ```
 
 - [ ] **Step 5: Ensure Down removes added objects**
@@ -752,6 +907,12 @@ In the generated migration `Down` method, confirm it drops these foreign keys, i
         migrationBuilder.DropCheckConstraint(
             name: "ck_fee_rule_program_scope_canonical",
             table: "fee_rule_versions");
+
+        migrationBuilder.Sql(
+            """
+            DROP TRIGGER IF EXISTS trg_validate_fee_rule_program_scope ON fee_rule_versions;
+            DROP FUNCTION IF EXISTS validate_fee_rule_program_scope();
+            """);
 
         migrationBuilder.DropForeignKey(
             name: "FK_fee_rule_versions_program_carriers_ProgramCarrierId",
@@ -888,9 +1049,18 @@ Add these methods below `ValidateVersionRequestAsync`:
     {
         var normalizedState = NormalizeStateCode(req.StateCode);
         if (!string.IsNullOrWhiteSpace(req.StateCode) && normalizedState is null)
-            return Result<ResolvedFeeProgramScope>.Failure("STATE_INVALID", "State must be a two-character code.");
+            return Result<ResolvedFeeProgramScope>.Failure("STATE_CODE_INVALID", "State code must be two characters.");
 
         var normalizedLob = NormalizeLineOfBusiness(req.LineOfBusiness);
+        PolicyLineOfBusiness? parsedLob = null;
+        if (!string.IsNullOrWhiteSpace(normalizedLob))
+        {
+            if (!Enum.TryParse<PolicyLineOfBusiness>(normalizedLob, ignoreCase: true, out var lobValue))
+                return Result<ResolvedFeeProgramScope>.Failure("LOB_INVALID", "Line of business is not valid.");
+
+            parsedLob = lobValue;
+            normalizedLob = lobValue.ToString();
+        }
 
         if (!req.ProgramConfigurationId.HasValue)
             return Result<ResolvedFeeProgramScope>.Success(new(null, null, null, normalizedLob, normalizedState));
@@ -927,10 +1097,7 @@ Add these methods below `ValidateVersionRequestAsync`:
             return Result<ResolvedFeeProgramScope>.Success(new(programCarrier.Id, null, null, null, null));
         }
 
-        if (!Enum.TryParse<PolicyLineOfBusiness>(normalizedLob, ignoreCase: true, out var lob))
-            return Result<ResolvedFeeProgramScope>.Failure("LOB_INVALID", "Line of business is not valid.");
-
-        normalizedLob = lob.ToString();
+        var lob = parsedLob!.Value;
 
         var programLob = await Db.Set<ProgramCarrierLineOfBusiness>()
             .FirstOrDefaultAsync(l =>
@@ -1078,9 +1245,9 @@ In `FeesAdminPage.tsx`, after `missingVendorPayee`, add:
   const stateOptions = selectedProgram
     ? programStateOptions.map(state => state.stateCode)
     : US_STATES
-  const programScopeRequiresCarrier = !!selectedProgram && (!!form.lineOfBusiness || !!form.stateCode)
-  const programScopeRequiresLob = !!selectedProgram && !!form.stateCode
-  const incompleteProgramScope = programScopeRequiresCarrier || programScopeRequiresLob
+  const programScopeMissingCarrier = !!selectedProgram && (!!form.lineOfBusiness || !!form.stateCode) && !form.carrierId
+  const programScopeMissingLob = !!selectedProgram && !!form.stateCode && !form.lineOfBusiness
+  const incompleteProgramScope = programScopeMissingCarrier || programScopeMissingLob
 ```
 
 - [ ] **Step 2: Add parent-changing setters**
@@ -1132,7 +1299,7 @@ Replace the existing Program, Carrier, State, and Line of Business fields in the
               <option value="">{selectedProgram ? 'Program Carrier Default' : 'All Carriers'}</option>
               {carrierOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {programScopeRequiresCarrier && !form.carrierId && <p className="mt-1 text-xs text-red-600">Select a carrier for this Program scope.</p>}
+            {programScopeMissingCarrier && <p className="mt-1 text-xs text-red-600">Select a carrier for this Program scope.</p>}
           </Field>
           <Field label="State">
             <select
@@ -1144,7 +1311,7 @@ Replace the existing Program, Carrier, State, and Line of Business fields in the
               <option value="">{selectedProgram ? 'All States for LOB' : 'All States'}</option>
               {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            {programScopeRequiresLob && !form.lineOfBusiness && <p className="mt-1 text-xs text-red-600">Select a line of business before choosing a state.</p>}
+            {programScopeMissingLob && <p className="mt-1 text-xs text-red-600">Select a line of business before choosing a state.</p>}
           </Field>
 ```
 
@@ -1305,11 +1472,14 @@ Expected: only the spec status doc is staged and pushed.
 
 - Program-scoped fee rules with Carrier, LOB, or State cannot be saved unless the matching Program setup path exists and is active on the fee effective date.
 - The database rejects Program-scoped fee rows that skip canonical Program setup references.
+- The database rejects Program-scoped fee rows whose canonical Program path ID does not match the denormalized Program, Carrier, LOB, or State columns.
+- Migration backfill normalizes state codes, rejects unsupported LOB values, and only links fee rules to Program setup paths active on the fee rule effective date.
 - Global fee rules continue working.
 - Program-level fee rules continue working.
 - Program/Carrier/LOB all-state fee rules work without duplicating every state.
 - Program/Carrier/LOB/State fee rules override all-state LOB defaults.
 - Fees admin UI only offers valid Program carriers, LOBs, and states after a Program is selected.
+- Fees admin UI enables Save for valid Program-level, Program/Carrier, Program/Carrier/LOB all-state, and Program/Carrier/LOB/State scopes.
 - Backend focused fee tests pass.
 - Frontend build passes.
 - Changes are committed and pushed to `origin/main` after each completed task group.
