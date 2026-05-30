@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
@@ -128,13 +128,7 @@ export function Topbar() {
           )}
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-1.5 transition-colors"
-          style={{ fontSize: 'var(--fs-base)', color: 'var(--ink-3)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--ink)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-3)')}
-        >
+        <button onClick={handleLogout} className="topbar-logout">
           <LogOut style={{ width: 14, height: 14 }} />
           Logout
         </button>

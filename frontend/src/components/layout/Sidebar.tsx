@@ -1,28 +1,12 @@
-import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2, Hash, Bot, Boxes, Handshake } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
-  const [hovered, setHovered] = useState(false)
   return (
     <NavLink
       to={to}
-      style={({ isActive }) => ({
-        display: 'flex',
-        alignItems: 'center',
-        gap: 9,
-        padding: '6px 10px',
-        borderRadius: 'var(--r-sm)',
-        fontSize: 12.5,
-        fontWeight: isActive ? 600 : 500,
-        color: isActive ? 'var(--accent-ink)' : hovered ? 'var(--ink)' : 'var(--ink-3)',
-        background: isActive ? 'var(--accent-soft)' : hovered ? 'var(--hover)' : 'transparent',
-        textDecoration: 'none',
-        transition: 'background .1s, color .1s',
-      })}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
     >
       <Icon style={{ width: 14, height: 14, flexShrink: 0, opacity: .85 }} />
       {label}
