@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { SendHorizontal, CheckCircle2, FileText, ChevronDown, ChevronRight } from 'lucide-react'
+import { SendHorizontal, CheckCircle2, FileText, ChevronDown, ChevronRight, Landmark } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getPendingInstructions,
@@ -12,32 +12,25 @@ import {
 } from '@/api/cashDistribution.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { StatusBadge } from '@/components/common/StatusBadge'
+import { EmptyState } from '@/components/common/EmptyState'
 import type { NettedPayee, BatchSummary } from '@/types/cashDistribution.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) =>
   new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
-// ---------- Status badge ----------
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    Open: 'bg-yellow-100 text-yellow-800',
-    PdfGenerated: 'bg-blue-100 text-blue-800',
-    Executed: 'bg-green-100 text-green-800',
-    Voided: 'bg-gray-100 text-gray-600',
-    Pending: 'bg-orange-100 text-orange-700',
-    Batched: 'bg-blue-100 text-blue-700',
-  }
-  const label: Record<string, string> = { PdfGenerated: 'PDF Ready' }
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[status] ?? 'bg-gray-100 text-gray-700'}`}>
-      {label[status] ?? status}
-    </span>
-  )
+const BATCH_PILL: Record<string, string> = {
+  Open: 'submitted',
+  PdfGenerated: 'inprogress',
+  Executed: 'bound',
+  Voided: 'voided',
+  Pending: 'inprogress',
+  Batched: 'submitted',
 }
+const BATCH_LABEL: Record<string, string> = { PdfGenerated: 'PDF Ready' }
 
-// ---------- Pending queue ----------
+// ---------- Pending Queue ----------
 
 function PendingQueue() {
   const qc = useQueryClient()
@@ -87,27 +80,29 @@ function PendingQueue() {
 
   if (payees.length === 0) {
     return (
-      <div className="border border-dashed border-gray-300 rounded-lg p-12 text-center text-sm text-gray-400">
-        No pending distribution instructions. Apply cash receipts to generate instructions.
-      </div>
+      <EmptyState
+        icon={Landmark}
+        title="No pending instructions"
+        description="Apply cash receipts to invoices to generate distribution instructions."
+      />
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <p style={{ fontSize: 13, color: 'var(--ink-2)' }}>
           {payees.length} payee{payees.length !== 1 ? 's' : ''} ·{' '}
           {payees.reduce((s, p) => s + p.instructionCount, 0)} instructions ·{' '}
           {fmt.format(payees.reduce((s, p) => s + p.totalAmount, 0))} pending
         </p>
         <button
+          className="sd-btn primary"
           disabled={selected.size === 0 || batchMutation.isPending}
           onClick={() => batchMutation.mutate({ payeeIds: [...selected] })}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
         >
-          <SendHorizontal className="h-4 w-4" />
+          <SendHorizontal style={{ width: 13, height: 13 }} />
           {batchMutation.isPending
             ? 'Creating batch…'
             : `Execute as Batch${selected.size > 0 ? ` (${selected.size})` : ''}`}
@@ -116,84 +111,99 @@ function PendingQueue() {
 
       {/* Selection summary */}
       {selected.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-800 flex items-center justify-between">
+        <div style={{
+          background: 'var(--accent-soft)',
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--r-lg)',
+          padding: '8px 14px',
+          fontSize: 13,
+          color: 'var(--accent-ink)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
           <span>
             {selected.size} payee{selected.size !== 1 ? 's' : ''} selected ·{' '}
             {selectedPayees.reduce((s, p) => s + p.instructionCount, 0)} instructions ·{' '}
             {fmt.format(selectedTotal)}
           </span>
-          <button onClick={() => setSelected(new Set())} className="text-blue-600 hover:underline text-xs">
+          <button
+            onClick={() => setSelected(new Set())}
+            style={{ fontSize: 12, color: 'var(--accent-ink)', background: 'none', border: 0, cursor: 'pointer', textDecoration: 'underline' }}
+          >
             Clear
           </button>
         </div>
       )}
 
       {/* Payee table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left">
+      <div className="subs-table-card">
+        <table className="subs-table">
+          <thead>
             <tr>
-              <th className="px-4 py-2 w-8">
+              <th className="subs-th" style={{ width: 40 }}>
                 <input
                   type="checkbox"
                   checked={selected.size === payees.length && payees.length > 0}
                   onChange={toggleAll}
-                  className="rounded"
                 />
               </th>
-              <th className="px-4 py-2 w-8" />
-              <th className="px-4 py-2 font-semibold text-gray-700">Payee</th>
-              <th className="px-4 py-2 font-semibold text-gray-700">Type</th>
-              <th className="px-4 py-2 font-semibold text-gray-700 text-right">Instructions</th>
-              <th className="px-4 py-2 font-semibold text-gray-700 text-right">Net Wire Amount</th>
+              <th className="subs-th" style={{ width: 32 }} />
+              <th className="subs-th">Payee</th>
+              <th className="subs-th">Type</th>
+              <th className="subs-th num">Instructions</th>
+              <th className="subs-th num">Net Wire Amount</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {payees.map((payee) => (
               <>
                 <tr
                   key={payee.payeeId}
-                  className={`hover:bg-gray-50 transition-colors ${selected.has(payee.payeeId) ? 'bg-blue-50' : ''}`}
+                  className="subs-row"
+                  style={{ background: selected.has(payee.payeeId) ? 'var(--accent-soft)' : undefined }}
                 >
-                  <td className="px-4 py-3">
+                  <td>
                     <input
                       type="checkbox"
                       checked={selected.has(payee.payeeId)}
                       onChange={() => togglePayee(payee.payeeId)}
-                      className="rounded"
                     />
                   </td>
-                  <td className="px-2 py-3">
-                    <button onClick={() => toggleExpand(payee.payeeId)} className="text-gray-400 hover:text-gray-700">
+                  <td>
+                    <button
+                      onClick={() => toggleExpand(payee.payeeId)}
+                      style={{ color: 'var(--ink-3)', background: 'none', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                    >
                       {expanded.has(payee.payeeId)
-                        ? <ChevronDown className="h-4 w-4" />
-                        : <ChevronRight className="h-4 w-4" />}
+                        ? <ChevronDown style={{ width: 14, height: 14 }} />
+                        : <ChevronRight style={{ width: 14, height: 14 }} />}
                     </button>
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{payee.payeeName}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{payee.payeeType}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{payee.instructionCount}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">
+                  <td style={{ fontWeight: 600, color: 'var(--ink)' }}>{payee.payeeName}</td>
+                  <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{payee.payeeType}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--ink-2)' }}>{payee.instructionCount}</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>
                     {fmt.format(payee.totalAmount)}
                   </td>
                 </tr>
                 {expanded.has(payee.payeeId) && (
-                  <tr key={`${payee.payeeId}-detail`} className="bg-gray-50">
-                    <td colSpan={6} className="px-8 py-2">
-                      <table className="w-full text-xs text-gray-600">
+                  <tr key={`${payee.payeeId}-detail`} style={{ background: 'var(--surface-2)', cursor: 'default' }}>
+                    <td colSpan={6} style={{ padding: '8px 28px' }}>
+                      <table style={{ width: '100%', fontSize: 12, color: 'var(--ink-3)' }}>
                         <thead>
-                          <tr className="text-gray-500 font-semibold">
-                            <td className="py-1 pr-4">Receipt</td>
-                            <td className="py-1 pr-4">Fee</td>
-                            <td className="py-1 text-right">Amount</td>
+                          <tr>
+                            <td style={{ paddingRight: 16, paddingBottom: 4, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', fontSize: 10.5, letterSpacing: '.04em' }}>Receipt</td>
+                            <td style={{ paddingRight: 16, paddingBottom: 4, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', fontSize: 10.5, letterSpacing: '.04em' }}>Fee</td>
+                            <td style={{ paddingBottom: 4, textAlign: 'right', fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', fontSize: 10.5, letterSpacing: '.04em' }}>Amount</td>
                           </tr>
                         </thead>
                         <tbody>
                           {payee.instructions.map((inst) => (
-                            <tr key={inst.id} className="border-t border-gray-100">
-                              <td className="py-1 pr-4 font-mono">{inst.receiptNumber}</td>
-                              <td className="py-1 pr-4">{inst.feeDisplayName}</td>
-                              <td className="py-1 text-right font-mono">{fmt.format(inst.amount)}</td>
+                            <tr key={inst.id} style={{ borderTop: '1px solid var(--line-2)' }}>
+                              <td style={{ padding: '4px 16px 4px 0', fontFamily: 'var(--font-mono)' }}>{inst.receiptNumber}</td>
+                              <td style={{ padding: '4px 16px 4px 0' }}>{inst.feeDisplayName}</td>
+                              <td style={{ padding: '4px 0', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt.format(inst.amount)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -204,13 +214,13 @@ function PendingQueue() {
               </>
             ))}
           </tbody>
-          <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+          <tfoot style={{ borderTop: '2px solid var(--line)', background: 'var(--surface-2)' }}>
             <tr>
-              <td colSpan={4} className="px-4 py-2 text-sm font-semibold text-gray-700">Total</td>
-              <td className="px-4 py-2 text-right text-sm font-semibold text-gray-700">
+              <td colSpan={4} style={{ padding: '10px 14px', fontSize: 13, fontWeight: 700, color: 'var(--ink-2)' }}>Total</td>
+              <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--ink-2)' }}>
                 {payees.reduce((s, p) => s + p.instructionCount, 0)}
               </td>
-              <td className="px-4 py-2 text-right font-mono font-bold text-gray-900">
+              <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>
                 {fmt.format(payees.reduce((s, p) => s + p.totalAmount, 0))}
               </td>
             </tr>
@@ -221,7 +231,7 @@ function PendingQueue() {
   )
 }
 
-// ---------- Batch list ----------
+// ---------- Batch List ----------
 
 function BatchList() {
   const qc = useQueryClient()
@@ -265,107 +275,116 @@ function BatchList() {
 
   if (batches.length === 0) {
     return (
-      <div className="border border-dashed border-gray-300 rounded-lg p-12 text-center text-sm text-gray-400">
-        No batches yet. Select payees from the Pending Queue and click "Execute as Batch".
-      </div>
+      <EmptyState
+        icon={Landmark}
+        title="No batches yet"
+        description='Select payees from the Pending Queue and click "Execute as Batch".'
+      />
     )
   }
 
   return (
-    <div className="flex gap-6">
+    <div style={{ display: 'flex', gap: 20 }}>
       {/* Batch table */}
-      <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden self-start">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left">
-            <tr>
-              <th className="px-4 py-2 font-semibold text-gray-700">Batch #</th>
-              <th className="px-4 py-2 font-semibold text-gray-700">Date</th>
-              <th className="px-4 py-2 font-semibold text-gray-700 text-right">Wires</th>
-              <th className="px-4 py-2 font-semibold text-gray-700 text-right">Total</th>
-              <th className="px-4 py-2 font-semibold text-gray-700">Status</th>
-              <th className="px-4 py-2 font-semibold text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {batches.map((b) => (
-              <tr
-                key={b.id}
-                onClick={() => setSelectedBatch(b.id === selectedBatch ? null : b.id)}
-                className={`cursor-pointer hover:bg-gray-50 transition-colors ${b.id === selectedBatch ? 'bg-blue-50' : ''}`}
-              >
-                <td className="px-4 py-3 font-mono font-medium text-gray-900">{b.batchNumber}</td>
-                <td className="px-4 py-3 text-gray-600">{fmtDate(b.createdAt)}</td>
-                <td className="px-4 py-3 text-right text-gray-700">{b.totalWires}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold">{fmt.format(b.totalAmount)}</td>
-                <td className="px-4 py-3"><StatusBadge status={b.status} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {b.pdfBlobPath && (
-                      <button
-                        onClick={() => openPdf(b.id)}
-                        title="Download wire sheet PDF"
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </button>
-                    )}
-                    {(b.status === 'Open' || b.status === 'PdfGenerated') && (
-                      <button
-                        onClick={() => setShowExecuteModal(b.id)}
-                        className="flex items-center gap-1 text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-                      >
-                        <CheckCircle2 className="h-3 w-3" />
-                        Mark Executed
-                      </button>
-                    )}
-                  </div>
-                </td>
+      <div style={{ flex: 1 }}>
+        <div className="subs-table-card">
+          <table className="subs-table">
+            <thead>
+              <tr>
+                <th className="subs-th">Batch #</th>
+                <th className="subs-th">Date</th>
+                <th className="subs-th num">Wires</th>
+                <th className="subs-th num">Total</th>
+                <th className="subs-th">Status</th>
+                <th className="subs-th">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {batches.map((b) => (
+                <tr
+                  key={b.id}
+                  className="subs-row"
+                  style={{ background: b.id === selectedBatch ? 'var(--accent-soft)' : undefined }}
+                  onClick={() => setSelectedBatch(b.id === selectedBatch ? null : b.id)}
+                >
+                  <td className="subs-id">{b.batchNumber}</td>
+                  <td style={{ color: 'var(--ink-2)' }}>{fmtDate(b.createdAt)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--ink-2)' }}>{b.totalWires}</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmt.format(b.totalAmount)}</td>
+                  <td><StatusBadge status={BATCH_PILL[b.status] ?? 'draft'} label={BATCH_LABEL[b.status] ?? b.status} /></td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {b.pdfBlobPath && (
+                        <button
+                          onClick={() => openPdf(b.id)}
+                          title="Download wire sheet PDF"
+                          style={{ color: 'var(--accent-ink)', background: 'none', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                        >
+                          <FileText style={{ width: 14, height: 14 }} />
+                        </button>
+                      )}
+                      {(b.status === 'Open' || b.status === 'PdfGenerated') && (
+                        <button
+                          className="sd-btn sm"
+                          onClick={() => setShowExecuteModal(b.id)}
+                          style={{ color: 'var(--pill-bound-fg)' }}
+                        >
+                          <CheckCircle2 style={{ width: 12, height: 12 }} />
+                          Mark Executed
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Batch detail panel */}
       {selectedBatch !== null && batchDetail && (
-        <div className="w-80 shrink-0 border border-gray-200 rounded-lg overflow-hidden self-start">
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-            <span className="font-semibold text-sm text-gray-800">{batchDetail.batchNumber}</span>
-            <button onClick={() => setSelectedBatch(null)} className="text-gray-400 hover:text-gray-700 text-xs">✕</button>
+        <div className="sd-card" style={{ width: 280, flexShrink: 0, alignSelf: 'flex-start', overflow: 'hidden' }}>
+          <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+            <h3>{batchDetail.batchNumber}</h3>
+            <button
+              onClick={() => setSelectedBatch(null)}
+              style={{ fontSize: 13, color: 'var(--ink-3)', background: 'none', border: 0, cursor: 'pointer' }}
+            >✕</button>
           </div>
-          <div className="p-4 space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Status</span>
-              <StatusBadge status={batchDetail.status} />
+          <div className="sd-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ color: 'var(--ink-3)' }}>Status</span>
+              <StatusBadge status={BATCH_PILL[batchDetail.status] ?? 'draft'} label={BATCH_LABEL[batchDetail.status] ?? batchDetail.status} />
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Total</span>
-              <span className="font-mono font-semibold">{fmt.format(batchDetail.totalAmount)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ color: 'var(--ink-3)' }}>Total</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{fmt.format(batchDetail.totalAmount)}</span>
             </div>
             {batchDetail.bankReference && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Bank Ref</span>
-                <span className="font-mono text-xs">{batchDetail.bankReference}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--ink-3)' }}>Bank Ref</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{batchDetail.bankReference}</span>
               </div>
             )}
             {batchDetail.executedAt && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Executed</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--ink-3)' }}>Executed</span>
                 <span>{fmtDate(batchDetail.executedAt)}</span>
               </div>
             )}
-            <div className="pt-2 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Wires</p>
+            <div style={{ paddingTop: 8, borderTop: '1px solid var(--line-2)' }}>
+              <p style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Wires</p>
               {batchDetail.wires.map((w) => (
-                <div key={w.payeeId} className="mb-3">
-                  <div className="flex justify-between text-sm font-medium text-gray-800">
+                <div key={w.payeeId} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
                     <span>{w.payeeName}</span>
-                    <span className="font-mono">{fmt.format(w.netAmount)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(w.netAmount)}</span>
                   </div>
                   {w.instructions.map((inst) => (
-                    <div key={inst.id} className="flex justify-between text-xs text-gray-500 pl-2 mt-0.5">
+                    <div key={inst.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', paddingLeft: 8, marginTop: 2 }}>
                       <span>{inst.receiptNumber} · {inst.feeDisplayName}</span>
-                      <span className="font-mono">{fmt.format(inst.amount)}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(inst.amount)}</span>
                     </div>
                   ))}
                 </div>
@@ -377,36 +396,40 @@ function BatchList() {
 
       {/* Mark Executed modal */}
       {showExecuteModal !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Mark Batch Executed</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              This will post a sweep journal entry to the ledger for each instruction in the batch,
-              reducing the Trust account and clearing the payable liabilities.
-            </p>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Bank Confirmation Reference <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={bankRef}
-              onChange={(e) => setBankRef(e.target.value)}
-              placeholder="e.g. FEDREF-20260502-001"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => { setShowExecuteModal(null); setBankRef('') }}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-              >
+        <div className="sims-modal-backdrop">
+          <div className="sims-modal">
+            <div className="sims-modal-head">
+              <span>Mark Batch Executed</span>
+              <button onClick={() => { setShowExecuteModal(null); setBankRef('') }} className="sims-modal-close">&times;</button>
+            </div>
+            <div className="sims-modal-body">
+              <p style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 14 }}>
+                This will post a sweep journal entry to the ledger for each instruction in the batch,
+                reducing the Trust account and clearing the payable liabilities.
+              </p>
+              <label className="sims-field">
+                <span className="sims-field-label">
+                  Bank Confirmation Reference <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(optional)</span>
+                </span>
+                <input
+                  type="text"
+                  className="sims-input"
+                  value={bankRef}
+                  onChange={(e) => setBankRef(e.target.value)}
+                  placeholder="e.g. FEDREF-20260502-001"
+                />
+              </label>
+            </div>
+            <div className="sims-modal-foot">
+              <button className="sd-btn outline" onClick={() => { setShowExecuteModal(null); setBankRef('') }}>
                 Cancel
               </button>
               <button
+                className="sd-btn primary"
                 disabled={executeMutation.isPending}
                 onClick={() => executeMutation.mutate({ id: showExecuteModal, ref: bankRef })}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-md flex items-center gap-2"
               >
-                <CheckCircle2 className="h-4 w-4" />
+                <CheckCircle2 style={{ width: 13, height: 13 }} />
                 {executeMutation.isPending ? 'Posting JEs…' : 'Confirm Executed'}
               </button>
             </div>
@@ -425,29 +448,27 @@ export function CashDistributionPage() {
   const [tab, setTab] = useState<Tab>('pending')
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader
-        title="Cash Distribution"
-        subtitle="Pending wire instructions netted by destination · Execute as batch · Mark bank confirmations"
-      />
+    <div className="subs-wrap">
+      <div className="subs-page-head" style={{ marginBottom: 16 }}>
+        <PageHeader
+          title="Cash Distribution"
+          subtitle="Pending wire instructions netted by destination · Execute as batch · Mark bank confirmations"
+        />
+      </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-6">
-          {(['pending', 'batches'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`pb-3 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
-                tab === t
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t === 'pending' ? 'Pending Queue' : 'Batch History'}
-            </button>
-          ))}
-        </nav>
+      <div className="sd-tabs" style={{ marginBottom: 20 }}>
+        <button
+          className={`sd-tab${tab === 'pending' ? ' active' : ''}`}
+          onClick={() => setTab('pending')}
+        >
+          Pending Queue
+        </button>
+        <button
+          className={`sd-tab${tab === 'batches' ? ' active' : ''}`}
+          onClick={() => setTab('batches')}
+        >
+          Batch History
+        </button>
       </div>
 
       {tab === 'pending' ? <PendingQueue /> : <BatchList />}

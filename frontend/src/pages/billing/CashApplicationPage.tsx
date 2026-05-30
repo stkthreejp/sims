@@ -9,14 +9,13 @@ import type { OpenInvoice, ApplicationLineRequest } from '@/types/receipt.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-const inputCls = 'w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-400 text-right'
 
 // ---------- Row state ----------
 
 interface GridRow {
   invoice: OpenInvoice
   grossApplied: number
-  commissionRate: number  // % entered by user
+  commissionRate: number
 }
 
 function rowCommission(row: GridRow): number {
@@ -48,73 +47,92 @@ function ReconciliationGrid({ rows, onChange }: ReconciliationGridProps) {
 
   if (rows.length === 0) {
     return (
-      <div className="border border-dashed border-gray-300 rounded-lg p-8 text-center text-sm text-gray-400">
+      <div style={{
+        border: '1px dashed var(--line)',
+        borderRadius: 'var(--r-lg)',
+        padding: '28px 16px',
+        textAlign: 'center',
+        fontSize: 13,
+        color: 'var(--ink-3)',
+      }}>
         No invoices added yet. Select open invoices from the list below.
       </div>
     )
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    border: '1px solid var(--line)',
+    borderRadius: 'var(--r)',
+    padding: '4px 8px',
+    fontSize: 12.5,
+    fontFamily: 'var(--font-mono)',
+    textAlign: 'right',
+    background: 'var(--surface)',
+    color: 'var(--ink)',
+    outline: 'none',
+  }
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-left">
+    <div className="sd-card" style={{ overflow: 'hidden' }}>
+      <table className="sd-table">
+        <thead>
           <tr>
-            <th className="px-4 py-2 font-medium text-gray-600">Invoice #</th>
-            <th className="px-4 py-2 font-medium text-gray-600">Invoice Date</th>
-            <th className="px-4 py-2 font-medium text-gray-600 text-right">Open Balance</th>
-            <th className="px-4 py-2 font-medium text-gray-600 text-right w-36">Gross Applied</th>
-            <th className="px-4 py-2 font-medium text-gray-600 text-right w-28">Comm %</th>
-            <th className="px-4 py-2 font-medium text-gray-600 text-right">Commission</th>
-            <th className="px-4 py-2 font-medium text-gray-600 text-right">Net Applied</th>
-            <th className="px-4 py-2 w-8" />
+            <th>Invoice #</th>
+            <th>Date</th>
+            <th className="num">Open Balance</th>
+            <th className="num" style={{ width: 140 }}>Gross Applied</th>
+            <th className="num" style={{ width: 110 }}>Comm %</th>
+            <th className="num">Commission</th>
+            <th className="num">Net Applied</th>
+            <th style={{ width: 32 }} />
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody>
           {rows.map((row, idx) => {
             const commission = rowCommission(row)
             const net = rowNet(row)
             const isOver = row.grossApplied > row.invoice.openBalance + 0.005
             return (
-              <tr key={row.invoice.id} className={isOver ? 'bg-red-50' : 'hover:bg-gray-50'}>
-                <td className="px-4 py-2 font-mono text-blue-700">{row.invoice.invoiceNumber}</td>
-                <td className="px-4 py-2 text-gray-500 text-xs">{fmtDate(row.invoice.invoiceDate)}</td>
-                <td className="px-4 py-2 text-right font-mono text-gray-700">{fmt.format(row.invoice.openBalance)}</td>
-                <td className="px-4 py-2">
+              <tr key={row.invoice.id} style={{ background: isOver ? 'var(--bad-bg)' : undefined, cursor: 'default' }}>
+                <td className="id">{row.invoice.invoiceNumber}</td>
+                <td style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{fmtDate(row.invoice.invoiceDate)}</td>
+                <td className="num">{fmt.format(row.invoice.openBalance)}</td>
+                <td className="num">
                   <input
-                    type="number" step="0.01" min="0"
-                    max={row.invoice.openBalance}
-                    className={`${inputCls} ${isOver ? 'border-red-400' : ''}`}
+                    type="number" step="0.01" min="0" max={row.invoice.openBalance}
+                    style={{ ...inputStyle, borderColor: isOver ? 'var(--bad-fg)' : undefined }}
                     value={row.grossApplied}
                     onChange={e => updateRow(idx, { grossApplied: parseFloat(e.target.value) || 0 })}
                   />
-                  {isOver && <p className="text-xs text-red-600 mt-0.5">Exceeds open balance</p>}
+                  {isOver && <p style={{ fontSize: 11, color: 'var(--bad-fg)', marginTop: 2 }}>Exceeds open balance</p>}
                 </td>
-                <td className="px-4 py-2">
+                <td className="num">
                   <input
                     type="number" step="0.1" min="0" max="100"
-                    className={inputCls}
+                    style={inputStyle}
                     value={row.commissionRate}
                     onChange={e => updateRow(idx, { commissionRate: parseFloat(e.target.value) || 0 })}
                   />
                 </td>
-                <td className="px-4 py-2 text-right font-mono text-orange-700">{fmt.format(commission)}</td>
-                <td className="px-4 py-2 text-right font-mono font-semibold text-gray-900">{fmt.format(net)}</td>
-                <td className="px-4 py-2 text-center">
+                <td className="num" style={{ color: 'var(--warn-fg)' }}>{fmt.format(commission)}</td>
+                <td className="num primary-cell">{fmt.format(net)}</td>
+                <td style={{ textAlign: 'center' }}>
                   <button
                     onClick={() => onChange(rows.filter((_, i) => i !== idx))}
-                    className="text-gray-300 hover:text-red-500 text-lg leading-none"
+                    style={{ color: 'var(--ink-4)', fontSize: 16, lineHeight: 1, background: 'none', border: 0, cursor: 'pointer', padding: '0 4px' }}
                   >&times;</button>
                 </td>
               </tr>
             )
           })}
-          <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-            <td colSpan={2} className="px-4 py-2 text-right text-gray-700">Totals</td>
+          <tr style={{ background: 'var(--surface-2)', fontWeight: 600, cursor: 'default', borderTop: '2px solid var(--line)' }}>
+            <td colSpan={2} style={{ textAlign: 'right', color: 'var(--ink-2)', padding: '11px 14px' }}>Totals</td>
             <td />
-            <td className="px-4 py-2 text-right font-mono">{fmt.format(totals.gross)}</td>
+            <td className="num">{fmt.format(totals.gross)}</td>
             <td />
-            <td className="px-4 py-2 text-right font-mono text-orange-700">{fmt.format(totals.commission)}</td>
-            <td className="px-4 py-2 text-right font-mono">{fmt.format(totals.net)}</td>
+            <td className="num" style={{ color: 'var(--warn-fg)' }}>{fmt.format(totals.commission)}</td>
+            <td className="num">{fmt.format(totals.net)}</td>
             <td />
           </tr>
         </tbody>
@@ -170,10 +188,7 @@ export function CashApplicationPage() {
     net: gridRows.reduce((s, r) => s + rowNet(r), 0),
   }), [gridRows])
 
-  const receiptRemaining = selectedReceipt
-    ? selectedReceipt.amount - selectedReceipt.appliedAmount
-    : 0
-
+  const receiptRemaining = selectedReceipt ? selectedReceipt.amount - selectedReceipt.appliedAmount : 0
   const variance = selectedReceipt ? receiptRemaining - totals.gross : 0
   const isBalanced = Math.abs(variance) < 0.005
   const hasOverApply = gridRows.some(r => r.grossApplied > r.invoice.openBalance + 0.005)
@@ -192,131 +207,158 @@ export function CashApplicationPage() {
   const isLoading = receiptsLoading || invoicesLoading
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Cash Application" />
+    <div className="subs-wrap">
+      <div className="subs-page-head" style={{ marginBottom: 20 }}>
+        <PageHeader title="Cash Application" />
+      </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12"><LoadingSpinner /></div>
+        <LoadingSpinner />
       ) : (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Step 1: Select Receipt */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">1 — Select Receipt</h3>
-            {openReceipts.length === 0 ? (
-              <p className="text-sm text-gray-400">No open receipts. Log a receipt first.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2">
-                {openReceipts.map(r => (
-                  <button
-                    key={r.id}
-                    onClick={() => { setSelectedReceiptId(r.id); setGridRows([]) }}
-                    className={`flex items-center justify-between px-4 py-3 rounded-lg border text-left text-sm transition-colors ${
-                      selectedReceiptId === r.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div>
-                      <span className="font-mono font-medium text-blue-700 mr-3">{r.receiptNumber}</span>
-                      <span className="text-gray-600">{r.payerName}</span>
-                      <span className="text-gray-400 text-xs ml-2">{fmtDate(r.receivedDate)}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono font-semibold text-gray-900">{fmt.format(r.amount - r.appliedAmount)}</div>
-                      <div className="text-xs text-gray-400">remaining</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="sd-card">
+            <div className="sd-card-head">
+              <h3>1 — Select Receipt</h3>
+            </div>
+            <div className="sd-card-body">
+              {openReceipts.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>No open receipts. Log a receipt first.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {openReceipts.map(r => {
+                    const isSelected = selectedReceiptId === r.id
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => { setSelectedReceiptId(r.id); setGridRows([]) }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 14px',
+                          borderRadius: 'var(--r-lg)',
+                          border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--line)'}`,
+                          background: isSelected ? 'var(--accent-soft)' : 'var(--surface)',
+                          textAlign: 'left',
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          transition: 'all .12s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: isSelected ? 'var(--accent-ink)' : 'var(--ink)' }}>{r.receiptNumber}</span>
+                          <span style={{ color: 'var(--ink-2)' }}>{r.payerName}</span>
+                          <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>{fmtDate(r.receivedDate)}</span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: isSelected ? 'var(--accent-ink)' : 'var(--ink)' }}>{fmt.format(r.amount - r.appliedAmount)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>remaining</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Step 2: Build Reconciliation Grid */}
+          {/* Step 2: Match Invoices */}
           {selectedReceipt && (
-            <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">2 — Match Invoices</h3>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-500">Receipt remaining: <span className="font-mono font-semibold text-gray-900">{fmt.format(receiptRemaining)}</span></span>
-                  <span className="text-gray-500">Gross applied: <span className="font-mono font-semibold text-gray-900">{fmt.format(totals.gross)}</span></span>
-                  <span className={`flex items-center gap-1.5 font-medium ${isBalanced && gridRows.length > 0 ? 'text-green-600' : 'text-amber-600'}`}>
+            <div className="sd-card">
+              <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+                <h3>2 — Match Invoices</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 13 }}>
+                  <span style={{ color: 'var(--ink-3)' }}>
+                    Receipt remaining: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(receiptRemaining)}</span>
+                  </span>
+                  <span style={{ color: 'var(--ink-3)' }}>
+                    Gross applied: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(totals.gross)}</span>
+                  </span>
+                  <span style={{
+                    display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600,
+                    color: isBalanced && gridRows.length > 0 ? 'var(--pill-bound-fg)' : 'var(--warn-fg)',
+                  }}>
                     {isBalanced && gridRows.length > 0
-                      ? <><CheckCircle className="h-4 w-4" /> Variance: {fmt.format(0)}</>
-                      : <><AlertCircle className="h-4 w-4" /> Variance: {fmt.format(Math.abs(variance))}</>
+                      ? <><CheckCircle style={{ width: 14, height: 14 }} /> Balanced</>
+                      : <><AlertCircle style={{ width: 14, height: 14 }} /> Variance: {fmt.format(Math.abs(variance))}</>
                     }
                   </span>
                 </div>
               </div>
+              <div className="sd-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <ReconciliationGrid rows={gridRows} onChange={setGridRows} />
 
-              <ReconciliationGrid rows={gridRows} onChange={setGridRows} />
-
-              {/* Available invoices to add */}
-              {availableInvoices.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-2">Add invoices:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {availableInvoices.map(inv => (
-                      <button
-                        key={inv.id}
-                        onClick={() => addInvoice(inv)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-full hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                      >
-                        <Link className="h-3 w-3 text-gray-400" />
-                        <span className="font-mono text-blue-700">{inv.invoiceNumber}</span>
-                        <span className="text-gray-500">{fmt.format(inv.openBalance)}</span>
-                      </button>
-                    ))}
+                {availableInvoices.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink-3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>Add invoices:</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {availableInvoices.map(inv => (
+                        <button
+                          key={inv.id}
+                          onClick={() => addInvoice(inv)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '5px 10px', fontSize: 12,
+                            border: '1px solid var(--line)',
+                            borderRadius: 999,
+                            background: 'var(--surface)',
+                            cursor: 'pointer',
+                            transition: 'border-color .1s, background .1s',
+                          }}
+                        >
+                          <Link style={{ width: 11, height: 11, color: 'var(--ink-3)' }} />
+                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-ink)', fontWeight: 600 }}>{inv.invoiceNumber}</span>
+                          <span style={{ color: 'var(--ink-3)' }}>{fmt.format(inv.openBalance)}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Post button */}
-              <div className="pt-2 flex justify-end">
-                <button
-                  onClick={handlePost}
-                  disabled={!canPost || isPending}
-                  className="px-6 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                >
-                  {isPending ? 'Posting…' : 'Post Application'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                  <button className="sd-btn primary" onClick={handlePost} disabled={!canPost || isPending}>
+                    {isPending ? 'Posting…' : 'Post Application'}
+                  </button>
+                  {!isBalanced && gridRows.length > 0 && (
+                    <p style={{ fontSize: 12, color: 'var(--warn-fg)' }}>
+                      Gross applied must equal receipt remaining ({fmt.format(receiptRemaining)}) before posting.
+                    </p>
+                  )}
+                </div>
               </div>
-              {!isBalanced && gridRows.length > 0 && (
-                <p className="text-xs text-amber-700 text-right">
-                  Gross applied must equal receipt remaining ({fmt.format(receiptRemaining)}) before posting.
-                </p>
-              )}
             </div>
           )}
 
-          {/* Open Invoices Reference */}
+          {/* Open Invoices Reference (when no receipt selected) */}
           {!selectedReceipt && openInvoices.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700">Open Invoices</h3>
+            <div className="sd-card" style={{ overflow: 'hidden' }}>
+              <div className="sd-card-head">
+                <h3>Open Invoices</h3>
               </div>
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left">
+              <table className="sd-table">
+                <thead>
                   <tr>
-                    <th className="px-4 py-2 font-medium text-gray-600">Invoice #</th>
-                    <th className="px-4 py-2 font-medium text-gray-600">Date</th>
-                    <th className="px-4 py-2 font-medium text-gray-600 text-right">Total</th>
-                    <th className="px-4 py-2 font-medium text-gray-600 text-right">Cleared</th>
-                    <th className="px-4 py-2 font-medium text-gray-600 text-right">Open Balance</th>
-                    <th className="px-4 py-2 font-medium text-gray-600">Status</th>
+                    <th>Invoice #</th>
+                    <th>Date</th>
+                    <th className="num">Total</th>
+                    <th className="num">Cleared</th>
+                    <th className="num">Open Balance</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {openInvoices.map(inv => (
-                    <tr key={inv.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-mono text-blue-700">{inv.invoiceNumber}</td>
-                      <td className="px-4 py-2 text-gray-500 text-xs">{fmtDate(inv.invoiceDate)}</td>
-                      <td className="px-4 py-2 text-right font-mono">{fmt.format(inv.totalAmount)}</td>
-                      <td className="px-4 py-2 text-right font-mono text-gray-500">{fmt.format(inv.clearedAmount)}</td>
-                      <td className="px-4 py-2 text-right font-mono font-semibold">{fmt.format(inv.openBalance)}</td>
-                      <td className="px-4 py-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          inv.status === 'PartiallyPaid' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-                        }`}>{inv.status}</span>
+                    <tr key={inv.id} style={{ cursor: 'default' }}>
+                      <td className="id">{inv.invoiceNumber}</td>
+                      <td style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{fmtDate(inv.invoiceDate)}</td>
+                      <td className="num">{fmt.format(inv.totalAmount)}</td>
+                      <td className="num" style={{ color: 'var(--ink-3)' }}>{fmt.format(inv.clearedAmount)}</td>
+                      <td className="num primary-cell">{fmt.format(inv.openBalance)}</td>
+                      <td>
+                        <span className={`sd-pill ${inv.status === 'PartiallyPaid' ? 'inprogress' : 'quoted'}`}>
+                          {inv.status === 'PartiallyPaid' ? 'Partial' : inv.status}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -324,7 +366,7 @@ export function CashApplicationPage() {
               </table>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
