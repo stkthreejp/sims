@@ -14,6 +14,9 @@ public class FeeRuleVersion
     public int? ProducerId { get; set; }
     public string? LineOfBusiness { get; set; }
     public string? StateCode { get; set; }
+    public Guid? ProgramCarrierId { get; set; }
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
+    public Guid? ProgramCarrierLobStateId { get; set; }
     public string? City { get; set; }
     public string? LicenseType { get; set; }  // 'Admitted'|'Non-Admitted'
 
@@ -83,6 +86,9 @@ public class FeeRuleVersion
 
     public FeeDefinition FeeDefinition { get; set; } = null!;
     public ProgramConfiguration? ProgramConfiguration { get; set; }
+    public ProgramCarrier? ProgramCarrier { get; set; }
+    public ProgramCarrierLineOfBusiness? ProgramCarrierLineOfBusiness { get; set; }
+    public ProgramCarrierLobState? ProgramCarrierLobState { get; set; }
     public Carrier? Carrier { get; set; }
     public Payee? PayablePayee { get; set; }
     public ICollection<FeePremiumBracket> PremiumBrackets { get; set; } = new List<FeePremiumBracket>();

@@ -8,7 +8,53 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
 {
     public void Configure(EntityTypeBuilder<FeeRuleVersion> b)
     {
-        b.ToTable("fee_rule_versions");
+        const string programScopeCanonicalCheck =
+            """
+            (
+                "ProgramConfigurationId" IS NULL
+                AND "ProgramCarrierId" IS NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NULL
+                AND "ProgramCarrierLobStateId" IS NULL
+            )
+            OR (
+                "ProgramConfigurationId" IS NOT NULL
+                AND "CarrierId" IS NULL
+                AND "LineOfBusiness" IS NULL
+                AND "StateCode" IS NULL
+                AND "ProgramCarrierId" IS NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NULL
+                AND "ProgramCarrierLobStateId" IS NULL
+            )
+            OR (
+                "ProgramConfigurationId" IS NOT NULL
+                AND "CarrierId" IS NOT NULL
+                AND "LineOfBusiness" IS NULL
+                AND "StateCode" IS NULL
+                AND "ProgramCarrierId" IS NOT NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NULL
+                AND "ProgramCarrierLobStateId" IS NULL
+            )
+            OR (
+                "ProgramConfigurationId" IS NOT NULL
+                AND "CarrierId" IS NOT NULL
+                AND "LineOfBusiness" IS NOT NULL
+                AND "StateCode" IS NULL
+                AND "ProgramCarrierId" IS NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NOT NULL
+                AND "ProgramCarrierLobStateId" IS NULL
+            )
+            OR (
+                "ProgramConfigurationId" IS NOT NULL
+                AND "CarrierId" IS NOT NULL
+                AND "LineOfBusiness" IS NOT NULL
+                AND "StateCode" IS NOT NULL
+                AND "ProgramCarrierId" IS NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NULL
+                AND "ProgramCarrierLobStateId" IS NOT NULL
+            )
+            """;
+
+        b.ToTable("fee_rule_versions", t => t.HasCheckConstraint("ck_fee_rule_program_scope_canonical", programScopeCanonicalCheck));
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).ValueGeneratedOnAdd();
         b.Property(x => x.StateCode).HasMaxLength(2);
@@ -41,6 +87,21 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
             .HasForeignKey(x => x.ProgramConfigurationId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        b.HasOne(x => x.ProgramCarrier)
+            .WithMany()
+            .HasForeignKey(x => x.ProgramCarrierId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.HasOne(x => x.ProgramCarrierLineOfBusiness)
+            .WithMany()
+            .HasForeignKey(x => x.ProgramCarrierLineOfBusinessId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.HasOne(x => x.ProgramCarrierLobState)
+            .WithMany()
+            .HasForeignKey(x => x.ProgramCarrierLobStateId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         b.HasOne(x => x.FeeDefinition)
             .WithMany(x => x.RuleVersions)
             .HasForeignKey(x => x.FeeDefinitionId)
@@ -57,5 +118,12 @@ public class FeeRuleVersionConfiguration : IEntityTypeConfiguration<FeeRuleVersi
             .HasDatabaseName("ix_fee_rule_carrier_lob_lookup");
         b.HasIndex(x => new { x.FeeDefinitionId, x.ProgramConfigurationId, x.CarrierId, x.LineOfBusiness, x.StateCode, x.EffectiveDate })
             .HasDatabaseName("ix_fee_rule_program_carrier_lob_lookup");
+        b.HasIndex(x => x.ProgramCarrierId)
+            .HasDatabaseName("ix_fee_rule_program_carrier_scope");
+        b.HasIndex(x => x.ProgramCarrierLineOfBusinessId)
+            .HasDatabaseName("ix_fee_rule_program_lob_scope");
+        b.HasIndex(x => x.ProgramCarrierLobStateId)
+            .HasDatabaseName("ix_fee_rule_program_state_scope");
+
     }
 }

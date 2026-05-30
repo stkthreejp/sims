@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Enums;
 
 namespace SIMS.Application.Services;
 
@@ -10,6 +12,13 @@ public class FeeAdminService : IFeeAdminService
 {
     private readonly IServiceProvider _sp;
     private DbContext Db => (DbContext)_sp.GetService(typeof(DbContext))!;
+
+    private sealed record ResolvedFeeProgramScope(
+        Guid? ProgramCarrierId,
+        Guid? ProgramCarrierLineOfBusinessId,
+        Guid? ProgramCarrierLobStateId,
+        string? LineOfBusiness,
+        string? StateCode);
 
     public FeeAdminService(IServiceProvider sp) => _sp = sp;
 
@@ -77,10 +86,10 @@ public class FeeAdminService : IFeeAdminService
     public async Task<Result<FeeRuleVersionDto>> CreateVersionAsync(Guid userId, CreateFeeRuleVersionRequest req, CancellationToken ct = default)
     {
         var validation = await ValidateVersionRequestAsync(req, ct);
-        if (validation is not null)
-            return Result<FeeRuleVersionDto>.Failure(validation.Value.Code, validation.Value.Message);
+        if (!validation.IsSuccess)
+            return Result<FeeRuleVersionDto>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
 
-        var version = BuildVersion(req, userId);
+        var version = BuildVersion(req, userId, validation.Value!);
         Db.Set<FeeRuleVersion>().Add(version);
 
         var auditLog = new FeeAuditLog
@@ -101,6 +110,12 @@ public class FeeAdminService : IFeeAdminService
         await Db.Entry(version).Reference(v => v.FeeDefinition).LoadAsync(ct);
         if (version.ProgramConfigurationId.HasValue)
             await Db.Entry(version).Reference(v => v.ProgramConfiguration).LoadAsync(ct);
+        if (version.ProgramCarrierId.HasValue)
+            await Db.Entry(version).Reference(v => v.ProgramCarrier).LoadAsync(ct);
+        if (version.ProgramCarrierLineOfBusinessId.HasValue)
+            await Db.Entry(version).Reference(v => v.ProgramCarrierLineOfBusiness).LoadAsync(ct);
+        if (version.ProgramCarrierLobStateId.HasValue)
+            await Db.Entry(version).Reference(v => v.ProgramCarrierLobState).LoadAsync(ct);
         var nonTaxableMap = await GetNonTaxableMapAsync([version.FeeDefinitionId], ct);
         return Result<FeeRuleVersionDto>.Success(MapVersion(version, nonTaxableMap));
     }
@@ -111,13 +126,13 @@ public class FeeAdminService : IFeeAdminService
         if (existing is null) return Result<FeeRuleVersionDto>.Failure("NOT_FOUND", "Existing version not found");
 
         var validation = await ValidateVersionRequestAsync(req, ct);
-        if (validation is not null)
-            return Result<FeeRuleVersionDto>.Failure(validation.Value.Code, validation.Value.Message);
+        if (!validation.IsSuccess)
+            return Result<FeeRuleVersionDto>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
 
         // Stamp old version's disabled_date with the new version's effective_date in one transaction
         existing.DisabledDate = req.EffectiveDate;
 
-        var newVersion = BuildVersion(req, userId);
+        var newVersion = BuildVersion(req, userId, validation.Value!);
         Db.Set<FeeRuleVersion>().Add(newVersion);
 
         await Db.SaveChangesAsync(ct);
@@ -135,6 +150,12 @@ public class FeeAdminService : IFeeAdminService
         await Db.Entry(newVersion).Reference(v => v.FeeDefinition).LoadAsync(ct);
         if (newVersion.ProgramConfigurationId.HasValue)
             await Db.Entry(newVersion).Reference(v => v.ProgramConfiguration).LoadAsync(ct);
+        if (newVersion.ProgramCarrierId.HasValue)
+            await Db.Entry(newVersion).Reference(v => v.ProgramCarrier).LoadAsync(ct);
+        if (newVersion.ProgramCarrierLineOfBusinessId.HasValue)
+            await Db.Entry(newVersion).Reference(v => v.ProgramCarrierLineOfBusiness).LoadAsync(ct);
+        if (newVersion.ProgramCarrierLobStateId.HasValue)
+            await Db.Entry(newVersion).Reference(v => v.ProgramCarrierLobState).LoadAsync(ct);
         var nonTaxableMap = await GetNonTaxableMapAsync([newVersion.FeeDefinitionId], ct);
         return Result<FeeRuleVersionDto>.Success(MapVersion(newVersion, nonTaxableMap));
     }
@@ -276,27 +297,129 @@ public class FeeAdminService : IFeeAdminService
             .ToDictionary(g => g.Key, g => g.Select(s => s.StateCode).ToList());
     }
 
-    private async Task<(string Code, string Message)?> ValidateVersionRequestAsync(
+    private async Task<Result<ResolvedFeeProgramScope>> ValidateVersionRequestAsync(
         CreateFeeRuleVersionRequest req, CancellationToken ct)
     {
         if (req.PayableRouting is not "NotPayable" and not "Company" and not "Entity")
-            return ("PAYABLE_ROUTING_INVALID", "Payable routing must be NotPayable, Company, or Entity.");
+            return Result<ResolvedFeeProgramScope>.Failure("PAYABLE_ROUTING_INVALID", "Payable routing must be NotPayable, Company, or Entity.");
 
         if (req.PayableRouting == "Entity")
         {
             if (!req.PayablePayeeId.HasValue)
-                return ("PAYABLE_PAYEE_REQUIRED", "A third-party/vendor payee is required when payable routing is Entity.");
+                return Result<ResolvedFeeProgramScope>.Failure("PAYABLE_PAYEE_REQUIRED", "A third-party/vendor payee is required when payable routing is Entity.");
 
             var payeeExists = await Db.Set<Payee>()
                 .AnyAsync(p => p.Id == req.PayablePayeeId.Value && p.IsActive, ct);
             if (!payeeExists)
-                return ("PAYABLE_PAYEE_NOT_FOUND", "The selected third-party/vendor payee was not found or is inactive.");
+                return Result<ResolvedFeeProgramScope>.Failure("PAYABLE_PAYEE_NOT_FOUND", "The selected third-party/vendor payee was not found or is inactive.");
         }
 
-        return null;
+        return await ResolveProgramScopeAsync(req, ct);
     }
 
-    private static FeeRuleVersion BuildVersion(CreateFeeRuleVersionRequest req, Guid userId)
+    private async Task<Result<ResolvedFeeProgramScope>> ResolveProgramScopeAsync(
+        CreateFeeRuleVersionRequest req, CancellationToken ct)
+    {
+        var normalizedState = NormalizeStateCode(req.StateCode);
+        if (!string.IsNullOrWhiteSpace(req.StateCode) && normalizedState is null)
+            return Result<ResolvedFeeProgramScope>.Failure("STATE_CODE_INVALID", "State code must be two characters.");
+
+        var normalizedLob = NormalizeLineOfBusiness(req.LineOfBusiness);
+        PolicyLineOfBusiness? parsedLob = null;
+        if (!string.IsNullOrWhiteSpace(normalizedLob))
+        {
+            var lobName = Enum.GetNames<PolicyLineOfBusiness>()
+                .FirstOrDefault(name => string.Equals(name, normalizedLob, StringComparison.OrdinalIgnoreCase));
+            if (lobName is null)
+                return Result<ResolvedFeeProgramScope>.Failure("LOB_INVALID", "Line of business is not valid.");
+
+            parsedLob = Enum.Parse<PolicyLineOfBusiness>(lobName);
+            normalizedLob = lobName;
+        }
+
+        if (!req.ProgramConfigurationId.HasValue)
+            return Result<ResolvedFeeProgramScope>.Success(new(null, null, null, normalizedLob, normalizedState));
+
+        var programExists = await Db.Set<ProgramConfiguration>()
+            .AnyAsync(p => p.Id == req.ProgramConfigurationId.Value && p.IsActive, ct);
+        if (!programExists)
+            return Result<ResolvedFeeProgramScope>.Failure("PROGRAM_NOT_FOUND", "The selected Program was not found or is inactive.");
+
+        if (!req.CarrierId.HasValue)
+        {
+            if (!string.IsNullOrWhiteSpace(normalizedLob) || normalizedState is not null)
+                return Result<ResolvedFeeProgramScope>.Failure("PROGRAM_SCOPE_PARENT_REQUIRED", "Select a carrier before selecting a Program line of business or state.");
+
+            return Result<ResolvedFeeProgramScope>.Success(new(null, null, null, null, null));
+        }
+
+        var programCarrier = await Db.Set<ProgramCarrier>()
+            .FirstOrDefaultAsync(c =>
+                c.ProgramConfigurationId == req.ProgramConfigurationId.Value &&
+                c.CarrierId == req.CarrierId.Value &&
+                c.IsActive &&
+                c.EffectiveDate <= req.EffectiveDate &&
+                (c.ExpirationDate == null || c.ExpirationDate >= req.EffectiveDate), ct);
+
+        if (programCarrier is null)
+            return Result<ResolvedFeeProgramScope>.Failure("PROGRAM_SCOPE_PATH_NOT_FOUND", "The selected carrier is not active for this Program on the fee effective date.");
+
+        if (string.IsNullOrWhiteSpace(normalizedLob))
+        {
+            if (normalizedState is not null)
+                return Result<ResolvedFeeProgramScope>.Failure("PROGRAM_SCOPE_PARENT_REQUIRED", "Select a line of business before selecting a Program state.");
+
+            return Result<ResolvedFeeProgramScope>.Success(new(programCarrier.Id, null, null, null, null));
+        }
+
+        var lob = parsedLob!.Value;
+
+        var programLob = await Db.Set<ProgramCarrierLineOfBusiness>()
+            .FirstOrDefaultAsync(l =>
+                l.ProgramCarrierId == programCarrier.Id &&
+                l.LineOfBusiness == lob &&
+                l.IsActive &&
+                l.EffectiveDate <= req.EffectiveDate &&
+                (l.ExpirationDate == null || l.ExpirationDate >= req.EffectiveDate), ct);
+
+        if (programLob is null)
+            return Result<ResolvedFeeProgramScope>.Failure("PROGRAM_SCOPE_PATH_NOT_FOUND", "The selected line of business is not active for this Program carrier on the fee effective date.");
+
+        if (normalizedState is null)
+            return Result<ResolvedFeeProgramScope>.Success(new(null, programLob.Id, null, normalizedLob, null));
+
+        var programState = await Db.Set<ProgramCarrierLobState>()
+            .FirstOrDefaultAsync(s =>
+                s.ProgramCarrierLineOfBusinessId == programLob.Id &&
+                s.StateCode == normalizedState &&
+                s.IsActive &&
+                s.EffectiveDate <= req.EffectiveDate &&
+                (s.ExpirationDate == null || s.ExpirationDate >= req.EffectiveDate), ct);
+
+        if (programState is null)
+            return Result<ResolvedFeeProgramScope>.Failure("PROGRAM_SCOPE_PATH_NOT_FOUND", "The selected state is not active for this Program carrier and line of business on the fee effective date.");
+
+        return Result<ResolvedFeeProgramScope>.Success(new(null, null, programState.Id, normalizedLob, normalizedState));
+    }
+
+    private static string? NormalizeStateCode(string? stateCode)
+    {
+        if (string.IsNullOrWhiteSpace(stateCode))
+            return null;
+
+        var normalized = stateCode.Trim().ToUpperInvariant();
+        return normalized.Length == 2 ? normalized : null;
+    }
+
+    private static string? NormalizeLineOfBusiness(string? lineOfBusiness)
+    {
+        if (string.IsNullOrWhiteSpace(lineOfBusiness))
+            return null;
+
+        return lineOfBusiness.Trim();
+    }
+
+    private static FeeRuleVersion BuildVersion(CreateFeeRuleVersionRequest req, Guid userId, ResolvedFeeProgramScope scope)
     {
         var version = new FeeRuleVersion
         {
@@ -305,8 +428,11 @@ public class FeeAdminService : IFeeAdminService
             CarrierId = req.CarrierId,
             CompanyId = req.CompanyId,
             ProducerId = req.ProducerId,
-            LineOfBusiness = req.LineOfBusiness,
-            StateCode = req.StateCode,
+            LineOfBusiness = scope.LineOfBusiness,
+            StateCode = scope.StateCode,
+            ProgramCarrierId = scope.ProgramCarrierId,
+            ProgramCarrierLineOfBusinessId = scope.ProgramCarrierLineOfBusinessId,
+            ProgramCarrierLobStateId = scope.ProgramCarrierLobStateId,
             City = req.City,
             LicenseType = req.LicenseType,
             EffectiveDate = req.EffectiveDate,

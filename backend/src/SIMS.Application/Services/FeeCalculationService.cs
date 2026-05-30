@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities.Accounting;
+using SIMS.Domain.Enums;
 using InvoiceLine = SIMS.Application.DTOs.Accounting.InvoiceLine;
 
 namespace SIMS.Application.Services;
@@ -15,6 +16,7 @@ public class FeeCalculationService : IFeeCalculationService
 
     public async Task<FeeCalculationResult> CalculateAsync(PolicyContext ctx, CancellationToken ct = default)
     {
+        ctx = NormalizeContext(ctx);
         var db = Db;
 
         // Step 1: Resolve all candidate rules matching scope + effective date
@@ -155,6 +157,25 @@ public class FeeCalculationService : IFeeCalculationService
         (v.StateCode != null ? 1 : 0) +
         (v.City != null ? 1 : 0) +
         (v.LicenseType != null ? 1 : 0);
+
+    private static PolicyContext NormalizeContext(PolicyContext ctx) =>
+        ctx with
+        {
+            StateCode = string.IsNullOrWhiteSpace(ctx.StateCode) ? ctx.StateCode : ctx.StateCode.Trim().ToUpperInvariant(),
+            LineOfBusiness = NormalizeLineOfBusiness(ctx.LineOfBusiness)
+        };
+
+    private static string? NormalizeLineOfBusiness(string? lineOfBusiness)
+    {
+        if (string.IsNullOrWhiteSpace(lineOfBusiness))
+            return null;
+
+        var normalized = lineOfBusiness.Trim();
+        var enumName = Enum.GetNames<PolicyLineOfBusiness>()
+            .FirstOrDefault(name => string.Equals(name, normalized, StringComparison.OrdinalIgnoreCase));
+
+        return enumName ?? normalized;
+    }
 
     private static bool IsTransaction(PolicyContext ctx, string transactionType) =>
         string.Equals(ctx.TransactionType, transactionType, StringComparison.OrdinalIgnoreCase);
