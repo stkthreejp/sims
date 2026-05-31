@@ -46,82 +46,25 @@ function daysUntil(dateStr: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86400000)
 }
 
-// ─── status pill ────────────────────────────────────────────────────────────
+// ─── status pills ────────────────────────────────────────────────────────────
 
-const SUB_PILL: Record<SubmissionStatus, { bg: string; fg: string }> = {
-  New:        { bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)' },
-  InProgress: { bg: 'var(--pill-inprog-bg)',   fg: 'var(--pill-inprog-fg)' },
-  Quoted:     { bg: 'var(--pill-quoted-bg)',   fg: 'var(--pill-quoted-fg)' },
-  Bound:      { bg: 'var(--pill-bound-bg)',    fg: 'var(--pill-bound-fg)' },
-  Declined:   { bg: 'var(--pill-declined-bg)', fg: 'var(--pill-declined-fg)' },
-  Withdrawn:  { bg: 'var(--pill-draft-bg)',    fg: 'var(--pill-draft-fg)' },
+const SUB_PILL: Record<SubmissionStatus, string> = {
+  New:        'new',
+  InProgress: 'inprogress',
+  Quoted:     'quoted',
+  Bound:      'bound',
+  Declined:   'declined',
+  Withdrawn:  'withdrawn',
 }
 
-function Pill({ label, bg, fg }: { label: string; bg: string; fg: string }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '3px 9px', borderRadius: 'var(--r-pill)',
-      fontSize: 'var(--fs-sm)', fontWeight: 600, letterSpacing: '.005em',
-      background: bg, color: fg,
-    }}>
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', opacity: .85 }} />
-      {label}
-    </span>
-  )
+function policyPillVariant(p: PolicyListItem): { variant: string; label: string } {
+  const days = daysUntil(p.expirationDate)
+  if (p.status === 'Active' && days > 30) return { variant: 'good', label: 'Active' }
+  if (p.status === 'Active' && days >= 0) return { variant: 'expiring', label: 'Expiring' }
+  return { variant: 'withdrawn', label: POLICY_STATUS_LABELS[p.status] }
 }
 
 // ─── shared card primitives ──────────────────────────────────────────────────
-
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--line)',
-      borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden', ...style,
-    }}>{children}</div>
-  )
-}
-
-function CardHead({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '13px 16px', borderBottom: '1px solid var(--line-2)',
-    }}>{children}</div>
-  )
-}
-
-function CardH3({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-.005em', display: 'flex', alignItems: 'center', gap: 8 }}>
-      {children}
-    </h3>
-  )
-}
-
-function HeadCount({ n }: { n: number }) {
-  return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', fontWeight: 500 }}>{n}</span>
-}
-
-function BtnSm({ children, onClick, variant = 'ghost' }: {
-  children: React.ReactNode; onClick?: () => void; variant?: 'ghost' | 'outline' | 'primary'
-}) {
-  const base: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px',
-    fontSize: 12, fontWeight: 500, borderRadius: 'var(--r-sm)', cursor: 'pointer',
-    border: 'none', background: 'none', color: 'var(--ink-2)',
-  }
-  if (variant === 'outline') return (
-    <button onClick={onClick} style={{ ...base, border: '1px solid var(--line)', background: 'var(--surface)' }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-light)'; e.currentTarget.style.background = 'var(--hover)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface)' }}
-    >{children}</button>
-  )
-  if (variant === 'primary') return (
-    <button onClick={onClick} style={{ ...base, background: 'var(--accent)', color: '#fff', border: 'none' }}>{children}</button>
-  )
-  return <button onClick={onClick} style={{ ...base, color: 'var(--ink-3)' }}>{children}</button>
-}
 
 function Field({ label, children, mono = false, colSpan = false }: {
   label: string; children: React.ReactNode; mono?: boolean; colSpan?: boolean
@@ -141,8 +84,6 @@ function Field({ label, children, mono = false, colSpan = false }: {
   )
 }
 
-// ─── LOB chip ────────────────────────────────────────────────────────────────
-
 function LobChip({ label }: { label: string }) {
   return (
     <span style={{
@@ -152,22 +93,15 @@ function LobChip({ label }: { label: string }) {
   )
 }
 
-// ─── policy rows  ────────────────────────────────────────────────────────────
-
-function policyPill(p: PolicyListItem) {
-  const days = daysUntil(p.expirationDate)
-  if (p.status === 'Active' && days > 30) return { label: 'Active', bg: 'var(--good-bg)', fg: 'var(--good-fg)' }
-  if (p.status === 'Active' && days >= 0) return { label: 'Expiring', bg: 'var(--warn-bg)', fg: 'var(--warn-fg)' }
-  return { label: POLICY_STATUS_LABELS[p.status], bg: 'var(--pill-draft-bg)', fg: 'var(--pill-draft-fg)' }
-}
+// ─── policy table ────────────────────────────────────────────────────────────
 
 function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+    <table className="subs-table">
       <thead>
         <tr>
           {['Policy #', 'Line', 'Carrier', 'Term', 'Status', 'Premium', ''].map((h, i) => (
-            <th key={i} className="id-th" style={{ textAlign: i === 5 ? 'right' : 'left', width: i === 6 ? 32 : undefined }}>
+            <th key={i} className="subs-th" style={{ textAlign: i === 5 ? 'right' : 'left', width: i === 6 ? 32 : undefined }}>
               {h}
             </th>
           ))}
@@ -176,24 +110,24 @@ function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
       <tbody>
         {policies.map((p) => {
           const days = daysUntil(p.expirationDate)
-          const pill = policyPill(p)
+          const { variant, label } = policyPillVariant(p)
           return (
-            <tr key={p.id} className="id-tr" onClick={() => window.location.href = `/policies/${p.id}`}>
-              <td className="id-td"><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{p.policyNumber}</span></td>
-              <td className="id-td"><LobChip label={LOB_LABELS[p.lineOfBusiness]} /></td>
-              <td className="id-td" style={{ color: 'var(--ink-2)' }}>{p.carrierName}</td>
-              <td className="id-td">
+            <tr key={p.id} className="subs-row" onClick={() => window.location.href = `/policies/${p.id}`}>
+              <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{p.policyNumber}</span></td>
+              <td><LobChip label={LOB_LABELS[p.lineOfBusiness]} /></td>
+              <td style={{ color: 'var(--ink-2)' }}>{p.carrierName}</td>
+              <td>
                 <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12.5 }}>
                   {new Date(p.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} →{' '}
                   {new Date(p.expirationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
                 {days >= 0 && days <= 60 && (
-                  <div style={{ fontSize: 11, color: '#b33a2a', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{days}d to renewal</div>
+                  <div style={{ fontSize: 11, color: 'var(--warn-fg)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{days}d to renewal</div>
                 )}
               </td>
-              <td className="id-td"><Pill label={pill.label} bg={pill.bg} fg={pill.fg} /></td>
-              <td className="id-td" style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(p.totalPremium)}</td>
-              <td className="id-td" />
+              <td><span className={`sd-pill ${variant}`}>{label}</span></td>
+              <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(p.totalPremium)}</td>
+              <td />
             </tr>
           )
         })}
@@ -204,41 +138,38 @@ function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
 
 // ─── submission table ────────────────────────────────────────────────────────
 
+type useSubmissions = Awaited<ReturnType<typeof submissionsApi.getByInsured>>
+
 function SubmissionTable({ subs, onOpen }: { subs: useSubmissions; onOpen: (id: string) => void }) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+    <table className="subs-table">
       <thead>
         <tr>
-          {['Submission #', 'Lines', 'Status', 'Effective', 'Underwriter', 'Quotes', 'Created'].map((h, i) => (
-            <th key={i} className="id-th" style={{ textAlign: 'left' }}>{h}</th>
+          {['Submission #', 'Lines', 'Status', 'Effective', 'Underwriter', 'Quotes', 'Created'].map((h) => (
+            <th key={h} className="subs-th">{h}</th>
           ))}
         </tr>
       </thead>
       <tbody>
-        {subs.map((s) => {
-          const pill = SUB_PILL[s.status]
-          return (
-            <tr key={s.id} className="id-tr" onClick={() => onOpen(s.id)}>
-              <td className="id-td"><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{s.submissionNumber}</span></td>
-              <td className="id-td">—</td>
-              <td className="id-td"><Pill label={SUBMISSION_STATUS_LABELS[s.status]} bg={pill.bg} fg={pill.fg} /></td>
-              <td className="id-td" style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12.5 }}>
-                {s.effectiveDate ? new Date(s.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-              </td>
-              <td className="id-td" style={{ color: 'var(--ink-2)' }}>{s.underwriterName}</td>
-              <td className="id-td" style={{ color: 'var(--ink-3)', fontSize: 12 }}>{s.quoteCount}</td>
-              <td className="id-td" style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-                {new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </td>
-            </tr>
-          )
-        })}
+        {subs.map((s) => (
+          <tr key={s.id} className="subs-row" onClick={() => onOpen(s.id)}>
+            <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{s.submissionNumber}</span></td>
+            <td style={{ color: 'var(--ink-3)' }}>—</td>
+            <td><span className={`sd-pill ${SUB_PILL[s.status]}`}>{SUBMISSION_STATUS_LABELS[s.status]}</span></td>
+            <td style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12.5 }}>
+              {s.effectiveDate ? new Date(s.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+            </td>
+            <td style={{ color: 'var(--ink-2)' }}>{s.underwriterName}</td>
+            <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{s.quoteCount}</td>
+            <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+              {new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </td>
+          </tr>
+        ))}
       </tbody>
     </table>
   )
 }
-
-type useSubmissions = Awaited<ReturnType<typeof submissionsApi.getByInsured>>
 
 // ─── main component ──────────────────────────────────────────────────────────
 
@@ -301,33 +232,15 @@ export function InsuredDetailPage() {
 
   return (
     <>
-      <style>{`
-        .id-th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 11px; padding: 9px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
-        .id-tr { border-bottom: 1px solid var(--line-2); transition: background .1s; cursor: pointer; }
-        .id-tr:last-child { border-bottom: 0; }
-        .id-tr:hover { background: var(--hover); }
-        .id-td { padding: 11px 14px; vertical-align: middle; }
-        .id-back:hover { color: var(--accent-ink); }
-        .id-tab { padding: 8px 12px; font-size: 12.5px; color: var(--ink-3); cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .1s; }
-        .id-tab:hover { color: var(--ink-2); }
-        .id-tab.active { color: var(--accent-ink); font-weight: 600; border-bottom-color: var(--accent); }
-        .id-tab .c { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); font-weight: 500; }
-        .id-tab.active .c { color: var(--accent); }
-        .id-metric { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 12px 14px; box-shadow: var(--shadow-sm); }
-        .id-metric.accent { background: var(--accent-soft); border-color: #cfe0ef; }
-        .id-doc:hover { background: var(--hover); cursor: pointer; }
-        .id-activity li::before { content: ""; position: absolute; left: 22px; top: 24px; bottom: -6px; width: 1px; background: var(--line); }
-        .id-activity li:last-child::before { display: none; }
-      `}</style>
-
       {/* Back */}
-      <a
-        className="id-back"
+      <button
         onClick={() => navigate('/insureds')}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14, cursor: 'pointer', fontWeight: 500 }}
+        className="sd-btn outline sm"
+        style={{ marginBottom: 14 }}
       >
-        <ArrowLeft style={{ width: 13, height: 13 }} /> Back to Insureds
-      </a>
+        <ArrowLeft style={{ width: 13, height: 13 }} />
+        Back to Insureds
+      </button>
 
       {/* Page header */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, marginBottom: 20 }}>
@@ -343,14 +256,12 @@ export function InsuredDetailPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: '-.015em', lineHeight: 1.15, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', color: 'var(--ink)' }}>
               {insured.displayName}
-              <Pill
-                label={insured.isActive ? 'Active client' : 'Inactive'}
-                bg={insured.isActive ? 'var(--good-bg)' : 'var(--pill-draft-bg)'}
-                fg={insured.isActive ? 'var(--good-fg)' : 'var(--pill-draft-fg)'}
-              />
+              <span className={`sd-pill ${insured.isActive ? 'good' : 'withdrawn'}`}>
+                {insured.isActive ? 'Active client' : 'Inactive'}
+              </span>
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5, color: 'var(--ink-3)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{insured.id.slice(0, 8).toUpperCase()}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>{insured.id.slice(0, 8).toUpperCase()}</span>
               <span style={{ color: 'var(--ink-4)' }}>·</span>
               <span>{insured.insuredType}</span>
               {insured.dba && <>
@@ -374,43 +285,24 @@ export function InsuredDetailPage() {
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {insured.email && (
-            <a href={`mailto:${insured.email}`} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 32,
-              borderRadius: 'var(--r)', fontSize: 12.5, fontWeight: 500, color: 'var(--ink-2)',
-              border: '1px solid var(--line)', background: 'var(--surface)', cursor: 'pointer', textDecoration: 'none',
-            }}>
+            <a href={`mailto:${insured.email}`} className="sd-btn outline sm">
               <Mail style={{ width: 13, height: 13 }} /> Email
             </a>
           )}
           {canEditInsureds && (
-            <Link to={`/insureds/${id}/edit`} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 32,
-              borderRadius: 'var(--r)', fontSize: 12.5, fontWeight: 500, color: 'var(--ink-2)',
-              border: '1px solid var(--line)', background: 'var(--surface)', textDecoration: 'none',
-            }}>
+            <Link to={`/insureds/${id}/edit`} className="sd-btn outline sm">
               <Edit style={{ width: 13, height: 13 }} /> Edit
             </Link>
           )}
           {canCreatePolicies && (
-            <button
-              onClick={() => navigate(`/submissions/new?insuredId=${id}`)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 32,
-                borderRadius: 'var(--r)', fontSize: 12.5, fontWeight: 500, color: '#fff',
-                background: 'var(--accent)', border: 'none', cursor: 'pointer',
-              }}
-            >
+            <button className="sd-btn primary sm" onClick={() => navigate(`/submissions/new?insuredId=${id}`)}>
               <Plus style={{ width: 13, height: 13 }} /> New submission
             </button>
           )}
           {canDeleteInsureds && (
             <button
+              className="sd-btn danger sm"
               onClick={() => { if (confirm('Delete this insured?')) deleteMutation.mutate() }}
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32,
-                borderRadius: 'var(--r)', fontSize: 12.5, color: 'var(--bad-fg)',
-                border: '1px solid var(--line)', background: 'var(--surface)', cursor: 'pointer',
-              }}
             >
               <Trash2 style={{ width: 13, height: 13 }} />
             </button>
@@ -419,49 +311,51 @@ export function InsuredDetailPage() {
       </header>
 
       {/* Metric strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 20 }}>
-        <div className="id-metric accent">
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--accent-ink)', opacity: .75, fontWeight: 600, margin: '0 0 4px' }}>In-force premium</div>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.015em', lineHeight: 1, color: 'var(--accent-ink)', fontVariantNumeric: 'tabular-nums' }}>{fmtMoneyK(inForcePremium)}</div>
-          <div style={{ color: 'var(--ink-3)', fontSize: 11.5, marginTop: 5 }}>{activePolicies.length} active {activePolicies.length === 1 ? 'policy' : 'policies'}</div>
+      <div className="sd-metrics five" style={{ marginBottom: 20 }}>
+        <div className="sd-metric accent">
+          <p className="k">In-force premium</p>
+          <p className="v">{fmtMoneyK(inForcePremium)}</p>
+          <p className="s">{activePolicies.length} active {activePolicies.length === 1 ? 'policy' : 'policies'}</p>
         </div>
-        <div className="id-metric">
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600, margin: '0 0 4px' }}>Open submissions</div>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.015em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{openSubs.length}</div>
-          <div style={{ color: 'var(--ink-3)', fontSize: 11.5, marginTop: 5 }}>{openSubs[0]?.submissionNumber ?? 'None active'}</div>
+        <div className="sd-metric">
+          <p className="k">Open submissions</p>
+          <p className="v">{openSubs.length}</p>
+          <p className="s">{openSubs[0]?.submissionNumber ?? 'None active'}</p>
         </div>
-        <div className="id-metric">
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600, margin: '0 0 4px' }}>Lifetime premium</div>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.015em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fmtMoneyK(lifetimePremium)}</div>
-          <div style={{ color: 'var(--ink-3)', fontSize: 11.5, marginTop: 5 }}>Across {policies.length} bound {policies.length === 1 ? 'policy' : 'policies'}</div>
+        <div className="sd-metric">
+          <p className="k">Lifetime premium</p>
+          <p className="v">{fmtMoneyK(lifetimePremium)}</p>
+          <p className="s">Across {policies.length} bound {policies.length === 1 ? 'policy' : 'policies'}</p>
         </div>
-        <div className="id-metric">
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600, margin: '0 0 4px' }}>3-yr loss ratio</div>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.015em', lineHeight: 1 }}>—</div>
-          <div style={{ color: 'var(--ink-3)', fontSize: 11.5, marginTop: 5 }}>No loss run data</div>
+        <div className="sd-metric">
+          <p className="k">3-yr loss ratio</p>
+          <p className="v">—</p>
+          <p className="s">No loss run data</p>
         </div>
-        <div className="id-metric">
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600, margin: '0 0 4px' }}>Renewal in</div>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.015em', lineHeight: 1, ...(nearestExpiry != null && nearestExpiry <= 30 ? { color: '#b33a2a' } : {}) }}>
+        <div className="sd-metric">
+          <p className="k">Renewal in</p>
+          <p className="v" style={nearestExpiry != null && nearestExpiry <= 30 ? { color: 'var(--warn-fg)' } : {}}>
             {nearestExpiry != null ? `${nearestExpiry}d` : '—'}
-          </div>
-          <div style={{ color: 'var(--ink-3)', fontSize: 11.5, marginTop: 5 }}>
+          </p>
+          <p className="s">
             {nearestExpiry != null ? `${activePolicies.length} ${activePolicies.length === 1 ? 'policy' : 'policies'} expiring` : 'No active policies'}
-          </div>
+          </p>
         </div>
       </div>
 
       {/* 3-col info row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 18 }}>
         {/* Contact */}
-        <Card>
-          <CardHead>
-            <CardH3>Contact</CardH3>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {insured.email && <a href={`mailto:${insured.email}`}><BtnSm><Mail style={{ width: 12, height: 12 }} /></BtnSm></a>}
-            </div>
-          </CardHead>
-          <div style={{ padding: '14px 16px' }}>
+        <div className="sd-card">
+          <div className="sd-card-head">
+            <h3>Contact</h3>
+            {insured.email && (
+              <a href={`mailto:${insured.email}`} className="sd-btn sm outline">
+                <Mail style={{ width: 12, height: 12 }} />
+              </a>
+            )}
+          </div>
+          <div className="sd-card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {insured.email && (
                 <Field label="Email">
@@ -485,18 +379,18 @@ export function InsuredDetailPage() {
               )}
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Address */}
-        <Card>
-          <CardHead>
-            <CardH3>Address</CardH3>
+        <div className="sd-card">
+          <div className="sd-card-head">
+            <h3>Address</h3>
             <div style={{ display: 'flex', gap: 6 }}>
-              <BtnSm><Copy style={{ width: 12, height: 12 }} /></BtnSm>
-              <BtnSm><ExternalLink style={{ width: 12, height: 12 }} /></BtnSm>
+              <button className="sd-btn sm"><Copy style={{ width: 12, height: 12 }} /></button>
+              <button className="sd-btn sm"><ExternalLink style={{ width: 12, height: 12 }} /></button>
             </div>
-          </CardHead>
-          <div style={{ padding: '14px 16px' }}>
+          </div>
+          <div className="sd-card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <Field label="Physical">
                 {insured.addressLine1}
@@ -535,19 +429,15 @@ export function InsuredDetailPage() {
               )}
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Business profile */}
-        <Card>
-          <CardHead><CardH3>Business profile</CardH3></CardHead>
-          <div style={{ padding: '14px 16px' }}>
+        <div className="sd-card">
+          <div className="sd-card-head"><h3>Business profile</h3></div>
+          <div className="sd-card-body">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-              {insured.taxId && (
-                <Field label="FEIN" mono>{insured.taxId}</Field>
-              )}
-              {insured.usDotNumber && (
-                <Field label="USDOT #" mono>{insured.usDotNumber}</Field>
-              )}
+              {insured.taxId && <Field label="FEIN" mono>{insured.taxId}</Field>}
+              {insured.usDotNumber && <Field label="USDOT #" mono>{insured.usDotNumber}</Field>}
               {!insured.usDotNumber && (
                 <Field label="USDOT #">
                   <Link to={`/insureds/${insured.id}/edit`} style={{ color: 'var(--accent-ink)', fontWeight: 500 }}>
@@ -558,32 +448,28 @@ export function InsuredDetailPage() {
               {insured.yearsInBusiness != null && (
                 <Field label="Years in business">{insured.yearsInBusiness} years</Field>
               )}
-              {insured.entityType && (
-                <Field label="Entity type" colSpan>{insured.entityType}</Field>
-              )}
-              {insured.dba && (
-                <Field label="DBA" colSpan>{insured.dba}</Field>
-              )}
+              {insured.entityType && <Field label="Entity type" colSpan>{insured.entityType}</Field>}
+              {insured.dba && <Field label="DBA" colSpan>{insured.dba}</Field>}
               {!insured.taxId && !insured.usDotNumber && !insured.yearsInBusiness && !insured.entityType && (
                 <p style={{ color: 'var(--ink-4)', fontSize: 12.5, gridColumn: '1 / -1' }}>No business profile on file.</p>
               )}
             </div>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Tabbed area */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* Tab strip */}
-        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--line)', padding: '0 4px' }}>
+        <div className="sd-tabs">
           {tabs.map(([key, label, count]) => (
             <button
               key={key}
-              className={`id-tab${tab === key ? ' active' : ''}`}
+              className={`sd-tab${tab === key ? ' active' : ''}`}
               onClick={() => setTab(key)}
             >
               {label}
-              {count != null && <span className="c">{count}</span>}
+              {count != null && <span className="cnt">{count}</span>}
             </button>
           ))}
         </div>
@@ -591,14 +477,16 @@ export function InsuredDetailPage() {
         {/* OVERVIEW */}
         {tab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Card>
-              <CardHead>
-                <CardH3>Policies in force <HeadCount n={activePolicies.length} /></CardH3>
+            <div className="sd-card" style={{ overflow: 'hidden' }}>
+              <div className="sd-card-head">
+                <h3>Policies in force <span className="cnt">{activePolicies.length}</span></h3>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <BtnSm variant="outline"><Download style={{ width: 12, height: 12 }} />COI</BtnSm>
-                  <BtnSm variant="outline" onClick={() => setTab('policies')}>View all</BtnSm>
+                  <button className="sd-btn sm outline">
+                    <Download style={{ width: 12, height: 12 }} />COI
+                  </button>
+                  <button className="sd-btn sm outline" onClick={() => setTab('policies')}>View all</button>
                 </div>
-              </CardHead>
+              </div>
               {activePolicies.length === 0 ? (
                 <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
                   No active policies.
@@ -606,99 +494,90 @@ export function InsuredDetailPage() {
               ) : (
                 <PolicyTable policies={activePolicies} />
               )}
-            </Card>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              {/* Loss history stub */}
-              <Card>
-                <CardHead><CardH3>Loss history (5 yrs)</CardH3></CardHead>
+              <div className="sd-card">
+                <div className="sd-card-head"><h3>Loss history (5 yrs)</h3></div>
                 <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
                   No loss run data on file.
                 </div>
-              </Card>
+              </div>
 
-              {/* Recent submissions */}
-              <Card>
-                <CardHead>
-                  <CardH3>Recent submissions</CardH3>
-                  <BtnSm variant="outline" onClick={() => setTab('submissions')}>View all</BtnSm>
-                </CardHead>
+              <div className="sd-card">
+                <div className="sd-card-head">
+                  <h3>Recent submissions</h3>
+                  <button className="sd-btn sm outline" onClick={() => setTab('submissions')}>View all</button>
+                </div>
                 {submissions.length === 0 ? (
                   <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No submissions yet.</div>
                 ) : (
                   <div>
-                    {submissions.slice(0, 4).map((s, i) => {
-                      const pill = SUB_PILL[s.status]
-                      return (
-                        <div
-                          key={s.id}
-                          onClick={() => navigate(`/submissions/${s.id}`)}
-                          style={{
-                            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-                            padding: '10px 16px', borderBottom: i < Math.min(submissions.length, 4) - 1 ? '1px solid var(--line-2)' : 'none',
-                            cursor: 'pointer',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--hover)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <div>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{s.submissionNumber}</div>
-                            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 1 }}>{s.underwriterName}</div>
-                          </div>
-                          <Pill label={SUBMISSION_STATUS_LABELS[s.status]} bg={pill.bg} fg={pill.fg} />
+                    {submissions.slice(0, 4).map((s, i) => (
+                      <div
+                        key={s.id}
+                        onClick={() => navigate(`/submissions/${s.id}`)}
+                        className="subs-row"
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                          padding: '10px 16px',
+                          borderBottom: i < Math.min(submissions.length, 4) - 1 ? '1px solid var(--line-2)' : 'none',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{s.submissionNumber}</div>
+                          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 1 }}>{s.underwriterName}</div>
                         </div>
-                      )
-                    })}
+                        <span className={`sd-pill ${SUB_PILL[s.status]}`}>{SUBMISSION_STATUS_LABELS[s.status]}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
-              </Card>
+              </div>
             </div>
           </div>
         )}
 
         {/* POLICIES */}
         {tab === 'policies' && (
-          <Card>
-            <CardHead>
-              <CardH3>All policies <HeadCount n={policies.length} /></CardH3>
+          <div className="sd-card" style={{ overflow: 'hidden' }}>
+            <div className="sd-card-head">
+              <h3>All policies <span className="cnt">{policies.length}</span></h3>
               <div style={{ display: 'flex', gap: 6 }}>
-                <BtnSm variant="outline"><Download style={{ width: 12, height: 12 }} />Export</BtnSm>
+                <button className="sd-btn sm outline">
+                  <Download style={{ width: 12, height: 12 }} />Export
+                </button>
                 {canCreatePolicies && (
-                  <BtnSm variant="primary" onClick={() => navigate(`/submissions/new?insuredId=${id}`)}>
+                  <button className="sd-btn sm primary" onClick={() => navigate(`/submissions/new?insuredId=${id}`)}>
                     <Plus style={{ width: 12, height: 12 }} />New submission
-                  </BtnSm>
+                  </button>
                 )}
               </div>
-            </CardHead>
+            </div>
             {policies.length === 0 ? (
               <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>No bound policies yet.</div>
             ) : (
               <PolicyTable policies={policies} />
             )}
-          </Card>
+          </div>
         )}
 
         {/* SUBMISSIONS */}
         {tab === 'submissions' && (
-          <Card>
-            <CardHead>
-              <CardH3>All submissions <HeadCount n={submissions.length} /></CardH3>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {canCreatePolicies && (
-                  <BtnSm variant="primary" onClick={() => navigate(`/submissions/new?insuredId=${id}`)}>
-                    <Plus style={{ width: 12, height: 12 }} />New submission
-                  </BtnSm>
-                )}
-              </div>
-            </CardHead>
+          <div className="sd-card" style={{ overflow: 'hidden' }}>
+            <div className="sd-card-head">
+              <h3>All submissions <span className="cnt">{submissions.length}</span></h3>
+              {canCreatePolicies && (
+                <button className="sd-btn sm primary" onClick={() => navigate(`/submissions/new?insuredId=${id}`)}>
+                  <Plus style={{ width: 12, height: 12 }} />New submission
+                </button>
+              )}
+            </div>
             {submissions.length === 0 ? (
               <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
                 No submissions yet.{' '}
                 {canCreatePolicies && (
-                  <span
-                    onClick={() => navigate(`/submissions/new?insuredId=${id}`)}
-                    style={{ color: 'var(--accent)', cursor: 'pointer' }}
-                  >
+                  <span onClick={() => navigate(`/submissions/new?insuredId=${id}`)} style={{ color: 'var(--accent)', cursor: 'pointer' }}>
                     Create the first one.
                   </span>
                 )}
@@ -706,29 +585,27 @@ export function InsuredDetailPage() {
             ) : (
               <SubmissionTable subs={submissions} onOpen={(submissionId) => navigate(`/submissions/${submissionId}`)} />
             )}
-          </Card>
+          </div>
         )}
 
         {/* DOCUMENTS */}
         {tab === 'documents' && (
-          <Card>
-            <CardHead>
-              <CardH3>Documents</CardH3>
-            </CardHead>
-            <div style={{ padding: '16px' }}>
+          <div className="sd-card">
+            <div className="sd-card-head"><h3>Documents</h3></div>
+            <div className="sd-card-body">
               <DocumentsSection entityId={id!} entityType="Insured" />
             </div>
-          </Card>
+          </div>
         )}
 
         {/* ACTIVITY */}
         {tab === 'activity' && (
-          <Card>
-            <CardHead><CardH3>Activity</CardH3></CardHead>
+          <div className="sd-card">
+            <div className="sd-card-head"><h3>Activity</h3></div>
             <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
               Activity log coming soon.
             </div>
-          </Card>
+          </div>
         )}
       </div>
     </>

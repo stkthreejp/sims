@@ -19,68 +19,68 @@ export function InsuredsPage() {
   })
 
   return (
-    <div>
-      <PageHeader
-        title="Insureds"
-        description="Manage your insured clients"
-        actions={
-          canCreateInsureds && (
-            <Link
-              to="/insureds/new"
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              New Insured
-            </Link>
-          )
-        }
-      />
+    <div className="subs-wrap">
+      <div className="subs-page-head">
+        <PageHeader title="Insureds" />
+        {canCreateInsureds && (
+          <Link to="/insureds/new" className="sd-btn primary">
+            <Plus style={{ width: 13, height: 13 }} />
+            New Insured
+          </Link>
+        )}
+      </div>
 
-      <div className="bg-white rounded-lg border border-slate-200">
-        <div className="p-4 border-b border-slate-100">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      {/* Search */}
+      <div className="sd-card" style={{ marginBottom: 14 }}>
+        <div className="sd-card-body" style={{ padding: '10px 14px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--ink-4)', pointerEvents: 'none' }} />
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               placeholder="Search by name, email…"
-              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="sims-input"
+              style={{ paddingLeft: 30 }}
             />
           </div>
         </div>
+      </div>
 
-        {isLoading ? <LoadingSpinner /> : data?.items.length === 0 ? (
+      <div className="subs-table-card">
+        {isLoading ? (
+          <LoadingSpinner />
+        ) : data?.items.length === 0 ? (
           <EmptyState icon={Building2} title="No insureds found" description="Add your first insured to get started." />
         ) : (
           <>
-            <table className="w-full text-sm">
+            <table className="subs-table">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                  <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Name</th>
-                  <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Type</th>
-                  <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Contact</th>
-                  <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Location</th>
-                  <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Policies</th>
-                  <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
+                <tr>
+                  <th className="subs-th">Name</th>
+                  <th className="subs-th">Type</th>
+                  <th className="subs-th">Contact</th>
+                  <th className="subs-th">Location</th>
+                  <th className="subs-th num">Policies</th>
+                  <th className="subs-th">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {data?.items.map((insured) => (
-                  <tr key={insured.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <Link to={`/insureds/${insured.id}`} className="font-medium text-blue-600 hover:underline">
+                  <tr key={insured.id} className="subs-row">
+                    <td>
+                      <Link to={`/insureds/${insured.id}`} style={{ fontWeight: 600, color: 'var(--accent-ink)', textDecoration: 'none' }}>
                         {insured.displayName}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{insured.insuredType}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <div>{insured.email ?? '—'}</div>
-                      <div className="text-slate-400">{insured.phone ?? ''}</div>
+                    <td style={{ color: 'var(--ink-2)' }}>{insured.insuredType}</td>
+                    <td>
+                      <div style={{ color: 'var(--ink-2)' }}>{insured.email ?? '—'}</div>
+                      {insured.phone && <div style={{ color: 'var(--ink-4)', fontSize: 12 }}>{insured.phone}</div>}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{insured.city}, {insured.state}</td>
-                    <td className="px-4 py-3 text-slate-600">{insured.policyCount}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${insured.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <td style={{ color: 'var(--ink-2)' }}>{insured.city}, {insured.state}</td>
+                    <td style={{ textAlign: 'right', color: 'var(--ink-2)' }}>{insured.policyCount}</td>
+                    <td>
+                      <span className={`sd-pill ${insured.isActive ? 'good' : 'withdrawn'}`}>
                         {insured.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -88,13 +88,14 @@ export function InsuredsPage() {
                 ))}
               </tbody>
             </table>
+
             {(data?.totalPages ?? 0) > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderTop: '1px solid var(--line-2)', fontSize: 13, color: 'var(--ink-3)' }}>
                 <span>{data?.totalCount} total</span>
-                <div className="flex gap-2">
-                  <button onClick={() => setPage(p => p - 1)} disabled={!data?.hasPreviousPage} className="px-3 py-1 border rounded disabled:opacity-40">Prev</button>
-                  <span className="px-3 py-1">Page {data?.page} of {data?.totalPages}</span>
-                  <button onClick={() => setPage(p => p + 1)} disabled={!data?.hasNextPage} className="px-3 py-1 border rounded disabled:opacity-40">Next</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button className="sd-btn sm outline" onClick={() => setPage(p => p - 1)} disabled={!data?.hasPreviousPage}>Prev</button>
+                  <span style={{ padding: '0 8px', color: 'var(--ink-2)' }}>Page {data?.page} of {data?.totalPages}</span>
+                  <button className="sd-btn sm outline" onClick={() => setPage(p => p + 1)} disabled={!data?.hasNextPage}>Next</button>
                 </div>
               </div>
             )}

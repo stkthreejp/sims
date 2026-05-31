@@ -415,6 +415,8 @@
 .sd-pill.posted     { background: var(--pill-bound-bg);    color: var(--pill-bound-fg); }
 .sd-pill.voided     { background: var(--bad-bg);           color: var(--bad-fg); }
 .sd-pill.cancelled  { background: var(--bad-bg);           color: var(--bad-fg); }
+.sd-pill.good       { background: var(--good-bg);          color: var(--good-fg); }
+.sd-pill.expiring   { background: var(--warn-bg);          color: var(--warn-fg); }
 
 /* LOB chip */
 .sd-lob {
