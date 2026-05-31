@@ -935,9 +935,6 @@ export function CarrierDetailPage() {
               description={bordereauxProgramOptions.length === 0
                 ? 'Add this carrier to an active program before creating a BDX profile.'
                 : 'Create the first carrier BDX profile here, choosing the program and LOB before setup.'}
-              action={bordereauxProgramOptions.length > 0
-                ? <button type="button" onClick={openBordereauxProfileForm} className="sd-btn outline sm">Create first profile</button>
-                : undefined}
             />
           ) : bordereauxProfiles.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 320px) 1fr', gap: 16 }}>
@@ -1113,7 +1110,6 @@ export function CarrierDetailPage() {
             <EmptyState
               icon={BanknoteIcon}
               title="No commission rates configured"
-              action={<button onClick={() => setShowAddCommission(true)} className="sd-btn outline sm">Add the first rate</button>}
             />
           ) : (
             (() => {
@@ -1235,7 +1231,6 @@ export function CarrierDetailPage() {
               icon={ShieldCheck}
               title="No rating plans assigned"
               description="Quotes for this carrier will not rate until a plan is assigned."
-              action={<button onClick={openAddRatingModal} className="sd-btn outline sm">Assign the first plan</button>}
             />
           ) : (
             <div className="subs-table-card" style={{ margin: 0 }}>
@@ -1572,7 +1567,6 @@ export function CarrierDetailPage() {
             <EmptyState
               icon={UserCircle}
               title="No contacts yet"
-              action={<button onClick={() => setShowNewContact(true)} className="sd-btn outline sm">Add the first contact</button>}
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

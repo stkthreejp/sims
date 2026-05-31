@@ -731,7 +731,6 @@ export function AgentDetailPage() {
             <EmptyState
               icon={BanknoteIcon}
               title="No commission rates configured"
-              action={<button onClick={() => setShowAddCommission(true)} className="sd-btn outline sm">Add the first rate</button>}
             />
           ) : (
             (() => {
@@ -862,7 +861,6 @@ export function AgentDetailPage() {
             <EmptyState
               icon={Building2}
               title="No offices added yet"
-              action={<button onClick={() => setShowNewLocation(true)} className="sd-btn outline sm">Add the first office</button>}
             />
           )}
 
