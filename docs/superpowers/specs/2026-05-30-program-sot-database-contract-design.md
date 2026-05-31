@@ -260,6 +260,13 @@ The first coded slice should:
 
 Then repeat the pattern for Bordereaux profiles and Surplus Lines.
 
+## Implementation Status
+
+- Fees Program SOT is implemented for Program, Program/Carrier, Program/Carrier/LOB all-state, and Program/Carrier/LOB/State fee rule versions.
+- Azure smoke is healthy after moving Safety Analytics connection to Key Vault and removing the stale App Service override. The deployed Fees admin asset contains the Program cascading selectors.
+- Logged-in UI save-path smoke remains manual because the in-app browser plugin could not attach in this environment.
+- Next target: Bordereaux profiles should move to canonical Program scope references using the same database contract pattern.
+
 ## Verification Expectations
 
 Each implementation phase should include:
@@ -277,4 +284,3 @@ For migrations:
 - Include read-only preflight queries before enforcing constraints.
 - Fail with clear diagnostics if existing data cannot be backfilled safely.
 - Avoid destructive cleanup unless explicitly approved.
-
