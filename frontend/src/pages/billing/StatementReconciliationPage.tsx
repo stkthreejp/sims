@@ -5,31 +5,35 @@ import { toast } from 'sonner'
 import { payeeStatementsApi } from '@/api/payeeStatements.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { StatusBadge } from '@/components/common/StatusBadge'
 import type { PayeeStatement, PayeeStatementSummary } from '@/types/payeeStatement.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) =>
   new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    Imported: 'bg-yellow-100 text-yellow-800',
-    Reconciled: 'bg-green-100 text-green-800',
-    Voided: 'bg-gray-100 text-gray-500',
-  }
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${map[status] ?? 'bg-gray-100 text-gray-700'}`}>
-      {status}
-    </span>
-  )
+const STMT_PILL: Record<string, string> = {
+  Imported: 'inprogress',
+  Reconciled: 'bound',
+  Voided: 'voided',
+}
+
+const MATCH_PILL: Record<string, { variant: string; label: string }> = {
+  AutoMatched: { variant: 'bound', label: 'Auto' },
+  ManualMatched: { variant: 'submitted', label: 'Manual' },
+  Unmatched: { variant: 'cancelled', label: 'Unmatched' },
 }
 
 function MatchBadge({ status }: { status: string }) {
-  if (status === 'AutoMatched')
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800"><CheckCircle2 className="h-3 w-3" />Auto</span>
-  if (status === 'ManualMatched')
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"><CheckCircle2 className="h-3 w-3" />Manual</span>
-  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><AlertCircle className="h-3 w-3" />Unmatched</span>
+  const cfg = MATCH_PILL[status] ?? { variant: 'draft', label: status }
+  return (
+    <span className={`sd-pill ${cfg.variant}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {status === 'Unmatched'
+        ? <AlertCircle style={{ width: 10, height: 10 }} />
+        : <CheckCircle2 style={{ width: 10, height: 10 }} />}
+      {cfg.label}
+    </span>
+  )
 }
 
 const EMPTY_IMPORT = { payeeName: '', statementDate: '', referenceNumber: '', apLedgerAccountId: '' }
@@ -61,86 +65,73 @@ function ImportPanel({ onImported }: { onImported: (s: PayeeStatement) => void }
   const canSubmit = form.payeeName && form.statementDate && form.apLedgerAccountId && file && !isPending
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-slate-800">Upload Statement</h3>
+    <div className="sd-card">
+      <div className="sd-card-head"><h3>Upload Statement</h3></div>
+      <div className="sd-card-body">
+        <div className="sims-fields" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 12 }}>
+          <label className="sims-field">
+            <span className="sims-field-label">Payee Name *</span>
+            <input
+              value={form.payeeName}
+              onChange={e => setForm(p => ({ ...p, payeeName: e.target.value }))}
+              placeholder="e.g. TX Surplus Lines Stamping Office"
+              className="sims-input"
+            />
+          </label>
+          <label className="sims-field">
+            <span className="sims-field-label">Statement Date *</span>
+            <input type="date" value={form.statementDate} onChange={e => setForm(p => ({ ...p, statementDate: e.target.value }))} className="sims-input" />
+          </label>
+          <label className="sims-field">
+            <span className="sims-field-label">Reference #</span>
+            <input value={form.referenceNumber} onChange={e => setForm(p => ({ ...p, referenceNumber: e.target.value }))} placeholder="Optional" className="sims-input" />
+          </label>
+          <label className="sims-field">
+            <span className="sims-field-label">AP Ledger Account ID *</span>
+            <input type="number" value={form.apLedgerAccountId} onChange={e => setForm(p => ({ ...p, apLedgerAccountId: e.target.value }))} placeholder="e.g. 42" className="sims-input" />
+          </label>
+        </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Payee Name *</label>
-          <input
-            value={form.payeeName}
-            onChange={e => setForm(p => ({ ...p, payeeName: e.target.value }))}
-            placeholder="e.g. TX Surplus Lines Stamping Office"
-            className="w-full border rounded px-2.5 py-1.5 text-sm"
-          />
+        <div style={{ marginBottom: 12 }}>
+          <p className="sims-field-label" style={{ marginBottom: 6 }}>CSV File *</p>
+          <div
+            onClick={() => fileRef.current?.click()}
+            style={{
+              border: '2px dashed var(--line)',
+              borderRadius: 'var(--r-lg)',
+              padding: '14px 16px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'border-color .1s, background .1s',
+            }}
+          >
+            {file ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: 'var(--ink-2)' }}>
+                <FileText style={{ width: 14, height: 14, color: 'var(--accent-ink)' }} />
+                {file.name}
+                <button
+                  onClick={e => { e.stopPropagation(); setFile(null) }}
+                  style={{ marginLeft: 4, color: 'var(--ink-4)', background: 'none', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                >
+                  <X style={{ width: 13, height: 13 }} />
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+                <Upload style={{ width: 18, height: 18, margin: '0 auto 4px', color: 'var(--ink-4)' }} />
+                Click to select CSV
+                <div style={{ fontSize: 11, marginTop: 2, color: 'var(--ink-4)' }}>PolicyNumber, StateCode, Amount, Description</div>
+              </div>
+            )}
+          </div>
+          <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] ?? null)} />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Statement Date *</label>
-          <input
-            type="date"
-            value={form.statementDate}
-            onChange={e => setForm(p => ({ ...p, statementDate: e.target.value }))}
-            className="w-full border rounded px-2.5 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Reference #</label>
-          <input
-            value={form.referenceNumber}
-            onChange={e => setForm(p => ({ ...p, referenceNumber: e.target.value }))}
-            placeholder="Optional"
-            className="w-full border rounded px-2.5 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">AP Ledger Account ID *</label>
-          <input
-            type="number"
-            value={form.apLedgerAccountId}
-            onChange={e => setForm(p => ({ ...p, apLedgerAccountId: e.target.value }))}
-            placeholder="e.g. 42"
-            className="w-full border rounded px-2.5 py-1.5 text-sm"
-          />
-        </div>
+
+        <button className="sd-btn primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => mutate()} disabled={!canSubmit}>
+          <Upload style={{ width: 13, height: 13 }} />
+          {isPending ? 'Importing…' : 'Import & Auto-Match'}
+        </button>
       </div>
-
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">CSV File *</label>
-        <div
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
-        >
-          {file ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
-              <FileText className="h-4 w-4 text-blue-600" />
-              {file.name}
-              <button
-                onClick={e => { e.stopPropagation(); setFile(null) }}
-                className="ml-1 text-slate-400 hover:text-red-500"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="text-sm text-slate-400">
-              <Upload className="h-5 w-5 mx-auto mb-1 text-slate-300" />
-              Click to select CSV
-              <div className="text-xs mt-0.5">PolicyNumber, StateCode, Amount, Description</div>
-            </div>
-          )}
-        </div>
-        <input ref={fileRef} type="file" accept=".csv" className="hidden"
-          onChange={e => setFile(e.target.files?.[0] ?? null)} />
-      </div>
-
-      <button
-        onClick={() => mutate()}
-        disabled={!canSubmit}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-      >
-        <Upload className="h-4 w-4" />
-        {isPending ? 'Importing…' : 'Import & Auto-Match'}
-      </button>
     </div>
   )
 }
@@ -171,68 +162,67 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
   const canPost = statement.status === 'Imported' && unmatchedCount === 0 && statement.lines.length > 0
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg">
+    <div className="sd-card" style={{ overflow: 'hidden' }}>
       {/* Header */}
-      <div className="flex items-start justify-between px-5 py-4 border-b border-slate-100">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-slate-900">{statement.payeeName}</h3>
-            <StatusBadge status={statement.status} />
-          </div>
-          <div className="mt-0.5 text-xs text-slate-500 space-x-3">
-            <span>{fmtDate(statement.statementDate)}</span>
-            {statement.referenceNumber && <span>Ref: {statement.referenceNumber}</span>}
-            <span>AP: {statement.apLedgerAccountName}</span>
-          </div>
+      <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h3>{statement.payeeName}</h3>
+          <StatusBadge status={STMT_PILL[statement.status] ?? 'draft'} label={statement.status} />
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="text-lg font-bold text-slate-900">{fmt.format(statement.statementTotal)}</div>
-            <div className="text-xs text-slate-500">{statement.lines.filter(l => l.matchStatus !== 'Unmatched').length}/{statement.lines.length} matched</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(statement.statementTotal)}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{statement.lines.filter(l => l.matchStatus !== 'Unmatched').length}/{statement.lines.length} matched</div>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
-            <X className="h-4 w-4" />
+          <button onClick={onClose} style={{ color: 'var(--ink-3)', background: 'none', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+            <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
       </div>
 
-      {/* Lines grid */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div style={{ padding: '6px 16px 8px', display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-3)', borderBottom: '1px solid var(--line-2)' }}>
+        <span>{fmtDate(statement.statementDate)}</span>
+        {statement.referenceNumber && <span>Ref: {statement.referenceNumber}</span>}
+        <span>AP: {statement.apLedgerAccountName}</span>
+      </div>
+
+      {/* Lines */}
+      <div style={{ overflowX: 'auto' }}>
+        <table className="sd-table">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-xs text-slate-500">
-              <th className="px-4 py-2.5 text-left font-medium">Policy Number</th>
-              <th className="px-4 py-2.5 text-left font-medium">State</th>
-              <th className="px-4 py-2.5 text-right font-medium">Amount</th>
-              <th className="px-4 py-2.5 text-left font-medium">Description</th>
-              <th className="px-4 py-2.5 text-left font-medium">Match</th>
-              <th className="px-4 py-2.5 text-left font-medium">Matched To</th>
-              {statement.status === 'Imported' && <th className="px-4 py-2.5" />}
+            <tr>
+              <th>Policy Number</th>
+              <th>State</th>
+              <th className="num">Amount</th>
+              <th>Description</th>
+              <th>Match</th>
+              <th>Matched To</th>
+              {statement.status === 'Imported' && <th style={{ width: 32 }} />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody>
             {statement.lines.map(line => (
-              <tr key={line.id} className={line.matchStatus === 'Unmatched' ? 'bg-red-50' : ''}>
-                <td className="px-4 py-2.5 font-mono text-xs text-blue-700">{line.policyNumber}</td>
-                <td className="px-4 py-2.5">{line.stateCode}</td>
-                <td className="px-4 py-2.5 text-right font-mono">{fmt.format(line.amount)}</td>
-                <td className="px-4 py-2.5 text-slate-500 text-xs">{line.description ?? '—'}</td>
-                <td className="px-4 py-2.5"><MatchBadge status={line.matchStatus} /></td>
-                <td className="px-4 py-2.5 text-xs text-slate-600">
+              <tr key={line.id} style={{ background: line.matchStatus === 'Unmatched' ? 'var(--bad-bg)' : undefined, cursor: 'default' }}>
+                <td className="id">{line.policyNumber}</td>
+                <td style={{ color: 'var(--ink-2)' }}>{line.stateCode}</td>
+                <td className="num">{fmt.format(line.amount)}</td>
+                <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{line.description ?? '—'}</td>
+                <td><MatchBadge status={line.matchStatus} /></td>
+                <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>
                   {line.matchedFeeDisplayName
                     ? <span title={`Invoice Line ${line.matchedInvoiceLineId}`}>{line.matchedFeeDisplayName}</span>
-                    : <span className="text-slate-300">—</span>}
+                    : <span style={{ color: 'var(--ink-4)' }}>—</span>}
                 </td>
                 {statement.status === 'Imported' && (
-                  <td className="px-4 py-2.5">
+                  <td>
                     {line.matchStatus !== 'Unmatched' && (
                       <button
                         onClick={() => unmatchMutation.mutate(line.id)}
                         disabled={unmatchMutation.isPending}
-                        className="text-xs text-slate-400 hover:text-red-600"
                         title="Clear match"
+                        style={{ color: 'var(--ink-4)', background: 'none', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <X style={{ width: 13, height: 13 }} />
                       </button>
                     )}
                   </td>
@@ -240,36 +230,32 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
               </tr>
             ))}
           </tbody>
-          <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50 font-semibold">
-              <td colSpan={2} className="px-4 py-2.5 text-xs text-slate-500">Total</td>
-              <td className="px-4 py-2.5 text-right font-mono">{fmt.format(statement.statementTotal)}</td>
+          <tfoot style={{ borderTop: '2px solid var(--line)', background: 'var(--surface-2)' }}>
+            <tr>
+              <td colSpan={2} style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--ink-2)', fontSize: 13 }}>Total</td>
+              <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(statement.statementTotal)}</td>
               <td colSpan={statement.status === 'Imported' ? 4 : 3} />
             </tr>
           </tfoot>
         </table>
       </div>
 
-      {/* Footer actions */}
+      {/* Footer */}
       {statement.status === 'Imported' && (
-        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+        <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {unmatchedCount > 0 ? (
-            <span className="text-xs text-red-600 flex items-center gap-1">
-              <AlertCircle className="h-3.5 w-3.5" />
+            <span style={{ fontSize: 12, color: 'var(--bad-fg)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <AlertCircle style={{ width: 13, height: 13 }} />
               {unmatchedCount} unmatched line{unmatchedCount > 1 ? 's' : ''} — resolve before posting
             </span>
           ) : (
-            <span className="text-xs text-green-700 flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" />
+            <span style={{ fontSize: 12, color: 'var(--pill-bound-fg)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <CheckCircle2 style={{ width: 13, height: 13 }} />
               All lines matched — ready to post
             </span>
           )}
-          <button
-            onClick={() => postMutation.mutate()}
-            disabled={!canPost || postMutation.isPending}
-            className="flex items-center gap-2 px-4 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-          >
-            <CheckCircle2 className="h-4 w-4" />
+          <button className="sd-btn primary" onClick={() => postMutation.mutate()} disabled={!canPost || postMutation.isPending}>
+            <CheckCircle2 style={{ width: 13, height: 13 }} />
             {postMutation.isPending ? 'Posting…' : 'Post Reconciliation'}
           </button>
         </div>
@@ -302,38 +288,49 @@ export function StatementReconciliationPage() {
   if (isLoading) return <LoadingSpinner />
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Statement Reconciliation"
-        subtitle="Import payee statements · auto-match to invoice fee lines · post JEs"
-      />
+    <div className="subs-wrap">
+      <div className="subs-page-head" style={{ marginBottom: 20 }}>
+        <PageHeader
+          title="Statement Reconciliation"
+          subtitle="Import payee statements · auto-match to invoice fee lines · post JEs"
+        />
+      </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        {/* Left: list + upload */}
-        <div className="space-y-4">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, alignItems: 'flex-start' }}>
+        {/* Left: upload + list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <ImportPanel onImported={handleImported} />
 
           {statements.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+            <div className="sd-card" style={{ overflow: 'hidden' }}>
               {statements.map(s => (
                 <button
                   key={s.id}
                   onClick={() => setSelectedId(s.id)}
-                  className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${selectedId === s.id ? 'bg-blue-50' : ''}`}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 14px',
+                    background: selectedId === s.id ? 'var(--accent-soft)' : 'transparent',
+                    border: 0,
+                    borderBottom: '1px solid var(--line-2)',
+                    cursor: 'pointer',
+                    transition: 'background .1s',
+                  }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-800 truncate">{s.payeeName}</span>
-                    <StatusBadge status={s.status} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{s.payeeName}</span>
+                    <StatusBadge status={STMT_PILL[s.status] ?? 'draft'} label={s.status} />
                   </div>
-                  <div className="mt-0.5 flex items-center justify-between text-xs text-slate-500">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)' }}>
                     <span>{fmtDate(s.statementDate)}</span>
-                    <span className="font-mono">{fmt.format(s.statementTotal)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(s.statementTotal)}</span>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1 text-xs">
-                    <span className={s.matchedLines === s.totalLines ? 'text-green-600' : 'text-amber-600'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, marginTop: 2 }}>
+                    <span style={{ color: s.matchedLines === s.totalLines ? 'var(--pill-bound-fg)' : 'var(--warn-fg)' }}>
                       {s.matchedLines}/{s.totalLines} matched
                     </span>
-                    <ChevronRight className="h-3 w-3 text-slate-300 ml-auto" />
+                    <ChevronRight style={{ width: 11, height: 11, color: 'var(--ink-4)', marginLeft: 'auto' }} />
                   </div>
                 </button>
               ))}
@@ -342,13 +339,13 @@ export function StatementReconciliationPage() {
         </div>
 
         {/* Right: detail */}
-        <div className="col-span-2">
+        <div>
           {detail ? (
             <StatementDetail statement={detail} onClose={() => setSelectedId(null)} />
           ) : (
-            <div className="bg-white border border-slate-200 rounded-lg p-12 text-center text-slate-400">
-              <FileText className="h-10 w-10 mx-auto mb-2 text-slate-200" />
-              <p className="text-sm">Select a statement or upload a new one</p>
+            <div className="sd-card" style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>
+              <FileText style={{ width: 36, height: 36, margin: '0 auto 10px', color: 'var(--ink-4)' }} />
+              <p style={{ fontSize: 13 }}>Select a statement or upload a new one</p>
             </div>
           )}
         </div>
