@@ -141,8 +141,8 @@ function InvoiceDetailView({ id, onBack }: { id: number; onBack: () => void }) {
     <div className="subs-wrap">
       <header className="subs-page-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={onBack} className="sd-btn outline" style={{ padding: '6px 8px' }}>
-            <ArrowLeft size={14} />
+          <button onClick={onBack} className="sims-icon-btn">
+            <ArrowLeft style={{ width: 14, height: 14 }} />
           </button>
           <div>
             <h1 className="subs-h1">{inv.invoiceNumber}</h1>
