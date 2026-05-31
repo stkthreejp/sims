@@ -173,14 +173,14 @@ export function InboxDetailPage() {
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ background: 'var(--bg)' }}>
-      <div className="flex items-start gap-3 px-7 py-5" style={{ borderBottom: '1px solid var(--line)', background: 'var(--surface)' }}>
-        <button type="button" onClick={() => navigate('/inbox')} className="sims-icon-btn mt-0.5" aria-label="Back to inbox">
-          <ArrowLeft className="h-4 w-4" />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '20px 28px', borderBottom: '1px solid var(--line)', background: 'var(--surface)' }}>
+        <button type="button" onClick={() => navigate('/inbox')} className="sims-icon-btn" style={{ marginTop: 2 }} aria-label="Back to inbox">
+          <ArrowLeft style={{ width: 14, height: 14 }} />
         </button>
 
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate" style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-xl)', fontWeight: 600 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h1 style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-xl)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {email.subject}
           </h1>
           <p style={{ margin: '4px 0 0', color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
@@ -191,11 +191,11 @@ export function InboxDetailPage() {
           </p>
         </div>
 
-        <div className="shrink-0">
+        <div style={{ flexShrink: 0 }}>
           {email.isProcessed ? (
-            <div className="flex items-center gap-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="sd-pill bound">
-                <CheckCircle2 className="h-3.5 w-3.5" />
+                <CheckCircle2 style={{ width: 13, height: 13 }} />
                 Processed
               </span>
               {email.linkedSubmissionId && (
@@ -211,15 +211,15 @@ export function InboxDetailPage() {
               disabled={selectedAttachments.length === 0 && email.attachments.length > 0}
               className="sd-btn primary"
             >
-              <FileText className="h-4 w-4" />
+              <FileText style={{ width: 14, height: 14 }} />
               Create Submission from Email
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-7">
-        <div className="grid gap-5">
+      <div style={{ flex: 1, overflow: 'auto', padding: 28 }}>
+        <div style={{ display: 'grid', gap: 20 }}>
           <div className="sd-card">
             <div className="sd-card-head">
               <h3>Message Body</h3>
@@ -227,8 +227,7 @@ export function InboxDetailPage() {
             <div className="sd-card-body">
               {email.bodyText ? (
                 <div
-                  className="max-h-96 overflow-auto whitespace-pre-wrap leading-relaxed"
-                  style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-body)' }}
+                  style={{ maxHeight: 384, overflow: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--ink-2)', fontSize: 'var(--fs-body)' }}
                 >
                   {email.bodyText.replace(/<[^>]+>/g, '')}
                 </div>
@@ -246,7 +245,7 @@ export function InboxDetailPage() {
             <div className="sd-card">
               <div className="sd-card-head">
                 <h3>
-                  <Paperclip className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />
+                  <Paperclip style={{ width: 14, height: 14, color: 'var(--ink-3)' }} />
                   Attachments <span className="cnt">{email.attachments.length}</span>
                 </h3>
                 {!email.isProcessed && (
@@ -256,29 +255,35 @@ export function InboxDetailPage() {
                 )}
               </div>
 
-              <ul className="m-0 list-none p-0">
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                 {email.attachments.map((attachment, index) => {
                   const checked = !deselectedIds.has(attachment.id)
                   return (
                     <li
                       key={attachment.id}
-                      className={`flex items-center justify-between gap-4 px-4 py-3 ${!checked ? 'opacity-50' : ''}`}
-                      style={index === email.attachments.length - 1 ? undefined : { borderBottom: '1px solid var(--line-2)' }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 16,
+                        padding: '12px 16px',
+                        opacity: checked ? 1 : 0.5,
+                        borderBottom: index < email.attachments.length - 1 ? '1px solid var(--line-2)' : undefined,
+                      }}
                     >
-                      <div className="flex min-w-0 items-center gap-3">
+                      <div style={{ display: 'flex', minWidth: 0, alignItems: 'center', gap: 12 }}>
                         {!email.isProcessed ? (
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleAttachment(attachment.id)}
-                            className="h-4 w-4 shrink-0 cursor-pointer rounded"
-                            style={{ accentColor: 'var(--accent)' }}
+                            style={{ width: 14, height: 14, flexShrink: 0, cursor: 'pointer', accentColor: 'var(--accent)' }}
                           />
                         ) : (
-                          <Paperclip className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-4)' }} />
+                          <Paperclip style={{ width: 14, height: 14, flexShrink: 0, color: 'var(--ink-4)' }} />
                         )}
-                        <div className="min-w-0">
-                          <p className="truncate" style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {attachment.fileName}
                           </p>
                           <p style={{ margin: '2px 0 0', color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
@@ -286,7 +291,7 @@ export function InboxDetailPage() {
                           </p>
                         </div>
                       </div>
-                      <a href={attachment.blobUrl} target="_blank" rel="noopener noreferrer" className="sd-btn outline sm shrink-0">
+                      <a href={attachment.blobUrl} target="_blank" rel="noopener noreferrer" className="sd-btn outline sm" style={{ flexShrink: 0 }}>
                         Download
                       </a>
                     </li>
@@ -295,7 +300,7 @@ export function InboxDetailPage() {
               </ul>
 
               {!email.isProcessed && deselectedIds.size > 0 && (
-                <p className="px-4 py-3" style={{ margin: 0, color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
+                <p style={{ margin: 0, padding: '12px 16px', color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
                   {selectedAttachments.length} of {email.attachments.length} attachments selected
                 </p>
               )}
@@ -306,7 +311,7 @@ export function InboxDetailPage() {
 
       {step !== 'idle' && (
         <div className="sims-modal-backdrop">
-          <div className="sims-modal max-w-lg">
+          <div className="sims-modal" style={{ maxWidth: 512 }}>
             {step === 'search' && (
               <>
                 <div className="sims-modal-head">
@@ -317,34 +322,35 @@ export function InboxDetailPage() {
                     </p>
                   </div>
                   <button type="button" onClick={() => setStep('idle')} className="sims-icon-btn" aria-label="Close">
-                    <X className="h-4 w-4" />
+                    <X style={{ width: 14, height: 14 }} />
                   </button>
                 </div>
 
-                <div className="sims-modal-body space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--ink-4)' }} />
+                <div className="sims-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: 'var(--ink-4)' }} />
                     <input
                       autoFocus
                       type="text"
                       placeholder="Search by name or company..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="sims-input w-full pl-9"
+                      className="sims-input"
+                      style={{ width: '100%', paddingLeft: 36 }}
                     />
                   </div>
 
-                  <div className="min-h-[160px] max-h-64 overflow-auto rounded-md" style={{ border: '1px solid var(--line)' }}>
+                  <div style={{ minHeight: 160, maxHeight: 256, overflow: 'auto', borderRadius: 'var(--r)', border: '1px solid var(--line)' }}>
                     {searchQuery.trim().length < 2 ? (
-                      <div className="flex h-20 items-center justify-center" style={{ color: 'var(--ink-4)', fontSize: 'var(--fs-body)' }}>
+                      <div style={{ display: 'flex', height: 80, alignItems: 'center', justifyContent: 'center', color: 'var(--ink-4)', fontSize: 'var(--fs-body)' }}>
                         Type at least 2 characters to search
                       </div>
                     ) : searchingInsureds ? (
-                      <div className="flex h-20 items-center justify-center" style={{ color: 'var(--ink-4)', fontSize: 'var(--fs-body)' }}>
+                      <div style={{ display: 'flex', height: 80, alignItems: 'center', justifyContent: 'center', color: 'var(--ink-4)', fontSize: 'var(--fs-body)' }}>
                         Searching...
                       </div>
                     ) : (insuredResults?.items ?? []).length === 0 ? (
-                      <div className="flex h-20 items-center justify-center" style={{ color: 'var(--ink-4)', fontSize: 'var(--fs-body)' }}>
+                      <div style={{ display: 'flex', height: 80, alignItems: 'center', justifyContent: 'center', color: 'var(--ink-4)', fontSize: 'var(--fs-body)' }}>
                         No insureds found
                       </div>
                     ) : (
@@ -357,10 +363,21 @@ export function InboxDetailPage() {
                             setCreateNew(false)
                             setStep('confirm')
                           }}
-                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--hover)]"
-                          style={{ borderBottom: '1px solid var(--line-2)', color: 'var(--ink-2)' }}
+                          className="subs-row"
+                          style={{
+                            display: 'flex',
+                            width: '100%',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: '10px 16px',
+                            textAlign: 'left',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid var(--line-2)',
+                          }}
                         >
-                          <User className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-4)' }} />
+                          <User style={{ width: 14, height: 14, flexShrink: 0, color: 'var(--ink-4)' }} />
                           <div>
                             <p style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>{insured.displayName}</p>
                             <p style={{ margin: '2px 0 0', color: 'var(--ink-4)', fontSize: 'var(--fs-sm)' }}>
@@ -373,7 +390,7 @@ export function InboxDetailPage() {
                   </div>
                 </div>
 
-                <div className="sims-modal-foot justify-between">
+                <div className="sims-modal-foot" style={{ justifyContent: 'space-between' }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -382,7 +399,7 @@ export function InboxDetailPage() {
                     }}
                     className="sd-btn outline sm"
                   >
-                    <UserPlus className="h-4 w-4" />
+                    <UserPlus style={{ width: 14, height: 14 }} />
                     Create new insured from sender
                   </button>
                   <button type="button" onClick={() => setStep('idle')} className="sd-btn ghost sm">
@@ -397,11 +414,11 @@ export function InboxDetailPage() {
                 <div className="sims-modal-head">
                   <h2 className="sims-modal-title">Confirm submission</h2>
                   <button type="button" onClick={() => setStep('idle')} className="sims-icon-btn" aria-label="Close">
-                    <X className="h-4 w-4" />
+                    <X style={{ width: 14, height: 14 }} />
                   </button>
                 </div>
 
-                <div className="sims-modal-body space-y-3">
+                <div className="sims-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <ConfirmCard label="Insured">
                     {createNew ? (
                       <p style={{ margin: 0, color: 'var(--ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>
@@ -414,9 +431,9 @@ export function InboxDetailPage() {
 
                   <ConfirmCard label="Lines of Business">
                     {detectedLob ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 shrink-0" style={{ color: 'var(--accent)' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Sparkles style={{ width: 14, height: 14, flexShrink: 0, color: 'var(--accent)' }} />
                           <span style={{ color: 'var(--accent-ink)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>
                             {selectedLob ? LOB_LABELS[selectedLob] : LOB_LABELS[detectedLob]}
                           </span>
@@ -441,7 +458,8 @@ export function InboxDetailPage() {
                           <select
                             value={selectedLob}
                             onChange={(event) => setSelectedLob(event.target.value as PolicyLineOfBusiness)}
-                            className="sims-select w-full"
+                            className="sims-select"
+                            style={{ width: '100%' }}
                           >
                             {ACTIVE_LOBS.map((lob) => (
                               <option key={lob} value={lob}>
@@ -452,15 +470,16 @@ export function InboxDetailPage() {
                         )}
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
-                          <Sparkles className="h-4 w-4 shrink-0" />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
+                          <Sparkles style={{ width: 14, height: 14, flexShrink: 0 }} />
                           <span>AI will detect lines of business from your PDFs</span>
                         </div>
                         <select
                           value={selectedLob}
                           onChange={(event) => setSelectedLob(event.target.value as PolicyLineOfBusiness)}
-                          className="sims-select w-full"
+                          className="sims-select"
+                          style={{ width: '100%' }}
                         >
                           <option value="">Optional hint (helps if AI cannot detect)</option>
                           {ACTIVE_LOBS.map((lob) => (
@@ -479,12 +498,12 @@ export function InboxDetailPage() {
 
                   {selectedAttachments.length > 0 && (
                     <ConfirmCard label={`Attachments to copy (${selectedAttachments.length})`}>
-                      <ul className="m-0 list-none space-y-1 p-0">
+                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {selectedAttachments.map((attachment) => (
-                          <li key={attachment.id} className="flex items-center gap-2" style={{ color: 'var(--ink-2)', fontSize: 'var(--fs-body)' }}>
-                            <Paperclip className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ink-4)' }} />
-                            <span className="truncate">{attachment.fileName}</span>
-                            <span className="shrink-0" style={{ color: 'var(--ink-4)' }}>
+                          <li key={attachment.id} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)', fontSize: 'var(--fs-body)' }}>
+                            <Paperclip style={{ width: 13, height: 13, flexShrink: 0, color: 'var(--ink-4)' }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.fileName}</span>
+                            <span style={{ flexShrink: 0, color: 'var(--ink-4)' }}>
                               - {DOC_TYPE_LABELS[attachment.documentType]}
                             </span>
                           </li>
