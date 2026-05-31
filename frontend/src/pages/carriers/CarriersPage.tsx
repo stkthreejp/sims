@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Trash2, X, Check, Users } from 'lucide-react'
+import { Plus, Check, X, Users, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
 import { queryClient } from '@/lib/queryClient'
 import { PageHeader } from '@/components/common/PageHeader'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { EmptyState } from '@/components/common/EmptyState'
 import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
 import type { CarrierCreate } from '@/types/carrier.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
+import { Building2 } from 'lucide-react'
 
 const EMPTY_FORM: CarrierCreate = { name: '', naic: '', amBestRating: '', defaultCurrencyCode: 'USD', linesOfBusiness: [] }
 
@@ -16,10 +19,10 @@ function LobCheckboxes({ selected, onChange }: { selected: PolicyLineOfBusiness[
   const toggle = (lob: PolicyLineOfBusiness) =>
     onChange(selected.includes(lob) ? selected.filter((l) => l !== lob) : [...selected, lob])
   return (
-    <div className="grid grid-cols-2 gap-1.5">
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
       {ACTIVE_LOBS.map((lob) => (
-        <label key={lob} className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={selected.includes(lob)} onChange={() => toggle(lob)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+        <label key={lob} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--ink-2)' }}>
+          <input type="checkbox" checked={selected.includes(lob)} onChange={() => toggle(lob)} />
           {LOB_LABELS[lob]}
         </label>
       ))}
@@ -62,129 +65,145 @@ export function CarriersPage() {
     setForm({ ...form, [k]: e.target.value })
 
   return (
-    <div>
-      <PageHeader
-        title="Carriers"
-        description="Manage carriers, lines of business, and contacts"
-        actions={
-          !showCreate && (
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md"
-            >
-              <Plus className="h-4 w-4" /> New Carrier
-            </button>
-          )
-        }
-      />
+    <div className="subs-wrap">
+      <div className="subs-page-head">
+        <PageHeader title="Carriers" />
+        <button onClick={() => setShowCreate(true)} className="sd-btn primary">
+          <Plus style={{ width: 13, height: 13 }} />
+          New Carrier
+        </button>
+      </div>
 
-      <div className="space-y-3">
-        {/* Quick-create form */}
-        {showCreate && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
-            <h3 className="text-sm font-medium text-slate-700">New Carrier</h3>
-            <p className="text-xs text-slate-500">Add address and contacts after creating.</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Carrier Name <span className="text-red-500">*</span></label>
-                <input value={form.name} onChange={set('name')} placeholder="e.g. Acuity Insurance" autoFocus className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">NAIC #</label>
-                <input value={form.naic ?? ''} onChange={set('naic')} placeholder="e.g. 14788" className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">AM Best Rating</label>
-                <input value={form.amBestRating ?? ''} onChange={set('amBestRating')} placeholder="e.g. A+" className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Currency</label>
-                <input value={form.defaultCurrencyCode ?? 'USD'} onChange={set('defaultCurrencyCode')} maxLength={3} placeholder="USD" className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-2">Lines of Business Offered</label>
-              <LobCheckboxes selected={form.linesOfBusiness} onChange={(lobs) => setForm({ ...form, linesOfBusiness: lobs })} />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={createMutation.isPending || !form.name.trim() || form.linesOfBusiness.length === 0}
-                onClick={() => createMutation.mutate(form)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-40"
-              >
-                <Check className="h-3.5 w-3.5" /> Create & Manage Contacts
-              </button>
-              <button type="button" onClick={() => { setShowCreate(false); setForm(EMPTY_FORM) }} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-sm rounded-md hover:bg-slate-50">
-                <X className="h-3.5 w-3.5" /> Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isLoading && <p className="text-sm text-slate-400 py-8 text-center">Loading…</p>}
-
-        {/* Carrier rows */}
-        {carriers?.map((carrier) => (
-          <div
-            key={carrier.id}
-            onClick={() => navigate(`/carriers/${carrier.id}`)}
-            className="bg-white border border-slate-200 rounded-lg px-5 py-4 flex items-start justify-between gap-4 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium text-slate-900">{carrier.name}</span>
-                {!carrier.isActive && (
-                  <span className="px-1.5 py-0.5 text-xs rounded bg-slate-100 text-slate-500">Inactive</span>
-                )}
-                {carrier.naic && <span className="text-xs text-slate-400">NAIC {carrier.naic}</span>}
-                {carrier.amBestRating && <span className="text-xs text-slate-400">AM Best: {carrier.amBestRating}</span>}
-                {(carrier.city || carrier.state) && (
-                  <span className="text-xs text-slate-400">
-                    {[carrier.city, carrier.state].filter(Boolean).join(', ')}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex gap-1 flex-wrap">
-                  {carrier.linesOfBusiness.map((lob) => (
-                    <span key={lob} className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                      {LOB_LABELS[lob]}
+      <div className="subs-table-card">
+        {isLoading ? (
+          <LoadingSpinner />
+        ) : carriers?.length === 0 ? (
+          <EmptyState icon={Building2} title="No carriers yet" description="Add your first carrier to get started." />
+        ) : (
+          <table className="subs-table">
+            <thead>
+              <tr>
+                <th className="subs-th">Name</th>
+                <th className="subs-th">Lines of Business</th>
+                <th className="subs-th">Location</th>
+                <th className="subs-th">Contacts</th>
+                <th className="subs-th">Status</th>
+                <th className="subs-th" style={{ width: 40 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {carriers?.map((carrier) => (
+                <tr key={carrier.id} className="subs-row" onClick={() => navigate(`/carriers/${carrier.id}`)}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{carrier.name}</div>
+                    {(carrier.naic || carrier.amBestRating) && (
+                      <div style={{ fontSize: 11.5, color: 'var(--ink-4)', marginTop: 2 }}>
+                        {carrier.naic && `NAIC ${carrier.naic}`}
+                        {carrier.naic && carrier.amBestRating && ' · '}
+                        {carrier.amBestRating && `AM Best: ${carrier.amBestRating}`}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                      {carrier.linesOfBusiness.map((lob) => (
+                        <span key={lob} className="sd-lob">{LOB_LABELS[lob]}</span>
+                      ))}
+                      {carrier.linesOfBusiness.length === 0 && (
+                        <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ color: 'var(--ink-2)' }}>
+                    {carrier.city && carrier.state ? `${carrier.city}, ${carrier.state}` : (carrier.city || carrier.state || '—')}
+                  </td>
+                  <td>
+                    {carrier.contactCount > 0 ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--ink-3)' }}>
+                        <Users style={{ width: 12, height: 12 }} />
+                        {carrier.contactCount}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`sd-pill ${carrier.isActive ? 'good' : 'withdrawn'}`}>
+                      {carrier.isActive ? 'Active' : 'Inactive'}
                     </span>
-                  ))}
-                  {carrier.linesOfBusiness.length === 0 && (
-                    <span className="text-xs text-slate-400">No lines of business configured</span>
-                  )}
-                </div>
-                {carrier.contactCount > 0 && (
-                  <span className="flex items-center gap-1 text-xs text-slate-400">
-                    <Users className="h-3 w-3" />
-                    {carrier.contactCount} {carrier.contactCount === 1 ? 'contact' : 'contacts'}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => navigate(`/carriers/${carrier.id}`)} className="p-1.5 rounded hover:bg-slate-100" title="Edit">
-                <Pencil className="h-4 w-4 text-slate-400 hover:text-slate-700" />
-              </button>
-              <button
-                onClick={() => { if (confirm(`Delete ${carrier.name}?`)) deleteMutation.mutate(carrier.id) }}
-                className="p-1.5 rounded hover:bg-slate-100"
-                title="Delete"
-              >
-                <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-500" />
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {!isLoading && carriers?.length === 0 && (
-          <div className="text-center py-12 text-slate-400 text-sm">
-            No carriers yet. Add your first carrier above.
-          </div>
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => { if (confirm(`Delete ${carrier.name}?`)) deleteMutation.mutate(carrier.id) }}
+                      className="sims-icon-btn"
+                      title="Delete carrier"
+                      style={{ color: 'var(--ink-4)' }}
+                    >
+                      <Trash2 style={{ width: 13, height: 13 }} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
+
+      {/* New Carrier modal */}
+      {showCreate && (
+        <div className="sims-modal-backdrop" onClick={() => { setShowCreate(false); setForm(EMPTY_FORM) }}>
+          <div className="sims-modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+            <div className="sims-modal-head">
+              <span>New Carrier</span>
+              <button className="sims-icon-btn" onClick={() => { setShowCreate(false); setForm(EMPTY_FORM) }}>
+                <X style={{ width: 14, height: 14 }} />
+              </button>
+            </div>
+            <div className="sims-modal-body">
+              <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 14 }}>
+                Add address and contacts after creating.
+              </p>
+              <div className="sims-fields" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 12 }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label className="sims-field-label">Carrier Name *</label>
+                  <input value={form.name} onChange={set('name')} placeholder="e.g. Acuity Insurance" autoFocus className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">NAIC #</label>
+                  <input value={form.naic ?? ''} onChange={set('naic')} placeholder="14788" className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">AM Best Rating</label>
+                  <input value={form.amBestRating ?? ''} onChange={set('amBestRating')} placeholder="A+" className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">Currency</label>
+                  <input value={form.defaultCurrencyCode ?? 'USD'} onChange={set('defaultCurrencyCode')} maxLength={3} placeholder="USD" className="sims-input" style={{ textTransform: 'uppercase' }} />
+                </div>
+              </div>
+              <div>
+                <label className="sims-field-label" style={{ marginBottom: 8 }}>Lines of Business</label>
+                <LobCheckboxes selected={form.linesOfBusiness} onChange={(lobs) => setForm({ ...form, linesOfBusiness: lobs })} />
+              </div>
+            </div>
+            <div className="sims-modal-foot">
+              <button
+                onClick={() => { setShowCreate(false); setForm(EMPTY_FORM) }}
+                className="sd-btn outline sm"
+              >
+                <X style={{ width: 12, height: 12 }} /> Cancel
+              </button>
+              <button
+                disabled={createMutation.isPending || !form.name.trim() || form.linesOfBusiness.length === 0}
+                onClick={() => createMutation.mutate(form)}
+                className="sd-btn primary sm"
+              >
+                <Check style={{ width: 12, height: 12 }} /> Create & Manage
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
