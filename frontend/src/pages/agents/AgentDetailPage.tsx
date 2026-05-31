@@ -97,11 +97,7 @@ function contactToForm(c: AgentContact): ContactFormData {
 // ─── Location form component ───────────────────────────────────────────────────
 
 function LocationForm({
-  form,
-  setForm,
-  onSave,
-  onCancel,
-  isPending,
+  form, setForm, onSave, onCancel, isPending,
 }: {
   form: LocationFormData
   setForm: (f: LocationFormData) => void
@@ -116,16 +112,11 @@ function LocationForm({
   const zipError = form.zipCode && !isValidZip(form.zipCode)
 
   return (
-    <div className="space-y-3 pt-2">
-      <div className="grid grid-cols-2 gap-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+      <div className="sims-fields" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div>
           <label className="sims-field-label">Office Label</label>
-          <input
-            value={form.name}
-            onChange={set('name')}
-            placeholder="e.g. Main Office, Downtown Branch"
-            className="sims-input"
-          />
+          <input value={form.name} onChange={set('name')} placeholder="e.g. Main Office, Downtown Branch" className="sims-input" />
         </div>
         <div>
           <label className="sims-field-label">Office Phone</label>
@@ -135,13 +126,11 @@ function LocationForm({
             type="text"
             placeholder="(555) 123-4567"
             className="sims-input"
-            aria-invalid={!!phoneError}
           />
-          {phoneError && <p className="text-xs text-red-600 mt-0.5">Enter a valid 10-digit number</p>}
+          {phoneError && <p style={{ fontSize: 11.5, color: 'var(--bad-fg)', marginTop: 2 }}>Enter a valid 10-digit number</p>}
         </div>
       </div>
-
-      <div className="grid grid-cols-2 gap-3">
+      <div className="sims-fields" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div>
           <label className="sims-field-label">Street Address</label>
           <AddressAutocomplete
@@ -149,60 +138,38 @@ function LocationForm({
             onChange={(val) => setForm({ ...form, addressLine1: val })}
             onSelect={(c) => setForm({ ...form, addressLine1: c.addressLine1, city: c.city, state: c.state, zipCode: c.zipCode })}
             placeholder="Start typing an address…"
-            className="px-2 py-1.5 text-sm"
           />
         </div>
         <div>
           <label className="sims-field-label">Suite / Unit</label>
-          <input
-            value={form.addressLine2}
-            onChange={set('addressLine2')}
-            placeholder="Apt, Suite, Unit…"
-            className="sims-input"
-          />
+          <input value={form.addressLine2} onChange={set('addressLine2')} placeholder="Apt, Suite, Unit…" className="sims-input" />
         </div>
       </div>
-
-      <div className="grid grid-cols-3 gap-3">
+      <div className="sims-fields" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div>
           <label className="sims-field-label">City</label>
           <input value={form.city} onChange={set('city')} placeholder="City" className="sims-input" />
         </div>
         <div>
           <label className="sims-field-label">State</label>
-          <input value={form.state} onChange={set('state')} maxLength={2} placeholder="TX" className="sims-input uppercase" />
+          <input value={form.state} onChange={set('state')} maxLength={2} placeholder="TX" className="sims-input" style={{ textTransform: 'uppercase' }} />
         </div>
         <div>
           <label className="sims-field-label">ZIP</label>
-          <input
-            value={form.zipCode}
-            onChange={set('zipCode')}
-            placeholder="78701"
-            className="sims-input"
-            aria-invalid={!!zipError}
-          />
-          {zipError && <p className="text-xs text-red-600 mt-0.5">Invalid ZIP code</p>}
+          <input value={form.zipCode} onChange={set('zipCode')} placeholder="78701" className="sims-input" />
+          {zipError && <p style={{ fontSize: 11.5, color: 'var(--bad-fg)', marginTop: 2 }}>Invalid ZIP code</p>}
         </div>
       </div>
-
-      <div className="flex items-center gap-2">
-        <input type="checkbox" id="loc-primary" checked={form.isPrimary} onChange={set('isPrimary')} className="rounded" />
-        <label htmlFor="loc-primary" className="text-sm text-slate-600">Mark as primary office</label>
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onSave}
-          disabled={isPending}
-          className="sd-btn primary sm"
-        >
-          <Check className="h-3.5 w-3.5" /> Save Office
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-2)', cursor: 'pointer' }}>
+        <input type="checkbox" id="loc-primary" checked={form.isPrimary} onChange={set('isPrimary')} />
+        Mark as primary office
+      </label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onSave} disabled={isPending} className="sd-btn primary sm">
+          <Check style={{ width: 12, height: 12 }} /> Save Office
         </button>
-        <button
-          onClick={onCancel}
-          className="sd-btn outline sm"
-        >
-          <X className="h-3.5 w-3.5" /> Cancel
+        <button onClick={onCancel} className="sd-btn outline sm">
+          <X style={{ width: 12, height: 12 }} /> Cancel
         </button>
       </div>
     </div>
@@ -212,11 +179,7 @@ function LocationForm({
 // ─── Contact form component ────────────────────────────────────────────────────
 
 function ContactForm({
-  form,
-  setForm,
-  onSave,
-  onCancel,
-  isPending,
+  form, setForm, onSave, onCancel, isPending,
 }: {
   form: ContactFormData
   setForm: (f: ContactFormData) => void
@@ -231,16 +194,11 @@ function ContactForm({
   const phoneError = form.phone && !isValidPhone(form.phone)
 
   return (
-    <div className="space-y-3 pt-2">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+      <div className="sims-fields" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div>
           <label className="sims-field-label">First Name *</label>
-          <input
-            value={form.firstName}
-            onChange={set('firstName')}
-            placeholder="First name"
-            className="sims-input"
-          />
+          <input value={form.firstName} onChange={set('firstName')} placeholder="First name" className="sims-input" />
         </div>
         <div>
           <label className="sims-field-label">Last Name</label>
@@ -250,25 +208,18 @@ function ContactForm({
           <label className="sims-field-label">Title / Role</label>
           <input value={form.title} onChange={set('title')} placeholder="e.g. Producer, Account Mgr" className="sims-input" />
         </div>
-        <div className="flex items-end pb-0">
-          <div className="flex items-center gap-2 mb-2">
-            <input type="checkbox" id="contact-primary" checked={form.isPrimary} onChange={set('isPrimary')} className="rounded" />
-            <label htmlFor="contact-primary" className="text-sm text-slate-600">Primary contact</label>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-2)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.isPrimary} onChange={set('isPrimary')} />
+            Primary contact
+          </label>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="sims-fields" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div>
           <label className="sims-field-label">Email</label>
-          <input
-            value={form.email}
-            onChange={set('email')}
-            type="text"
-            placeholder="email@example.com"
-            className="sims-input"
-            aria-invalid={!!emailError}
-          />
-          {emailError && <p className="text-xs text-red-600 mt-0.5">Enter a valid email address</p>}
+          <input value={form.email} onChange={set('email')} type="text" placeholder="email@example.com" className="sims-input" />
+          {emailError && <p style={{ fontSize: 11.5, color: 'var(--bad-fg)', marginTop: 2 }}>Enter a valid email address</p>}
         </div>
         <div>
           <label className="sims-field-label">Direct Phone</label>
@@ -278,21 +229,16 @@ function ContactForm({
             type="text"
             placeholder="(555) 123-4567"
             className="sims-input"
-            aria-invalid={!!phoneError}
           />
-          {phoneError && <p className="text-xs text-red-600 mt-0.5">Enter a valid 10-digit number</p>}
+          {phoneError && <p style={{ fontSize: 11.5, color: 'var(--bad-fg)', marginTop: 2 }}>Enter a valid 10-digit number</p>}
         </div>
       </div>
-      <div className="flex gap-2">
-        <button
-          onClick={onSave}
-          disabled={isPending || !form.firstName.trim()}
-          className="sd-btn primary sm"
-        >
-          <Check className="h-3.5 w-3.5" /> Save Contact
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onSave} disabled={isPending || !form.firstName.trim()} className="sd-btn primary sm">
+          <Check style={{ width: 12, height: 12 }} /> Save Contact
         </button>
         <button onClick={onCancel} className="sd-btn outline sm">
-          <X className="h-3.5 w-3.5" /> Cancel
+          <X style={{ width: 12, height: 12 }} /> Cancel
         </button>
       </div>
     </div>
@@ -307,24 +253,20 @@ export function AgentDetailPage() {
   const qc = useQueryClient()
   const { canUploadAttachments, canDeleteAttachments } = usePermissions()
 
-  // Agent info edit
   const [editingInfo, setEditingInfo] = useState(false)
   const [infoForm, setInfoForm] = useState({ name: '', agencyName: '', licenseNumber: '', email: '', phone: '', isActive: true })
 
-  // Location state
   const [showNewLocation, setShowNewLocation] = useState(false)
   const [newLocForm, setNewLocForm] = useState<LocationFormData>(emptyLocationForm())
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
   const [editLocForm, setEditLocForm] = useState<LocationFormData>(emptyLocationForm())
   const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(new Set())
 
-  // Contact state
-  const [showNewContact, setShowNewContact] = useState<string | null>(null)  // locationId
+  const [showNewContact, setShowNewContact] = useState<string | null>(null)
   const [newContactForm, setNewContactForm] = useState<ContactFormData>(emptyContactForm())
   const [editingContact, setEditingContact] = useState<{ locationId: string; contactId: string } | null>(null)
   const [editContactForm, setEditContactForm] = useState<ContactFormData>(emptyContactForm())
 
-  // Commission state
   const [showAddCommission, setShowAddCommission] = useState(false)
   const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
@@ -350,8 +292,6 @@ export function AgentDetailPage() {
     queryKey: ['admin', 'program-configurations', 'active'],
     queryFn: () => programConfigurationsApi.getAll(false),
   })
-
-  // ─── Info mutations ──────────────────────────────────────────────────────────
 
   const updateInfoMutation = useMutation({
     mutationFn: () => agentsApi.update(id!, {
@@ -383,8 +323,6 @@ export function AgentDetailPage() {
     })
     setEditingInfo(true)
   }
-
-  // ─── Location mutations ──────────────────────────────────────────────────────
 
   const addLocationMutation = useMutation({
     mutationFn: (data: AgentLocationInput) => agentsApi.addLocation(id!, data),
@@ -419,8 +357,6 @@ export function AgentDetailPage() {
     },
     onError: () => toast.error('Failed to delete office'),
   })
-
-  // ─── Contact mutations ───────────────────────────────────────────────────────
 
   const addContactMutation = useMutation({
     mutationFn: ({ locationId, data }: { locationId: string; data: AgentContactInput }) =>
@@ -457,8 +393,6 @@ export function AgentDetailPage() {
     onError: () => toast.error('Failed to delete contact'),
   })
 
-  // ─── Commission mutations ────────────────────────────────────────────────────
-
   const addCommissionMutation = useMutation({
     mutationFn: () => createAgentCommission(id!, {
       programConfigurationId: commissionForm.programConfigurationId || null,
@@ -494,8 +428,6 @@ export function AgentDetailPage() {
       return next
     })
   }
-
-  // ─── Helpers ────────────────────────────────────────────────────────────────
 
   const formToLocationInput = (f: LocationFormData): AgentLocationInput => ({
     name: f.name || undefined,
@@ -534,665 +466,578 @@ export function AgentDetailPage() {
   if (!agent) return <EmptyState icon={UserCircle} title="Agent not found" description="The requested agent record could not be loaded." />
 
   const primaryLocation = agent.locations.find((l) => l.isPrimary) ?? agent.locations[0]
-  const selectedCommissionProgram = programs.find((program) => program.id === commissionForm.programConfigurationId)
-  const selectedProgramCarriers = selectedCommissionProgram?.carriers.filter((programCarrier) => programCarrier.isActive) ?? []
+  const selectedCommissionProgram = programs.find((p) => p.id === commissionForm.programConfigurationId)
+  const selectedProgramCarriers = selectedCommissionProgram?.carriers.filter((pc) => pc.isActive) ?? []
   const commissionCarrierOptions = commissionForm.programConfigurationId
-    ? carriers.filter((carrier) => selectedProgramCarriers.some((programCarrier) => programCarrier.carrierId === carrier.id))
+    ? carriers.filter((c) => selectedProgramCarriers.some((pc) => pc.carrierId === c.id))
     : carriers
-  const selectedProgramCarrier = selectedProgramCarriers.find((programCarrier) => programCarrier.carrierId === commissionForm.carrierId)
+  const selectedProgramCarrier = selectedProgramCarriers.find((pc) => pc.carrierId === commissionForm.carrierId)
   const programLobs = selectedProgramCarrier
     ? selectedProgramCarrier.linesOfBusiness.filter((lob) => lob.isActive)
-    : selectedProgramCarriers.flatMap((programCarrier) => programCarrier.linesOfBusiness).filter((lob) => lob.isActive)
+    : selectedProgramCarriers.flatMap((pc) => pc.linesOfBusiness).filter((lob) => lob.isActive)
   const carrierLobs = commissionForm.carrierId
-    ? carriers.find((carrier) => carrier.id === commissionForm.carrierId)?.linesOfBusiness ?? []
+    ? carriers.find((c) => c.id === commissionForm.carrierId)?.linesOfBusiness ?? []
     : []
   const commissionLobValues = commissionForm.programConfigurationId
     ? Array.from(new Set(programLobs.map((lob) => lob.lineOfBusiness)))
     : commissionForm.carrierId
       ? carrierLobs
-      : LOB_OPTIONS.filter((option) => option.value).map((option) => option.value)
+      : LOB_OPTIONS.filter((o) => o.value).map((o) => o.value)
   const commissionLobOptions = [
     LOB_OPTIONS[0],
-    ...LOB_OPTIONS.filter((option) => option.value && commissionLobValues.includes(option.value)),
+    ...LOB_OPTIONS.filter((o) => o.value && commissionLobValues.includes(o.value)),
   ]
   const selectedProgramLob = selectedProgramCarrier?.linesOfBusiness.find((lob) => lob.lineOfBusiness === commissionForm.lineOfBusiness && lob.isActive)
-  const commissionStateOptions = selectedProgramLob?.states.filter((state) => state.isActive).map((state) => state.stateCode) ?? []
+  const commissionStateOptions = selectedProgramLob?.states.filter((s) => s.isActive).map((s) => s.stateCode) ?? []
+
+  const formPanelStyle: React.CSSProperties = {
+    border: '1px solid var(--line)',
+    background: 'var(--surface-2)',
+    borderRadius: 'var(--r)',
+    padding: 14,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  }
 
   return (
-    <div className="space-y-5">
+    <div className="subs-wrap">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-slate-500">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13, color: 'var(--ink-3)' }}>
         <Link to="/agents" className="sd-btn ghost sm">
-          <ArrowLeft className="h-4 w-4" /> Agents
+          <ArrowLeft style={{ width: 13, height: 13 }} /> Agents
         </Link>
         <span>/</span>
-        <span className="text-slate-800 font-medium">{agent.name}</span>
+        <span style={{ color: 'var(--ink)', fontWeight: 600 }}>{agent.name}</span>
       </div>
 
       {/* Agent info panel */}
-      <div className="sd-card p-5">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold text-slate-900">{agent.name}</h1>
-              <span className={`sd-pill ${agent.isActive ? 'bound' : 'draft'}`}>
-                {agent.isActive ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-            {agent.agencyName && <p className="text-sm text-slate-500 mt-0.5">{agent.agencyName}</p>}
+      <div className="sd-card">
+        <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h3 style={{ fontWeight: 600, fontSize: 16, color: 'var(--ink)' }}>{agent.name}</h3>
+            <span className={`sd-pill ${agent.isActive ? 'good' : 'withdrawn'}`}>
+              {agent.isActive ? 'Active' : 'Inactive'}
+            </span>
           </div>
           {!editingInfo && (
-            <button
-              onClick={startEditInfo}
-              className="sd-btn outline sm"
-            >
-              <Pencil className="h-3.5 w-3.5" /> Edit
+            <button onClick={startEditInfo} className="sd-btn outline sm">
+              <Pencil style={{ width: 12, height: 12 }} /> Edit
             </button>
           )}
         </div>
 
-        {editingInfo ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Name *</label>
-                <input
-                  value={infoForm.name}
-                  onChange={(e) => setInfoForm({ ...infoForm, name: e.target.value })}
-                  className="sims-input"
-                />
+        <div className="sd-card-body">
+          {editingInfo ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="sims-fields" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div>
+                  <label className="sims-field-label">Name *</label>
+                  <input value={infoForm.name} onChange={(e) => setInfoForm({ ...infoForm, name: e.target.value })} className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">Agency</label>
+                  <input value={infoForm.agencyName} onChange={(e) => setInfoForm({ ...infoForm, agencyName: e.target.value })} className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">License #</label>
+                  <input value={infoForm.licenseNumber} onChange={(e) => setInfoForm({ ...infoForm, licenseNumber: e.target.value })} className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">Email</label>
+                  <input value={infoForm.email} onChange={(e) => setInfoForm({ ...infoForm, email: e.target.value })} type="text" className="sims-input" />
+                  {infoEmailError && <p style={{ fontSize: 11.5, color: 'var(--bad-fg)', marginTop: 2 }}>Enter a valid email</p>}
+                </div>
+                <div>
+                  <label className="sims-field-label">Phone</label>
+                  <input value={infoForm.phone} onChange={(e) => setInfoForm({ ...infoForm, phone: formatPhoneInput(e.target.value) })} type="text" className="sims-input" />
+                  {infoPhoneError && <p style={{ fontSize: 11.5, color: 'var(--bad-fg)', marginTop: 2 }}>Enter a valid 10-digit number</p>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', paddingTop: 18 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-2)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={infoForm.isActive} onChange={(e) => setInfoForm({ ...infoForm, isActive: e.target.checked })} />
+                    Active
+                  </label>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Agency</label>
-                <input
-                  value={infoForm.agencyName}
-                  onChange={(e) => setInfoForm({ ...infoForm, agencyName: e.target.value })}
-                  className="sims-input"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">License #</label>
-                <input
-                  value={infoForm.licenseNumber}
-                  onChange={(e) => setInfoForm({ ...infoForm, licenseNumber: e.target.value })}
-                  className="sims-input"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-                <input
-                  value={infoForm.email}
-                  onChange={(e) => setInfoForm({ ...infoForm, email: e.target.value })}
-                  type="text"
-                  className="sims-input"
-                  aria-invalid={!!infoEmailError}
-                />
-                {infoEmailError && <p className="text-xs text-red-600 mt-0.5">Enter a valid email</p>}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Phone</label>
-                <input
-                  value={infoForm.phone}
-                  onChange={(e) => setInfoForm({ ...infoForm, phone: formatPhoneInput(e.target.value) })}
-                  type="text"
-                  className="sims-input"
-                  aria-invalid={!!infoPhoneError}
-                />
-                {infoPhoneError && <p className="text-xs text-red-600 mt-0.5">Enter a valid 10-digit number</p>}
-              </div>
-              <div className="flex items-center gap-2 mt-4">
-                <input
-                  type="checkbox"
-                  id="info-active"
-                  checked={infoForm.isActive}
-                  onChange={(e) => setInfoForm({ ...infoForm, isActive: e.target.checked })}
-                  className="rounded"
-                />
-                <label htmlFor="info-active" className="text-sm text-slate-600">Active</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    if (!infoForm.name.trim()) { toast.error('Name is required'); return }
+                    if (infoEmailError) { toast.error('Enter a valid email'); return }
+                    if (infoPhoneError) { toast.error('Enter a valid phone number'); return }
+                    updateInfoMutation.mutate()
+                  }}
+                  disabled={updateInfoMutation.isPending}
+                  className="sd-btn primary sm"
+                >
+                  <Check style={{ width: 12, height: 12 }} /> Save
+                </button>
+                <button onClick={() => setEditingInfo(false)} className="sd-btn outline sm">
+                  <X style={{ width: 12, height: 12 }} /> Cancel
+                </button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (!infoForm.name.trim()) { toast.error('Name is required'); return }
-                  if (infoEmailError) { toast.error('Enter a valid email'); return }
-                  if (infoPhoneError) { toast.error('Enter a valid phone number'); return }
-                  updateInfoMutation.mutate()
-                }}
-                disabled={updateInfoMutation.isPending}
-                className="sd-btn primary sm"
-              >
-                <Check className="h-3.5 w-3.5" /> Save
-              </button>
-              <button
-                onClick={() => setEditingInfo(false)}
-                className="sd-btn outline sm"
-              >
-                <X className="h-3.5 w-3.5" /> Cancel
-              </button>
+          ) : (
+            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+              {agent.agencyName && (
+                <div>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Agency</span>
+                  <p style={{ fontSize: 13, color: 'var(--ink)', marginTop: 2 }}>{agent.agencyName}</p>
+                </div>
+              )}
+              {agent.licenseNumber && (
+                <div>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>License #</span>
+                  <p style={{ fontSize: 13, color: 'var(--ink)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{agent.licenseNumber}</p>
+                </div>
+              )}
+              {agent.email && (
+                <div>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Email</span>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, marginTop: 2 }}>
+                    <Mail style={{ width: 12, height: 12, color: 'var(--ink-4)' }} />
+                    <a href={`mailto:${agent.email}`} style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>{agent.email}</a>
+                  </p>
+                </div>
+              )}
+              {agent.phone && (
+                <div>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Phone</span>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--ink)', marginTop: 2 }}>
+                    <Phone style={{ width: 12, height: 12, color: 'var(--ink-4)' }} />
+                    {agent.phone}
+                  </p>
+                </div>
+              )}
+              {primaryLocation && (primaryLocation.city || primaryLocation.state) && (
+                <div>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Primary Location</span>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--ink)', marginTop: 2 }}>
+                    <MapPin style={{ width: 12, height: 12, color: 'var(--ink-4)' }} />
+                    {[primaryLocation.city, primaryLocation.state].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            {agent.licenseNumber && (
-              <div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">License #</span>
-                <p className="text-slate-800 mt-0.5">{agent.licenseNumber}</p>
-              </div>
-            )}
-            {agent.email && (
-              <div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Email</span>
-                <p className="text-slate-800 mt-0.5 flex items-center gap-1">
-                  <Mail className="h-3.5 w-3.5 text-slate-400" />
-                  <a href={`mailto:${agent.email}`} className="hover:text-sky-700">{agent.email}</a>
-                </p>
-              </div>
-            )}
-            {agent.phone && (
-              <div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Phone</span>
-                <p className="text-slate-800 mt-0.5 flex items-center gap-1">
-                  <Phone className="h-3.5 w-3.5 text-slate-400" />
-                  {agent.phone}
-                </p>
-              </div>
-            )}
-            {primaryLocation && (primaryLocation.city || primaryLocation.state) && (
-              <div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Primary Location</span>
-                <p className="text-slate-800 mt-0.5 flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                  {[primaryLocation.city, primaryLocation.state].filter(Boolean).join(', ')}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Documents */}
       <DocumentsSection entityType="Agent" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
 
       {/* Commission Schedules */}
-      <div className="sd-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <Percent className="h-4 w-4 text-slate-400" />
+      <div className="sd-card">
+        <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+          <h3>
+            <Percent style={{ width: 12, height: 12, marginRight: 6, display: 'inline', verticalAlign: 'text-bottom' }} />
             Commission Schedules
-          </h2>
+          </h3>
           {!showAddCommission && (
-            <button
-              onClick={() => setShowAddCommission(true)}
-              className="sd-btn primary sm"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Rate
+            <button onClick={() => setShowAddCommission(true)} className="sd-btn primary sm">
+              <Plus style={{ width: 12, height: 12 }} /> Add Rate
             </button>
           )}
         </div>
 
-        {/* Add commission form */}
-        {showAddCommission && (
-          <div className="mb-4 rounded-lg p-3" style={{ border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
-            <p className="text-xs font-medium text-slate-600 mb-2">New Commission Rate</p>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Program</label>
-                <select
-                  value={commissionForm.programConfigurationId}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value, carrierId: '', lineOfBusiness: '', stateCode: '' })}
-                  className="sims-select"
+        <div className="sd-card-body">
+          {showAddCommission && (
+            <div style={{ ...formPanelStyle, marginBottom: 16 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-3)' }}>New Commission Rate</p>
+              <div className="sims-fields" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+                <div>
+                  <label className="sims-field-label">Program</label>
+                  <select
+                    value={commissionForm.programConfigurationId}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, programConfigurationId: e.target.value, carrierId: '', lineOfBusiness: '', stateCode: '' })}
+                    className="sims-select"
+                  >
+                    <option value="">Any program</option>
+                    {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="sims-field-label">Carrier</label>
+                  <select
+                    value={commissionForm.carrierId}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, carrierId: e.target.value, lineOfBusiness: '', stateCode: '' })}
+                    className="sims-select"
+                  >
+                    <option value="">Any carrier</option>
+                    {commissionCarrierOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="sims-field-label">Line of Business</label>
+                  <select
+                    value={commissionForm.lineOfBusiness}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value, stateCode: '' })}
+                    className="sims-select"
+                  >
+                    {commissionLobOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="sims-field-label">State</label>
+                  <select
+                    value={commissionForm.stateCode}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, stateCode: e.target.value })}
+                    disabled={!commissionForm.programConfigurationId || !commissionForm.carrierId || !commissionForm.lineOfBusiness}
+                    className="sims-select"
+                  >
+                    <option value="">Any state</option>
+                    {commissionStateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="sims-field-label">Rate (%)</label>
+                  <input type="number" step="0.01" min="0" max="100" value={commissionForm.rate} onChange={(e) => setCommissionForm({ ...commissionForm, rate: e.target.value })} placeholder="15" className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">Effective Date</label>
+                  <input type="date" value={commissionForm.effectiveDate} onChange={(e) => setCommissionForm({ ...commissionForm, effectiveDate: e.target.value })} className="sims-input" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    if (commissionForm.stateCode && (!commissionForm.carrierId || !commissionForm.lineOfBusiness)) {
+                      toast.error('State-specific rates require carrier and line of business')
+                      return
+                    }
+                    if (!commissionForm.rate || !commissionForm.effectiveDate) {
+                      toast.error('Rate and effective date are required')
+                      return
+                    }
+                    addCommissionMutation.mutate()
+                  }}
+                  disabled={addCommissionMutation.isPending}
+                  className="sd-btn primary sm"
                 >
-                  <option value="">Any program</option>
-                  {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Carrier</label>
-                <select
-                  value={commissionForm.carrierId}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, carrierId: e.target.value, lineOfBusiness: '', stateCode: '' })}
-                  className="sims-select"
+                  <Check style={{ width: 12, height: 12 }} /> Save Rate
+                </button>
+                <button
+                  onClick={() => { setShowAddCommission(false); setCommissionForm({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' }) }}
+                  className="sd-btn outline sm"
                 >
-                  <option value="">Any carrier</option>
-                  {commissionCarrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Line of Business</label>
-                <select
-                  value={commissionForm.lineOfBusiness}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, lineOfBusiness: e.target.value, stateCode: '' })}
-                  className="sims-select"
-                >
-                  {commissionLobOptions.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                <select
-                  value={commissionForm.stateCode}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, stateCode: e.target.value })}
-                  disabled={!commissionForm.programConfigurationId || !commissionForm.carrierId || !commissionForm.lineOfBusiness}
-                  className="sims-select disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="">Any state</option>
-                  {commissionStateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={commissionForm.rate}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, rate: e.target.value })}
-                  placeholder="e.g. 15"
-                  className="sims-input"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
-                <input
-                  type="date"
-                  value={commissionForm.effectiveDate}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, effectiveDate: e.target.value })}
-                  className="sims-input"
-                />
+                  <X style={{ width: 12, height: 12 }} /> Cancel
+                </button>
               </div>
             </div>
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => {
-                  if (commissionForm.stateCode && (!commissionForm.carrierId || !commissionForm.lineOfBusiness)) {
-                    toast.error('State-specific rates require carrier and line of business')
-                    return
-                  }
-                  if (!commissionForm.rate || !commissionForm.effectiveDate) {
-                    toast.error('Rate and effective date are required')
-                    return
-                  }
-                  addCommissionMutation.mutate()
-                }}
-                disabled={addCommissionMutation.isPending}
-                className="sd-btn primary sm"
-              >
-                <Check className="h-3.5 w-3.5" /> Save Rate
-              </button>
-              <button
-                onClick={() => { setShowAddCommission(false); setCommissionForm({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' }) }}
-                className="sd-btn outline sm"
-              >
-                <X className="h-3.5 w-3.5" /> Cancel
-              </button>
-            </div>
-          </div>
-        )}
+          )}
 
-        {commissions.length === 0 && !showAddCommission ? (
-          <EmptyState
-            icon={BanknoteIcon}
-            title="No commission rates configured"
-            action={<button onClick={() => setShowAddCommission(true)} className="sd-btn outline sm">Add the first rate</button>}
-          />
-        ) : (
-          (() => {
-            const byLob = commissions.reduce<Record<string, AgentCommission[]>>((acc, c) => {
-              const key = c.lineOfBusiness ?? '__all__'
-              if (!acc[key]) acc[key] = []
-              acc[key].push(c)
-              return acc
-            }, {})
+          {commissions.length === 0 && !showAddCommission ? (
+            <EmptyState
+              icon={BanknoteIcon}
+              title="No commission rates configured"
+              action={<button onClick={() => setShowAddCommission(true)} className="sd-btn outline sm">Add the first rate</button>}
+            />
+          ) : (
+            (() => {
+              const byLob = commissions.reduce<Record<string, AgentCommission[]>>((acc, c) => {
+                const key = c.lineOfBusiness ?? '__all__'
+                if (!acc[key]) acc[key] = []
+                acc[key].push(c)
+                return acc
+              }, {})
 
-            return (
-              <div className="divide-y">
-                {Object.entries(byLob).map(([lobKey, rows]) => {
-                  const label = lobKey === '__all__' ? 'All Lines (default)' : (rows[0].lineOfBusinessLabel ?? lobKey)
-                  const active = rows.find((r) => r.isActive)
-                  const isExpanded = expandedLobs.has(lobKey)
+              return (
+                <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+                  {Object.entries(byLob).map(([lobKey, rows], i) => {
+                    const label = lobKey === '__all__' ? 'All Lines (default)' : (rows[0].lineOfBusinessLabel ?? lobKey)
+                    const active = rows.find((r) => r.isActive)
+                    const isExpanded = expandedLobs.has(lobKey)
 
-                  return (
-                    <div key={lobKey} className="py-2">
-                      <div
-                        className="flex items-center justify-between cursor-pointer hover:bg-slate-50 rounded px-2 py-1"
-                        onClick={() => toggleLob(lobKey)}
-                      >
-                        <div className="flex items-center gap-3">
-                          {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
-                          <span className="text-sm font-medium text-slate-700">{label}</span>
-                          {active && (
-                            <span className="text-sm text-slate-900 font-semibold">
-                              {(active.commissionRate * 100).toFixed(2)}%
-                            </span>
-                          )}
-                          {active?.programName && (
-                            <span className="text-xs text-blue-600">{active.programName}</span>
-                          )}
-                          {active?.carrierName && (
-                            <span className="text-xs text-slate-500">{active.carrierName}</span>
-                          )}
-                          {active?.stateCode && (
-                            <span className="text-xs text-slate-500">{active.stateCode}</span>
-                          )}
+                    return (
+                      <div key={lobKey} style={{ borderTop: i > 0 ? '1px solid var(--line)' : undefined }}>
+                        <div
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', cursor: 'pointer', background: 'var(--surface)' }}
+                          onClick={() => toggleLob(lobKey)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            {isExpanded ? <ChevronUp style={{ width: 13, height: 13, color: 'var(--ink-4)' }} /> : <ChevronDown style={{ width: 13, height: 13, color: 'var(--ink-4)' }} />}
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{label}</span>
+                            {active && (
+                              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)' }}>
+                                {(active.commissionRate * 100).toFixed(2)}%
+                              </span>
+                            )}
+                            {active?.programName && <span style={{ fontSize: 11.5, color: 'var(--accent-ink)' }}>{active.programName}</span>}
+                            {active?.carrierName && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{active.carrierName}</span>}
+                            {active?.stateCode && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{active.stateCode}</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className={`sd-pill ${active ? 'bound' : 'withdrawn'}`}>{active ? 'Active' : 'Inactive'}</span>
+                            <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>{rows.length} {rows.length === 1 ? 'version' : 'versions'}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {active ? (
-                            <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">Inactive</span>
-                          )}
-                          <span className="text-xs text-slate-400">{rows.length} {rows.length === 1 ? 'version' : 'versions'}</span>
-                        </div>
-                      </div>
 
-                      {isExpanded && (
-                        <div className="mt-1 ml-6">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="text-slate-500">
-                                <th className="text-left py-1 font-medium">Rate</th>
-                                <th className="text-left py-1 font-medium">Program</th>
-                                <th className="text-left py-1 font-medium">Carrier</th>
-                                <th className="text-left py-1 font-medium">State</th>
-                                <th className="text-left py-1 font-medium">Effective</th>
-                                <th className="text-left py-1 font-medium">Disabled</th>
-                                <th className="text-left py-1 font-medium">Status</th>
-                                <th />
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {rows.map((r) => (
-                                <tr key={r.id}>
-                                  <td className="py-1.5 font-medium text-slate-800">{(r.commissionRate * 100).toFixed(2)}%</td>
-                                  <td className="py-1.5 text-slate-600">{r.programName ?? 'Any program'}</td>
-                                  <td className="py-1.5 text-slate-600">{r.carrierName ?? 'Any carrier'}</td>
-                                  <td className="py-1.5 text-slate-600">{r.stateCode ?? 'Any state'}</td>
-                                  <td className="py-1.5 text-slate-600">{r.effectiveDate}</td>
-                                  <td className="py-1.5 text-slate-600">{r.disabledDate ?? '—'}</td>
-                                  <td className="py-1.5">
-                                    {r.isActive ? (
-                                      <span className="px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Active</span>
-                                    ) : (
-                                      <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Disabled</span>
-                                    )}
-                                  </td>
-                                  <td className="py-1.5 text-right">
-                                    {r.isActive && (
-                                      <button
-                                        onClick={() => {
-                                          if (confirm('Disable this commission rate?'))
-                                            disableCommissionMutation.mutate(r.id)
-                                        }}
-                                        className="sims-icon-btn hover:text-red-500"
-                                        title="Disable"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                      </button>
-                                    )}
-                                  </td>
+                        {isExpanded && (
+                          <div style={{ borderTop: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+                            <table className="subs-table">
+                              <thead>
+                                <tr>
+                                  <th className="subs-th">Rate</th>
+                                  <th className="subs-th">Program</th>
+                                  <th className="subs-th">Carrier</th>
+                                  <th className="subs-th">State</th>
+                                  <th className="subs-th">Effective</th>
+                                  <th className="subs-th">Disabled</th>
+                                  <th className="subs-th">Status</th>
+                                  <th className="subs-th" />
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()
-        )}
+                              </thead>
+                              <tbody>
+                                {rows.map((r) => (
+                                  <tr key={r.id} className="subs-row">
+                                    <td style={{ fontWeight: 600 }}>{(r.commissionRate * 100).toFixed(2)}%</td>
+                                    <td style={{ color: 'var(--ink-2)' }}>{r.programName ?? 'Any program'}</td>
+                                    <td style={{ color: 'var(--ink-2)' }}>{r.carrierName ?? 'Any carrier'}</td>
+                                    <td style={{ color: 'var(--ink-2)' }}>{r.stateCode ?? 'Any state'}</td>
+                                    <td style={{ color: 'var(--ink-2)' }}>{r.effectiveDate}</td>
+                                    <td style={{ color: 'var(--ink-3)' }}>{r.disabledDate ?? '—'}</td>
+                                    <td>
+                                      <span className={`sd-pill ${r.isActive ? 'bound' : 'withdrawn'}`}>
+                                        {r.isActive ? 'Active' : 'Disabled'}
+                                      </span>
+                                    </td>
+                                    <td style={{ textAlign: 'right' }}>
+                                      {r.isActive && (
+                                        <button
+                                          onClick={() => { if (confirm('Disable this commission rate?')) disableCommissionMutation.mutate(r.id) }}
+                                          className="sims-icon-btn"
+                                          title="Disable"
+                                        >
+                                          <X style={{ width: 12, height: 12 }} />
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()
+          )}
+        </div>
       </div>
 
-      {/* Offices & Contacts section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-slate-400" />
+      {/* Offices & Contacts */}
+      <div className="sd-card">
+        <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+          <h3>
+            <Building2 style={{ width: 13, height: 13, marginRight: 6, display: 'inline', verticalAlign: 'text-bottom' }} />
             Offices &amp; Contacts
-            <span className="text-xs font-normal text-slate-400">
-              ({agent.locations.length} {agent.locations.length === 1 ? 'office' : 'offices'})
-            </span>
-          </h2>
+            <span className="cnt">{agent.locations.length}</span>
+          </h3>
           {!showNewLocation && (
-            <button
-              onClick={() => { setShowNewLocation(true); setShowNewContact(null) }}
-              className="sd-btn primary sm"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Office
+            <button onClick={() => { setShowNewLocation(true); setShowNewContact(null) }} className="sd-btn primary sm">
+              <Plus style={{ width: 12, height: 12 }} /> Add Office
             </button>
           )}
         </div>
 
-        {/* New location form */}
-        {showNewLocation && (
-          <div className="sd-card p-4">
-            <h3 className="text-sm font-medium text-slate-700 mb-1">New Office</h3>
-            <LocationForm
-              form={newLocForm}
-              setForm={setNewLocForm}
-              onSave={() => addLocationMutation.mutate(formToLocationInput(newLocForm))}
-              onCancel={() => { setShowNewLocation(false); setNewLocForm(emptyLocationForm()) }}
-              isPending={addLocationMutation.isPending}
+        <div className="sd-card-body">
+          {showNewLocation && (
+            <div style={{ ...formPanelStyle, marginBottom: 14 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-3)' }}>New Office</p>
+              <LocationForm
+                form={newLocForm}
+                setForm={setNewLocForm}
+                onSave={() => addLocationMutation.mutate(formToLocationInput(newLocForm))}
+                onCancel={() => { setShowNewLocation(false); setNewLocForm(emptyLocationForm()) }}
+                isPending={addLocationMutation.isPending}
+              />
+            </div>
+          )}
+
+          {agent.locations.length === 0 && !showNewLocation && (
+            <EmptyState
+              icon={Building2}
+              title="No offices added yet"
+              action={<button onClick={() => setShowNewLocation(true)} className="sd-btn outline sm">Add the first office</button>}
             />
-          </div>
-        )}
+          )}
 
-        {agent.locations.length === 0 && !showNewLocation && (
-          <EmptyState
-            icon={Building2}
-            title="No offices added yet"
-            action={<button onClick={() => setShowNewLocation(true)} className="sd-btn outline sm">Add the first office</button>}
-          />
-        )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {agent.locations.map((location) => {
+              const isCollapsed = collapsedLocations.has(location.id)
+              const isEditingThisLoc = editingLocationId === location.id
+              const addressParts = [location.addressLine1, location.addressLine2, location.city && location.state ? `${location.city}, ${location.state} ${location.zipCode ?? ''}`.trim() : null].filter(Boolean)
 
-        {/* Location cards */}
-        {agent.locations.map((location) => {
-          const isCollapsed = collapsedLocations.has(location.id)
-          const isEditingThisLoc = editingLocationId === location.id
-          const addressParts = [location.addressLine1, location.addressLine2, location.city && location.state ? `${location.city}, ${location.state} ${location.zipCode ?? ''}`.trim() : null].filter(Boolean)
-
-          return (
-            <div key={location.id} className="sd-card overflow-hidden">
-              {/* Location header */}
-              <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => toggleCollapse(location.id)} className="text-slate-400 hover:text-slate-600">
-                    {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                  </button>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-800 text-sm">
-                        {location.name || 'Office'}
-                      </span>
-                      {location.isPrimary && (
-                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                          <Star className="h-2.5 w-2.5" /> Primary
-                        </span>
-                      )}
-                    </div>
-                    {addressParts.length > 0 && (
-                      <p className="text-xs text-slate-500 mt-0.5">{addressParts.join(' · ')}</p>
-                    )}
-                    {location.phone && (
-                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="h-3 w-3" /> {location.phone}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-slate-400 mr-2">
-                    {location.contacts.length} {location.contacts.length === 1 ? 'contact' : 'contacts'}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setEditingLocationId(location.id)
-                      setEditLocForm(locationToForm(location))
-                      setCollapsedLocations((prev) => { const n = new Set(prev); n.delete(location.id); return n })
-                    }}
-                    className="sims-icon-btn hover:text-sky-600"
-                    title="Edit office"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete "${location.name || 'this office'}" and all its contacts?`))
-                        deleteLocationMutation.mutate(location.id)
-                    }}
-                    className="sims-icon-btn hover:text-red-500"
-                    title="Delete office"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Location body */}
-              {!isCollapsed && (
-                <div className="p-4">
-                  {/* Edit location form */}
-                  {isEditingThisLoc && (
-                    <div className="mb-4 pb-4 border-b">
-                      <p className="text-xs font-medium text-slate-600 mb-1">Edit Office</p>
-                      <LocationForm
-                        form={editLocForm}
-                        setForm={setEditLocForm}
-                        onSave={() => updateLocationMutation.mutate({ locationId: location.id, data: formToLocationInput(editLocForm) })}
-                        onCancel={() => setEditingLocationId(null)}
-                        isPending={updateLocationMutation.isPending}
-                      />
-                    </div>
-                  )}
-
-                  {/* Contacts list */}
-                  <div className="space-y-2">
-                    {location.contacts.length === 0 && showNewContact !== location.id && (
-                      <p className="text-xs text-slate-400 italic">No contacts at this office.</p>
-                    )}
-
-                    {location.contacts.map((contact) => {
-                      const isEditingThisContact =
-                        editingContact?.locationId === location.id && editingContact?.contactId === contact.id
-                      const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ')
-
-                      return (
-                        <div key={contact.id}>
-                          {isEditingThisContact ? (
-                            <div className="bg-slate-50 rounded-lg p-3 border">
-                              <ContactForm
-                                form={editContactForm}
-                                setForm={setEditContactForm}
-                                onSave={() =>
-                                  updateContactMutation.mutate({
-                                    locationId: location.id,
-                                    contactId: contact.id,
-                                    data: formToContactInput(editContactForm),
-                                  })
-                                }
-                                onCancel={() => setEditingContact(null)}
-                                isPending={updateContactMutation.isPending}
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-50 group">
-                              <div className="flex items-center gap-3">
-                                <UserCircle className="h-7 w-7 text-slate-300 shrink-0" />
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-sm font-medium text-slate-800">{fullName}</span>
-                                    {contact.isPrimary && (
-                                      <span className="text-xs text-amber-600">· Primary</span>
-                                    )}
-                                    {contact.title && (
-                                      <span className="text-xs text-slate-400">· {contact.title}</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3 mt-0.5">
-                                    {contact.email && (
-                                      <a href={`mailto:${contact.email}`} className="text-xs text-sky-700 hover:underline flex items-center gap-1">
-                                        <Mail className="h-3 w-3" /> {contact.email}
-                                      </a>
-                                    )}
-                                    {contact.phone && (
-                                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                                        <Phone className="h-3 w-3" /> {contact.phone}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => {
-                                    setEditingContact({ locationId: location.id, contactId: contact.id })
-                                    setEditContactForm(contactToForm(contact))
-                                    setShowNewContact(null)
-                                  }}
-                                  className="sims-icon-btn hover:text-sky-600"
-                                  title="Edit contact"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (confirm(`Delete contact ${fullName}?`))
-                                      deleteContactMutation.mutate({ locationId: location.id, contactId: contact.id })
-                                  }}
-                                  className="sims-icon-btn hover:text-red-500"
-                                  title="Delete contact"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </div>
+              return (
+                <div key={location.id} style={{ border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+                  {/* Location header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-2)', borderBottom: isCollapsed ? 'none' : '1px solid var(--line)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button onClick={() => toggleCollapse(location.id)} className="sims-icon-btn" style={{ color: 'var(--ink-4)' }}>
+                        {isCollapsed ? <ChevronDown style={{ width: 14, height: 14 }} /> : <ChevronUp style={{ width: 14, height: 14 }} />}
+                      </button>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                            {location.name || 'Office'}
+                          </span>
+                          {location.isPrimary && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--warn-fg)', background: 'var(--warn-bg)', padding: '1px 6px', borderRadius: 10 }}>
+                              <Star style={{ width: 10, height: 10 }} /> Primary
+                            </span>
                           )}
                         </div>
-                      )
-                    })}
-
-                    {/* New contact form */}
-                    {showNewContact === location.id && (
-                      <div className="bg-slate-50 rounded-lg p-3 border mt-2">
-                        <ContactForm
-                          form={newContactForm}
-                          setForm={setNewContactForm}
-                          onSave={() =>
-                            addContactMutation.mutate({
-                              locationId: location.id,
-                              data: formToContactInput(newContactForm),
-                            })
-                          }
-                          onCancel={() => { setShowNewContact(null); setNewContactForm(emptyContactForm()) }}
-                          isPending={addContactMutation.isPending}
-                        />
+                        {addressParts.length > 0 && (
+                          <p style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 1 }}>{addressParts.join(' · ')}</p>
+                        )}
+                        {location.phone && (
+                          <p style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--ink-3)', marginTop: 1 }}>
+                            <Phone style={{ width: 11, height: 11 }} /> {location.phone}
+                          </p>
+                        )}
                       </div>
-                    )}
-
-                    {showNewContact !== location.id && (
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11.5, color: 'var(--ink-4)', marginRight: 4 }}>
+                        {location.contacts.length} {location.contacts.length === 1 ? 'contact' : 'contacts'}
+                      </span>
                       <button
                         onClick={() => {
-                          setShowNewContact(location.id)
-                          setNewContactForm(emptyContactForm())
-                          setEditingContact(null)
+                          setEditingLocationId(location.id)
+                          setEditLocForm(locationToForm(location))
+                          setCollapsedLocations((prev) => { const n = new Set(prev); n.delete(location.id); return n })
                         }}
-                        className="sd-btn ghost sm mt-1"
+                        className="sims-icon-btn"
+                        title="Edit office"
                       >
-                        <Plus className="h-3.5 w-3.5" /> Add Contact
+                        <Pencil style={{ width: 13, height: 13 }} />
                       </button>
-                    )}
+                      <button
+                        onClick={() => { if (confirm(`Delete "${location.name || 'this office'}" and all its contacts?`)) deleteLocationMutation.mutate(location.id) }}
+                        className="sims-icon-btn"
+                        title="Delete office"
+                      >
+                        <Trash2 style={{ width: 13, height: 13 }} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Location body */}
+                  {!isCollapsed && (
+                    <div style={{ padding: '12px 14px' }}>
+                      {isEditingThisLoc && (
+                        <div style={{ ...formPanelStyle, marginBottom: 12 }}>
+                          <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-3)' }}>Edit Office</p>
+                          <LocationForm
+                            form={editLocForm}
+                            setForm={setEditLocForm}
+                            onSave={() => updateLocationMutation.mutate({ locationId: location.id, data: formToLocationInput(editLocForm) })}
+                            onCancel={() => setEditingLocationId(null)}
+                            isPending={updateLocationMutation.isPending}
+                          />
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {location.contacts.length === 0 && showNewContact !== location.id && (
+                          <p style={{ fontSize: 12, color: 'var(--ink-4)', fontStyle: 'italic' }}>No contacts at this office.</p>
+                        )}
+
+                        {location.contacts.map((contact) => {
+                          const isEditingThisContact = editingContact?.locationId === location.id && editingContact?.contactId === contact.id
+                          const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ')
+
+                          return (
+                            <div key={contact.id}>
+                              {isEditingThisContact ? (
+                                <div style={formPanelStyle}>
+                                  <ContactForm
+                                    form={editContactForm}
+                                    setForm={setEditContactForm}
+                                    onSave={() => updateContactMutation.mutate({ locationId: location.id, contactId: contact.id, data: formToContactInput(editContactForm) })}
+                                    onCancel={() => setEditingContact(null)}
+                                    isPending={updateContactMutation.isPending}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="subs-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <UserCircle style={{ width: 26, height: 26, color: 'var(--line)', flexShrink: 0 }} />
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{fullName}</span>
+                                        {contact.isPrimary && <span style={{ fontSize: 11.5, color: 'var(--warn-fg)' }}>· Primary</span>}
+                                        {contact.title && <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>· {contact.title}</span>}
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
+                                        {contact.email && (
+                                          <a href={`mailto:${contact.email}`} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, color: 'var(--accent-ink)', textDecoration: 'none' }}>
+                                            <Mail style={{ width: 11, height: 11 }} /> {contact.email}
+                                          </a>
+                                        )}
+                                        {contact.phone && (
+                                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, color: 'var(--ink-3)' }}>
+                                            <Phone style={{ width: 11, height: 11 }} /> {contact.phone}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <button
+                                      onClick={() => { setEditingContact({ locationId: location.id, contactId: contact.id }); setEditContactForm(contactToForm(contact)); setShowNewContact(null) }}
+                                      className="sims-icon-btn"
+                                      title="Edit contact"
+                                    >
+                                      <Pencil style={{ width: 12, height: 12 }} />
+                                    </button>
+                                    <button
+                                      onClick={() => { if (confirm(`Delete contact ${fullName}?`)) deleteContactMutation.mutate({ locationId: location.id, contactId: contact.id }) }}
+                                      className="sims-icon-btn"
+                                      title="Delete contact"
+                                    >
+                                      <Trash2 style={{ width: 12, height: 12 }} />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+
+                        {showNewContact === location.id && (
+                          <div style={{ ...formPanelStyle, marginTop: 8 }}>
+                            <ContactForm
+                              form={newContactForm}
+                              setForm={setNewContactForm}
+                              onSave={() => addContactMutation.mutate({ locationId: location.id, data: formToContactInput(newContactForm) })}
+                              onCancel={() => { setShowNewContact(null); setNewContactForm(emptyContactForm()) }}
+                              isPending={addContactMutation.isPending}
+                            />
+                          </div>
+                        )}
+
+                        {showNewContact !== location.id && (
+                          <button
+                            onClick={() => { setShowNewContact(location.id); setNewContactForm(emptyContactForm()); setEditingContact(null) }}
+                            className="sd-btn ghost sm"
+                            style={{ marginTop: 4 }}
+                          >
+                            <Plus style={{ width: 12, height: 12 }} /> Add Contact
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )
-        })}
+              )
+            })}
+          </div>
+        </div>
       </div>
     </div>
   )
