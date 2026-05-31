@@ -82,27 +82,26 @@ export function TaskQueuePage() {
   if (isLoading) return <LoadingSpinner />
 
   return (
-    <div className="space-y-5 p-6">
-      <PageHeader
-        title="Tasks"
-        subtitle={`${counts.open} open tasks in your queue`}
-      />
+    <div className="subs-wrap">
+      <div className="subs-page-head">
+        <PageHeader title="Tasks" />
+        <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{counts.open} open tasks in your queue</span>
+      </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 4 }}>
         <TaskMetric label="Open" value={counts.open} tone="open" />
         <TaskMetric label="Overdue" value={counts.overdue} tone={counts.overdue > 0 ? 'attention' : 'muted'} />
         <TaskMetric label="Blocked" value={counts.blocked} tone={counts.blocked > 0 ? 'warning' : 'muted'} />
         <TaskMetric label="Closed" value={counts.closed} tone="muted" />
       </div>
 
-      <div className="subs-toolbar flex-wrap">
+      <div className="subs-toolbar">
         <label className="subs-search">
           <Search className="h-3.5 w-3.5 shrink-0" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search tasks..."
-            className="w-full border-0 bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
           />
         </label>
         <select
@@ -156,10 +155,10 @@ export function TaskQueuePage() {
                   style={{ boxShadow: `inset 3px 0 0 ${taskAccent(task)}` }}
                 >
                   <td className="primary-cell">
-                    <div className="flex items-center gap-2">
-                      {task.isOverdue && <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: 'rgba(155, 45, 31, 0.78)' }} />}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {task.isOverdue && <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0, color: 'rgba(155, 45, 31, 0.78)' }} />}
                       {task.escalationLevel > 0 && (
-                        <span className="rounded px-1.5 py-0.5 text-xs font-semibold" style={{ background: 'var(--pill-inprog-bg)', color: 'var(--pill-inprog-fg)' }}>
+                        <span style={{ borderRadius: 4, padding: '1px 6px', fontSize: 11.5, fontWeight: 600, background: 'var(--pill-inprog-bg)', color: 'var(--pill-inprog-fg)' }}>
                           L{task.escalationLevel}
                         </span>
                       )}
@@ -173,27 +172,23 @@ export function TaskQueuePage() {
                     <TonePill label={STATUS_TONE[task.status].label} tone={STATUS_TONE[task.status]} />
                   </td>
                   <td>
-                    <div
-                      className="flex items-center gap-1"
-                      style={{ color: task.isOverdue ? 'rgba(155, 45, 31, 0.78)' : 'var(--ink-3)', fontWeight: task.isOverdue ? 600 : 500 }}
-                    >
-                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: task.isOverdue ? 'rgba(155, 45, 31, 0.78)' : 'var(--ink-3)', fontWeight: task.isOverdue ? 600 : 500 }}>
+                      <Clock style={{ width: 13, height: 13, flexShrink: 0 }} />
                       {new Date(task.dueDate).toLocaleDateString()}
                     </div>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {task.entityType === 'PolicyTransaction' ? (
-                      <span className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-3)' }}>
                         {taskEntityLabel(task)}
-                        {task.policyTransactionStatus && <span className="ml-1 text-slate-400">{task.policyTransactionStatus}</span>}
+                        {task.policyTransactionStatus && <span style={{ marginLeft: 4, color: 'var(--ink-4)' }}>{task.policyTransactionStatus}</span>}
                       </span>
                     ) : (
                       <Link
                         to={entityUrl(task)}
-                        className="flex items-center gap-1 text-xs font-medium"
-                        style={{ color: 'var(--accent)' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, color: 'var(--accent)' }}
                       >
-                        {taskEntityLabel(task)} <ExternalLink className="h-3 w-3" />
+                        {taskEntityLabel(task)} <ExternalLink style={{ width: 11, height: 11 }} />
                       </Link>
                     )}
                   </td>
