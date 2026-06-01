@@ -9,6 +9,9 @@ public class BordereauxProfile : BaseEntity
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness? LineOfBusiness { get; set; }
     public string? StateCode { get; set; }
+    public Guid? ProgramCarrierId { get; set; }
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
+    public Guid? ProgramCarrierLobStateId { get; set; }
     public BordereauxReportType ReportType { get; set; } = BordereauxReportType.Premium;
     public BordereauxFrequency Frequency { get; set; } = BordereauxFrequency.Monthly;
     public BordereauxOutputFormat OutputFormat { get; set; } = BordereauxOutputFormat.Xlsx;
@@ -25,5 +28,8 @@ public class BordereauxProfile : BaseEntity
 
     public ProgramConfiguration ProgramConfiguration { get; set; } = null!;
     public Carrier Carrier { get; set; } = null!;
+    public ProgramCarrier? ProgramCarrier { get; set; }
+    public ProgramCarrierLineOfBusiness? ProgramCarrierLineOfBusiness { get; set; }
+    public ProgramCarrierLobState? ProgramCarrierLobState { get; set; }
     public ICollection<BordereauxRun> Runs { get; set; } = new List<BordereauxRun>();
 }

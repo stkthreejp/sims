@@ -107,6 +107,7 @@ export function BordereauxProfileSetupPanel({
     onSave({
       ...profile,
       lineOfBusiness: lineOfBusiness || null,
+      stateCode: lineOfBusiness === (profile.lineOfBusiness ?? '') ? profile.stateCode : null,
       requiredTabsJson: JSON.stringify(requiredTabs),
       staticValuesJson: JSON.stringify(staticValues),
     })

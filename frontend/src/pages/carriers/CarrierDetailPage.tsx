@@ -620,11 +620,29 @@ export function CarrierDetailPage() {
         .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
         .map((lob) => lob.lineOfBusiness)))
     : carrier.linesOfBusiness
-  const bordereauxLobOptions = Array.from(new Set([
-    ...carrier.linesOfBusiness,
-    ...bordereauxProfiles.map((profile) => profile.lineOfBusiness).filter((lob): lob is PolicyLineOfBusiness => Boolean(lob)),
-  ])).map((lob) => ({ value: lob, label: LOB_LABELS[lob] ?? lob }))
+  const selectedBordereauxProgramLob = selectedBordereauxProgramCarrier?.linesOfBusiness.find((lob) =>
+    lob.isActive && lob.lineOfBusiness === bordereauxProfileForm.lineOfBusiness
+  )
+  const createBordereauxStateOptions = bordereauxProfileForm.lineOfBusiness
+    ? Array.from(new Set((selectedBordereauxProgramLob?.states ?? [])
+        .filter((state) => state.isActive)
+        .map((state) => state.stateCode)))
+        .sort()
+    : []
   const selectedBordereauxProfile = bordereauxProfiles.find((profile) => profile.id === selectedBordereauxProfileId)
+  const selectedBordereauxProfileProgram = selectedBordereauxProfile
+    ? programs.find((program) => program.id === selectedBordereauxProfile.programConfigurationId)
+    : undefined
+  const selectedBordereauxProfileProgramCarrier = selectedBordereauxProfileProgram?.carriers.find((programCarrier) =>
+    programCarrier.carrierId === carrier.id && programCarrier.isActive
+  )
+  const selectedBordereauxProfileLob = selectedBordereauxProfile?.lineOfBusiness as PolicyLineOfBusiness | null | undefined
+  const bordereauxLobOptions = Array.from(new Set<PolicyLineOfBusiness>([
+    ...(selectedBordereauxProfileProgramCarrier?.linesOfBusiness ?? [])
+      .filter((lob) => lob.isActive && carrier.linesOfBusiness.includes(lob.lineOfBusiness))
+      .map((lob) => lob.lineOfBusiness),
+    ...(selectedBordereauxProfileLob ? [selectedBordereauxProfileLob] : []),
+  ])).map((lob) => ({ value: lob, label: LOB_LABELS[lob] ?? lob }))
 
   const openBordereauxProfileForm = () => {
     const programId = bordereauxProgramOptions[0]?.id ?? ''
@@ -860,7 +878,7 @@ export function CarrierDetailPage() {
                   <label className="sims-field-label">Program *</label>
                   <select
                     value={bordereauxProfileForm.programConfigurationId}
-                    onChange={(e) => setBordereauxProfileForm((f) => ({ ...f, programConfigurationId: e.target.value, lineOfBusiness: '' }))}
+                    onChange={(e) => setBordereauxProfileForm((f) => ({ ...f, programConfigurationId: e.target.value, lineOfBusiness: '', stateCode: '' }))}
                     className="sims-select"
                   >
                     <option value="">Select...</option>
@@ -871,7 +889,7 @@ export function CarrierDetailPage() {
                   <label className="sims-field-label">Line of Business</label>
                   <select
                     value={bordereauxProfileForm.lineOfBusiness}
-                    onChange={(e) => setBordereauxProfileForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness | '' }))}
+                    onChange={(e) => setBordereauxProfileForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness | '', stateCode: '' }))}
                     className="sims-select"
                   >
                     <option value="">All lines</option>
@@ -880,14 +898,17 @@ export function CarrierDetailPage() {
                 </div>
                 <div>
                   <label className="sims-field-label">State</label>
-                  <input
+                  <select
                     value={bordereauxProfileForm.stateCode}
-                    maxLength={2}
-                    onChange={(e) => setBordereauxProfileForm((f) => ({ ...f, stateCode: e.target.value.toUpperCase() }))}
-                    placeholder="All"
-                    className="sims-input"
-                    style={{ textTransform: 'uppercase' }}
-                  />
+                    onChange={(e) => setBordereauxProfileForm((f) => ({ ...f, stateCode: e.target.value }))}
+                    disabled={!bordereauxProfileForm.lineOfBusiness || createBordereauxStateOptions.length === 0}
+                    className="sims-select"
+                  >
+                    <option value="">All states</option>
+                    {createBordereauxStateOptions.map((stateCode) => (
+                      <option key={stateCode} value={stateCode}>{stateCode}</option>
+                    ))}
+                  </select>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-2)', cursor: 'pointer', whiteSpace: 'nowrap' }}>

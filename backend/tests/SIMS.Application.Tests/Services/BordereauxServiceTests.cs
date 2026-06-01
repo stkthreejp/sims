@@ -19,6 +19,7 @@ public class BordereauxServiceTests
     {
         await using var db = CreateDb();
         var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobStateAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability, "MS");
         var service = new BordereauxService(db);
 
         var result = await service.CreateProfileAsync(new UpsertBordereauxProfileRequest(
@@ -83,6 +84,85 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task CreateProfileAsync_RejectsCarrierOutsideProgramSetupPath()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "BRACE", IsActive = true };
+        db.AddRange(program, carrier);
+        await db.SaveChangesAsync();
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            LineOfBusiness = null,
+            StateCode = null,
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateProfileAsync_RejectsStateOutsideProgramSetupPath()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            StateCode = "TX",
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateProfileAsync_SavesCanonicalLobScopeForAllStates()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.Set<SIMS.Domain.Entities.Bordereaux.BordereauxProfile>().SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.Equal(saved.ProgramCarrierLineOfBusinessId, result.Value!.ProgramCarrierLineOfBusinessId);
+        Assert.Equal(program.Id, saved.ProgramConfigurationId);
+        Assert.Equal(carrier.Id, saved.CarrierId);
+        Assert.Equal(PolicyLineOfBusiness.GeneralLiability, saved.LineOfBusiness);
+        Assert.Null(saved.StateCode);
+        Assert.Null(saved.ProgramCarrierId);
+        Assert.NotNull(saved.ProgramCarrierLineOfBusinessId);
+        Assert.Null(saved.ProgramCarrierLobStateId);
+    }
+
+    [Fact]
+    public async Task CreateProfileAsync_SavesCanonicalStateScopeForStateProfile()
+    {
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var state = await SeedProgramCarrierLobStateAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability, "TX");
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            StateCode = "tx",
+        });
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.Set<SIMS.Domain.Entities.Bordereaux.BordereauxProfile>().SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.Equal(state.Id, saved.ProgramCarrierLobStateId);
+        Assert.Equal(state.Id, result.Value!.ProgramCarrierLobStateId);
+        Assert.Null(saved.ProgramCarrierId);
+        Assert.Null(saved.ProgramCarrierLineOfBusinessId);
+        Assert.Equal("TX", saved.StateCode);
+    }
+
+    [Fact]
     public async Task GetProfilesAsync_FiltersByProgramAndActiveStatus()
     {
         await using var db = CreateDb();
@@ -90,6 +170,7 @@ public class BordereauxServiceTests
         var otherProgram = new ProgramConfiguration { Name = "Shuttlebee", Code = "SHUTTLEBEE", IsActive = true };
         db.Add(otherProgram);
         await db.SaveChangesAsync();
+        await SeedProgramCarrierLobSetupAsync(db, otherProgram, carrier, PolicyLineOfBusiness.GeneralLiability);
         var service = new BordereauxService(db);
 
         await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
@@ -113,6 +194,7 @@ public class BordereauxServiceTests
     {
         await using var db = CreateDb();
         var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobStateAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability, "AL");
         var service = new BordereauxService(db);
         var create = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id));
 
@@ -211,6 +293,7 @@ public class BordereauxServiceTests
     {
         await using var db = CreateDb();
         var (program, carrier) = await SeedProgramCarrierAsync(db);
+        await SeedProgramCarrierLobStateAsync(db, program, carrier, PolicyLineOfBusiness.GeneralLiability, "MS");
         var otherCarrier = new Carrier { Name = "Other", IsActive = true };
         db.Add(otherCarrier);
         await db.SaveChangesAsync();
@@ -947,15 +1030,6 @@ public class BordereauxServiceTests
         var carrier = new Carrier { Name = "BRACE", IsActive = true };
         db.AddRange(program, carrier);
         await db.SaveChangesAsync();
-        return (program, carrier);
-    }
-
-    private static async Task SeedProgramCarrierLobSetupAsync(
-        ApplicationDbContext db,
-        ProgramConfiguration program,
-        Carrier carrier,
-        PolicyLineOfBusiness lineOfBusiness)
-    {
         var programCarrier = new ProgramCarrier
         {
             ProgramConfigurationId = program.Id,
@@ -965,17 +1039,94 @@ public class BordereauxServiceTests
         };
         programCarrier.LinesOfBusiness.Add(new ProgramCarrierLineOfBusiness
         {
-            LineOfBusiness = lineOfBusiness,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
             IsActive = true,
             EffectiveDate = new DateOnly(2025, 1, 1),
-            LondonUmr = "BRACE-SMM-2025-LOGGING",
-            LondonSectionNumber = "Section No 1",
-            LondonClassOfBusiness = "FORESTRY GENERAL LIABILITY",
-            LondonRiskCode = "LOGGING LUMBERING",
-            LondonInsuranceType = "DIRECT",
         });
         db.Add(programCarrier);
         await db.SaveChangesAsync();
+        return (program, carrier);
+    }
+
+    private static async Task<ProgramCarrierLineOfBusiness> SeedProgramCarrierLobSetupAsync(
+        ApplicationDbContext db,
+        ProgramConfiguration program,
+        Carrier carrier,
+        PolicyLineOfBusiness lineOfBusiness)
+    {
+        var programCarrier = await db.Set<ProgramCarrier>()
+            .Include(c => c.LinesOfBusiness)
+            .SingleOrDefaultAsync(c => c.ProgramConfigurationId == program.Id && c.CarrierId == carrier.Id);
+
+        if (programCarrier is null)
+        {
+            programCarrier = new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2025, 1, 1),
+            };
+            db.Add(programCarrier);
+        }
+
+        var lob = programCarrier.LinesOfBusiness
+            .FirstOrDefault(l => l.LineOfBusiness == lineOfBusiness);
+        if (lob is null)
+        {
+            lob = new ProgramCarrierLineOfBusiness
+            {
+                LineOfBusiness = lineOfBusiness,
+            };
+            programCarrier.LinesOfBusiness.Add(lob);
+            db.Set<ProgramCarrierLineOfBusiness>().Add(lob);
+        }
+
+        lob.IsActive = true;
+        lob.EffectiveDate = new DateOnly(2025, 1, 1);
+        lob.ExpirationDate = null;
+        lob.LondonUmr = "BRACE-SMM-2025-LOGGING";
+        lob.LondonSectionNumber = "Section No 1";
+        lob.LondonClassOfBusiness = "FORESTRY GENERAL LIABILITY";
+        lob.LondonRiskCode = "LOGGING LUMBERING";
+        lob.LondonInsuranceType = "DIRECT";
+
+        await db.SaveChangesAsync();
+        return lob;
+    }
+
+    private static async Task<ProgramCarrierLobState> SeedProgramCarrierLobStateAsync(
+        ApplicationDbContext db,
+        ProgramConfiguration program,
+        Carrier carrier,
+        PolicyLineOfBusiness lineOfBusiness,
+        string stateCode)
+    {
+        var lob = await db.Set<ProgramCarrierLineOfBusiness>()
+            .Include(l => l.ProgramCarrier)
+            .Include(l => l.States)
+            .SingleAsync(l =>
+                l.LineOfBusiness == lineOfBusiness &&
+                l.ProgramCarrier.ProgramConfigurationId == program.Id &&
+                l.ProgramCarrier.CarrierId == carrier.Id);
+
+        var normalizedState = stateCode.Trim().ToUpperInvariant();
+        var state = lob.States.FirstOrDefault(s => s.StateCode == normalizedState);
+        if (state is null)
+        {
+            state = new ProgramCarrierLobState
+            {
+                StateCode = normalizedState,
+            };
+            lob.States.Add(state);
+            db.Set<ProgramCarrierLobState>().Add(state);
+        }
+
+        state.IsActive = true;
+        state.EffectiveDate = new DateOnly(2025, 1, 1);
+        state.ExpirationDate = null;
+        await db.SaveChangesAsync();
+        return state;
     }
 
     private static async Task SeedSurplusLinesSetupAsync(

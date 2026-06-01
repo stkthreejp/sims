@@ -7,6 +7,9 @@ export interface BordereauxProfile {
   carrierName: string
   lineOfBusiness: string | null
   stateCode: string | null
+  programCarrierId: string | null
+  programCarrierLineOfBusinessId: string | null
+  programCarrierLobStateId: string | null
   reportType: string
   frequency: string
   outputFormat: string

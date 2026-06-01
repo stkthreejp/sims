@@ -42,6 +42,11 @@ public class BordereauxService : IBordereauxService
     [
         new("commissionBasis", "Commission Basis"),
     ];
+    private sealed record ResolvedBordereauxProgramScope(
+        Guid? ProgramCarrierId,
+        Guid? ProgramCarrierLineOfBusinessId,
+        Guid? ProgramCarrierLobStateId,
+        string? StateCode);
 
     public BordereauxService(DbContext db) : this(db, null)
     {
@@ -98,9 +103,12 @@ public class BordereauxService : IBordereauxService
         var validation = await ValidateAsync(request, null, ct);
         if (validation is not null)
             return Result<BordereauxProfileDto>.Failure(validation.Value.Code, validation.Value.Message);
+        var scope = await ResolveProgramScopeAsync(request, ct);
+        if (!scope.IsSuccess)
+            return Result<BordereauxProfileDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
 
         var profile = new BordereauxProfile();
-        Apply(profile, request);
+        Apply(profile, request, scope.Value!);
         _db.Set<BordereauxProfile>().Add(profile);
         await _db.SaveChangesAsync(ct);
 
@@ -117,8 +125,11 @@ public class BordereauxService : IBordereauxService
         var validation = await ValidateAsync(request, id, ct);
         if (validation is not null)
             return Result<BordereauxProfileDto>.Failure(validation.Value.Code, validation.Value.Message);
+        var scope = await ResolveProgramScopeAsync(request, ct);
+        if (!scope.IsSuccess)
+            return Result<BordereauxProfileDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
 
-        Apply(profile, request);
+        Apply(profile, request, scope.Value!);
         profile.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
@@ -488,13 +499,86 @@ public class BordereauxService : IBordereauxService
         return null;
     }
 
-    private static void Apply(BordereauxProfile profile, UpsertBordereauxProfileRequest request)
+    private async Task<Result<ResolvedBordereauxProgramScope>> ResolveProgramScopeAsync(
+        UpsertBordereauxProfileRequest request,
+        CancellationToken ct)
+    {
+        var stateCode = NormalizeState(request.StateCode);
+        if (stateCode is not null && !request.LineOfBusiness.HasValue)
+        {
+            return Result<ResolvedBordereauxProgramScope>.Failure(
+                "INVALID_PROGRAM_SETUP_PATH",
+                "Selected state requires a Program carrier line of business.");
+        }
+
+        var effectiveDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var programCarrier = await _db.Set<ProgramCarrier>()
+            .FirstOrDefaultAsync(c =>
+                c.ProgramConfigurationId == request.ProgramConfigurationId &&
+                c.CarrierId == request.CarrierId &&
+                c.IsActive &&
+                !c.IsDeleted &&
+                c.EffectiveDate <= effectiveDate &&
+                (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate), ct);
+
+        if (programCarrier is null)
+        {
+            return Result<ResolvedBordereauxProgramScope>.Failure(
+                "INVALID_PROGRAM_SETUP_PATH",
+                "Selected carrier is not active for this program.");
+        }
+
+        if (!request.LineOfBusiness.HasValue)
+            return Result<ResolvedBordereauxProgramScope>.Success(new(programCarrier.Id, null, null, null));
+
+        var programLob = await _db.Set<ProgramCarrierLineOfBusiness>()
+            .FirstOrDefaultAsync(l =>
+                l.ProgramCarrierId == programCarrier.Id &&
+                l.LineOfBusiness == request.LineOfBusiness.Value &&
+                l.IsActive &&
+                !l.IsDeleted &&
+                l.EffectiveDate <= effectiveDate &&
+                (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate), ct);
+
+        if (programLob is null)
+        {
+            return Result<ResolvedBordereauxProgramScope>.Failure(
+                "INVALID_PROGRAM_SETUP_PATH",
+                "Selected line of business is not active for this program carrier.");
+        }
+
+        if (stateCode is null)
+            return Result<ResolvedBordereauxProgramScope>.Success(new(null, programLob.Id, null, null));
+
+        var programState = await _db.Set<ProgramCarrierLobState>()
+            .FirstOrDefaultAsync(s =>
+                s.ProgramCarrierLineOfBusinessId == programLob.Id &&
+                s.StateCode == stateCode &&
+                s.IsActive &&
+                !s.IsDeleted &&
+                s.EffectiveDate <= effectiveDate &&
+                (s.ExpirationDate == null || s.ExpirationDate >= effectiveDate), ct);
+
+        if (programState is null)
+        {
+            return Result<ResolvedBordereauxProgramScope>.Failure(
+                "INVALID_PROGRAM_SETUP_PATH",
+                "Selected state is not active for this program carrier and line of business.");
+        }
+
+        return Result<ResolvedBordereauxProgramScope>.Success(new(null, null, programState.Id, stateCode));
+    }
+
+    private static void Apply(BordereauxProfile profile, UpsertBordereauxProfileRequest request, ResolvedBordereauxProgramScope scope)
     {
         profile.Name = request.Name.Trim();
         profile.ProgramConfigurationId = request.ProgramConfigurationId;
         profile.CarrierId = request.CarrierId;
         profile.LineOfBusiness = request.LineOfBusiness;
-        profile.StateCode = NormalizeState(request.StateCode);
+        profile.StateCode = scope.StateCode;
+        profile.ProgramCarrierId = scope.ProgramCarrierId;
+        profile.ProgramCarrierLineOfBusinessId = scope.ProgramCarrierLineOfBusinessId;
+        profile.ProgramCarrierLobStateId = scope.ProgramCarrierLobStateId;
         profile.ReportType = request.ReportType;
         profile.Frequency = request.Frequency;
         profile.OutputFormat = request.OutputFormat;
@@ -519,6 +603,9 @@ public class BordereauxService : IBordereauxService
         p.Carrier.Name,
         p.LineOfBusiness,
         p.StateCode,
+        p.ProgramCarrierId,
+        p.ProgramCarrierLineOfBusinessId,
+        p.ProgramCarrierLobStateId,
         p.ReportType,
         p.Frequency,
         p.OutputFormat,
@@ -1065,7 +1152,7 @@ public class BordereauxService : IBordereauxService
             .ToListAsync(ct);
 
         var missingLondonRows = rows
-            .Where(row => ResolveLobSetup(lobSetups, row.LineOfBusiness, row.ReportingDate) is null)
+            .Where(row => !HasLondonLobSetup(ResolveLobSetup(lobSetups, row.LineOfBusiness, row.ReportingDate)))
             .ToList();
         var missingSurplusLinesRows = rows
             .Where(row => ResolveSurplusLinesSetup(surplusLinesSetups, row, row.ReportingDate, profile.ProgramConfigurationId) is null)
@@ -1198,6 +1285,14 @@ public class BordereauxService : IBordereauxService
                 && (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= asOfDate))
             .OrderByDescending(l => l.EffectiveDate)
             .FirstOrDefault();
+
+    private static bool HasLondonLobSetup(ProgramCarrierLineOfBusiness? setup)
+        => setup is not null
+            && !string.IsNullOrWhiteSpace(setup.LondonUmr)
+            && !string.IsNullOrWhiteSpace(setup.LondonSectionNumber)
+            && !string.IsNullOrWhiteSpace(setup.LondonClassOfBusiness)
+            && !string.IsNullOrWhiteSpace(setup.LondonRiskCode)
+            && !string.IsNullOrWhiteSpace(setup.LondonInsuranceType);
 
     private static IntermediaryProgramCarrierLobSetup? ResolveIntermediarySetup(
         IReadOnlyList<IntermediaryProgramCarrierLobSetup> setups,
