@@ -11,6 +11,8 @@ public record ProposalDocumentConfigurationDto(
     PolicyLineOfBusiness LineOfBusiness,
     string LineOfBusinessLabel,
     string? State,
+    Guid? ProgramCarrierLineOfBusinessId,
+    Guid? ProgramCarrierLobStateId,
     ProposalDocumentRole Role,
     Guid DocumentTemplateId,
     string DocumentTemplateName,

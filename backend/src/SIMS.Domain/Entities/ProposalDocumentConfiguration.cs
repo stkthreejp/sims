@@ -8,6 +8,8 @@ public class ProposalDocumentConfiguration : BaseEntity
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public string? State { get; set; }
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
+    public Guid? ProgramCarrierLobStateId { get; set; }
     public ProposalDocumentRole Role { get; set; }
     public Guid DocumentTemplateId { get; set; }
     public int SequenceOrder { get; set; } = 1;
@@ -18,5 +20,7 @@ public class ProposalDocumentConfiguration : BaseEntity
 
     public ProgramConfiguration? ProgramConfiguration { get; set; }
     public Carrier Carrier { get; set; } = null!;
+    public ProgramCarrierLineOfBusiness? ProgramCarrierLineOfBusiness { get; set; }
+    public ProgramCarrierLobState? ProgramCarrierLobState { get; set; }
     public DocumentTemplate DocumentTemplate { get; set; } = null!;
 }

@@ -11,6 +11,8 @@ export interface ProposalDocumentConfiguration {
   lineOfBusiness: PolicyLineOfBusiness
   lineOfBusinessLabel: string
   state: string | null
+  programCarrierLineOfBusinessId: string | null
+  programCarrierLobStateId: string | null
   role: ProposalDocumentRole
   documentTemplateId: string
   documentTemplateName: string

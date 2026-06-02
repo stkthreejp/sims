@@ -45,8 +45,12 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
         if (validation is not null)
             return Result<ProposalDocumentConfigurationDto>.Failure(validation.Value.Code, validation.Value.Message);
 
+        var scope = await ResolveProgramScopeAsync(request, ct);
+        if (!scope.IsSuccess)
+            return Result<ProposalDocumentConfigurationDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
+
         var configuration = new ProposalDocumentConfiguration();
-        Apply(configuration, request);
+        Apply(configuration, request, scope.Value!);
         _db.Set<ProposalDocumentConfiguration>().Add(configuration);
         await _db.SaveChangesAsync(ct);
 
@@ -64,7 +68,11 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
         if (validation is not null)
             return Result<ProposalDocumentConfigurationDto>.Failure(validation.Value.Code, validation.Value.Message);
 
-        Apply(configuration, request);
+        var scope = await ResolveProgramScopeAsync(request, ct);
+        if (!scope.IsSuccess)
+            return Result<ProposalDocumentConfigurationDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
+
+        Apply(configuration, request, scope.Value!);
         configuration.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
@@ -160,6 +168,13 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
         if (request.ExpirationDate.HasValue && request.EffectiveDate.HasValue && request.ExpirationDate.Value < request.EffectiveDate.Value)
             return ("INVALID_DATE_RANGE", "Expiration date cannot be before effective date.");
 
+        var state = NormalizeStateCode(request.State);
+        if (!state.IsSuccess)
+            return (state.ErrorCode!, state.ErrorMessage!);
+
+        if (request.Role == ProposalDocumentRole.StateNotice && state.Value == null)
+            return ("STATE_REQUIRED", "State notices require a state.");
+
         var carrierExists = await _db.Set<Carrier>().AnyAsync(c => c.Id == request.CarrierId && !c.IsDeleted, ct);
         if (!carrierExists)
             return ("CARRIER_NOT_FOUND", "Carrier not found.");
@@ -171,53 +186,88 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
         if (request.ProgramConfigurationId.HasValue)
         {
             var programExists = await _db.Set<ProgramConfiguration>()
-                .AnyAsync(p => p.Id == request.ProgramConfigurationId.Value && p.IsActive, ct);
+                .AnyAsync(p => p.Id == request.ProgramConfigurationId.Value && p.IsActive && !p.IsDeleted, ct);
             if (!programExists)
                 return ("PROGRAM_NOT_FOUND", "Program not found or inactive.");
-
-            var pathExists = await ProgramProposalPathExistsAsync(
-                request.ProgramConfigurationId.Value,
-                request.CarrierId,
-                request.LineOfBusiness,
-                request.State,
-                ct);
-            if (!pathExists)
-                return ("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and state are not active for this program.");
         }
 
         return null;
     }
 
-    private async Task<bool> ProgramProposalPathExistsAsync(
-        Guid programConfigurationId,
-        Guid carrierId,
-        PolicyLineOfBusiness lineOfBusiness,
-        string? state,
+    private async Task<Result<ResolvedProposalDocumentProgramScope>> ResolveProgramScopeAsync(
+        UpsertProposalDocumentConfigurationRequest request,
         CancellationToken ct)
     {
-        var stateCode = NormalizeState(state);
-        var query = _db.Set<ProgramCarrierLineOfBusiness>()
-            .Where(l =>
-                l.LineOfBusiness == lineOfBusiness &&
-                l.IsActive &&
-                l.ProgramCarrier.IsActive &&
-                l.ProgramCarrier.CarrierId == carrierId &&
-                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId);
+        var state = NormalizeStateCode(request.State);
+        if (!state.IsSuccess)
+            return Result<ResolvedProposalDocumentProgramScope>.Failure(state.ErrorCode!, state.ErrorMessage!);
 
-        if (stateCode != null)
+        if (!request.ProgramConfigurationId.HasValue)
+            return Result<ResolvedProposalDocumentProgramScope>.Success(new(null, null, state.Value));
+
+        var programId = request.ProgramConfigurationId.Value;
+        var asOfDate = request.EffectiveDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (state.Value == null)
         {
-            query = query.Where(l => l.States.Any(s => s.StateCode == stateCode && s.IsActive));
+            var programLobId = await _db.Set<ProgramCarrierLineOfBusiness>()
+                .Where(l =>
+                    l.LineOfBusiness == request.LineOfBusiness &&
+                    l.IsActive &&
+                    !l.IsDeleted &&
+                    l.EffectiveDate <= asOfDate &&
+                    (l.ExpirationDate == null || l.ExpirationDate >= asOfDate) &&
+                    l.ProgramCarrier.IsActive &&
+                    !l.ProgramCarrier.IsDeleted &&
+                    l.ProgramCarrier.EffectiveDate <= asOfDate &&
+                    (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= asOfDate) &&
+                    l.ProgramCarrier.CarrierId == request.CarrierId &&
+                    l.ProgramCarrier.ProgramConfigurationId == programId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync(ct);
+
+            return programLobId.HasValue
+                ? Result<ResolvedProposalDocumentProgramScope>.Success(new(programLobId.Value, null, null))
+                : Result<ResolvedProposalDocumentProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected carrier and line of business are not active for this program.");
         }
 
-        return await query.AnyAsync(ct);
+        var programStateId = await _db.Set<ProgramCarrierLobState>()
+            .Where(s =>
+                s.StateCode == state.Value &&
+                s.IsActive &&
+                !s.IsDeleted &&
+                s.EffectiveDate <= asOfDate &&
+                (s.ExpirationDate == null || s.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.LineOfBusiness == request.LineOfBusiness &&
+                s.ProgramCarrierLineOfBusiness.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.IsDeleted &&
+                s.ProgramCarrierLineOfBusiness.EffectiveDate <= asOfDate &&
+                (s.ProgramCarrierLineOfBusiness.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsDeleted &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.EffectiveDate <= asOfDate &&
+                (s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.CarrierId == request.CarrierId &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.ProgramConfigurationId == programId)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return programStateId.HasValue
+            ? Result<ResolvedProposalDocumentProgramScope>.Success(new(null, programStateId.Value, state.Value))
+            : Result<ResolvedProposalDocumentProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and state are not active for this program.");
     }
 
-    private static void Apply(ProposalDocumentConfiguration configuration, UpsertProposalDocumentConfigurationRequest request)
+    private static void Apply(
+        ProposalDocumentConfiguration configuration,
+        UpsertProposalDocumentConfigurationRequest request,
+        ResolvedProposalDocumentProgramScope scope)
     {
         configuration.ProgramConfigurationId = request.ProgramConfigurationId;
         configuration.CarrierId = request.CarrierId;
         configuration.LineOfBusiness = request.LineOfBusiness;
-        configuration.State = NormalizeState(request.State);
+        configuration.State = scope.State;
+        configuration.ProgramCarrierLineOfBusinessId = request.ProgramConfigurationId.HasValue ? scope.ProgramCarrierLineOfBusinessId : null;
+        configuration.ProgramCarrierLobStateId = request.ProgramConfigurationId.HasValue ? scope.ProgramCarrierLobStateId : null;
         configuration.Role = request.Role;
         configuration.DocumentTemplateId = request.DocumentTemplateId;
         configuration.SequenceOrder = request.SequenceOrder <= 0 ? 1 : request.SequenceOrder;
@@ -236,6 +286,8 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
         c.LineOfBusiness,
         LobLabels.GetValueOrDefault(c.LineOfBusiness, c.LineOfBusiness.ToString()),
         c.State,
+        c.ProgramCarrierLineOfBusinessId,
+        c.ProgramCarrierLobStateId,
         c.Role,
         c.DocumentTemplateId,
         c.DocumentTemplate.Name,
@@ -258,10 +310,18 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
 
     private static string? NormalizeState(string? state)
     {
+        var result = NormalizeStateCode(state);
+        return result.IsSuccess ? result.Value : null;
+    }
+
+    private static Result<string?> NormalizeStateCode(string? state)
+    {
         if (string.IsNullOrWhiteSpace(state))
-            return null;
+            return Result<string?>.Success(null);
         var trimmed = state.Trim().ToUpperInvariant();
-        return trimmed.Length == 2 ? trimmed : null;
+        return trimmed.Length == 2
+            ? Result<string?>.Success(trimmed)
+            : Result<string?>.Failure("STATE_INVALID", "State must be a two-letter code.");
     }
 
     private static string? ExtractState(string? address)
@@ -272,3 +332,8 @@ public class ProposalDocumentConfigurationService : IProposalDocumentConfigurati
         return match.Success ? match.Value : null;
     }
 }
+
+internal sealed record ResolvedProposalDocumentProgramScope(
+    Guid? ProgramCarrierLineOfBusinessId,
+    Guid? ProgramCarrierLobStateId,
+    string? State);

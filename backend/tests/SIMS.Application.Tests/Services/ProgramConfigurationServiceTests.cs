@@ -171,7 +171,7 @@ public class ProgramConfigurationServiceTests
             new DateOnly(2026, 1, 1),
             null,
             "IM setup"));
-        await service.AddStateAsync(program.Id, programCarrier.Value.Id, lob.Value!.Id, new UpsertProgramCarrierLobStateRequest(
+        var sourceState = await service.AddStateAsync(program.Id, programCarrier.Value.Id, lob.Value!.Id, new UpsertProgramCarrierLobStateRequest(
             "NC",
             true,
             new DateOnly(2026, 1, 1),
@@ -183,6 +183,7 @@ public class ProgramConfigurationServiceTests
             CarrierId = carrier.Id,
             LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
             State = "NC",
+            ProgramCarrierLobStateId = sourceState.Value!.Id,
             Name = "NC IM Forms",
             IsActive = true,
             Forms =
@@ -204,6 +205,7 @@ public class ProgramConfigurationServiceTests
                 CarrierId = carrier.Id,
                 LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
                 State = "NC",
+                ProgramCarrierLobStateId = sourceState.Value.Id,
                 Role = ProposalDocumentRole.StateNotice,
                 DocumentTemplateId = proposalTemplate.Id,
                 SequenceOrder = 1,
@@ -228,6 +230,8 @@ public class ProgramConfigurationServiceTests
             .SingleOrDefaultAsync(p => p.ProgramConfigurationId == program.Id && p.CarrierId == carrier.Id && p.LineOfBusiness == PolicyLineOfBusiness.InlandMarine && p.State == "SC");
         Assert.NotNull(copiedNotice);
         Assert.Equal(proposalTemplate.Id, copiedNotice!.DocumentTemplateId);
+        Assert.Equal(copy.Value!.Id, copiedNotice.ProgramCarrierLobStateId);
+        Assert.Null(copiedNotice.ProgramCarrierLineOfBusinessId);
         Assert.Equal("Attach to NC proposals", copiedNotice.Notes);
     }
 

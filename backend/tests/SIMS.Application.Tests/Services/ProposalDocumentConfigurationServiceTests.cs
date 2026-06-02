@@ -53,6 +53,12 @@ public class ProposalDocumentConfigurationServiceTests
         var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
         var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
         var template = CreateTemplate("Texas notice");
+        var state = new ProgramCarrierLobState
+        {
+            StateCode = "TX",
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+        };
         db.AddRange(
             program,
             carrier,
@@ -72,12 +78,7 @@ public class ProposalDocumentConfigurationServiceTests
                         EffectiveDate = new DateOnly(2026, 1, 1),
                         States =
                         {
-                            new ProgramCarrierLobState
-                            {
-                                StateCode = "TX",
-                                IsActive = true,
-                                EffectiveDate = new DateOnly(2026, 1, 1),
-                            },
+                            state,
                         },
                     },
                 },
@@ -101,6 +102,89 @@ public class ProposalDocumentConfigurationServiceTests
         Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
         Assert.Equal(carrier.Id, result.Value.CarrierId);
         Assert.Equal("TX", result.Value.State);
+        Assert.Equal(state.Id, result.Value.ProgramCarrierLobStateId);
+        Assert.Null(result.Value.ProgramCarrierLineOfBusinessId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AllowsProgramAllStateProposalWhenCarrierLobIsConfiguredForProgram()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var template = CreateTemplate("Longleaf proposal");
+        var programLob = new ProgramCarrierLineOfBusiness
+        {
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            States =
+            {
+                new ProgramCarrierLobState
+                {
+                    StateCode = "TX",
+                    IsActive = true,
+                    EffectiveDate = new DateOnly(2026, 1, 1),
+                },
+            },
+        };
+        db.AddRange(
+            program,
+            carrier,
+            template,
+            new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                LinesOfBusiness = { programLob },
+            });
+        await db.SaveChangesAsync();
+
+        var result = await new ProposalDocumentConfigurationService(db).CreateAsync(new(
+            program.Id,
+            carrier.Id,
+            PolicyLineOfBusiness.InlandMarine,
+            null,
+            ProposalDocumentRole.Proposal,
+            template.Id,
+            1,
+            true,
+            null,
+            null,
+            null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.State);
+        Assert.Equal(programLob.Id, result.Value.ProgramCarrierLineOfBusinessId);
+        Assert.Null(result.Value.ProgramCarrierLobStateId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsStateNoticeWithoutState()
+    {
+        await using var db = CreateDb();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var template = CreateTemplate("State notice");
+        db.AddRange(carrier, template);
+        await db.SaveChangesAsync();
+
+        var result = await new ProposalDocumentConfigurationService(db).CreateAsync(new(
+            null,
+            carrier.Id,
+            PolicyLineOfBusiness.InlandMarine,
+            null,
+            ProposalDocumentRole.StateNotice,
+            template.Id,
+            1,
+            true,
+            null,
+            null,
+            null));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("STATE_REQUIRED", result.ErrorCode);
     }
 
     [Fact]
