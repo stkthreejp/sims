@@ -15,7 +15,7 @@ namespace SIMS.Application.Tests.Services;
 public class PolicyFormServiceTests
 {
     [Fact]
-    public async Task CreatePackageAsync_RejectsProgramSpecificPackageWhenCarrierLobIsNotConfiguredForProgram()
+    public async Task CreatePackageAsync_RejectsProgramAllStatePackageWhenCarrierLobIsNotConfiguredForProgram()
     {
         await using var db = CreateDb();
         var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
@@ -37,13 +37,13 @@ public class PolicyFormServiceTests
             ProgramConfigurationId = program.Id,
             CarrierId = carrier.Id,
             LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
-            State = "TX",
-            Name = "Longleaf TX IM",
+            State = null,
+            Name = "Longleaf IM Forms",
             IsActive = true,
         });
 
         Assert.False(result.IsSuccess);
-        Assert.Contains("Selected carrier, line of business, and state are not active for this program.", result.ErrorMessage);
+        Assert.Contains("Selected carrier and line of business are not active for this program.", result.ErrorMessage);
     }
 
     [Fact]
@@ -52,6 +52,12 @@ public class PolicyFormServiceTests
         await using var db = CreateDb();
         var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
         var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var state = new ProgramCarrierLobState
+        {
+            StateCode = "TX",
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+        };
         db.AddRange(
             program,
             carrier,
@@ -70,12 +76,7 @@ public class PolicyFormServiceTests
                         EffectiveDate = new DateOnly(2026, 1, 1),
                         States =
                         {
-                            new ProgramCarrierLobState
-                            {
-                                StateCode = "TX",
-                                IsActive = true,
-                                EffectiveDate = new DateOnly(2026, 1, 1),
-                            },
+                            state,
                         },
                     },
                 },
@@ -96,6 +97,99 @@ public class PolicyFormServiceTests
         Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
         Assert.Equal(carrier.Id, result.Value.CarrierId);
         Assert.Equal("TX", result.Value.State);
+        Assert.Equal(state.Id, result.Value.ProgramCarrierLobStateId);
+        Assert.Null(result.Value.ProgramCarrierLineOfBusinessId);
+    }
+
+    [Fact]
+    public async Task CreatePackageAsync_AllowsProgramAllStatePackageWhenCarrierLobIsConfiguredForProgram()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        var programLob = new ProgramCarrierLineOfBusiness
+        {
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            States =
+            {
+                new ProgramCarrierLobState
+                {
+                    StateCode = "TX",
+                    IsActive = true,
+                    EffectiveDate = new DateOnly(2026, 1, 1),
+                },
+            },
+        };
+        db.AddRange(
+            program,
+            carrier,
+            new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                LinesOfBusiness = { programLob },
+            });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreatePackageAsync(new PolicyPackageConfigurationUpsertDto
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            State = null,
+            Name = "Longleaf IM Forms",
+            IsActive = true,
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.State);
+        Assert.Equal(programLob.Id, result.Value.ProgramCarrierLineOfBusinessId);
+        Assert.Null(result.Value.ProgramCarrierLobStateId);
+    }
+
+    [Fact]
+    public async Task CreatePackageAsync_RejectsProgramPackageWhenProgramIsInactive()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = false };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
+        db.AddRange(
+            program,
+            carrier,
+            new ProgramCarrier
+            {
+                ProgramConfigurationId = program.Id,
+                CarrierId = carrier.Id,
+                IsActive = true,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                LinesOfBusiness =
+                {
+                    new ProgramCarrierLineOfBusiness
+                    {
+                        LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+                        IsActive = true,
+                        EffectiveDate = new DateOnly(2026, 1, 1),
+                    },
+                },
+            });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreatePackageAsync(new PolicyPackageConfigurationUpsertDto
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            State = null,
+            Name = "Longleaf IM Forms",
+            IsActive = true,
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Program not found.", result.ErrorMessage);
     }
 
     private static PolicyFormService CreateService(ApplicationDbContext db)

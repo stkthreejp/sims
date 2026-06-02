@@ -52,6 +52,50 @@ public class QuotePolicyFormSelectionServiceTests
         Assert.Equal("GEN-SC", selection.FormNumber);
     }
 
+    [Fact]
+    public async Task ResetFromPackageAsync_UsesProgramAllStatePackageWhenStateOverrideIsMissing()
+    {
+        await using var db = CreateDb();
+        var programId = Guid.NewGuid();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden Specialty" };
+        var quote = CreateQuote(carrier, "GA", PolicyLineOfBusiness.InlandMarine, programId);
+        var genericStateForm = CreateTemplate("GEN-GA", "Generic GA notice");
+        var programAllStateForm = CreateTemplate("LONG-IM", "Longleaf IM packet");
+        var genericStatePackage = CreatePackage(carrier, PolicyLineOfBusiness.InlandMarine, "GA", "Generic GA package", null, genericStateForm);
+        var programAllStatePackage = CreatePackage(carrier, PolicyLineOfBusiness.InlandMarine, null, "Longleaf IM package", programId, programAllStateForm);
+        db.AddRange(carrier, quote.Submission.Insured, quote.Submission, quote, genericStateForm, programAllStateForm, genericStatePackage, programAllStatePackage);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).ResetFromPackageAsync(quote.Id);
+
+        Assert.True(result.IsSuccess);
+        var selection = Assert.Single(result.Value!);
+        Assert.Equal(programAllStateForm.Id, selection.PolicyFormTemplateId);
+        Assert.Equal("LONG-IM", selection.FormNumber);
+    }
+
+    [Fact]
+    public async Task ResetFromPackageAsync_PrefersProgramStatePackageOverProgramAllStatePackage()
+    {
+        await using var db = CreateDb();
+        var programId = Guid.NewGuid();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden Specialty" };
+        var quote = CreateQuote(carrier, "AL", PolicyLineOfBusiness.GeneralLiability, programId);
+        var allStateForm = CreateTemplate("LONG-GL", "Longleaf GL packet");
+        var stateForm = CreateTemplate("LONG-AL", "Longleaf AL notice");
+        var allStatePackage = CreatePackage(carrier, PolicyLineOfBusiness.GeneralLiability, null, "Longleaf GL package", programId, allStateForm);
+        var statePackage = CreatePackage(carrier, PolicyLineOfBusiness.GeneralLiability, "AL", "Longleaf AL package", programId, stateForm);
+        db.AddRange(carrier, quote.Submission.Insured, quote.Submission, quote, allStateForm, stateForm, allStatePackage, statePackage);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).ResetFromPackageAsync(quote.Id);
+
+        Assert.True(result.IsSuccess);
+        var selection = Assert.Single(result.Value!);
+        Assert.Equal(stateForm.Id, selection.PolicyFormTemplateId);
+        Assert.Equal("LONG-AL", selection.FormNumber);
+    }
+
     private static QuotePolicyFormSelectionService CreateService(PolicyFormsTestDbContext db)
     {
         var provider = new ServiceCollection()
@@ -115,7 +159,7 @@ public class QuotePolicyFormSelectionServiceTests
     private static PolicyPackageConfiguration CreatePackage(
         Carrier carrier,
         PolicyLineOfBusiness lob,
-        string state,
+        string? state,
         string name,
         Guid? programId,
         PolicyFormTemplate form)
@@ -184,6 +228,7 @@ public class QuotePolicyFormSelectionServiceTests
             modelBuilder.Entity<Submission>().Ignore(s => s.Supplemental);
             modelBuilder.Entity<Submission>().Ignore(s => s.GLCoverages);
             modelBuilder.Entity<Submission>().Ignore(s => s.IMCoverages);
+            modelBuilder.Entity<Submission>().Ignore(s => s.RenewingPolicy);
             modelBuilder.Entity<Quote>().Ignore(q => q.CreatedBy);
             modelBuilder.Entity<Quote>().Ignore(q => q.Notes);
             modelBuilder.Entity<Quote>().Ignore(q => q.Attachments);

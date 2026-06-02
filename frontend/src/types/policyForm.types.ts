@@ -74,7 +74,9 @@ export interface PolicyPackageConfiguration {
   carrierId: string
   carrierName: string
   lineOfBusiness: PolicyLineOfBusiness
-  state: string
+  state: string | null
+  programCarrierLineOfBusinessId: string | null
+  programCarrierLobStateId: string | null
   name: string
   isActive: boolean
   forms: PolicyPackageForm[]
@@ -85,7 +87,7 @@ export interface PolicyPackageConfigurationUpsert {
   programConfigurationId?: string | null
   carrierId: string
   lineOfBusiness: PolicyLineOfBusiness
-  state: string
+  state: string | null
   name: string
   isActive: boolean
 }

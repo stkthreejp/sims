@@ -255,8 +255,9 @@ export function PolicyFormsAdminPage() {
   const derivedPackageName = useMemo(() => {
     const programName = programs.find((program) => program.id === packageForm.programConfigurationId)?.name
     const carrierName = carriers.find((carrier) => carrier.id === packageForm.carrierId)?.name
-    if (!carrierName || !packageForm.lineOfBusiness || !packageForm.state) return ''
-    return [programName, carrierName, LOB_LABELS[packageForm.lineOfBusiness], packageForm.state].filter(Boolean).join(' - ')
+    if (!carrierName || !packageForm.lineOfBusiness) return ''
+    const stateLabel = packageForm.state || 'All States'
+    return [programName, carrierName, LOB_LABELS[packageForm.lineOfBusiness], stateLabel].filter(Boolean).join(' - ')
   }, [carriers, packageForm.carrierId, packageForm.lineOfBusiness, packageForm.programConfigurationId, packageForm.state, programs])
   const selectedPackageProgram = programs.find((program) => program.id === packageForm.programConfigurationId)
   const packageCarrierOptions = useMemo(() => (
@@ -375,7 +376,7 @@ export function PolicyFormsAdminPage() {
       const stateOptions = lobSetup
         ? lobSetup.states.filter((state) => state.isActive).map((state) => state.stateCode)
         : []
-      const state = form.state && stateOptions.includes(form.state) ? form.state : stateOptions[0] ?? ''
+      const state = form.state && stateOptions.includes(form.state) ? form.state : ''
 
       if (carrierId === form.carrierId && lineOfBusiness === form.lineOfBusiness && state === form.state) {
         return form
@@ -435,7 +436,7 @@ export function PolicyFormsAdminPage() {
       ...packageForm,
       programConfigurationId: packageForm.programConfigurationId || null,
       name: derivedPackageName,
-      state: packageForm.state.toUpperCase(),
+      state: packageForm.state ? packageForm.state.toUpperCase() : null,
     }),
     onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ['policy-form-packages'] })
@@ -718,12 +719,12 @@ export function PolicyFormsAdminPage() {
                 {packageLobOptions.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
               </select>
               <select value={packageForm.state} onChange={(e) => setPackageForm((f) => ({ ...f, state: e.target.value }))} className="border rounded px-2 py-1.5 text-sm">
-                <option value="">State</option>
+                <option value="">Any state</option>
                 {packageStateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
               </select>
             </div>
             <div className="border rounded px-2 py-1.5 text-sm bg-white text-slate-700 min-h-9">
-              {derivedPackageName || 'Package name will be Program - Carrier - LOB - State'}
+              {derivedPackageName || 'Package name will be Program - Carrier - LOB - State/All States'}
             </div>
             <button onClick={() => createPackage.mutate()} disabled={createPackage.isPending || !derivedPackageName} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
               <Plus className="h-4 w-4" /> Create package
@@ -733,7 +734,7 @@ export function PolicyFormsAdminPage() {
             {packages.map((pkg) => (
               <button key={pkg.id} onClick={() => selectPackage(pkg)} className={`w-full text-left p-3 hover:bg-slate-50 ${selectedPackageId === pkg.id ? 'bg-blue-50' : ''}`}>
                 <p className="text-sm font-medium text-slate-800">{pkg.name}</p>
-                <p className="text-xs text-slate-500">{pkg.carrierName} · {LOB_LABELS[pkg.lineOfBusiness]} · {pkg.state} · {pkg.forms.length} forms</p>
+                <p className="text-xs text-slate-500">{pkg.carrierName} · {LOB_LABELS[pkg.lineOfBusiness]} · {pkg.state ?? 'All States'} · {pkg.forms.length} forms</p>
               </button>
             ))}
           </div>
@@ -750,7 +751,7 @@ export function PolicyFormsAdminPage() {
             <div className="p-4 space-y-3">
               <div>
                 <p className="text-sm font-semibold text-slate-800">{selectedPackage.name}</p>
-                <p className="text-xs text-slate-500">{selectedPackage.carrierName} · {selectedPackage.state}</p>
+                <p className="text-xs text-slate-500">{selectedPackage.carrierName} · {selectedPackage.state ?? 'All States'}</p>
               </div>
               <div className="space-y-2">
                 {packageRows.map((row, index) => (

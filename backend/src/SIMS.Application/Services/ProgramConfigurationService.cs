@@ -358,7 +358,7 @@ public class ProgramConfigurationService : IProgramConfigurationService
 
         _db.Set<ProgramCarrierLobState>().Add(copy);
         await _db.SaveChangesAsync(ct);
-        await CopyStatePolicyPackagesAsync(programId, programCarrierId, source.ProgramCarrierLineOfBusiness.LineOfBusiness, sourceState, targetState, ct);
+        await CopyStatePolicyPackagesAsync(programId, programCarrierId, source.ProgramCarrierLineOfBusiness.LineOfBusiness, sourceState, targetState, copy.Id, ct);
         await CopyStateProposalDocumentsAsync(programId, programCarrierId, source.ProgramCarrierLineOfBusiness.LineOfBusiness, sourceState, targetState, ct);
         await _db.SaveChangesAsync(ct);
 
@@ -371,6 +371,7 @@ public class ProgramConfigurationService : IProgramConfigurationService
         PolicyLineOfBusiness lineOfBusiness,
         string sourceState,
         string targetState,
+        Guid targetProgramCarrierLobStateId,
         CancellationToken ct)
     {
         var carrierId = await _db.Set<ProgramCarrier>()
@@ -395,6 +396,8 @@ public class ProgramConfigurationService : IProgramConfigurationService
                 CarrierId = sourcePackage.CarrierId,
                 LineOfBusiness = sourcePackage.LineOfBusiness,
                 State = targetState,
+                ProgramCarrierLineOfBusinessId = null,
+                ProgramCarrierLobStateId = targetProgramCarrierLobStateId,
                 Name = ReplaceStateToken(sourcePackage.Name, sourceState, targetState),
                 IsActive = sourcePackage.IsActive,
                 Forms = sourcePackage.Forms

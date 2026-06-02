@@ -233,8 +233,11 @@ public class PolicyFormService : IPolicyFormService
         var validation = await ValidatePackageAsync(dto);
         if (validation != null) return Result<PolicyPackageConfigurationDto>.Failure("VALIDATION", validation);
 
+        var scope = await ResolveProgramScopeAsync(dto);
+        if (!scope.IsSuccess) return Result<PolicyPackageConfigurationDto>.Failure("VALIDATION", scope.ErrorMessage!);
+
         var package = new PolicyPackageConfiguration();
-        ApplyPackage(package, dto);
+        ApplyPackage(package, dto, scope.Value!);
         Db.Set<PolicyPackageConfiguration>().Add(package);
         await Db.SaveChangesAsync();
         return await GetPackageAsync(package.Id);
@@ -249,7 +252,10 @@ public class PolicyFormService : IPolicyFormService
         if (package == null)
             return Result<PolicyPackageConfigurationDto>.Failure("NOT_FOUND", "Policy package configuration not found.");
 
-        ApplyPackage(package, dto);
+        var scope = await ResolveProgramScopeAsync(dto);
+        if (!scope.IsSuccess) return Result<PolicyPackageConfigurationDto>.Failure("VALIDATION", scope.ErrorMessage!);
+
+        ApplyPackage(package, dto, scope.Value!);
         await Db.SaveChangesAsync();
         return await GetPackageAsync(package.Id);
     }
@@ -349,36 +355,89 @@ public class PolicyFormService : IPolicyFormService
     private async Task<string?> ValidatePackageAsync(PolicyPackageConfigurationUpsertDto dto)
     {
         if (dto.CarrierId == Guid.Empty) return "Carrier is required.";
-        if (string.IsNullOrWhiteSpace(dto.State) || dto.State.Trim().Length != 2) return "State must be a two-letter code.";
+        var state = NormalizeState(dto.State);
+        if (!state.IsSuccess) return state.ErrorMessage;
         if (string.IsNullOrWhiteSpace(dto.Name)) return "Package name is required.";
         if (!await Db.Set<Carrier>().AnyAsync(c => c.Id == dto.CarrierId))
             return "Carrier not found.";
-        if (dto.ProgramConfigurationId.HasValue && !await Db.Set<ProgramConfiguration>().AnyAsync(p => p.Id == dto.ProgramConfigurationId.Value))
+        if (dto.ProgramConfigurationId.HasValue && !await Db.Set<ProgramConfiguration>().AnyAsync(p =>
+                p.Id == dto.ProgramConfigurationId.Value &&
+                p.IsActive &&
+                !p.IsDeleted))
             return "Program not found.";
-        if (dto.ProgramConfigurationId.HasValue)
-        {
-            var pathExists = await ProgramPackagePathExistsAsync(
-                dto.ProgramConfigurationId.Value,
-                dto.CarrierId,
-                dto.LineOfBusiness,
-                dto.State);
-            if (!pathExists)
-                return "Selected carrier, line of business, and state are not active for this program.";
-        }
         return null;
     }
 
-    private async Task<bool> ProgramPackagePathExistsAsync(Guid programConfigurationId, Guid carrierId, PolicyLineOfBusiness lineOfBusiness, string state)
+    private async Task<Result<ResolvedPolicyPackageProgramScope>> ResolveProgramScopeAsync(PolicyPackageConfigurationUpsertDto dto)
     {
+        var state = NormalizeState(dto.State);
+        if (!state.IsSuccess)
+            return Result<ResolvedPolicyPackageProgramScope>.Failure("VALIDATION", state.ErrorMessage!);
+
+        if (!dto.ProgramConfigurationId.HasValue)
+            return Result<ResolvedPolicyPackageProgramScope>.Success(new(null, null, state.Value));
+
+        var programId = dto.ProgramConfigurationId.Value;
+        var asOfDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (state.Value == null)
+        {
+            var programLobId = await Db.Set<ProgramCarrierLineOfBusiness>()
+                .Where(l =>
+                    l.LineOfBusiness == dto.LineOfBusiness &&
+                    l.IsActive &&
+                    !l.IsDeleted &&
+                    l.EffectiveDate <= asOfDate &&
+                    (l.ExpirationDate == null || l.ExpirationDate >= asOfDate) &&
+                    l.ProgramCarrier.IsActive &&
+                    !l.ProgramCarrier.IsDeleted &&
+                    l.ProgramCarrier.EffectiveDate <= asOfDate &&
+                    (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= asOfDate) &&
+                    l.ProgramCarrier.CarrierId == dto.CarrierId &&
+                    l.ProgramCarrier.ProgramConfigurationId == programId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
+
+            return programLobId.HasValue
+                ? Result<ResolvedPolicyPackageProgramScope>.Success(new(programLobId.Value, null, null))
+                : Result<ResolvedPolicyPackageProgramScope>.Failure("VALIDATION", "Selected carrier and line of business are not active for this program.");
+        }
+
+        var programStateId = await Db.Set<ProgramCarrierLobState>()
+            .Where(s =>
+                s.StateCode == state.Value &&
+                s.IsActive &&
+                !s.IsDeleted &&
+                s.EffectiveDate <= asOfDate &&
+                (s.ExpirationDate == null || s.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.LineOfBusiness == dto.LineOfBusiness &&
+                s.ProgramCarrierLineOfBusiness.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.IsDeleted &&
+                s.ProgramCarrierLineOfBusiness.EffectiveDate <= asOfDate &&
+                (s.ProgramCarrierLineOfBusiness.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsDeleted &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.EffectiveDate <= asOfDate &&
+                (s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.CarrierId == dto.CarrierId &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.ProgramConfigurationId == programId)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync();
+
+        return programStateId.HasValue
+            ? Result<ResolvedPolicyPackageProgramScope>.Success(new(null, programStateId.Value, state.Value))
+            : Result<ResolvedPolicyPackageProgramScope>.Failure("VALIDATION", "Selected carrier, line of business, and state are not active for this program.");
+    }
+
+    private static Result<string?> NormalizeState(string? state)
+    {
+        if (string.IsNullOrWhiteSpace(state))
+            return Result<string?>.Success(null);
+
         var stateCode = state.Trim().ToUpperInvariant();
-        return await Db.Set<ProgramCarrierLineOfBusiness>()
-            .AnyAsync(l =>
-                l.LineOfBusiness == lineOfBusiness &&
-                l.IsActive &&
-                l.ProgramCarrier.IsActive &&
-                l.ProgramCarrier.CarrierId == carrierId &&
-                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
-                l.States.Any(s => s.StateCode == stateCode && s.IsActive));
+        return stateCode.Length == 2
+            ? Result<string?>.Success(stateCode)
+            : Result<string?>.Failure("VALIDATION", "State must be a two-letter code.");
     }
 
     private static void ApplyTemplate(PolicyFormTemplate form, PolicyFormTemplateUpsertDto dto)
@@ -395,12 +454,14 @@ public class PolicyFormService : IPolicyFormService
         form.Notes = dto.Notes?.Trim();
     }
 
-    private static void ApplyPackage(PolicyPackageConfiguration package, PolicyPackageConfigurationUpsertDto dto)
+    private static void ApplyPackage(PolicyPackageConfiguration package, PolicyPackageConfigurationUpsertDto dto, ResolvedPolicyPackageProgramScope scope)
     {
         package.CarrierId = dto.CarrierId;
         package.ProgramConfigurationId = dto.ProgramConfigurationId;
         package.LineOfBusiness = dto.LineOfBusiness;
-        package.State = dto.State.Trim().ToUpper();
+        package.State = scope.State;
+        package.ProgramCarrierLineOfBusinessId = dto.ProgramConfigurationId.HasValue ? scope.ProgramCarrierLineOfBusinessId : null;
+        package.ProgramCarrierLobStateId = dto.ProgramConfigurationId.HasValue ? scope.ProgramCarrierLobStateId : null;
         package.Name = dto.Name.Trim();
         package.IsActive = dto.IsActive;
     }
@@ -526,6 +587,8 @@ public class PolicyFormService : IPolicyFormService
         CarrierName = p.Carrier?.Name ?? string.Empty,
         LineOfBusiness = p.LineOfBusiness,
         State = p.State,
+        ProgramCarrierLineOfBusinessId = p.ProgramCarrierLineOfBusinessId,
+        ProgramCarrierLobStateId = p.ProgramCarrierLobStateId,
         Name = p.Name,
         IsActive = p.IsActive,
         Forms = p.Forms.OrderBy(f => f.SequenceOrder).Select(MapPackageForm).ToList(),
@@ -545,3 +608,8 @@ public class PolicyFormService : IPolicyFormService
         Notes = f.Notes,
     };
 }
+
+internal sealed record ResolvedPolicyPackageProgramScope(
+    Guid? ProgramCarrierLineOfBusinessId,
+    Guid? ProgramCarrierLobStateId,
+    string? State);

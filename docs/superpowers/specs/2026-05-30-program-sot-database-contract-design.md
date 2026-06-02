@@ -265,9 +265,10 @@ Then repeat the pattern for Bordereaux profiles and Surplus Lines.
 - Fees Program SOT is implemented for Program, Program/Carrier, Program/Carrier/LOB all-state, and Program/Carrier/LOB/State fee rule versions.
 - Bordereaux profiles Program SOT is implemented for Program/Carrier, Program/Carrier/LOB all-state, and Program/Carrier/LOB/State profiles, including canonical database references, migration preflight/backfill checks, and Program-scoped profile selectors.
 - Surplus Lines setup Program SOT is implemented for Program/Carrier/LOB/State rows, including canonical `ProgramCarrierLobStateId` references, migration preflight/backfill checks, reverse Program setup identity protections, and Program-scoped admin selectors that require carrier and LOB.
+- Policy Form Packages Program SOT is implemented for Program/Carrier/LOB all-state defaults and Program/Carrier/LOB/State overrides, including canonical database references, migration preflight/backfill checks, reverse Program setup identity protections, and quote form selection that prefers state-specific packages before all-state fallbacks.
 - Azure smoke is healthy after moving Safety Analytics connection to Key Vault and removing the stale App Service override. The deployed Fees admin asset contains the Program cascading selectors.
 - Logged-in UI save-path smoke remains manual because the in-app browser plugin could not attach in this environment.
-- Next target: Phase 2 should move Policy Form Packages, Proposal Document Configurations, and Policy Number Assignments onto canonical Program scope references.
+- Next target: Phase 2 should move Proposal Document Configurations, then Policy Number Assignments, onto canonical Program scope references.
 
 ## Verification Expectations
 

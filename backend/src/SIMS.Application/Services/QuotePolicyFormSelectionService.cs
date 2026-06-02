@@ -90,9 +90,10 @@ public class QuotePolicyFormSelectionService : IQuotePolicyFormSelectionService
             .Where(p => p.IsActive
                 && p.CarrierId == quote.CarrierId
                 && p.LineOfBusiness == quote.LineOfBusiness
-                && p.State == state
+                && (p.State == state || p.State == null)
                 && (p.ProgramConfigurationId == quote.ProgramId || p.ProgramConfigurationId == null))
             .OrderByDescending(p => p.ProgramConfigurationId == quote.ProgramId ? 1 : 0)
+            .ThenByDescending(p => p.State == state ? 1 : 0)
             .ThenByDescending(p => p.UpdatedAt)
             .FirstOrDefaultAsync();
 

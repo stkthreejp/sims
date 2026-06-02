@@ -72,7 +72,9 @@ public class PolicyPackageConfigurationDto
     public Guid CarrierId { get; set; }
     public string CarrierName { get; set; } = string.Empty;
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
-    public string State { get; set; } = string.Empty;
+    public string? State { get; set; }
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
+    public Guid? ProgramCarrierLobStateId { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public List<PolicyPackageFormDto> Forms { get; set; } = [];
@@ -84,7 +86,7 @@ public class PolicyPackageConfigurationUpsertDto
     public Guid? ProgramConfigurationId { get; set; }
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
-    public string State { get; set; } = string.Empty;
+    public string? State { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
 }
