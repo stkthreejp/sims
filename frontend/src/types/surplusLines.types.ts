@@ -9,6 +9,7 @@ export interface SurplusLinesStateSetup {
   carrierName: string | null
   lineOfBusiness: PolicyLineOfBusiness | null
   lineOfBusinessLabel: string | null
+  programCarrierLobStateId: string | null
   effectiveDate: string
   expirationDate: string | null
   isActive: boolean

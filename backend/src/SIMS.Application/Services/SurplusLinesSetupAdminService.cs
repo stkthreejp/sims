@@ -49,8 +49,12 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         if (validation is not null)
             return Result<SurplusLinesStateSetupDto>.Failure(validation.Value.Code, validation.Value.Message);
 
+        var scope = await ResolveProgramScopeAsync(request, ct);
+        if (!scope.IsSuccess)
+            return Result<SurplusLinesStateSetupDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
+
         var setup = new SurplusLinesStateSetup();
-        Apply(setup, request);
+        Apply(setup, request, scope.Value!.ProgramCarrierLobStateId);
 
         _db.Set<SurplusLinesStateSetup>().Add(setup);
         await _db.SaveChangesAsync(ct);
@@ -68,7 +72,11 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         if (validation is not null)
             return Result<SurplusLinesStateSetupDto>.Failure(validation.Value.Code, validation.Value.Message);
 
-        Apply(setup, request);
+        var scope = await ResolveProgramScopeAsync(request, ct);
+        if (!scope.IsSuccess)
+            return Result<SurplusLinesStateSetupDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
+
+        Apply(setup, request, scope.Value!.ProgramCarrierLobStateId);
         await _db.SaveChangesAsync(ct);
 
         return await GetAsync(setup.Id, ct);
@@ -87,17 +95,19 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         if (source.StateCode == targetState.Value)
             return Result<SurplusLinesStateSetupDto>.Failure("SURPLUS_LINES_COPY_SAME_STATE", "Target state must be different from source state.");
 
+        Guid? targetProgramCarrierLobStateId = null;
         if (source.ProgramConfigurationId.HasValue)
         {
-            var pathValidation = await ValidateProgramSetupPathAsync(
+            var pathValidation = await ResolveProgramScopeAsync(
                 source.ProgramConfigurationId.Value,
                 source.CarrierId,
                 source.LineOfBusiness,
                 targetState.Value!,
                 source.EffectiveDate,
                 ct);
-            if (pathValidation is not null)
-                return Result<SurplusLinesStateSetupDto>.Failure(pathValidation.Value.Code, pathValidation.Value.Message);
+            if (!pathValidation.IsSuccess)
+                return Result<SurplusLinesStateSetupDto>.Failure(pathValidation.ErrorCode!, pathValidation.ErrorMessage!);
+            targetProgramCarrierLobStateId = pathValidation.Value!.ProgramCarrierLobStateId;
         }
 
         var copy = new SurplusLinesStateSetup
@@ -106,6 +116,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             ProgramConfigurationId = source.ProgramConfigurationId,
             CarrierId = source.CarrierId,
             LineOfBusiness = source.LineOfBusiness,
+            ProgramCarrierLobStateId = targetProgramCarrierLobStateId,
             EffectiveDate = source.EffectiveDate,
             ExpirationDate = source.ExpirationDate,
             IsActive = source.IsActive,
@@ -202,15 +213,15 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
 
         if (request.ProgramConfigurationId.HasValue)
         {
-            var pathValidation = await ValidateProgramSetupPathAsync(
+            var pathValidation = await ResolveProgramScopeAsync(
                 request.ProgramConfigurationId.Value,
                 request.CarrierId,
                 request.LineOfBusiness,
                 normalizedState.Value!,
                 request.EffectiveDate,
                 ct);
-            if (pathValidation is not null)
-                return pathValidation.Value;
+            if (!pathValidation.IsSuccess)
+                return (pathValidation.ErrorCode!, pathValidation.ErrorMessage!);
         }
 
         var feeIds = new[]
@@ -254,7 +265,24 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         return null;
     }
 
-    private async Task<(string Code, string Message)?> ValidateProgramSetupPathAsync(
+    private async Task<Result<ResolvedSurplusLinesProgramScope>> ResolveProgramScopeAsync(UpsertSurplusLinesStateSetupRequest request, CancellationToken ct)
+    {
+        if (!request.ProgramConfigurationId.HasValue)
+            return Result<ResolvedSurplusLinesProgramScope>.Success(new(null));
+
+        var stateCode = NormalizeStateCode(request.StateCode);
+        return !stateCode.IsSuccess
+            ? Result<ResolvedSurplusLinesProgramScope>.Failure(stateCode.ErrorCode!, stateCode.ErrorMessage!)
+            : await ResolveProgramScopeAsync(
+                request.ProgramConfigurationId.Value,
+                request.CarrierId,
+                request.LineOfBusiness,
+                stateCode.Value!,
+                request.EffectiveDate,
+                ct);
+    }
+
+    private async Task<Result<ResolvedSurplusLinesProgramScope>> ResolveProgramScopeAsync(
         Guid programConfigurationId,
         Guid? carrierId,
         PolicyLineOfBusiness? lineOfBusiness,
@@ -262,37 +290,46 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         DateOnly effectiveDate,
         CancellationToken ct)
     {
-        var query = _db.Set<ProgramCarrierLobState>()
+        if (!carrierId.HasValue || !lineOfBusiness.HasValue)
+        {
+            return Result<ResolvedSurplusLinesProgramScope>.Failure(
+                "INVALID_PROGRAM_SETUP_PATH",
+                "Program-scoped surplus lines setup requires an active Program carrier, line of business, and state.");
+        }
+
+        var programState = await _db.Set<ProgramCarrierLobState>()
             .Where(s =>
                 s.StateCode == stateCode &&
                 s.IsActive &&
+                !s.IsDeleted &&
                 s.EffectiveDate <= effectiveDate &&
                 (s.ExpirationDate == null || s.ExpirationDate >= effectiveDate) &&
                 s.ProgramCarrierLineOfBusiness.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.IsDeleted &&
                 s.ProgramCarrierLineOfBusiness.EffectiveDate <= effectiveDate &&
                 (s.ProgramCarrierLineOfBusiness.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ExpirationDate >= effectiveDate) &&
                 s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsDeleted &&
                 s.ProgramCarrierLineOfBusiness.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.CarrierId == carrierId.Value &&
                 s.ProgramCarrierLineOfBusiness.ProgramCarrier.EffectiveDate <= effectiveDate &&
-                (s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate >= effectiveDate));
+                (s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate >= effectiveDate) &&
+                s.ProgramCarrierLineOfBusiness.LineOfBusiness == lineOfBusiness.Value)
+            .Select(s => new { s.Id })
+            .FirstOrDefaultAsync(ct);
 
-        if (carrierId.HasValue)
-            query = query.Where(s => s.ProgramCarrierLineOfBusiness.ProgramCarrier.CarrierId == carrierId.Value);
-
-        if (lineOfBusiness.HasValue)
-            query = query.Where(s => s.ProgramCarrierLineOfBusiness.LineOfBusiness == lineOfBusiness.Value);
-
-        return await query.AnyAsync(ct)
-            ? null
-            : ("INVALID_PROGRAM_SETUP_PATH", "Selected program, carrier, line of business, and state are not active in Program setup.");
+        return programState is null
+            ? Result<ResolvedSurplusLinesProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected program, carrier, line of business, and state are not active in Program setup.")
+            : Result<ResolvedSurplusLinesProgramScope>.Success(new(programState.Id));
     }
 
-    private static void Apply(SurplusLinesStateSetup setup, UpsertSurplusLinesStateSetupRequest request)
+    private static void Apply(SurplusLinesStateSetup setup, UpsertSurplusLinesStateSetupRequest request, Guid? programCarrierLobStateId)
     {
         setup.StateCode = NormalizeStateCode(request.StateCode).Value!;
         setup.ProgramConfigurationId = request.ProgramConfigurationId;
         setup.CarrierId = request.CarrierId;
         setup.LineOfBusiness = request.LineOfBusiness;
+        setup.ProgramCarrierLobStateId = request.ProgramConfigurationId.HasValue ? programCarrierLobStateId : null;
         setup.EffectiveDate = request.EffectiveDate;
         setup.ExpirationDate = request.ExpirationDate;
         setup.IsActive = request.IsActive;
@@ -350,6 +387,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             setup.Carrier?.Name,
             setup.LineOfBusiness,
             setup.LineOfBusiness.HasValue ? GetLobLabel(setup.LineOfBusiness.Value) : null,
+            setup.ProgramCarrierLobStateId,
             setup.EffectiveDate,
             setup.ExpirationDate,
             setup.IsActive,
@@ -461,3 +499,5 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         return JsonSerializer.Serialize(document.RootElement);
     }
 }
+
+internal sealed record ResolvedSurplusLinesProgramScope(Guid? ProgramCarrierLobStateId);

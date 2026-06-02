@@ -118,8 +118,10 @@ export function SurplusLinesAdminPage() {
   )
   const stateOptions = selectedProgram ? programScopeOptions.states : US_STATES
   const programScopeAllowsCurrent = !selectedProgram || (
-    (!form.carrierId || carrierOptions.some((carrier) => carrier.id === form.carrierId)) &&
-    (!form.lineOfBusiness || lobOptions.some((lob) => lob.value === form.lineOfBusiness)) &&
+    Boolean(form.carrierId) &&
+    Boolean(form.lineOfBusiness) &&
+    carrierOptions.some((carrier) => carrier.id === form.carrierId) &&
+    lobOptions.some((lob) => lob.value === form.lineOfBusiness) &&
     stateOptions.includes(form.stateCode)
   )
 
@@ -333,11 +335,11 @@ export function SurplusLinesAdminPage() {
               {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
             </SelectField>
             <SelectField label="Carrier" value={form.carrierId ?? ''} onChange={changeCarrier}>
-              <option value="">All carriers</option>
+              <option value="">{selectedProgram ? 'Select carrier' : 'All carriers'}</option>
               {carrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
             </SelectField>
             <SelectField label="LOB" value={form.lineOfBusiness ?? ''} onChange={changeLineOfBusiness}>
-              <option value="">All LOBs</option>
+              <option value="">{selectedProgram ? 'Select LOB' : 'All LOBs'}</option>
               {lobOptions.map((lob) => <option key={lob.value} value={lob.value}>{lob.label}</option>)}
             </SelectField>
             <SelectField label="State" value={form.stateCode} onChange={(value) => setForm((f) => ({ ...f, stateCode: value, licenseState: value, brokerState: value }))}>

@@ -8,7 +8,21 @@ public class SurplusLinesStateSetupConfiguration : IEntityTypeConfiguration<Surp
 {
     public void Configure(EntityTypeBuilder<SurplusLinesStateSetup> builder)
     {
-        builder.ToTable("surplus_lines_state_setups");
+        const string programScopeCanonicalCheck =
+            """
+            (
+                "ProgramConfigurationId" IS NULL
+                AND "ProgramCarrierLobStateId" IS NULL
+            )
+            OR (
+                "ProgramConfigurationId" IS NOT NULL
+                AND "CarrierId" IS NOT NULL
+                AND "LineOfBusiness" IS NOT NULL
+                AND "ProgramCarrierLobStateId" IS NOT NULL
+            )
+            """;
+
+        builder.ToTable("surplus_lines_state_setups", t => t.HasCheckConstraint("ck_surplus_lines_state_setup_program_scope_canonical", programScopeCanonicalCheck));
         builder.HasKey(s => s.Id);
 
         builder.Property(s => s.StateCode).IsRequired().HasMaxLength(2);
@@ -43,6 +57,8 @@ public class SurplusLinesStateSetupConfiguration : IEntityTypeConfiguration<Surp
             s.LineOfBusiness,
             s.EffectiveDate,
         }).HasDatabaseName("ix_surplus_lines_state_setup_lookup");
+        builder.HasIndex(s => s.ProgramCarrierLobStateId)
+            .HasDatabaseName("ix_surplus_lines_state_setup_program_state_scope");
 
         builder.HasOne(s => s.ProgramConfiguration)
             .WithMany()
@@ -52,6 +68,11 @@ public class SurplusLinesStateSetupConfiguration : IEntityTypeConfiguration<Surp
         builder.HasOne(s => s.Carrier)
             .WithMany()
             .HasForeignKey(s => s.CarrierId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.ProgramCarrierLobState)
+            .WithMany()
+            .HasForeignKey(s => s.ProgramCarrierLobStateId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(s => s.SurplusLinesTaxFeeDefinition)

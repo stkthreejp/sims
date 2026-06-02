@@ -11,6 +11,7 @@ public record SurplusLinesStateSetupDto(
     string? CarrierName,
     PolicyLineOfBusiness? LineOfBusiness,
     string? LineOfBusinessLabel,
+    Guid? ProgramCarrierLobStateId,
     DateOnly EffectiveDate,
     DateOnly? ExpirationDate,
     bool IsActive,

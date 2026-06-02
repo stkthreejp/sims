@@ -9,6 +9,7 @@ public class SurplusLinesStateSetup : BaseEntity
     public Guid? ProgramConfigurationId { get; set; }
     public Guid? CarrierId { get; set; }
     public PolicyLineOfBusiness? LineOfBusiness { get; set; }
+    public Guid? ProgramCarrierLobStateId { get; set; }
     public DateOnly EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
     public bool IsActive { get; set; } = true;
@@ -46,6 +47,7 @@ public class SurplusLinesStateSetup : BaseEntity
 
     public ProgramConfiguration? ProgramConfiguration { get; set; }
     public Carrier? Carrier { get; set; }
+    public ProgramCarrierLobState? ProgramCarrierLobState { get; set; }
     public FeeDefinition? SurplusLinesTaxFeeDefinition { get; set; }
     public FeeDefinition? StampingFeeDefinition { get; set; }
     public FeeDefinition? FilingFeeDefinition { get; set; }

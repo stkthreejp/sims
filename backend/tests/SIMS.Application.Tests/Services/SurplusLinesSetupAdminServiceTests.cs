@@ -21,7 +21,7 @@ public class SurplusLinesSetupAdminServiceTests
         var stampingFee = new FeeDefinition { Code = "MS_STAMP", DisplayName = "MS Stamping Fee", FeeCategory = "StampingFee", LedgerAccountId = 1 };
         db.AddRange(program, carrier, taxFee, stampingFee);
         await db.SaveChangesAsync();
-        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.GeneralLiability, "MS");
+        var programState = await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.GeneralLiability, "MS");
         var statePayee = await AddStatePayeeAsync(db, "MS");
 
         var service = new SurplusLinesSetupAdminService(db);
@@ -60,6 +60,7 @@ public class SurplusLinesSetupAdminServiceTests
         Assert.Equal("Longleaf", result.Value.ProgramName);
         Assert.Equal(carrier.Id, result.Value.CarrierId);
         Assert.Equal("BRACE", result.Value.CarrierName);
+        Assert.Equal(programState.Id, result.Value.ProgramCarrierLobStateId);
         Assert.Equal("MS Surplus Lines Tax", result.Value.SurplusLinesTaxFeeName);
         Assert.Equal("MS Stamping Fee", result.Value.StampingFeeName);
         Assert.Equal("MS notice", result.Value.RequiredNoticeText);
@@ -104,6 +105,51 @@ public class SurplusLinesSetupAdminServiceTests
             null,
             null,
             null));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsProgramScopedSetupWithoutFullProgramPath()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Name = "BRACE", IsActive = true };
+        db.AddRange(program, carrier);
+        await db.SaveChangesAsync();
+        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "TX");
+        var statePayee = await AddStatePayeeAsync(db, "TX");
+
+        var service = new SurplusLinesSetupAdminService(db);
+
+        var result = await service.CreateAsync(new UpsertSurplusLinesStateSetupRequest(
+            "TX",
+            program.Id,
+            null,
+            null,
+            new DateOnly(2026, 1, 1),
+            null,
+            true,
+            true,
+            "SMM",
+            "Specialty Market Managers, LLC",
+            "TX-SL-1",
+            "TX",
+            "123 Main",
+            null,
+            "Dallas",
+            "TX",
+            "75201",
+            "USA",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            StatePayeeId: statePayee.Id));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
@@ -162,7 +208,7 @@ public class SurplusLinesSetupAdminServiceTests
         db.AddRange(program, carrier, fee);
         await db.SaveChangesAsync();
         await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "NC");
-        await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "SC");
+        var targetState = await AddProgramPathAsync(db, program.Id, carrier.Id, PolicyLineOfBusiness.InlandMarine, "SC");
         var statePayee = await AddStatePayeeAsync(db, "NC");
 
         var service = new SurplusLinesSetupAdminService(db);
@@ -202,6 +248,7 @@ public class SurplusLinesSetupAdminServiceTests
         Assert.Equal("NC notice", copy.Value.RequiredNoticeText);
         Assert.Equal(fee.Id, copy.Value.SurplusLinesTaxFeeDefinitionId);
         Assert.Equal(statePayee.Id, copy.Value.StatePayeeId);
+        Assert.Equal(targetState.Id, copy.Value.ProgramCarrierLobStateId);
     }
 
     [Fact]
@@ -526,7 +573,7 @@ public class SurplusLinesSetupAdminServiceTests
         return payee;
     }
 
-    private static async Task AddProgramPathAsync(
+    private static async Task<ProgramCarrierLobState> AddProgramPathAsync(
         ApplicationDbContext db,
         Guid programId,
         Guid carrierId,
@@ -548,14 +595,16 @@ public class SurplusLinesSetupAdminServiceTests
             IsActive = true,
             EffectiveDate = programCarrier.EffectiveDate
         };
-        lob.States.Add(new ProgramCarrierLobState
+        var state = new ProgramCarrierLobState
         {
             StateCode = stateCode,
             IsActive = true,
             EffectiveDate = programCarrier.EffectiveDate
-        });
+        };
+        lob.States.Add(state);
         programCarrier.LinesOfBusiness.Add(lob);
         db.Add(programCarrier);
         await db.SaveChangesAsync();
+        return state;
     }
 }
