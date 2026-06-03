@@ -5705,6 +5705,12 @@ namespace SIMS.Infrastructure.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("ProgramCarrierLineOfBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProgramCarrierLobStateId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ProgramConfigurationId")
                         .HasColumnType("uuid");
 
@@ -5724,10 +5730,19 @@ namespace SIMS.Infrastructure.Migrations
 
                     b.HasIndex("PolicyNumberSequenceId");
 
+                    b.HasIndex("ProgramCarrierLineOfBusinessId")
+                        .HasDatabaseName("ix_policy_number_assignment_program_lob_scope");
+
+                    b.HasIndex("ProgramCarrierLobStateId")
+                        .HasDatabaseName("ix_policy_number_assignment_program_state_scope");
+
                     b.HasIndex("ProgramConfigurationId", "CarrierId", "WritingCompanyId", "LineOfBusiness", "State", "IsActive")
                         .HasDatabaseName("ix_policy_number_assignments_program_lookup");
 
-                    b.ToTable("policy_number_assignments", (string)null);
+                    b.ToTable("policy_number_assignments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_policy_number_assignment_program_scope_canonical", "(\n    \"ProgramConfigurationId\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n    AND \"ProgramCarrierLobStateId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"State\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NOT NULL\n    AND \"ProgramCarrierLobStateId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"State\" IS NOT NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n    AND \"ProgramCarrierLobStateId\" IS NOT NULL\n)");
+                        });
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.PolicyNumberSequence", b =>
@@ -11355,6 +11370,16 @@ namespace SIMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrierLineOfBusiness", "ProgramCarrierLineOfBusiness")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierLineOfBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrierLobState", "ProgramCarrierLobState")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierLobStateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SIMS.Domain.Entities.ProgramConfiguration", "ProgramConfiguration")
                         .WithMany()
                         .HasForeignKey("ProgramConfigurationId")
@@ -11363,6 +11388,10 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("Carrier");
 
                     b.Navigation("PolicyNumberSequence");
+
+                    b.Navigation("ProgramCarrierLineOfBusiness");
+
+                    b.Navigation("ProgramCarrierLobState");
 
                     b.Navigation("ProgramConfiguration");
                 });

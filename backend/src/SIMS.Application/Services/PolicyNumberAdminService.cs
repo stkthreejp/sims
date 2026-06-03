@@ -83,8 +83,11 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         var validation = await ValidateAssignmentAsync(dto);
         if (!validation.IsSuccess) return Result<PolicyNumberAssignmentDto>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
 
+        var scope = await ResolveProgramScopeAsync(dto);
+        if (!scope.IsSuccess) return Result<PolicyNumberAssignmentDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
+
         var assignment = new PolicyNumberAssignment();
-        ApplyAssignment(assignment, dto);
+        ApplyAssignment(assignment, dto, scope.Value!);
         _db.Set<PolicyNumberAssignment>().Add(assignment);
         await _db.SaveChangesAsync();
 
@@ -96,10 +99,13 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         var validation = await ValidateAssignmentAsync(dto);
         if (!validation.IsSuccess) return Result<PolicyNumberAssignmentDto>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
 
+        var scope = await ResolveProgramScopeAsync(dto);
+        if (!scope.IsSuccess) return Result<PolicyNumberAssignmentDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
+
         var assignment = await _db.Set<PolicyNumberAssignment>().FirstOrDefaultAsync(a => a.Id == id);
         if (assignment == null) return Result<PolicyNumberAssignmentDto>.Failure("NOT_FOUND", "Policy number assignment not found.");
 
-        ApplyAssignment(assignment, dto);
+        ApplyAssignment(assignment, dto, scope.Value!);
         await _db.SaveChangesAsync();
 
         return Result<PolicyNumberAssignmentDto>.Success((await GetAssignmentAsync(assignment.Id))!);
@@ -152,42 +158,88 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
     {
         if (!await _db.Set<PolicyNumberSequence>().AnyAsync(s => s.Id == dto.PolicyNumberSequenceId))
             return Result.Failure("VALIDATION", "Select a valid sequence.");
-        if (dto.ProgramConfigurationId.HasValue && !await _db.Set<ProgramConfiguration>().AnyAsync(p => p.Id == dto.ProgramConfigurationId.Value && p.IsActive))
+        if (dto.ProgramConfigurationId.HasValue && !await _db.Set<ProgramConfiguration>().AnyAsync(p =>
+                p.Id == dto.ProgramConfigurationId.Value &&
+                p.IsActive &&
+                !p.IsDeleted))
             return Result.Failure("VALIDATION", "Select a valid active program.");
         if (!await _db.Set<Carrier>().AnyAsync(c => c.Id == dto.CarrierId))
             return Result.Failure("VALIDATION", "Select a valid carrier.");
         if (!string.IsNullOrWhiteSpace(dto.State) && dto.State.Trim().Length != 2)
             return Result.Failure("VALIDATION", "State must be blank or a two-letter code.");
-        if (dto.ProgramConfigurationId.HasValue)
-        {
-            var pathExists = await ProgramAssignmentPathExistsAsync(
-                dto.ProgramConfigurationId.Value,
-                dto.CarrierId,
-                dto.LineOfBusiness,
-                dto.State);
-            if (!pathExists)
-                return Result.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and state are not active for this program.");
-        }
         return Result.Success();
     }
 
-    private async Task<bool> ProgramAssignmentPathExistsAsync(Guid programConfigurationId, Guid carrierId, PolicyLineOfBusiness lineOfBusiness, string? state)
+    private async Task<Result<ResolvedPolicyNumberProgramScope>> ResolveProgramScopeAsync(PolicyNumberAssignmentUpsertDto dto)
     {
-        var stateCode = string.IsNullOrWhiteSpace(state) ? null : state.Trim().ToUpperInvariant();
-        var query = _db.Set<ProgramCarrierLineOfBusiness>()
-            .Where(l =>
-                l.LineOfBusiness == lineOfBusiness &&
-                l.IsActive &&
-                l.ProgramCarrier.IsActive &&
-                l.ProgramCarrier.CarrierId == carrierId &&
-                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId);
+        var state = NormalizeState(dto.State);
+        if (!state.IsSuccess)
+            return Result<ResolvedPolicyNumberProgramScope>.Failure("VALIDATION", state.ErrorMessage!);
 
-        if (stateCode != null)
+        if (!dto.ProgramConfigurationId.HasValue)
+            return Result<ResolvedPolicyNumberProgramScope>.Success(new(null, null, state.Value));
+
+        var programId = dto.ProgramConfigurationId.Value;
+        var asOfDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (state.Value == null)
         {
-            query = query.Where(l => l.States.Any(s => s.StateCode == stateCode && s.IsActive));
+            var programLobId = await _db.Set<ProgramCarrierLineOfBusiness>()
+                .Where(l =>
+                    l.LineOfBusiness == dto.LineOfBusiness &&
+                    l.IsActive &&
+                    !l.IsDeleted &&
+                    l.EffectiveDate <= asOfDate &&
+                    (l.ExpirationDate == null || l.ExpirationDate >= asOfDate) &&
+                    l.ProgramCarrier.IsActive &&
+                    !l.ProgramCarrier.IsDeleted &&
+                    l.ProgramCarrier.EffectiveDate <= asOfDate &&
+                    (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= asOfDate) &&
+                    l.ProgramCarrier.CarrierId == dto.CarrierId &&
+                    l.ProgramCarrier.ProgramConfigurationId == programId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
+
+            return programLobId.HasValue
+                ? Result<ResolvedPolicyNumberProgramScope>.Success(new(programLobId.Value, null, null))
+                : Result<ResolvedPolicyNumberProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected carrier and line of business are not active for this program.");
         }
 
-        return await query.AnyAsync();
+        var programStateId = await _db.Set<ProgramCarrierLobState>()
+            .Where(s =>
+                s.StateCode == state.Value &&
+                s.IsActive &&
+                !s.IsDeleted &&
+                s.EffectiveDate <= asOfDate &&
+                (s.ExpirationDate == null || s.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.LineOfBusiness == dto.LineOfBusiness &&
+                s.ProgramCarrierLineOfBusiness.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.IsDeleted &&
+                s.ProgramCarrierLineOfBusiness.EffectiveDate <= asOfDate &&
+                (s.ProgramCarrierLineOfBusiness.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsActive &&
+                !s.ProgramCarrierLineOfBusiness.ProgramCarrier.IsDeleted &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.EffectiveDate <= asOfDate &&
+                (s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate == null || s.ProgramCarrierLineOfBusiness.ProgramCarrier.ExpirationDate >= asOfDate) &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.CarrierId == dto.CarrierId &&
+                s.ProgramCarrierLineOfBusiness.ProgramCarrier.ProgramConfigurationId == programId)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync();
+
+        return programStateId.HasValue
+            ? Result<ResolvedPolicyNumberProgramScope>.Success(new(null, programStateId.Value, state.Value))
+            : Result<ResolvedPolicyNumberProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and state are not active for this program.");
+    }
+
+    private static Result<string?> NormalizeState(string? state)
+    {
+        if (string.IsNullOrWhiteSpace(state))
+            return Result<string?>.Success(null);
+
+        var stateCode = state.Trim().ToUpperInvariant();
+        return stateCode.Length == 2
+            ? Result<string?>.Success(stateCode)
+            : Result<string?>.Failure("VALIDATION", "State must be a two-letter code.");
     }
 
     private static void ApplySequence(PolicyNumberSequence sequence, PolicyNumberSequenceUpsertDto dto)
@@ -203,14 +255,16 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         sequence.Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim();
     }
 
-    private static void ApplyAssignment(PolicyNumberAssignment assignment, PolicyNumberAssignmentUpsertDto dto)
+    private static void ApplyAssignment(PolicyNumberAssignment assignment, PolicyNumberAssignmentUpsertDto dto, ResolvedPolicyNumberProgramScope scope)
     {
         assignment.PolicyNumberSequenceId = dto.PolicyNumberSequenceId;
         assignment.ProgramConfigurationId = dto.ProgramConfigurationId;
         assignment.CarrierId = dto.CarrierId;
         assignment.WritingCompanyId = dto.WritingCompanyId;
         assignment.LineOfBusiness = dto.LineOfBusiness;
-        assignment.State = string.IsNullOrWhiteSpace(dto.State) ? null : dto.State.Trim().ToUpperInvariant();
+        assignment.State = scope.State;
+        assignment.ProgramCarrierLineOfBusinessId = dto.ProgramConfigurationId.HasValue ? scope.ProgramCarrierLineOfBusinessId : null;
+        assignment.ProgramCarrierLobStateId = dto.ProgramConfigurationId.HasValue ? scope.ProgramCarrierLobStateId : null;
         assignment.Priority = dto.Priority;
         assignment.IsActive = dto.IsActive;
     }
@@ -241,6 +295,8 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         WritingCompanyId = assignment.WritingCompanyId,
         LineOfBusiness = assignment.LineOfBusiness,
         State = assignment.State,
+        ProgramCarrierLineOfBusinessId = assignment.ProgramCarrierLineOfBusinessId,
+        ProgramCarrierLobStateId = assignment.ProgramCarrierLobStateId,
         Priority = assignment.Priority,
         IsActive = assignment.IsActive,
     };
@@ -281,3 +337,8 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         return new string(value.Where(char.IsLetterOrDigit).Take(12).Select(char.ToUpperInvariant).ToArray());
     }
 }
+
+internal sealed record ResolvedPolicyNumberProgramScope(
+    Guid? ProgramCarrierLineOfBusinessId,
+    Guid? ProgramCarrierLobStateId,
+    string? State);

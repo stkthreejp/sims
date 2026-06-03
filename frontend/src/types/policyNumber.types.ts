@@ -38,6 +38,8 @@ export interface PolicyNumberAssignment {
   writingCompanyId: string | null
   lineOfBusiness: PolicyLineOfBusiness
   state: string | null
+  programCarrierLineOfBusinessId: string | null
+  programCarrierLobStateId: string | null
   priority: number
   isActive: boolean
 }

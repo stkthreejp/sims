@@ -10,10 +10,14 @@ public class PolicyNumberAssignment : BaseEntity
     public Guid? WritingCompanyId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public string? State { get; set; }
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
+    public Guid? ProgramCarrierLobStateId { get; set; }
     public int Priority { get; set; }
     public bool IsActive { get; set; } = true;
 
     public PolicyNumberSequence PolicyNumberSequence { get; set; } = null!;
     public ProgramConfiguration? ProgramConfiguration { get; set; }
     public Carrier Carrier { get; set; } = null!;
+    public ProgramCarrierLineOfBusiness? ProgramCarrierLineOfBusiness { get; set; }
+    public ProgramCarrierLobState? ProgramCarrierLobState { get; set; }
 }

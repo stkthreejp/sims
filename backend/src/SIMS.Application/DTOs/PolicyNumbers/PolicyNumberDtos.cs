@@ -41,6 +41,8 @@ public class PolicyNumberAssignmentDto
     public Guid? WritingCompanyId { get; set; }
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public string? State { get; set; }
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
+    public Guid? ProgramCarrierLobStateId { get; set; }
     public int Priority { get; set; }
     public bool IsActive { get; set; }
 }
