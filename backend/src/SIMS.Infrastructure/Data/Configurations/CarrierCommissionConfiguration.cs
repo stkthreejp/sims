@@ -8,7 +8,28 @@ public class CarrierCommissionConfiguration : IEntityTypeConfiguration<CarrierCo
 {
     public void Configure(EntityTypeBuilder<CarrierCommission> builder)
     {
-        builder.ToTable("carrier_commissions");
+        const string programScopeCanonicalCheck =
+            """
+            (
+                "ProgramConfigurationId" IS NULL
+                AND "ProgramCarrierId" IS NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NULL
+            )
+            OR (
+                "ProgramConfigurationId" IS NOT NULL
+                AND "LineOfBusiness" IS NULL
+                AND "ProgramCarrierId" IS NOT NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NULL
+            )
+            OR (
+                "ProgramConfigurationId" IS NOT NULL
+                AND "LineOfBusiness" IS NOT NULL
+                AND "ProgramCarrierId" IS NULL
+                AND "ProgramCarrierLineOfBusinessId" IS NOT NULL
+            )
+            """;
+
+        builder.ToTable("carrier_commissions", t => t.HasCheckConstraint("ck_carrier_commission_program_scope_canonical", programScopeCanonicalCheck));
         builder.HasKey(e => e.Id);
         builder.Property(e => e.CommissionRate).HasColumnType("numeric(8,6)");
         builder.Property(e => e.LineOfBusiness).HasMaxLength(50);
@@ -23,9 +44,23 @@ public class CarrierCommissionConfiguration : IEntityTypeConfiguration<CarrierCo
             .HasForeignKey(e => e.CarrierId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(e => e.ProgramCarrier)
+            .WithMany()
+            .HasForeignKey(e => e.ProgramCarrierId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.ProgramCarrierLineOfBusiness)
+            .WithMany()
+            .HasForeignKey(e => e.ProgramCarrierLineOfBusinessId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(e => new { e.ProgramConfigurationId, e.CarrierId, e.LineOfBusiness, e.EffectiveDate })
             .IsUnique()
             .AreNullsDistinct(false);
+        builder.HasIndex(e => e.ProgramCarrierId)
+            .HasDatabaseName("ix_carrier_commission_program_carrier_scope");
+        builder.HasIndex(e => e.ProgramCarrierLineOfBusinessId)
+            .HasDatabaseName("ix_carrier_commission_program_lob_scope");
         builder.HasIndex(e => new { e.CarrierId, e.DisabledDate });
     }
 }

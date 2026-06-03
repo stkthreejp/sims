@@ -2510,6 +2510,12 @@ namespace SIMS.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<Guid?>("ProgramCarrierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProgramCarrierLineOfBusinessId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ProgramConfigurationId")
                         .HasColumnType("uuid");
 
@@ -2518,6 +2524,12 @@ namespace SIMS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProgramCarrierId")
+                        .HasDatabaseName("ix_carrier_commission_program_carrier_scope");
+
+                    b.HasIndex("ProgramCarrierLineOfBusinessId")
+                        .HasDatabaseName("ix_carrier_commission_program_lob_scope");
+
                     b.HasIndex("CarrierId", "DisabledDate");
 
                     b.HasIndex("ProgramConfigurationId", "CarrierId", "LineOfBusiness", "EffectiveDate")
@@ -2525,7 +2537,10 @@ namespace SIMS.Infrastructure.Migrations
 
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ProgramConfigurationId", "CarrierId", "LineOfBusiness", "EffectiveDate"), false);
 
-                    b.ToTable("carrier_commissions", (string)null);
+                    b.ToTable("carrier_commissions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_carrier_commission_program_scope_canonical", "(\n    \"ProgramConfigurationId\" IS NULL\n    AND \"ProgramCarrierId\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"LineOfBusiness\" IS NULL\n    AND \"ProgramCarrierId\" IS NOT NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"LineOfBusiness\" IS NOT NULL\n    AND \"ProgramCarrierId\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NOT NULL\n)");
+                        });
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.CarrierContact", b =>
@@ -10797,12 +10812,26 @@ namespace SIMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrier", "ProgramCarrier")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrierLineOfBusiness", "ProgramCarrierLineOfBusiness")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierLineOfBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SIMS.Domain.Entities.ProgramConfiguration", "ProgramConfiguration")
                         .WithMany()
                         .HasForeignKey("ProgramConfigurationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Carrier");
+
+                    b.Navigation("ProgramCarrier");
+
+                    b.Navigation("ProgramCarrierLineOfBusiness");
 
                     b.Navigation("ProgramConfiguration");
                 });

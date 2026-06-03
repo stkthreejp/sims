@@ -4,6 +4,8 @@ export interface CarrierCommission {
   programName: string | null
   lineOfBusiness: string | null
   lineOfBusinessLabel: string | null
+  programCarrierId: string | null
+  programCarrierLineOfBusinessId: string | null
   commissionRate: number
   smmRetentionRate: number
   effectiveDate: string

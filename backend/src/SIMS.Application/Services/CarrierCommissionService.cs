@@ -52,28 +52,14 @@ public class CarrierCommissionService : ICarrierCommissionService
 
         var db = Db;
 
-        if (req.ProgramConfigurationId.HasValue)
-        {
-            var programExists = await db.Set<ProgramConfiguration>()
-                .AnyAsync(p => p.Id == req.ProgramConfigurationId.Value && p.IsActive, ct);
-            if (!programExists)
-                return Result<CarrierCommissionDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
-
-            var pathExists = await ProgramCarrierCommissionPathExistsAsync(
-                req.ProgramConfigurationId.Value,
-                carrierId,
-                req.LineOfBusiness,
-                req.EffectiveDate,
-                ct);
-            if (!pathExists)
-                return Result<CarrierCommissionDto>.Failure("INVALID_PROGRAM_SETUP_PATH",
-                    "Selected carrier and line of business are not active for this program.");
-        }
+        var scope = await ResolveProgramScopeAsync(req.ProgramConfigurationId, carrierId, req.LineOfBusiness, req.EffectiveDate, ct);
+        if (!scope.IsSuccess)
+            return Result<CarrierCommissionDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
 
         var duplicate = await db.Set<CarrierCommission>()
             .AnyAsync(c => c.CarrierId == carrierId
                 && c.ProgramConfigurationId == req.ProgramConfigurationId
-                && c.LineOfBusiness == req.LineOfBusiness
+                && c.LineOfBusiness == scope.Value!.LineOfBusiness
                 && c.EffectiveDate == req.EffectiveDate, ct);
 
         if (duplicate)
@@ -83,7 +69,9 @@ public class CarrierCommissionService : ICarrierCommissionService
         {
             CarrierId = carrierId,
             ProgramConfigurationId = req.ProgramConfigurationId,
-            LineOfBusiness = req.LineOfBusiness,
+            LineOfBusiness = scope.Value!.LineOfBusiness,
+            ProgramCarrierId = scope.Value.ProgramCarrierId,
+            ProgramCarrierLineOfBusinessId = scope.Value.ProgramCarrierLineOfBusinessId,
             CommissionRate = req.CommissionRate,
             SMMRetentionRate = req.SMMRetentionRate,
             EffectiveDate = req.EffectiveDate,
@@ -135,38 +123,66 @@ public class CarrierCommissionService : ICarrierCommissionService
         return null;
     }
 
-    private async Task<bool> ProgramCarrierCommissionPathExistsAsync(
-        Guid programConfigurationId,
+    private async Task<Result<ResolvedCarrierCommissionProgramScope>> ResolveProgramScopeAsync(
+        Guid? programConfigurationId,
         Guid carrierId,
         string? lineOfBusiness,
         DateOnly effectiveDate,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(lineOfBusiness))
+        var normalizedLineOfBusiness = string.IsNullOrWhiteSpace(lineOfBusiness) ? null : lineOfBusiness.Trim();
+        if (!programConfigurationId.HasValue)
+            return Result<ResolvedCarrierCommissionProgramScope>.Success(new(null, null, normalizedLineOfBusiness));
+
+        var programId = programConfigurationId.Value;
+        var programExists = await Db.Set<ProgramConfiguration>()
+            .AnyAsync(p => p.Id == programId && p.IsActive && !p.IsDeleted, ct);
+        if (!programExists)
+            return Result<ResolvedCarrierCommissionProgramScope>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
+
+        if (normalizedLineOfBusiness == null)
         {
-            return await Db.Set<ProgramCarrier>()
-                .AnyAsync(c =>
-                    c.ProgramConfigurationId == programConfigurationId &&
+            var programCarrierId = await Db.Set<ProgramCarrier>()
+                .Where(c =>
+                    c.ProgramConfigurationId == programId &&
                     c.CarrierId == carrierId &&
                     c.IsActive &&
+                    !c.IsDeleted &&
                     c.EffectiveDate <= effectiveDate &&
-                    (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate), ct);
+                    (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate))
+                .Select(c => (Guid?)c.Id)
+                .FirstOrDefaultAsync(ct);
+
+            return programCarrierId.HasValue
+                ? Result<ResolvedCarrierCommissionProgramScope>.Success(new(programCarrierId.Value, null, null))
+                : Result<ResolvedCarrierCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                    "Selected carrier is not active for this program.");
         }
 
-        if (!Enum.TryParse<PolicyLineOfBusiness>(lineOfBusiness, out var lob))
-            return false;
+        if (!Enum.TryParse<PolicyLineOfBusiness>(normalizedLineOfBusiness, out var lob))
+            return Result<ResolvedCarrierCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                "Selected carrier and line of business are not active for this program.");
 
-        return await Db.Set<ProgramCarrierLineOfBusiness>()
-            .AnyAsync(l =>
+        var programLobId = await Db.Set<ProgramCarrierLineOfBusiness>()
+            .Where(l =>
                 l.LineOfBusiness == lob &&
                 l.IsActive &&
+                !l.IsDeleted &&
                 l.EffectiveDate <= effectiveDate &&
                 (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate) &&
                 l.ProgramCarrier.IsActive &&
+                !l.ProgramCarrier.IsDeleted &&
                 l.ProgramCarrier.CarrierId == carrierId &&
-                l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
+                l.ProgramCarrier.ProgramConfigurationId == programId &&
                 l.ProgramCarrier.EffectiveDate <= effectiveDate &&
-                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate), ct);
+                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate))
+            .Select(l => (Guid?)l.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return programLobId.HasValue
+            ? Result<ResolvedCarrierCommissionProgramScope>.Success(new(null, programLobId.Value, normalizedLineOfBusiness))
+            : Result<ResolvedCarrierCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                "Selected carrier and line of business are not active for this program.");
     }
 
     private static CarrierCommissionDto ToDto(CarrierCommission c) => new(
@@ -175,6 +191,8 @@ public class CarrierCommissionService : ICarrierCommissionService
         c.ProgramConfiguration?.Name,
         c.LineOfBusiness,
         c.LineOfBusiness != null && LobLabels.TryGetValue(c.LineOfBusiness, out var label) ? label : null,
+        c.ProgramCarrierId,
+        c.ProgramCarrierLineOfBusinessId,
         c.CommissionRate,
         c.SMMRetentionRate,
         c.EffectiveDate,
@@ -183,3 +201,8 @@ public class CarrierCommissionService : ICarrierCommissionService
         c.CreatedAt
     );
 }
+
+internal sealed record ResolvedCarrierCommissionProgramScope(
+    Guid? ProgramCarrierId,
+    Guid? ProgramCarrierLineOfBusinessId,
+    string? LineOfBusiness);

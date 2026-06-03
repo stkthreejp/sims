@@ -72,16 +72,17 @@ public class CommissionProgramScopeTests
         await using var db = CreateDb();
         var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden Specialty", IsActive = true };
         var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var programCarrier = new ProgramCarrier
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+        };
         db.AddRange(
             carrier,
             program,
-            new ProgramCarrier
-            {
-                ProgramConfigurationId = program.Id,
-                CarrierId = carrier.Id,
-                IsActive = true,
-                EffectiveDate = new DateOnly(2026, 1, 1),
-            });
+            programCarrier);
         await db.SaveChangesAsync();
 
         var result = await CreateCarrierService(db).CreateAsync(carrier.Id, new(
@@ -94,6 +95,8 @@ public class CommissionProgramScopeTests
         Assert.True(result.IsSuccess);
         Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
         Assert.Null(result.Value.LineOfBusiness);
+        Assert.Equal(programCarrier.Id, result.Value.ProgramCarrierId);
+        Assert.Null(result.Value.ProgramCarrierLineOfBusinessId);
     }
 
     [Fact]
@@ -131,6 +134,12 @@ public class CommissionProgramScopeTests
         await using var db = CreateDb();
         var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden Specialty", IsActive = true };
         var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var programLob = new ProgramCarrierLineOfBusiness
+        {
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+        };
         db.AddRange(
             carrier,
             program,
@@ -142,12 +151,7 @@ public class CommissionProgramScopeTests
                 EffectiveDate = new DateOnly(2026, 1, 1),
                 LinesOfBusiness =
                 {
-                    new ProgramCarrierLineOfBusiness
-                    {
-                        LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
-                        IsActive = true,
-                        EffectiveDate = new DateOnly(2026, 1, 1),
-                    },
+                    programLob,
                 },
             });
         await db.SaveChangesAsync();
@@ -162,6 +166,8 @@ public class CommissionProgramScopeTests
         Assert.True(result.IsSuccess);
         Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
         Assert.Equal("InlandMarine", result.Value.LineOfBusiness);
+        Assert.Null(result.Value.ProgramCarrierId);
+        Assert.Equal(programLob.Id, result.Value.ProgramCarrierLineOfBusinessId);
     }
 
     [Fact]

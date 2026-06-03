@@ -6,6 +6,8 @@ public record CarrierCommissionDto(
     string? ProgramName,
     string? LineOfBusiness,
     string? LineOfBusinessLabel,
+    Guid? ProgramCarrierId,
+    Guid? ProgramCarrierLineOfBusinessId,
     decimal CommissionRate,
     decimal SMMRetentionRate,
     DateOnly EffectiveDate,
