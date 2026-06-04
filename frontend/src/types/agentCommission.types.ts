@@ -7,6 +7,9 @@ export interface AgentCommission {
   lineOfBusiness: string | null
   lineOfBusinessLabel: string | null
   stateCode: string | null
+  programCarrierId: string | null
+  programCarrierLineOfBusinessId: string | null
+  programCarrierLobStateId: string | null
   commissionRate: number
   effectiveDate: string
   disabledDate: string | null

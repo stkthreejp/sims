@@ -1635,6 +1635,15 @@ namespace SIMS.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<Guid?>("ProgramCarrierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProgramCarrierLineOfBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProgramCarrierLobStateId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ProgramConfigurationId")
                         .HasColumnType("uuid");
 
@@ -1646,6 +1655,15 @@ namespace SIMS.Infrastructure.Migrations
 
                     b.HasIndex("CarrierId");
 
+                    b.HasIndex("ProgramCarrierId")
+                        .HasDatabaseName("ix_agent_commission_program_carrier_scope");
+
+                    b.HasIndex("ProgramCarrierLineOfBusinessId")
+                        .HasDatabaseName("ix_agent_commission_program_lob_scope");
+
+                    b.HasIndex("ProgramCarrierLobStateId")
+                        .HasDatabaseName("ix_agent_commission_program_state_scope");
+
                     b.HasIndex("AgentId", "DisabledDate");
 
                     b.HasIndex("ProgramConfigurationId", "CarrierId", "AgentId", "LineOfBusiness", "StateCode", "EffectiveDate")
@@ -1653,7 +1671,10 @@ namespace SIMS.Infrastructure.Migrations
 
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ProgramConfigurationId", "CarrierId", "AgentId", "LineOfBusiness", "StateCode", "EffectiveDate"), false);
 
-                    b.ToTable("agent_commissions", (string)null);
+                    b.ToTable("agent_commissions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_agent_commission_program_scope_canonical", "(\n    \"ProgramConfigurationId\" IS NULL\n    AND \"ProgramCarrierId\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n    AND \"ProgramCarrierLobStateId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"CarrierId\" IS NULL\n    AND \"LineOfBusiness\" IS NULL\n    AND \"StateCode\" IS NULL\n    AND \"ProgramCarrierId\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n    AND \"ProgramCarrierLobStateId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"CarrierId\" IS NOT NULL\n    AND \"LineOfBusiness\" IS NULL\n    AND \"StateCode\" IS NULL\n    AND \"ProgramCarrierId\" IS NOT NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n    AND \"ProgramCarrierLobStateId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"CarrierId\" IS NOT NULL\n    AND \"LineOfBusiness\" IS NOT NULL\n    AND \"StateCode\" IS NULL\n    AND \"ProgramCarrierId\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NOT NULL\n    AND \"ProgramCarrierLobStateId\" IS NULL\n)\nOR (\n    \"ProgramConfigurationId\" IS NOT NULL\n    AND \"CarrierId\" IS NOT NULL\n    AND \"LineOfBusiness\" IS NOT NULL\n    AND \"StateCode\" IS NOT NULL\n    AND \"ProgramCarrierId\" IS NULL\n    AND \"ProgramCarrierLineOfBusinessId\" IS NULL\n    AND \"ProgramCarrierLobStateId\" IS NOT NULL\n)");
+                        });
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.AgentContact", b =>
@@ -10606,6 +10627,21 @@ namespace SIMS.Infrastructure.Migrations
                         .HasForeignKey("CarrierId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrier", "ProgramCarrier")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrierLineOfBusiness", "ProgramCarrierLineOfBusiness")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierLineOfBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrierLobState", "ProgramCarrierLobState")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierLobStateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SIMS.Domain.Entities.ProgramConfiguration", "ProgramConfiguration")
                         .WithMany()
                         .HasForeignKey("ProgramConfigurationId")
@@ -10614,6 +10650,12 @@ namespace SIMS.Infrastructure.Migrations
                     b.Navigation("Agent");
 
                     b.Navigation("Carrier");
+
+                    b.Navigation("ProgramCarrier");
+
+                    b.Navigation("ProgramCarrierLineOfBusiness");
+
+                    b.Navigation("ProgramCarrierLobState");
 
                     b.Navigation("ProgramConfiguration");
                 });

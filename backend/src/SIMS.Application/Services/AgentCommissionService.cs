@@ -51,44 +51,34 @@ public class AgentCommissionService : IAgentCommissionService
             return Result<AgentCommissionDto>.Failure("INVALID_RATE", "Commission rate must be between 0 and 1 (e.g. 0.15 for 15%)");
 
         var db = Db;
-        var stateCode = NormalizeStateCode(req.StateCode);
-        if (stateCode != null && (!req.CarrierId.HasValue || string.IsNullOrWhiteSpace(req.LineOfBusiness)))
+        var scope = await ResolveProgramScopeAsync(
+            req.ProgramConfigurationId,
+            req.CarrierId,
+            req.LineOfBusiness,
+            req.StateCode,
+            req.EffectiveDate,
+            ct);
+        if (!scope.IsSuccess)
+            return Result<AgentCommissionDto>.Failure(scope.ErrorCode!, scope.ErrorMessage!);
+
+        if (scope.Value!.StateCode != null && (!scope.Value.CarrierId.HasValue || string.IsNullOrWhiteSpace(scope.Value.LineOfBusiness)))
             return Result<AgentCommissionDto>.Failure("INVALID_STATE_SCOPE", "State-specific agent commission rates require a carrier and line of business.");
 
         Carrier? carrier = null;
-        if (req.CarrierId.HasValue)
+        if (scope.Value.CarrierId.HasValue)
         {
             carrier = await db.Set<Carrier>()
-                .FirstOrDefaultAsync(c => c.Id == req.CarrierId.Value && c.IsActive, ct);
+                .FirstOrDefaultAsync(c => c.Id == scope.Value.CarrierId.Value && c.IsActive && !c.IsDeleted, ct);
             if (carrier == null)
                 return Result<AgentCommissionDto>.Failure("CARRIER_NOT_FOUND", "Carrier not found or inactive.");
-        }
-
-        if (req.ProgramConfigurationId.HasValue)
-        {
-            var programExists = await db.Set<ProgramConfiguration>()
-                .AnyAsync(p => p.Id == req.ProgramConfigurationId.Value && p.IsActive, ct);
-            if (!programExists)
-                return Result<AgentCommissionDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
-
-            var pathExists = await ProgramAgentCommissionPathExistsAsync(
-                req.ProgramConfigurationId.Value,
-                req.CarrierId,
-                req.LineOfBusiness,
-                stateCode,
-                req.EffectiveDate,
-                ct);
-            if (!pathExists)
-                return Result<AgentCommissionDto>.Failure("INVALID_PROGRAM_SETUP_PATH",
-                    "Selected carrier, line of business, and state are not active for this program.");
         }
 
         var duplicate = await db.Set<AgentCommission>()
             .AnyAsync(c => c.AgentId == agentId
                 && c.ProgramConfigurationId == req.ProgramConfigurationId
-                && c.CarrierId == req.CarrierId
-                && c.LineOfBusiness == req.LineOfBusiness
-                && c.StateCode == stateCode
+                && c.CarrierId == scope.Value.CarrierId
+                && c.LineOfBusiness == scope.Value.LineOfBusiness
+                && c.StateCode == scope.Value.StateCode
                 && c.EffectiveDate == req.EffectiveDate, ct);
 
         if (duplicate)
@@ -98,9 +88,12 @@ public class AgentCommissionService : IAgentCommissionService
         {
             AgentId = agentId,
             ProgramConfigurationId = req.ProgramConfigurationId,
-            CarrierId = req.CarrierId,
-            LineOfBusiness = req.LineOfBusiness,
-            StateCode = stateCode,
+            CarrierId = scope.Value.CarrierId,
+            LineOfBusiness = scope.Value.LineOfBusiness,
+            StateCode = scope.Value.StateCode,
+            ProgramCarrierId = scope.Value.ProgramCarrierId,
+            ProgramCarrierLineOfBusinessId = scope.Value.ProgramCarrierLineOfBusinessId,
+            ProgramCarrierLobStateId = scope.Value.ProgramCarrierLobStateId,
             CommissionRate = req.CommissionRate,
             EffectiveDate = req.EffectiveDate,
             CreatedBy = userId,
@@ -159,55 +152,115 @@ public class AgentCommissionService : IAgentCommissionService
             .FirstOrDefault()?.CommissionRate;
     }
 
-    private async Task<bool> ProgramAgentCommissionPathExistsAsync(
-        Guid programConfigurationId,
+    private async Task<Result<ResolvedAgentCommissionProgramScope>> ResolveProgramScopeAsync(
+        Guid? programConfigurationId,
         Guid? carrierId,
         string? lineOfBusiness,
         string? stateCode,
         DateOnly effectiveDate,
         CancellationToken ct)
     {
-        if (carrierId.HasValue && string.IsNullOrWhiteSpace(lineOfBusiness))
+        var normalizedLineOfBusiness = string.IsNullOrWhiteSpace(lineOfBusiness) ? null : lineOfBusiness.Trim();
+        var normalizedStateCode = NormalizeStateCode(stateCode);
+        if (!programConfigurationId.HasValue)
         {
-            return await Db.Set<ProgramCarrier>()
-                .AnyAsync(c =>
-                    c.ProgramConfigurationId == programConfigurationId &&
-                    c.CarrierId == carrierId.Value &&
-                    c.IsActive &&
-                    c.EffectiveDate <= effectiveDate &&
-                    (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate), ct);
+            return Result<ResolvedAgentCommissionProgramScope>.Success(new(
+                carrierId,
+                normalizedLineOfBusiness,
+                normalizedStateCode,
+                null,
+                null,
+                null));
         }
 
-        if (string.IsNullOrWhiteSpace(lineOfBusiness))
-            return true;
+        var programId = programConfigurationId.Value;
+        var programExists = await Db.Set<ProgramConfiguration>()
+            .AnyAsync(p => p.Id == programId && p.IsActive && !p.IsDeleted, ct);
+        if (!programExists)
+            return Result<ResolvedAgentCommissionProgramScope>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
 
-        if (!Enum.TryParse<PolicyLineOfBusiness>(lineOfBusiness, out var lob))
-            return false;
+        if (normalizedStateCode != null && (!carrierId.HasValue || normalizedLineOfBusiness == null))
+            return Result<ResolvedAgentCommissionProgramScope>.Failure("INVALID_STATE_SCOPE", "State-specific agent commission rates require a carrier and line of business.");
+
+        if (normalizedLineOfBusiness == null)
+        {
+            if (!carrierId.HasValue)
+            {
+                return Result<ResolvedAgentCommissionProgramScope>.Success(new(
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null));
+            }
+
+            var programCarrierId = await Db.Set<ProgramCarrier>()
+                .Where(c =>
+                    c.ProgramConfigurationId == programId &&
+                    c.CarrierId == carrierId.Value &&
+                    c.IsActive &&
+                    !c.IsDeleted &&
+                    c.EffectiveDate <= effectiveDate &&
+                    (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate))
+                .Select(c => (Guid?)c.Id)
+                .FirstOrDefaultAsync(ct);
+
+            return programCarrierId.HasValue
+                ? Result<ResolvedAgentCommissionProgramScope>.Success(new(carrierId, null, null, programCarrierId.Value, null, null))
+                : Result<ResolvedAgentCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                    "Selected carrier is not active for this program.");
+        }
+
+        if (!carrierId.HasValue)
+            return Result<ResolvedAgentCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                "Program-scoped agent commission rates require a carrier when line of business is selected.");
+
+        if (!Enum.TryParse<PolicyLineOfBusiness>(normalizedLineOfBusiness, out var lob))
+            return Result<ResolvedAgentCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                "Selected carrier, line of business, and state are not active for this program.");
 
         var query = Db.Set<ProgramCarrierLineOfBusiness>()
             .Where(l =>
                 l.LineOfBusiness == lob &&
                 l.IsActive &&
+                !l.IsDeleted &&
                 l.EffectiveDate <= effectiveDate &&
                 (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate) &&
                 l.ProgramCarrier.IsActive &&
+                !l.ProgramCarrier.IsDeleted &&
                 l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
+                l.ProgramCarrier.CarrierId == carrierId.Value &&
                 l.ProgramCarrier.EffectiveDate <= effectiveDate &&
                 (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate));
 
-        if (carrierId.HasValue)
-            query = query.Where(l => l.ProgramCarrier.CarrierId == carrierId.Value);
-
-        if (stateCode != null)
+        if (normalizedStateCode != null)
         {
-            query = query.Where(l => l.States.Any(s =>
-                s.StateCode == stateCode &&
+            var programStateId = await query
+                .SelectMany(l => l.States)
+                .Where(s =>
+                s.StateCode == normalizedStateCode &&
                 s.IsActive &&
+                !s.IsDeleted &&
                 s.EffectiveDate <= effectiveDate &&
-                (s.ExpirationDate == null || s.ExpirationDate >= effectiveDate)));
+                (s.ExpirationDate == null || s.ExpirationDate >= effectiveDate))
+                .Select(s => (Guid?)s.Id)
+                .FirstOrDefaultAsync(ct);
+
+            return programStateId.HasValue
+                ? Result<ResolvedAgentCommissionProgramScope>.Success(new(carrierId, normalizedLineOfBusiness, normalizedStateCode, null, null, programStateId.Value))
+                : Result<ResolvedAgentCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                    "Selected carrier, line of business, and state are not active for this program.");
         }
 
-        return await query.AnyAsync(ct);
+        var programLobId = await query
+            .Select(l => (Guid?)l.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return programLobId.HasValue
+            ? Result<ResolvedAgentCommissionProgramScope>.Success(new(carrierId, normalizedLineOfBusiness, null, null, programLobId.Value, null))
+            : Result<ResolvedAgentCommissionProgramScope>.Failure("INVALID_PROGRAM_SETUP_PATH",
+                "Selected carrier and line of business are not active for this program.");
     }
 
     private static string? NormalizeStateCode(string? stateCode)
@@ -225,6 +278,9 @@ public class AgentCommissionService : IAgentCommissionService
         c.LineOfBusiness,
         c.LineOfBusiness != null && LobLabels.TryGetValue(c.LineOfBusiness, out var label) ? label : null,
         c.StateCode,
+        c.ProgramCarrierId,
+        c.ProgramCarrierLineOfBusinessId,
+        c.ProgramCarrierLobStateId,
         c.CommissionRate,
         c.EffectiveDate,
         c.DisabledDate,
@@ -232,3 +288,11 @@ public class AgentCommissionService : IAgentCommissionService
         c.CreatedAt
     );
 }
+
+internal sealed record ResolvedAgentCommissionProgramScope(
+    Guid? CarrierId,
+    string? LineOfBusiness,
+    string? StateCode,
+    Guid? ProgramCarrierId,
+    Guid? ProgramCarrierLineOfBusinessId,
+    Guid? ProgramCarrierLobStateId);
