@@ -23,8 +23,9 @@ namespace SIMS.Infrastructure.Migrations
                 SET program_carrier_line_of_business_id = pcl."Id"
                 FROM program_carrier_lines_of_business pcl
                 INNER JOIN program_carriers pc ON pc."Id" = pcl."ProgramCarrierId"
-                INNER JOIN rating_plan_versions v ON v.id = a.rating_plan_version_id
+                INNER JOIN rating_plan_versions v ON TRUE
                 WHERE a.program_configuration_id IS NOT NULL
+                  AND v.id = a.rating_plan_version_id
                   AND pc."ProgramConfigurationId" = a.program_configuration_id
                   AND pc."CarrierId" = a.carrier_id
                   AND pcl."LineOfBusiness" = a.line_of_business
