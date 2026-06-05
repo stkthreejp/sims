@@ -22,6 +22,8 @@ export interface IntermediaryBrokerageSetup {
   carrierName: string
   lineOfBusiness: PolicyLineOfBusiness | null
   lineOfBusinessLabel: string
+  programCarrierId: string | null
+  programCarrierLineOfBusinessId: string | null
   effectiveDate: string
   expirationDate: string | null
   brokerageRate: number | null

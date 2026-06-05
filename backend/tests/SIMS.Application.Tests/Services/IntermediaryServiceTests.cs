@@ -104,10 +104,39 @@ public class IntermediaryServiceTests
         Assert.Equal("Longleaf Casualty", result.Value.CarrierName);
         Assert.Equal(PolicyLineOfBusiness.InlandMarine, result.Value.LineOfBusiness);
         Assert.Equal("Inland Marine", result.Value.LineOfBusinessLabel);
+        Assert.Null(result.Value.ProgramCarrierId);
+        Assert.Equal(fixture.ProgramCarrierLineOfBusinessId, result.Value.ProgramCarrierLineOfBusinessId);
         Assert.Equal(0.075m, result.Value.BrokerageRate);
         Assert.True(result.Value.CreatePayable);
         Assert.Equal(payee.Id, result.Value.PayablePayeeId);
         Assert.Equal("Bridge Specialty Brokers", result.Value.PayablePayeeName);
+    }
+
+    [Fact]
+    public async Task CreateBrokerageSetupAsync_StoresProgramCarrierForAllLinesSetup()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedSetupFixtureAsync(db);
+        var service = new IntermediaryService(db);
+
+        var result = await service.CreateBrokerageSetupAsync(
+            fixture.Intermediary.Id,
+            new UpsertIntermediaryBrokerageSetupRequest(
+                ProgramConfigurationId: fixture.Program.Id,
+                CarrierId: fixture.Carrier.Id,
+                LineOfBusiness: null,
+                EffectiveDate: new DateOnly(2026, 4, 1),
+                ExpirationDate: null,
+                BrokerageRate: 0.075m,
+                CreatePayable: false,
+                PayablePayeeId: null,
+                IsActive: true,
+                Notes: null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(fixture.ProgramCarrierId, result.Value!.ProgramCarrierId);
+        Assert.Null(result.Value.ProgramCarrierLineOfBusinessId);
+        Assert.Equal("All Lines", result.Value.LineOfBusinessLabel);
     }
 
     [Fact]
@@ -258,7 +287,9 @@ public class IntermediaryServiceTests
         db.AddRange(intermediary, program, carrier, programCarrier);
         await db.SaveChangesAsync();
 
-        return new SetupFixture(intermediary, program, carrier);
+        var programLob = programCarrier.LinesOfBusiness.FirstOrDefault(l => l.LineOfBusiness == PolicyLineOfBusiness.InlandMarine);
+
+        return new SetupFixture(intermediary, program, carrier, programCarrier.Id, programLob?.Id);
     }
 
     private static ApplicationDbContext CreateDb()
@@ -273,5 +304,7 @@ public class IntermediaryServiceTests
     private sealed record SetupFixture(
         Intermediary Intermediary,
         ProgramConfiguration Program,
-        Carrier Carrier);
+        Carrier Carrier,
+        Guid ProgramCarrierId,
+        Guid? ProgramCarrierLineOfBusinessId);
 }

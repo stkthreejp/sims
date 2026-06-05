@@ -9,6 +9,8 @@ public class IntermediaryProgramCarrierLobSetup : BaseEntity
     public Guid ProgramConfigurationId { get; set; }
     public Guid CarrierId { get; set; }
     public PolicyLineOfBusiness? LineOfBusiness { get; set; }
+    public Guid? ProgramCarrierId { get; set; }
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
     public DateOnly EffectiveDate { get; set; }
     public DateOnly? ExpirationDate { get; set; }
     public decimal? BrokerageRate { get; set; }
@@ -20,5 +22,7 @@ public class IntermediaryProgramCarrierLobSetup : BaseEntity
     public Intermediary Intermediary { get; set; } = null!;
     public ProgramConfiguration ProgramConfiguration { get; set; } = null!;
     public Carrier Carrier { get; set; } = null!;
+    public ProgramCarrier? ProgramCarrier { get; set; }
+    public ProgramCarrierLineOfBusiness? ProgramCarrierLineOfBusiness { get; set; }
     public Payee? PayablePayee { get; set; }
 }

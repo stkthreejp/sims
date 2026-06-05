@@ -150,6 +150,8 @@ public class IntermediaryService : IIntermediaryService
             ProgramConfigurationId = request.ProgramConfigurationId,
             CarrierId = request.CarrierId,
             LineOfBusiness = request.LineOfBusiness,
+            ProgramCarrierId = refs.ProgramCarrierId,
+            ProgramCarrierLineOfBusinessId = refs.ProgramCarrierLineOfBusinessId,
             EffectiveDate = request.EffectiveDate,
             ExpirationDate = request.ExpirationDate,
             BrokerageRate = request.BrokerageRate,
@@ -188,6 +190,8 @@ public class IntermediaryService : IIntermediaryService
         setup.ProgramConfigurationId = request.ProgramConfigurationId;
         setup.CarrierId = request.CarrierId;
         setup.LineOfBusiness = request.LineOfBusiness;
+        setup.ProgramCarrierId = refs.ProgramCarrierId;
+        setup.ProgramCarrierLineOfBusinessId = refs.ProgramCarrierLineOfBusinessId;
         setup.EffectiveDate = request.EffectiveDate;
         setup.ExpirationDate = request.ExpirationDate;
         setup.BrokerageRate = request.BrokerageRate;
@@ -250,7 +254,7 @@ public class IntermediaryService : IIntermediaryService
             return Result<SetupReferences>.Failure("PAYABLE_PAYEE_REQUIRED", "A payable payee is required when direct broker payable is enabled.");
 
         var program = await _db.Set<ProgramConfiguration>()
-            .SingleOrDefaultAsync(p => p.Id == request.ProgramConfigurationId && p.IsActive, ct);
+            .SingleOrDefaultAsync(p => p.Id == request.ProgramConfigurationId && p.IsActive && !p.IsDeleted, ct);
         if (program is null)
             return Result<SetupReferences>.Failure("PROGRAM_NOT_FOUND", "Program was not found or is inactive.");
 
@@ -259,13 +263,13 @@ public class IntermediaryService : IIntermediaryService
         if (carrier is null)
             return Result<SetupReferences>.Failure("CARRIER_NOT_FOUND", "Carrier was not found or is inactive.");
 
-        var pathExists = await ProgramCarrierLobPathExistsAsync(
+        var scope = await ResolveProgramCarrierLobPathAsync(
             request.ProgramConfigurationId,
             request.CarrierId,
             request.LineOfBusiness,
             request.EffectiveDate,
             ct);
-        if (!pathExists)
+        if (scope is null)
             return Result<SetupReferences>.Failure("INVALID_PROGRAM_SETUP_PATH", "Selected carrier and line of business are not active for this program.");
 
         Payee? payee = null;
@@ -277,10 +281,15 @@ public class IntermediaryService : IIntermediaryService
                 return Result<SetupReferences>.Failure("PAYABLE_PAYEE_NOT_FOUND", "The selected payable payee was not found or is inactive.");
         }
 
-        return Result<SetupReferences>.Success(new SetupReferences(program, carrier, payee));
+        return Result<SetupReferences>.Success(new SetupReferences(
+            program,
+            carrier,
+            scope.ProgramCarrierId,
+            scope.ProgramCarrierLineOfBusinessId,
+            payee));
     }
 
-    private async Task<bool> ProgramCarrierLobPathExistsAsync(
+    private async Task<ResolvedIntermediaryProgramScope?> ResolveProgramCarrierLobPathAsync(
         Guid programConfigurationId,
         Guid carrierId,
         PolicyLineOfBusiness? lineOfBusiness,
@@ -289,26 +298,41 @@ public class IntermediaryService : IIntermediaryService
     {
         if (!lineOfBusiness.HasValue)
         {
-            return await _db.Set<ProgramCarrier>()
-                .AnyAsync(c =>
+            var programCarrierId = await _db.Set<ProgramCarrier>()
+                .Where(c =>
                     c.ProgramConfigurationId == programConfigurationId &&
                     c.CarrierId == carrierId &&
                     c.IsActive &&
+                    !c.IsDeleted &&
                     c.EffectiveDate <= effectiveDate &&
-                    (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate), ct);
+                    (c.ExpirationDate == null || c.ExpirationDate >= effectiveDate))
+                .Select(c => (Guid?)c.Id)
+                .FirstOrDefaultAsync(ct);
+
+            return programCarrierId.HasValue
+                ? new ResolvedIntermediaryProgramScope(programCarrierId.Value, null)
+                : null;
         }
 
-        return await _db.Set<ProgramCarrierLineOfBusiness>()
-            .AnyAsync(l =>
+        var programLobId = await _db.Set<ProgramCarrierLineOfBusiness>()
+            .Where(l =>
                 l.LineOfBusiness == lineOfBusiness.Value &&
                 l.IsActive &&
+                !l.IsDeleted &&
                 l.EffectiveDate <= effectiveDate &&
                 (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate) &&
                 l.ProgramCarrier.IsActive &&
+                !l.ProgramCarrier.IsDeleted &&
                 l.ProgramCarrier.CarrierId == carrierId &&
                 l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
                 l.ProgramCarrier.EffectiveDate <= effectiveDate &&
-                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate), ct);
+                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate))
+            .Select(l => (Guid?)l.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return programLobId.HasValue
+            ? new ResolvedIntermediaryProgramScope(null, programLobId.Value)
+            : null;
     }
 
     private static IntermediaryDto Map(Intermediary intermediary) =>
@@ -352,6 +376,8 @@ public class IntermediaryService : IIntermediaryService
             setup.Carrier?.Name ?? string.Empty,
             setup.LineOfBusiness,
             GetLobLabel(setup.LineOfBusiness),
+            setup.ProgramCarrierId,
+            setup.ProgramCarrierLineOfBusinessId,
             setup.EffectiveDate,
             setup.ExpirationDate,
             setup.BrokerageRate,
@@ -388,5 +414,11 @@ public class IntermediaryService : IIntermediaryService
     private sealed record SetupReferences(
         ProgramConfiguration Program,
         Carrier Carrier,
+        Guid? ProgramCarrierId,
+        Guid? ProgramCarrierLineOfBusinessId,
         Payee? Payee);
+
+    private sealed record ResolvedIntermediaryProgramScope(
+        Guid? ProgramCarrierId,
+        Guid? ProgramCarrierLineOfBusinessId);
 }

@@ -47,6 +47,8 @@ public record IntermediaryBrokerageSetupDto(
     string CarrierName,
     PolicyLineOfBusiness? LineOfBusiness,
     string LineOfBusinessLabel,
+    Guid? ProgramCarrierId,
+    Guid? ProgramCarrierLineOfBusinessId,
     DateOnly EffectiveDate,
     DateOnly? ExpirationDate,
     decimal? BrokerageRate,

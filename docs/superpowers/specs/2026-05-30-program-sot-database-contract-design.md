@@ -271,9 +271,10 @@ Then repeat the pattern for Bordereaux profiles and Surplus Lines.
 - Carrier Commissions Program SOT is implemented for Program/Carrier all-lines defaults and Program/Carrier/LOB overrides, including canonical database references, migration preflight/backfill checks, reverse Program setup identity protections, and admin validation that stores the resolved Program setup path.
 - Agent Commissions Program SOT is implemented for Program, Program/Carrier, Program/Carrier/LOB all-state, and Program/Carrier/LOB/State agent-specific rates, including canonical database references, migration preflight/backfill checks, reverse Program setup identity protections, and admin validation that stores the resolved Program setup path.
 - Rating Assignments Program SOT is implemented for Program/Carrier/LOB all-state rating plan assignments, including canonical database references, migration preflight/backfill checks, reverse Program setup identity protections, and admin validation that stores the resolved Program setup path.
+- Intermediary/brokerage setup Program SOT is implemented for Program/Carrier all-lines defaults and Program/Carrier/LOB brokerage rows, including canonical database references, migration preflight/backfill checks, reverse Program setup identity protections, and admin validation that stores the resolved Program setup path.
 - Azure smoke is healthy after moving Safety Analytics connection to Key Vault and removing the stale App Service override. The deployed Fees admin asset contains the Program cascading selectors.
 - Logged-in UI save-path smoke remains manual because the in-app browser plugin could not attach in this environment.
-- Next target: Phase 3 should move Intermediary/brokerage setup onto canonical Program scope references.
+- Next target: Phase 3 should review remaining Program setup surfaces for any non-canonical Program scope references.
 
 ## Verification Expectations
 
