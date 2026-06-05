@@ -26,7 +26,8 @@ public class CarrierRatingAssignmentProgramScopeMigrationTests
     {
         var sql = UpSql();
 
-        Assert.Contains("SET program_carrier_line_of_business_id = pcl.\"Id\"", sql);
+        Assert.Contains("SET program_carrier_line_of_business_id = (", sql);
+        Assert.Contains("SELECT pcl.\"Id\"", sql);
         Assert.Contains("pc.\"EffectiveDate\" <= v.effective_date", sql);
         Assert.Contains("pcl.\"EffectiveDate\" <= v.effective_date", sql);
         Assert.Contains("Program/Carrier/LOB rating assignment has no matching active ProgramCarrierLineOfBusiness path", sql);

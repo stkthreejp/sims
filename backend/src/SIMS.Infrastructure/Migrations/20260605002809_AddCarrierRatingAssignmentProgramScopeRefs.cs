@@ -20,23 +20,25 @@ namespace SIMS.Infrastructure.Migrations
             migrationBuilder.Sql(
                 """
                 UPDATE carrier_rating_assignments a
-                SET program_carrier_line_of_business_id = pcl."Id"
-                FROM program_carrier_lines_of_business pcl
-                INNER JOIN program_carriers pc ON pc."Id" = pcl."ProgramCarrierId"
-                INNER JOIN rating_plan_versions v ON TRUE
-                WHERE a.program_configuration_id IS NOT NULL
-                  AND v.id = a.rating_plan_version_id
-                  AND pc."ProgramConfigurationId" = a.program_configuration_id
-                  AND pc."CarrierId" = a.carrier_id
-                  AND pcl."LineOfBusiness" = a.line_of_business
-                  AND pc."IsActive" = TRUE
-                  AND pc."IsDeleted" = FALSE
-                  AND pcl."IsActive" = TRUE
-                  AND pcl."IsDeleted" = FALSE
-                  AND pc."EffectiveDate" <= v.effective_date
-                  AND (pc."ExpirationDate" IS NULL OR pc."ExpirationDate" >= v.effective_date)
-                  AND pcl."EffectiveDate" <= v.effective_date
-                  AND (pcl."ExpirationDate" IS NULL OR pcl."ExpirationDate" >= v.effective_date);
+                SET program_carrier_line_of_business_id = (
+                    SELECT pcl."Id"
+                    FROM rating_plan_versions v
+                    INNER JOIN program_carriers pc ON pc."ProgramConfigurationId" = a.program_configuration_id
+                    INNER JOIN program_carrier_lines_of_business pcl ON pcl."ProgramCarrierId" = pc."Id"
+                    WHERE v.id = a.rating_plan_version_id
+                      AND pc."CarrierId" = a.carrier_id
+                      AND pcl."LineOfBusiness" = a.line_of_business
+                      AND pc."IsActive" = TRUE
+                      AND pc."IsDeleted" = FALSE
+                      AND pcl."IsActive" = TRUE
+                      AND pcl."IsDeleted" = FALSE
+                      AND pc."EffectiveDate" <= v.effective_date
+                      AND (pc."ExpirationDate" IS NULL OR pc."ExpirationDate" >= v.effective_date)
+                      AND pcl."EffectiveDate" <= v.effective_date
+                      AND (pcl."ExpirationDate" IS NULL OR pcl."ExpirationDate" >= v.effective_date)
+                    LIMIT 1
+                )
+                WHERE a.program_configuration_id IS NOT NULL;
 
                 DO $$
                 BEGIN
