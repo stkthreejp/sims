@@ -8,6 +8,7 @@ export interface CarrierRatingAssignment {
   carrierName: string
   lineOfBusiness: PolicyLineOfBusiness
   lineOfBusinessLabel: string
+  programCarrierLineOfBusinessId: string | null
   ratingPlanVersionId: string
   planName: string
   versionNumber: number

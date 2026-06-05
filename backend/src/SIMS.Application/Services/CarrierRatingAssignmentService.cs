@@ -77,20 +77,21 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
                 $"Rating plan version is for {version.RatingPlan.LineOfBusiness}, not {dto.LineOfBusiness}.");
 
         ProgramConfiguration? program = null;
+        Guid? programCarrierLineOfBusinessId = null;
         if (dto.ProgramConfigurationId.HasValue)
         {
             program = await db.Set<ProgramConfiguration>()
-                .FirstOrDefaultAsync(p => p.Id == dto.ProgramConfigurationId.Value && p.IsActive, ct);
+                .FirstOrDefaultAsync(p => p.Id == dto.ProgramConfigurationId.Value && p.IsActive && !p.IsDeleted, ct);
             if (program == null)
                 return Result<CarrierRatingAssignmentDto>.Failure("PROGRAM_NOT_FOUND", "Program not found or inactive.");
 
-            var pathExists = await ProgramCarrierLobPathExistsAsync(
+            programCarrierLineOfBusinessId = await ResolveProgramCarrierLobPathAsync(
                 dto.ProgramConfigurationId.Value,
                 dto.CarrierId,
                 dto.LineOfBusiness,
                 version.EffectiveDate,
                 ct);
-            if (!pathExists)
+            if (!programCarrierLineOfBusinessId.HasValue)
                 return Result<CarrierRatingAssignmentDto>.Failure("INVALID_PROGRAM_SETUP_PATH",
                     "Selected carrier and line of business are not active for this program.");
         }
@@ -110,6 +111,7 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
             ProgramConfigurationId = dto.ProgramConfigurationId,
             CarrierId = dto.CarrierId,
             LineOfBusiness = dto.LineOfBusiness,
+            ProgramCarrierLineOfBusinessId = programCarrierLineOfBusinessId,
             RatingPlanVersionId = dto.RatingPlanVersionId,
         };
 
@@ -223,7 +225,7 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
         }).ToList();
     }
 
-    private async Task<bool> ProgramCarrierLobPathExistsAsync(
+    private async Task<Guid?> ResolveProgramCarrierLobPathAsync(
         Guid programConfigurationId,
         Guid carrierId,
         PolicyLineOfBusiness lineOfBusiness,
@@ -231,16 +233,20 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
         CancellationToken ct)
     {
         return await Db.Set<ProgramCarrierLineOfBusiness>()
-            .AnyAsync(l =>
+            .Where(l =>
                 l.LineOfBusiness == lineOfBusiness &&
                 l.IsActive &&
+                !l.IsDeleted &&
                 l.EffectiveDate <= effectiveDate &&
                 (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate) &&
                 l.ProgramCarrier.IsActive &&
+                !l.ProgramCarrier.IsDeleted &&
                 l.ProgramCarrier.CarrierId == carrierId &&
                 l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
                 l.ProgramCarrier.EffectiveDate <= effectiveDate &&
-                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate), ct);
+                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate))
+            .Select(l => (Guid?)l.Id)
+            .FirstOrDefaultAsync(ct);
     }
 
     private static CarrierRatingAssignmentDto ToDto(CarrierRatingAssignment a) => new()
@@ -252,6 +258,7 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
         CarrierName = a.Carrier.Name,
         LineOfBusiness = a.LineOfBusiness,
         LineOfBusinessLabel = LobLabels.GetValueOrDefault(a.LineOfBusiness, a.LineOfBusiness.ToString()),
+        ProgramCarrierLineOfBusinessId = a.ProgramCarrierLineOfBusinessId,
         RatingPlanVersionId = a.RatingPlanVersionId,
         PlanName = a.RatingPlanVersion.RatingPlan.Name,
         VersionNumber = a.RatingPlanVersion.VersionNumber,

@@ -104,6 +104,12 @@ public class CarrierRatingAssignmentProgramScopeTests
         var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Falls Lake", IsActive = true };
         var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
         var version = CreateVersion("Longleaf GL", PolicyLineOfBusiness.GeneralLiability);
+        var programLob = new ProgramCarrierLineOfBusiness
+        {
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+        };
         var programCarrier = new ProgramCarrier
         {
             ProgramConfigurationId = program.Id,
@@ -112,12 +118,7 @@ public class CarrierRatingAssignmentProgramScopeTests
             EffectiveDate = new DateOnly(2026, 1, 1),
             LinesOfBusiness =
             {
-                new ProgramCarrierLineOfBusiness
-                {
-                    LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
-                    IsActive = true,
-                    EffectiveDate = new DateOnly(2026, 1, 1),
-                },
+                programLob,
             },
         };
 
@@ -134,6 +135,7 @@ public class CarrierRatingAssignmentProgramScopeTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(program.Id, result.Value!.ProgramConfigurationId);
+        Assert.Equal(programLob.Id, result.Value.ProgramCarrierLineOfBusinessId);
     }
 
     private static RatingPlanVersion CreateVersion(string planName, PolicyLineOfBusiness lob = PolicyLineOfBusiness.InlandMarine)

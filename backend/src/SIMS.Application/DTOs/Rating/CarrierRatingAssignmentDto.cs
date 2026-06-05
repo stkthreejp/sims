@@ -11,6 +11,7 @@ public class CarrierRatingAssignmentDto
     public string CarrierName { get; set; } = string.Empty;
     public PolicyLineOfBusiness LineOfBusiness { get; set; }
     public string LineOfBusinessLabel { get; set; } = string.Empty;
+    public Guid? ProgramCarrierLineOfBusinessId { get; set; }
     public Guid RatingPlanVersionId { get; set; }
     public string PlanName { get; set; } = string.Empty;
     public int VersionNumber { get; set; }

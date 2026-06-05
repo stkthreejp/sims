@@ -7305,6 +7305,10 @@ namespace SIMS.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("line_of_business");
 
+                    b.Property<Guid?>("ProgramCarrierLineOfBusinessId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("program_carrier_line_of_business_id");
+
                     b.Property<Guid?>("ProgramConfigurationId")
                         .HasColumnType("uuid")
                         .HasColumnName("program_configuration_id");
@@ -7319,6 +7323,9 @@ namespace SIMS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProgramCarrierLineOfBusinessId")
+                        .HasDatabaseName("ix_carrier_rating_assignment_program_lob_scope");
+
                     b.HasIndex("RatingPlanVersionId");
 
                     b.HasIndex("CarrierId", "LineOfBusiness")
@@ -7329,7 +7336,10 @@ namespace SIMS.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("program_configuration_id IS NOT NULL");
 
-                    b.ToTable("carrier_rating_assignments", (string)null);
+                    b.ToTable("carrier_rating_assignments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_carrier_rating_assignment_program_scope_canonical", "(\n    program_configuration_id IS NULL\n    AND program_carrier_line_of_business_id IS NULL\n)\nOR (\n    program_configuration_id IS NOT NULL\n    AND program_carrier_line_of_business_id IS NOT NULL\n)");
+                        });
                 });
 
             modelBuilder.Entity("SIMS.Domain.Entities.Rating.EligibilityRule", b =>
@@ -11954,6 +11964,11 @@ namespace SIMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SIMS.Domain.Entities.ProgramCarrierLineOfBusiness", "ProgramCarrierLineOfBusiness")
+                        .WithMany()
+                        .HasForeignKey("ProgramCarrierLineOfBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SIMS.Domain.Entities.ProgramConfiguration", "ProgramConfiguration")
                         .WithMany()
                         .HasForeignKey("ProgramConfigurationId")
@@ -11966,6 +11981,8 @@ namespace SIMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Carrier");
+
+                    b.Navigation("ProgramCarrierLineOfBusiness");
 
                     b.Navigation("ProgramConfiguration");
 
