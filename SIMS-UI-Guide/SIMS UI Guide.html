@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SIMS — UI Brand & Component Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Reddit+Mono:wght@400;500;600&family=Instrument+Serif&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);font-size:var(--fs-app);line-height:var(--lh-normal);-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{color:var(--accent-deep);text-decoration:underline}
+  code,.mono{font-family:var(--font-mono);font-size:.92em}
+
+  /* ============ Layout ============ */
+  .shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh;max-width:1400px;margin:0 auto;background:var(--surface);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+
+  .toc{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);padding:28px 20px;background:var(--surface)}
+  .toc .brand{display:flex;align-items:center;gap:10px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+  .toc .brand img{width:30px;height:30px}
+  .toc .brand-name{font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .toc .brand-sub{font-size:11px;color:var(--ink-3);margin-top:2px}
+  .toc h4{margin:18px 0 6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);font-weight:600}
+  .toc a{display:block;padding:5px 8px;font-size:12.5px;color:var(--ink-2);border-radius:var(--r-sm);margin-left:-8px}
+  .toc a:hover{background:var(--hover);color:var(--ink);text-decoration:none}
+  .toc a.depth-2{padding-left:18px;font-size:12px;color:var(--ink-3)}
+
+  .body{padding:48px 56px 120px;max-width:none;min-width:0}
+
+  /* ============ Doc typography ============ */
+  .doc-hero{padding:0 0 36px;margin-bottom:36px;border-bottom:2px solid var(--ink)}
+  .doc-hero .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:14px}
+  .doc-hero h1{margin:0 0 14px;font-family:'Instrument Serif',serif;font-size:60px;font-weight:400;letter-spacing:-.015em;line-height:1.02;color:var(--ink)}
+  .doc-hero .lead{font-size:16px;color:var(--ink-2);max-width:680px;line-height:1.6}
+  .doc-hero .meta{display:flex;gap:24px;margin-top:24px;font-size:12px;color:var(--ink-3)}
+  .doc-hero .meta b{color:var(--ink-2);font-weight:600;display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
+
+  h2.sec{margin:64px 0 8px;font-size:28px;font-weight:600;letter-spacing:-.015em;color:var(--ink);scroll-margin-top:20px}
+  h2.sec .num{font-family:var(--font-mono);font-size:13px;color:var(--ink-4);font-weight:500;margin-right:10px;letter-spacing:0}
+  .sec-lead{color:var(--ink-3);font-size:14px;margin:0 0 28px;max-width:720px;line-height:1.6}
+
+  h3.sub{margin:36px 0 12px;font-size:18px;font-weight:600;letter-spacing:-.005em;color:var(--ink);scroll-margin-top:20px}
+  h4.label{margin:24px 0 8px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+
+  p{margin:0 0 12px;color:var(--ink-2)}
+  p.note{font-size:12.5px;color:var(--ink-3);background:var(--surface-2);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 var(--r-sm) var(--r-sm) 0;margin:14px 0}
+  p.note b{color:var(--ink-2)}
+
+  /* "rule" callout */
+  .rule{display:flex;gap:14px;padding:14px 16px;background:#fff8f5;border:1px solid #f5d2c9;border-left:4px solid #b33a2a;border-radius:var(--r-md);margin:18px 0;font-size:13px;color:var(--ink-2)}
+  .rule.do{background:#f1f8f4;border-color:#cfe5d6;border-left-color:var(--good-fg)}
+  .rule b{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--bad-fg);margin-bottom:4px;font-weight:700}
+  .rule.do b{color:var(--good-fg)}
+
+  /* ============ Spec table ============ */
+  table.spec{width:100%;border-collapse:collapse;font-size:12.5px;margin:14px 0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+  table.spec th{text-align:left;font-weight:600;color:var(--ink-3);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+  table.spec td{padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;color:var(--ink-2)}
+  table.spec tr:last-child td{border-bottom:0}
+  table.spec .tok{font-family:var(--font-mono);font-size:11.5px;color:var(--accent-ink);font-weight:500;white-space:nowrap}
+  table.spec .val{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-2);white-space:nowrap}
+  table.spec .use{color:var(--ink-3)}
+  table.spec td.swatch-cell{width:60px;padding:8px 14px}
+  table.spec .sw{width:36px;height:36px;border-radius:6px;border:1px solid var(--line)}
+
+  /* ============ Demo blocks ============ */
+  .demo{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-md);padding:24px;margin:14px 0;position:relative}
+  .demo::before{content:"Live example";position:absolute;top:-9px;left:14px;background:var(--surface);padding:0 8px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-4);font-weight:600}
+  .demo.flush{padding:0;overflow:hidden}
+  .demo-row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .demo-stack{display:flex;flex-direction:column;gap:14px}
+  .demo-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .demo-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .demo-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:900px){.demo-grid-2,.demo-grid-3,.demo-grid-4{grid-template-columns:1fr 1fr}}
+
+  /* ============ Color swatches ============ */
+  .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:14px 0}
+  .swatch{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+  .swatch .chip{height:84px;display:flex;align-items:flex-end;padding:10px 12px;color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:500}
+  .swatch .chip.dark-ink{color:var(--ink)}
+  .swatch .body{padding:10px 12px}
+  .swatch .name{font-family:var(--font-mono);font-size:11.5px;color:var(--accent-ink);font-weight:600}
+  .swatch .desc{font-size:11px;color:var(--ink-3);margin-top:3px;line-height:1.4}
+
+  /* Inked grid (small) */
+  .ink-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .ink-chip{padding:14px 12px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--surface)}
+  .ink-chip .tone{font-size:14px;font-weight:600;margin-bottom:8px}
+  .ink-chip .meta{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);line-height:1.5}
+
+  /* Type specimens */
+  .type-row{display:grid;grid-template-columns:140px 1fr;gap:24px;padding:14px 0;border-bottom:1px solid var(--line-2);align-items:baseline}
+  .type-row:last-child{border-bottom:0}
+  .type-row .meta{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);line-height:1.5;padding-top:6px}
+  .type-row .meta .tok{display:block;color:var(--accent-ink);font-weight:600;margin-bottom:4px}
+  .type-row .specimen{color:var(--ink);min-width:0;overflow-wrap:break-word}
+
+  /* radii showcase */
+  .radii{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+  .radii .r{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .radii .r .box{width:62px;height:62px;background:var(--accent-soft);border:1px solid #cfe0ef}
+  .radii .r .label{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);text-align:center;line-height:1.4}
+  .radii .r .label b{display:block;color:var(--accent-ink);font-weight:600}
+
+  /* spacing showcase */
+  .spacing{display:flex;flex-direction:column;gap:6px}
+  .spacing .bar{display:flex;align-items:center;gap:14px}
+  .spacing .bar .meta{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);width:120px;flex:0 0 120px}
+  .spacing .bar .meta .tok{color:var(--accent-ink);font-weight:600;display:inline-block;margin-right:8px}
+  .spacing .bar .strip{height:18px;background:var(--accent);border-radius:3px}
+
+  /* shadow demo */
+  .sh{padding:18px;background:var(--surface);border-radius:var(--r-md);border:1px solid var(--line);box-shadow:var(--shadow-sm);font-size:12px;color:var(--ink-3)}
+
+  /* ============ Buttons (lifted from app) ============ */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;height:32px;border-radius:var(--r);font-size:var(--fs-base);font-weight:500;color:var(--ink-2);transition:.12s;white-space:nowrap;line-height:1;font-family:inherit;cursor:pointer;border:0;background:none}
+  .btn:hover{background:var(--hover);color:var(--ink)}
+  .btn.outline{border:1px solid var(--line);background:var(--surface)}
+  .btn.outline:hover{border-color:var(--accent-light);background:var(--hover)}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.primary:hover{background:var(--accent-deep);color:#fff}
+  .btn.ghost{padding:0 8px;color:var(--ink-3)}
+  .btn.ghost:hover{color:var(--ink)}
+  .btn.danger{color:#9b2d1f;border:1px solid #f3c6be;background:var(--surface)}
+  .btn.danger:hover{background:#fde0dc;color:#7a2318}
+  .btn.sm{height:26px;padding:0 9px;font-size:12px;border-radius:var(--r-sm)}
+  .btn-mini{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;font-size:11.5px;font-weight:500;color:var(--ink-2);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;white-space:nowrap;font-family:inherit}
+  .btn-mini:hover{border-color:var(--accent-light);background:var(--hover);color:var(--ink)}
+  .btn-mini.ghost{border:0;background:transparent;color:var(--ink-3)}
+
+  /* Pills (status) */
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--r-pill);font-size:var(--fs-sm);font-weight:600;line-height:1.3}
+  .pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.85}
+  .pill.draft{background:var(--pill-draft-bg);color:var(--pill-draft-fg)}
+  .pill.quoted{background:var(--pill-quoted-bg);color:var(--pill-quoted-fg)}
+  .pill.bound{background:var(--pill-bound-bg);color:var(--pill-bound-fg)}
+  .pill.declined{background:var(--pill-declined-bg);color:var(--pill-declined-fg)}
+  .pill.inprogress{background:var(--pill-inprog-bg);color:var(--pill-inprog-fg)}
+  .pill.ok{background:var(--good-bg);color:var(--good-fg)}
+  .pill.warn{background:var(--warn-bg);color:var(--warn-fg)}
+  .pill.bad{background:var(--bad-bg);color:var(--bad-fg)}
+
+  /* tags (LOB / state-chip) */
+  .lob{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:var(--r-xs);background:var(--surface-2);color:var(--ink-2);font-weight:500;line-height:1.4}
+  .state-chip{display:inline-block;font-family:var(--font-mono);font-size:10.5px;padding:2px 6px;border-radius:var(--r-xs);background:var(--surface-2);color:var(--ink-3);font-weight:600}
+
+  /* form input demo */
+  .field{display:flex;align-items:center;gap:7px;height:32px;padding:0 10px;background:var(--surface-2);border:1px solid transparent;border-radius:var(--r);color:var(--ink);font-size:var(--fs-base);width:240px;font-family:inherit}
+  .field:focus-within{border-color:var(--accent);background:var(--surface)}
+  .field input{border:0;outline:0;background:transparent;width:100%;color:var(--ink);font:inherit}
+  .field svg{color:var(--ink-3);flex:0 0 14px}
+
+  /* metric card */
+  .metric-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;box-shadow:var(--shadow-sm)}
+  .metric-card .k{font-size:var(--fs-xs);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:0 0 4px}
+  .metric-card .v{font-size:var(--fs-lg);font-weight:600;letter-spacing:-.015em;line-height:1;font-variant-numeric:tabular-nums}
+  .metric-card .s{color:var(--ink-3);font-size:var(--fs-sm);margin-top:5px}
+  .metric-card.accent{background:var(--accent-soft);border-color:#cfe0ef}
+  .metric-card.accent .v{color:var(--accent-ink)}
+
+  /* table demo */
+  .demo-table{width:100%;border-collapse:collapse;font-size:var(--fs-body);background:var(--surface)}
+  .demo-table th{text-align:left;font-weight:500;color:var(--ink-3);font-size:11px;padding:9px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);letter-spacing:.02em;text-transform:uppercase}
+  .demo-table th.num{text-align:right}
+  .demo-table td{padding:12px 14px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+  .demo-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .demo-table tbody tr:last-child td{border-bottom:0}
+  .demo-table tbody tr:hover{background:var(--hover);cursor:pointer}
+  .demo-table .id{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3)}
+  .demo-table .insured{font-weight:600;color:var(--ink)}
+  .demo-table .insured small{display:block;font-weight:400;color:var(--ink-3);font-size:11.5px;margin-top:2px}
+  .demo-table .row-quoted{background:var(--row-quoted)}
+  .demo-table .row-bound{background:var(--row-bound)}
+  .demo-table .row-declined{background:var(--row-declined)}
+  .demo-table .row-inprog{background:var(--row-inprog)}
+
+  /* tab variants */
+  .tabs-pill{display:flex;gap:2px}
+  .tab-p{padding:6px 12px;font-size:var(--fs-base);color:var(--ink-3);border-radius:var(--r);cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px;background:none;border:0;font-family:inherit}
+  .tab-p:hover{background:var(--hover);color:var(--ink-2)}
+  .tab-p.active{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+  .tab-p .c{font-family:var(--font-mono);font-size:11px;color:var(--ink-4)}
+  .tab-p.active .c{color:var(--accent)}
+
+  .tabs-under{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+  .tab-u{padding:8px 14px;font-size:var(--fs-body);color:var(--ink-3);cursor:pointer;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;gap:6px;align-items:center;background:none;border-top:0;border-left:0;border-right:0;font-family:inherit}
+  .tab-u:hover{color:var(--ink-2)}
+  .tab-u.active{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:600}
+
+  .seg-switch{display:flex;gap:2px;background:var(--surface-2);border-radius:var(--r-lg);padding:3px;width:fit-content}
+  .seg-switch button{padding:7px 14px;border-radius:var(--r);font-size:var(--fs-base);font-weight:500;color:var(--ink-3);border:0;background:none;cursor:pointer;font-family:inherit;display:inline-flex;gap:8px;align-items:center}
+  .seg-switch button:hover{color:var(--ink)}
+  .seg-switch button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm);font-weight:600}
+
+  /* checklist */
+  .check{display:grid;grid-template-columns:20px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:var(--fs-body)}
+  .check:last-child{border-bottom:0}
+  .check .box{width:16px;height:16px;border:1.5px solid var(--ink-4);border-radius:var(--r-xs);display:grid;place-items:center;color:#fff}
+  .check.done .box{background:var(--accent);border-color:var(--accent)}
+  .check.done .label{color:var(--ink-3);text-decoration:line-through}
+  .check.blocker .box{border-color:#b33a2a}
+  .check .label{color:var(--ink);font-weight:500}
+  .check .label small{display:block;font-weight:400;color:var(--ink-3);font-size:11.5px;margin-top:2px}
+  .check .who{color:var(--ink-3);font-size:11.5px}
+  .check .who b{color:var(--ink-2);font-weight:600}
+
+  /* sidebar mini */
+  .mini-app{display:grid;grid-template-columns:200px 1fr;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;min-height:280px}
+  .mini-side{padding:14px 12px;border-right:1px solid var(--line);background:var(--surface)}
+  .mini-side .brand-r{display:flex;align-items:center;gap:8px;padding:4px 8px 14px;font-size:13px;font-weight:600}
+  .mini-side .brand-r img{width:22px;height:22px}
+  .mini-nav a{display:flex;gap:9px;align-items:center;padding:6px 9px;border-radius:var(--r);color:var(--ink-2);font-size:12.5px;font-weight:500;cursor:pointer;margin-bottom:1px}
+  .mini-nav a:hover{background:var(--hover);text-decoration:none}
+  .mini-nav a.active{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+  .mini-nav a svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
+  .mini-nav a.active svg{color:var(--accent)}
+  .mini-nav .section{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);padding:14px 9px 4px;font-weight:600}
+  .mini-nav .submenu{display:flex;flex-direction:column;gap:1px;margin:2px 0 4px 20px;padding-left:10px;border-left:1px solid var(--line)}
+  .mini-nav .submenu a.sub{padding:4px 9px;font-size:12px;color:var(--ink-3);font-weight:500;border-radius:var(--r-sm)}
+  .mini-nav .submenu a.sub.active{color:var(--accent-ink);font-weight:600;position:relative;background:none}
+  .mini-nav .submenu a.sub.active::before{content:"";position:absolute;left:-11px;top:5px;bottom:5px;width:2px;background:var(--accent);border-radius:2px}
+  .mini-main{padding:18px 22px;background:var(--bg)}
+  .mini-topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 22px;border-bottom:1px solid var(--line);background:var(--surface);font-size:12px;color:var(--ink-3)}
+
+  /* drawer demo */
+  .drawer-demo{display:grid;grid-template-columns:1fr 320px;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;min-height:260px}
+  .drawer-back{padding:18px;background:var(--bg);color:var(--ink-3);font-size:12px}
+  .drawer-side{background:var(--surface);border-left:1px solid var(--line);padding:18px}
+  .drawer-side h4{margin:0 0 4px;font-size:14px;font-weight:600}
+  .drawer-side .sub{font-size:11.5px;color:var(--ink-3);margin-bottom:14px}
+  .drawer-side .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line-2);font-size:12px}
+  .drawer-side .row .k{color:var(--ink-3)}
+  .drawer-side .row .v{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+
+  /* icon strip */
+  .icon-strip{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin:14px 0}
+  .icon-cell{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;color:var(--ink-3)}
+  .icon-cell svg{stroke:var(--ink-2);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;width:18px;height:18px}
+
+  /* anatomy diagram */
+  .anatomy{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:24px 32px;margin:14px 0}
+  .anatomy .pill-big{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:var(--r-pill);background:var(--pill-quoted-bg);color:var(--pill-quoted-fg);font-size:14px;font-weight:600}
+  .anatomy .pill-big::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.85}
+  .anatomy .annot{position:absolute;font-size:10.5px;font-family:var(--font-mono);color:var(--ink-3);line-height:1.4}
+  .anatomy .annot b{color:var(--ink-2);font-weight:600;display:block}
+
+  /* row-tint demo */
+  .tint-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:12.5px}
+  .tint-row:last-child{border-bottom:0}
+  .tint-row .name{font-weight:600;color:var(--ink)}
+  .tint-row .meta{color:var(--ink-3);font-size:11.5px}
+
+  /* footer */
+  .doc-foot{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+  /* responsive */
+  @media (max-width:980px){
+    .shell{grid-template-columns:1fr}
+    .toc{position:relative;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+    .body{padding:32px 24px 80px}
+    .doc-hero h1{font-size:42px}
+    .ink-grid{grid-template-columns:repeat(2,1fr)}
+    .icon-strip{grid-template-columns:repeat(4,1fr)}
+    .drawer-demo{grid-template-columns:1fr}
+    .drawer-side{border-left:0;border-top:1px solid var(--line)}
+    .mini-app{grid-template-columns:1fr}
+    .mini-side{border-right:0;border-bottom:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ==================== TABLE OF CONTENTS ==================== -->
+  <aside class="toc">
+    <div class="brand">
+      <img src="assets/smm-symbol.png" alt="SMM"/>
+      <div>
+        <div class="brand-name">SIMS</div>
+        <div class="brand-sub">UI Brand Guide v1.0</div>
+      </div>
+    </div>
+
+    <h4>Foundations</h4>
+    <a href="#principles">01 · Design principles</a>
+    <a href="#tokens">02 · The token contract</a>
+    <a href="#color">03 · Color</a>
+    <a href="#color" class="depth-2">Surfaces &amp; ink</a>
+    <a href="#color" class="depth-2">Accent (brand blue)</a>
+    <a href="#color" class="depth-2">Status pills</a>
+    <a href="#color" class="depth-2">Semantic (good/warn/bad)</a>
+    <a href="#color" class="depth-2">Row tints</a>
+    <a href="#type">04 · Typography</a>
+    <a href="#space">05 · Spacing, radii &amp; elevation</a>
+    <a href="#icons">06 · Icons</a>
+
+    <h4>Layout</h4>
+    <a href="#layout">07 · App shell</a>
+    <a href="#nav">08 · Navigation</a>
+    <a href="#topbar">09 · Topbar &amp; search</a>
+
+    <h4>Components</h4>
+    <a href="#buttons">10 · Buttons</a>
+    <a href="#pills">11 · Status pills</a>
+    <a href="#tags">12 · Tags &amp; chips</a>
+    <a href="#fields">13 · Inputs &amp; fields</a>
+    <a href="#cards">14 · Cards</a>
+    <a href="#metrics">15 · Metric cards</a>
+    <a href="#tables">16 · Data tables</a>
+    <a href="#tabs">17 · Tabs &amp; switches</a>
+    <a href="#checklist">18 · Checklists</a>
+    <a href="#drawer">19 · Entity drawer</a>
+
+    <h4>Patterns</h4>
+    <a href="#density">20 · Density &amp; rhythm</a>
+    <a href="#numbers">21 · Numbers &amp; money</a>
+    <a href="#voice">22 · Voice &amp; copy</a>
+    <a href="#newpage">23 · Spinning up a new page</a>
+    <a href="#newpage" class="depth-2">Standard anatomy</a>
+    <a href="#newpage" class="depth-2">Four layout recipes</a>
+    <a href="#newpage" class="depth-2">Skeleton snippet</a>
+    <a href="#newpage" class="depth-2">Empty / loading / error</a>
+    <a href="#dont">24 · Avoid this</a>
+  </aside>
+
+  <!-- ==================== BODY ==================== -->
+  <main class="body">
+
+    <header class="doc-hero">
+      <div class="kicker">SIMS · UI &amp; Brand Guide</div>
+      <h1>The visual contract<br/>between design &amp; engineering.</h1>
+      <p class="lead">
+        This document encodes every design decision that's been made for SIMS so far &mdash; tokens, components, layout, and the rationale behind them &mdash; in a single place a developer can read top-to-bottom and refer back to. It is the source of truth for anything visual.
+      </p>
+      <p class="lead" style="margin-top:10px">
+        <b>The rule:</b> nothing visual ships in code that isn't either documented here or added to <code>tokens.css</code> first. When you hit something this guide doesn't cover, raise it &mdash; don't invent.
+      </p>
+      <div class="meta">
+        <div><b>Version</b>1.0 &middot; May 2026</div>
+        <div><b>Tokens file</b><code>tokens.css</code></div>
+        <div><b>Owner</b>Design (this project)</div>
+        <div><b>Companion</b><code>FOR CLAUDE CODE.md</code></div>
+      </div>
+    </header>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="principles"><span class="num">01</span>Design principles</h2>
+    <p class="sec-lead">Five rules that should sit behind every visual decision. If a screen is hard to design, return here.</p>
+
+    <div class="demo-grid-2">
+      <div style="padding:18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)">
+        <h4 class="label" style="margin-top:0">01 &middot; Density without clutter</h4>
+        <p style="margin:0;font-size:13px;color:var(--ink-2)">
+          Underwriters scan many rows of structured data per hour. Tables run at 13px body with 12px row padding &mdash; tight, not crammed. Whitespace is reserved for between cards and around the page edge, not inside dense data.
+        </p>
+      </div>
+      <div style="padding:18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)">
+        <h4 class="label" style="margin-top:0">02 &middot; One blue, used decisively</h4>
+        <p style="margin:0;font-size:13px;color:var(--ink-2)">
+          A single brand blue carries primary CTAs, focus, the active nav state, hover backgrounds, and Quoted status. Nothing else is colored "for fun." If a control isn't blue, it's neutral.
+        </p>
+      </div>
+      <div style="padding:18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)">
+        <h4 class="label" style="margin-top:0">03 &middot; Status is the loudest signal</h4>
+        <p style="margin:0;font-size:13px;color:var(--ink-2)">
+          A submission's state (Draft &middot; In Progress &middot; Quoted &middot; Bound &middot; Declined) is encoded twice: a pill and a row tint. Quoted is one shade darker than the others so it pops in scans.
+        </p>
+      </div>
+      <div style="padding:18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)">
+        <h4 class="label" style="margin-top:0">04 &middot; Numbers earn a monospace</h4>
+        <p style="margin:0;font-size:13px;color:var(--ink-2)">
+          IDs (<code>SUB-2026-00418</code>), timestamps, and tabular columns get Reddit Mono so digits align vertically. Body copy stays Inter. Don't put labels in mono &mdash; only identifiers and numbers.
+        </p>
+      </div>
+      <div style="padding:18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);grid-column:1/-1">
+        <h4 class="label" style="margin-top:0">05 &middot; Elevation is barely there</h4>
+        <p style="margin:0;font-size:13px;color:var(--ink-2)">
+          One shadow exists (<code>--shadow-sm</code>). Cards sit on a faint shadow against a faint <code>--bg</code>. We do not have card-on-card, layered overlays, glassmorphism, or gradients beyond the single <code>kpi-hero</code> wash. The interface is flat with one half-step of depth.
+        </p>
+      </div>
+    </div>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="tokens"><span class="num">02</span>The token contract</h2>
+    <p class="sec-lead">
+      <code>tokens.css</code> is the single source of truth. Everything in this guide either resolves to a token or is built from tokens. The names on this side and in the app's theme system must be identical &mdash; that's how design and code stay in sync.
+    </p>
+
+    <div class="rule">
+      <div>
+        <b>Don't do this</b>
+        Reach for a raw hex in component code (<code>color: #1B75BA</code>). The next person who edits that file has no idea it's the brand blue, and a palette change won't find it.
+      </div>
+    </div>
+    <div class="rule do">
+      <div>
+        <b>Do this</b>
+        Always reference the token: <code>color: var(--accent)</code>. If you need a value that doesn't exist, add it to <code>tokens.css</code> first, then use it. Propose the name + rationale in the same change.
+      </div>
+    </div>
+
+    <p class="note"><b>Naming convention:</b> we use semantic-purpose names, not literal color names. <code>--accent-ink</code> means &ldquo;text on a soft-accent background,&rdquo; not &ldquo;dark blue.&rdquo; This way the palette can shift without renaming the API.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="color"><span class="num">03</span>Color</h2>
+    <p class="sec-lead">Six families: <b>surfaces</b>, <b>ink</b>, <b>lines</b>, <b>accent</b>, <b>status pills</b>, and <b>semantic</b>. Plus one set of row tints for the submissions list.</p>
+
+    <h3 class="sub" id="color-surfaces">Surfaces</h3>
+    <p>Three flat tones, no gradients. <code>--bg</code> is the app behind everything; <code>--surface</code> is every card, table, drawer, modal; <code>--surface-2</code> is the &ldquo;well&rdquo; tone &mdash; table headers, search input, segmented-switch tracks, soft chips.</p>
+    <div class="palette">
+      <div class="swatch"><div class="chip dark-ink" style="background:#f7f8fa">#f7f8fa</div><div class="body"><div class="name">--bg</div><div class="desc">App background. Sits behind every card.</div></div></div>
+      <div class="swatch"><div class="chip dark-ink" style="background:#ffffff;border-bottom:1px solid var(--line)">#ffffff</div><div class="body"><div class="name">--surface</div><div class="desc">Cards, tables, drawers, sidebar.</div></div></div>
+      <div class="swatch"><div class="chip dark-ink" style="background:#f3f4f7">#f3f4f7</div><div class="body"><div class="name">--surface-2</div><div class="desc">Table headers, search fields, switch tracks.</div></div></div>
+    </div>
+
+    <h3 class="sub" id="color-ink">Ink (text)</h3>
+    <p>A four-stop ramp. Use them in order &mdash; <code>ink</code> for primary content, <code>ink-2</code> for body copy, <code>ink-3</code> for secondary metadata, <code>ink-4</code> for placeholders / tertiary only. Never put body copy on <code>ink-4</code>; it fails contrast for sustained reading.</p>
+    <div class="ink-grid">
+      <div class="ink-chip" style="color:var(--ink)"><div class="tone">Aa &mdash; Primary</div><div class="meta"><b style="color:var(--accent-ink)">--ink</b><br/>#0c111c<br/>Headings, table cells, primary values</div></div>
+      <div class="ink-chip" style="color:var(--ink-2)"><div class="tone">Aa &mdash; Body</div><div class="meta"><b style="color:var(--accent-ink)">--ink-2</b><br/>#353a47<br/>Paragraph copy, nav labels, buttons</div></div>
+      <div class="ink-chip" style="color:var(--ink-3)"><div class="tone">Aa &mdash; Secondary</div><div class="meta"><b style="color:var(--accent-ink)">--ink-3</b><br/>#626876<br/>Metadata, descriptions, table headers</div></div>
+      <div class="ink-chip" style="color:var(--ink-4)"><div class="tone">Aa &mdash; Tertiary</div><div class="meta"><b style="color:var(--accent-ink)">--ink-4</b><br/>#9aa0ad<br/>Placeholders, dashes, decorative only</div></div>
+    </div>
+
+    <h3 class="sub" id="color-lines">Lines</h3>
+    <p>Two divider tones. <code>--line</code> outlines cards and runs across major separations; <code>--line-2</code> is the lighter tone for internal dividers (table row separators, dashed breakdown rows).</p>
+    <div class="palette">
+      <div class="swatch"><div class="chip dark-ink" style="background:#e6e8ed">#e6e8ed</div><div class="body"><div class="name">--line</div><div class="desc">Card &amp; table outlines, major dividers.</div></div></div>
+      <div class="swatch"><div class="chip dark-ink" style="background:#eef0f3">#eef0f3</div><div class="body"><div class="name">--line-2</div><div class="desc">Internal row separators, secondary divides.</div></div></div>
+    </div>
+
+    <h3 class="sub" id="color-accent">Accent &mdash; the brand blue</h3>
+    <p>One blue, five variants. Used for: primary CTAs, focus rings, active nav, active tabs, hover backgrounds, Quoted status, and the in-progress quote stage. Treat the variants as a system &mdash; never invent a sixth.</p>
+
+    <table class="spec">
+      <thead><tr><th>Token</th><th></th><th>Value</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td class="tok">--accent</td><td class="swatch-cell"><div class="sw" style="background:#1B75BA"></div></td><td class="val">#1B75BA</td><td class="use">Primary CTA fill, focus ring, active state markers, sort indicators.</td></tr>
+        <tr><td class="tok">--accent-soft</td><td class="swatch-cell"><div class="sw" style="background:#e6f0f8"></div></td><td class="val">#e6f0f8</td><td class="use">Nav-active background, tab-active background, row hover, "hero" metric card fill.</td></tr>
+        <tr><td class="tok">--accent-ink</td><td class="swatch-cell"><div class="sw" style="background:#064778"></div></td><td class="val">#064778</td><td class="use">Text color when sitting on <code>--accent-soft</code>. Also "Bound" status text.</td></tr>
+        <tr><td class="tok">--accent-light</td><td class="swatch-cell"><div class="sw" style="background:#63A2D2"></div></td><td class="val">#63A2D2</td><td class="use">Hover border on outline buttons &amp; filter chips. Subtle, not loud.</td></tr>
+        <tr><td class="tok">--accent-deep</td><td class="swatch-cell"><div class="sw" style="background:#085C9C"></div></td><td class="val">#085C9C</td><td class="use">CTA hover fill (deeper than rest state). "In Progress" pill foreground.</td></tr>
+        <tr><td class="tok">--hover</td><td class="swatch-cell"><div class="sw" style="background:#e6f0f8"></div></td><td class="val">#e6f0f8</td><td class="use">Alias of <code>--accent-soft</code>, used at hover-call-sites for readability.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="demo">
+      <div class="demo-row">
+        <button class="btn primary">Primary CTA</button>
+        <button class="btn outline">Outline button</button>
+        <button class="btn ghost">Ghost</button>
+        <div class="field"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Search insureds…"/></div>
+        <span class="pill quoted">Quoted</span>
+      </div>
+    </div>
+
+    <h3 class="sub" id="color-pills">Status pills</h3>
+    <p>Five paired bg/fg tones for the submission lifecycle. <b>Always used as a pair</b> &mdash; never mix a pill background with a different pill foreground.</p>
+
+    <table class="spec">
+      <thead><tr><th>Status</th><th>BG token</th><th>FG token</th><th>BG / FG hex</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Draft</td><td class="tok">--pill-draft-bg</td><td class="tok">--pill-draft-fg</td><td class="val">#eef0f3 / #626876</td><td><span class="pill draft">Draft</span></td></tr>
+        <tr><td>In Progress</td><td class="tok">--pill-inprog-bg</td><td class="tok">--pill-inprog-fg</td><td class="val">#e0edf7 / #085C9C</td><td><span class="pill inprogress">In Progress</span></td></tr>
+        <tr><td>Quoted</td><td class="tok">--pill-quoted-bg</td><td class="tok">--pill-quoted-fg</td><td class="val">#e6f0f8 / #1B75BA</td><td><span class="pill quoted">Quoted</span></td></tr>
+        <tr><td>Bound</td><td class="tok">--pill-bound-bg</td><td class="tok">--pill-bound-fg</td><td class="val">#d8e8f4 / #064778</td><td><span class="pill bound">Bound</span></td></tr>
+        <tr><td>Declined</td><td class="tok">--pill-declined-bg</td><td class="tok">--pill-declined-fg</td><td class="val">#fde0dc / #9b2d1f</td><td><span class="pill declined">Declined</span></td></tr>
+      </tbody>
+    </table>
+
+    <p class="note"><b>The blue progression is intentional:</b> In Progress &rarr; Quoted &rarr; Bound goes from lighter to deeper. A user can tell where a submission is in its lifecycle by the shade alone, even before reading the label.</p>
+
+    <h3 class="sub" id="color-semantic">Semantic (good / warn / bad)</h3>
+    <p>Three additional paired tones used for validation feedback, MVR badges, loss-run severity, and any "this thing is healthy / needs attention / has a problem" signal that isn't a submission status. They are <i>not</i> used as primary brand color &mdash; they're domain signals.</p>
+
+    <table class="spec">
+      <thead><tr><th>Use</th><th>BG token</th><th>FG token</th><th>Hex</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Good / clean</td><td class="tok">--good-bg</td><td class="tok">--good-fg</td><td class="val">#e6f2ea / #156b37</td><td><span class="pill ok">Clean MVR</span></td></tr>
+        <tr><td>Warning / attention</td><td class="tok">--warn-bg</td><td class="tok">--warn-fg</td><td class="val">#fdf3df / #8a5a0b</td><td><span class="pill warn">2 minor</span></td></tr>
+        <tr><td>Bad / problem</td><td class="tok">--bad-bg</td><td class="tok">--bad-fg</td><td class="val">#fde0dc / #9b2d1f</td><td><span class="pill bad">1 major</span></td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub" id="color-rows">Row tints (Submissions list)</h3>
+    <p>Each submission row gets a faint background that matches its status. This is the one place we color a large rectangle &mdash; it makes status scannable down the table. Quoted is intentionally one shade darker than the rest so the in-play deals pop.</p>
+
+    <div class="demo flush">
+      <div class="tint-row" style="background:var(--row-draft)">
+        <div><div class="name">Apex Logistics Co.</div><div class="meta mono">SUB-2026-00401</div></div>
+        <span class="pill draft">Draft</span>
+      </div>
+      <div class="tint-row" style="background:var(--row-inprog)">
+        <div><div class="name">Northwind Construction</div><div class="meta mono">SUB-2026-00412</div></div>
+        <span class="pill inprogress">In Progress</span>
+      </div>
+      <div class="tint-row" style="background:var(--row-quoted)">
+        <div><div class="name">Ridgeline Carrier Services LLC</div><div class="meta mono">SUB-2026-00418 &middot; <b style="color:var(--accent-ink)">one shade darker on purpose</b></div></div>
+        <span class="pill quoted">Quoted</span>
+      </div>
+      <div class="tint-row" style="background:var(--row-bound)">
+        <div><div class="name">Greenfield Equipment Rental</div><div class="meta mono">SUB-2026-00399</div></div>
+        <span class="pill bound">Bound</span>
+      </div>
+      <div class="tint-row" style="background:var(--row-declined)">
+        <div><div class="name">Vista Painting Inc.</div><div class="meta mono">SUB-2026-00388</div></div>
+        <span class="pill declined">Declined</span>
+      </div>
+    </div>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="type"><span class="num">04</span>Typography</h2>
+    <p class="sec-lead">Two faces. Eight sizes. Two line heights. That's the entire system.</p>
+
+    <h3 class="sub">Type families</h3>
+    <table class="spec">
+      <thead><tr><th>Token</th><th>Family</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td class="tok">--font-sans</td><td><b style="font-family:Inter">Inter</b>, system-ui, -apple-system, sans-serif</td><td>Everything by default. Body, UI, headings.</td></tr>
+        <tr><td class="tok">--font-mono</td><td><b style="font-family:'Reddit Mono'">Reddit Mono</b>, ui-monospace, monospace</td><td>IDs, dates, tabular numbers, counts, sort indicators.</td></tr>
+      </tbody>
+    </table>
+    <p class="note"><b>Substitution note:</b> earlier mocks used JetBrains Mono. Reddit Mono is the locked choice going forward &mdash; it's the only mono in <code>tokens.css</code>. If you see JetBrains in older HTML files, that's drift that will be cleaned up.</p>
+
+    <h3 class="sub">Size scale</h3>
+    <p>Sizes are deliberately small and tight. The app is a workbench &mdash; underwriters need information density. <code>--fs-app</code> (13.5px) is the root body size; everything else is relative.</p>
+
+    <div class="demo">
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-xl</span>24px / 1.3</div>
+        <div class="specimen" style="font-size:var(--fs-xl);font-weight:600;letter-spacing:-.01em">Page heading H1</div>
+      </div>
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-lg</span>20px / 1<br/>tabular-nums</div>
+        <div class="specimen" style="font-size:var(--fs-lg);font-weight:600;letter-spacing:-.015em;font-variant-numeric:tabular-nums">$164,800 &middot; metric values</div>
+      </div>
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-md</span>16px / 1.3</div>
+        <div class="specimen" style="font-size:var(--fs-md);font-weight:600">Card titles &amp; section headers</div>
+      </div>
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-app</span>13.5px / 1.5<br/>root body</div>
+        <div class="specimen" style="font-size:var(--fs-app)">Application root size &mdash; nav labels, default UI text. Comfortable but tight.</div>
+      </div>
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-body</span>13px / 1.5</div>
+        <div class="specimen" style="font-size:var(--fs-body)">Table body and paragraph copy. Used inside data-dense contexts.</div>
+      </div>
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-base</span>12.5px / 1.5</div>
+        <div class="specimen" style="font-size:var(--fs-base)">Buttons, tabs, filters, secondary UI. The workhorse size.</div>
+      </div>
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-sm</span>11.5px / 1.3</div>
+        <div class="specimen" style="font-size:var(--fs-sm)">State chips, ID columns, metric subtitles, secondary metadata.</div>
+      </div>
+      <div class="type-row">
+        <div class="meta"><span class="tok">--fs-xs</span>10.5px / 1.3<br/>uppercase + tracked</div>
+        <div class="specimen" style="font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;font-weight:600;color:var(--ink-3)">Eyebrow labels &middot; uppercase micro-labels</div>
+      </div>
+    </div>
+
+    <h3 class="sub">Weight ladder</h3>
+    <p>Three weights, used predictably. Headings and labels &amp; values at <b>600</b>; everything else at <b>500</b>; running prose at <b>400</b>. We do not use 700 except inside the pill foregrounds.</p>
+
+    <div class="demo demo-row">
+      <span style="font-weight:400">400 Regular</span>
+      <span style="font-weight:500">500 Medium</span>
+      <span style="font-weight:600">600 Semibold</span>
+    </div>
+
+    <h3 class="sub">Letter-spacing &amp; line-height</h3>
+    <table class="spec">
+      <thead><tr><th>Treatment</th><th>Used on</th></tr></thead>
+      <tbody>
+        <tr><td><code>letter-spacing: -0.015em</code></td><td>Large numeric values, page H1.</td></tr>
+        <tr><td><code>letter-spacing: -0.01em</code></td><td>Headings (H1, H2).</td></tr>
+        <tr><td><code>letter-spacing: 0.04em</code> + uppercase</td><td>Eyebrow labels, table headers, micro-labels.</td></tr>
+        <tr><td><code>line-height: 1.5</code> &middot; <code>--lh-normal</code></td><td>Body copy, defaults.</td></tr>
+        <tr><td><code>line-height: 1.3</code> &middot; <code>--lh-tight</code></td><td>Headings, pills, large values, anything single-line.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub">Tabular numbers</h3>
+    <p>Any column of numbers &mdash; premium, deltas, counts, currency cells &mdash; uses <code>font-variant-numeric: tabular-nums</code> so digits align vertically. This applies to both Inter and Reddit Mono.</p>
+
+    <div class="demo">
+      <div class="demo-grid-2">
+        <div>
+          <div style="font-size:11px;color:var(--ink-3);margin-bottom:4px">Default (proportional)</div>
+          <div style="font-family:var(--font-sans);font-size:14px;line-height:1.6">
+            $164,800<br/>$1,247,100<br/>$98,200<br/>$1,569
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--ink-3);margin-bottom:4px">With <code>tabular-nums</code></div>
+          <div style="font-family:var(--font-sans);font-size:14px;line-height:1.6;font-variant-numeric:tabular-nums;text-align:right;display:inline-block">
+            &nbsp;&nbsp;$164,800<br/>$1,247,100<br/>&nbsp;&nbsp;&nbsp;$98,200<br/>&nbsp;&nbsp;&nbsp;&nbsp;$1,569
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="space"><span class="num">05</span>Spacing, radii &amp; elevation</h2>
+
+    <h3 class="sub">Spacing scale (4px grid)</h3>
+    <p>Eight steps. All padding, margins, and gaps should resolve to one of these. If you find yourself reaching for <code>13px</code> or <code>22px</code>, you're off-grid.</p>
+
+    <div class="demo">
+      <div class="spacing">
+        <div class="bar"><div class="meta"><span class="tok">--s-1</span>4px</div><div class="strip" style="width:4px"></div></div>
+        <div class="bar"><div class="meta"><span class="tok">--s-2</span>8px</div><div class="strip" style="width:8px"></div></div>
+        <div class="bar"><div class="meta"><span class="tok">--s-3</span>12px</div><div class="strip" style="width:12px"></div></div>
+        <div class="bar"><div class="meta"><span class="tok">--s-4</span>16px</div><div class="strip" style="width:16px"></div></div>
+        <div class="bar"><div class="meta"><span class="tok">--s-5</span>20px</div><div class="strip" style="width:20px"></div></div>
+        <div class="bar"><div class="meta"><span class="tok">--s-6</span>24px</div><div class="strip" style="width:24px"></div></div>
+        <div class="bar"><div class="meta"><span class="tok">--s-7</span>28px</div><div class="strip" style="width:28px"></div></div>
+        <div class="bar"><div class="meta"><span class="tok">--s-8</span>32px</div><div class="strip" style="width:32px"></div></div>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Where</th><th>Value</th><th>Token</th></tr></thead>
+      <tbody>
+        <tr><td>Page container side padding</td><td>28px</td><td class="tok">--container-pad</td></tr>
+        <tr><td>Card body padding</td><td>14px&ndash;18px</td><td class="tok">--s-4 / --s-5</td></tr>
+        <tr><td>Table cell padding</td><td>12px 14px</td><td class="tok">--s-3 --s-4</td></tr>
+        <tr><td>Gap between cards in a column</td><td>16&ndash;20px</td><td class="tok">--s-4 / --s-5</td></tr>
+        <tr><td>Gap between buttons in a group</td><td>8px</td><td class="tok">--s-2</td></tr>
+        <tr><td>Section vertical rhythm</td><td>22&ndash;28px between major blocks</td><td class="tok">--s-6 / --s-7</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub">Radii</h3>
+    <p>Six radii. The system has a "smaller chip, bigger card" feel &mdash; pills are 999px, chips are 4px, controls climb up through 7&ndash;8px, cards land at 10&ndash;12px.</p>
+
+    <div class="demo">
+      <div class="radii">
+        <div class="r"><div class="box" style="border-radius:var(--r-xs)"></div><div class="label"><b>--r-xs</b>4px<br/>chips, LOB tags</div></div>
+        <div class="r"><div class="box" style="border-radius:var(--r-sm)"></div><div class="label"><b>--r-sm</b>6px<br/>small buttons</div></div>
+        <div class="r"><div class="box" style="border-radius:var(--r)"></div><div class="label"><b>--r</b>7px<br/>buttons, nav, tabs</div></div>
+        <div class="r"><div class="box" style="border-radius:var(--r-md)"></div><div class="label"><b>--r-md</b>8px<br/>search, soft tags</div></div>
+        <div class="r"><div class="box" style="border-radius:var(--r-lg)"></div><div class="label"><b>--r-lg</b>10px<br/>metric cards</div></div>
+        <div class="r"><div class="box" style="border-radius:var(--r-xl)"></div><div class="label"><b>--r-xl</b>12px<br/>table cards, toolbars</div></div>
+        <div class="r"><div class="box" style="border-radius:var(--r-pill)"></div><div class="label"><b>--r-pill</b>999px<br/>status pills</div></div>
+      </div>
+    </div>
+
+    <h3 class="sub">Elevation</h3>
+    <p>Exactly one shadow. Use it on cards and the table card. Do not stack shadows or invent depth.</p>
+    <div class="demo">
+      <div class="sh">
+        <code>--shadow-sm</code> &mdash; <span class="mono">0 1px 2px rgba(16,24,40,.04), 0 1px 1px rgba(16,24,40,.02)</span>
+      </div>
+    </div>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="icons"><span class="num">06</span>Icons</h2>
+    <p class="sec-lead">Stroke icons, line-style, 24&times;24 viewBox, drawn at 14px (sometimes 13px or 18px). Stroke matches text color so they inherit cleanly.</p>
+
+    <table class="spec">
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>viewBox</td><td><code>0 0 24 24</code></td></tr>
+        <tr><td>fill</td><td><code>none</code></td></tr>
+        <tr><td>stroke</td><td><code>currentColor</code> &mdash; inherits from parent</td></tr>
+        <tr><td>stroke-width</td><td><code>1.7</code></td></tr>
+        <tr><td>stroke-linecap / linejoin</td><td><code>round</code></td></tr>
+        <tr><td>Default render size</td><td>14&times;14 (16 in headers, 13 in dense rows, 18 in empty states)</td></tr>
+        <tr><td>Vertical alignment</td><td><code>vertical-align: -2px</code> when sitting inline with text</td></tr>
+      </tbody>
+    </table>
+
+    <p>The set used so far across screens (drawn here at the canonical 18px so the proportions read clearly):</p>
+
+    <div class="icon-strip">
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>home</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z M14 2v6h6"/></svg>file</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>shield</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V7l6-4 6 4v14M10 9h1M10 13h1M10 17h1M13 9h1M13 13h1M13 17h1"/></svg>build</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 11a4 4 0 100-8 4 4 0 000 8"/></svg>users</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3"/></svg>search</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>bell</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>plus</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M10 18h4"/></svg>filter</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5l5 5 5-5M4 21h16"/></svg>download</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M12 21V9m-5 5l5-5 5 5M4 3h16"/></svg>import</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>check</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>edit</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M3 7h18M5 3v4M19 3v4M4 7h16v14H4z"/></svg>calendar</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-linecap="round"/></svg>dots</div>
+      <div class="icon-cell"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>chevDn</div>
+    </div>
+
+    <p class="note"><b>Sourcing:</b> we don't pull from an icon library &mdash; the path data is inline in each screen so the bundle stays small. If you add a new icon, match the existing visual weight (single-stroke, rounded ends, no fills) and put it in a shared <code>icons.ts</code> in code rather than copying paths into multiple components.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="layout"><span class="num">07</span>App shell</h2>
+    <p class="sec-lead">Sidebar + topbar + page wrap. This scaffold is the same on every screen.</p>
+
+    <table class="spec">
+      <thead><tr><th>Region</th><th>Token / value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Sidebar width</td><td class="tok">--sidebar-w &middot; 210px</td><td>Fixed. Sticky to top, full viewport height.</td></tr>
+        <tr><td>Topbar height</td><td class="tok">--topbar-h &middot; 48px</td><td>Sticky to top of main column, z-index 5.</td></tr>
+        <tr><td>Container horizontal padding</td><td class="tok">--container-pad &middot; 28px</td><td>Applied to topbar and page <code>.wrap</code> consistently.</td></tr>
+        <tr><td>Page wrap padding</td><td><code>20px 28px 60px</code></td><td>Top tighter than bottom; bottom leaves breathing room before the fold.</td></tr>
+        <tr><td>Drawer width</td><td class="tok">--drawer-w &middot; 560px</td><td>Right-anchored entity drill-in.</td></tr>
+      </tbody>
+    </table>
+
+    <p>The structure, rendered:</p>
+
+    <div class="mini-app">
+      <aside class="mini-side">
+        <div class="brand-r"><img src="assets/smm-symbol.png" alt=""/>SIMS</div>
+        <nav class="mini-nav">
+          <a><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>Dashboard</a>
+          <a class="active"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z M14 2v6h6"/></svg>Submissions</a>
+          <div class="submenu">
+            <a class="sub active">All submissions</a>
+            <a class="sub">My queue</a>
+            <a class="sub">Needs action</a>
+          </div>
+          <a><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Policies</a>
+          <a><svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V7l6-4 6 4v14"/></svg>Insureds</a>
+          <div class="section">Admin</div>
+          <a><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 11a4 4 0 100-8 4 4 0 000 8"/></svg>Agents</a>
+        </nav>
+      </aside>
+      <div>
+        <div class="mini-topbar">
+          <div>Workspace <span style="color:var(--ink-4)">/</span> <span style="color:var(--ink);font-weight:500">Submissions</span></div>
+          <div class="demo-row" style="gap:8px">
+            <div class="field" style="width:180px;height:28px;font-size:11.5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Search…"/></div>
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-size:10px;font-weight:700">LP</div>
+          </div>
+        </div>
+        <div class="mini-main">
+          <div style="font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:4px">Submissions</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-bottom:14px">All submissions across your book &middot; 42 records</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div class="metric-card accent" style="padding:10px 12px"><div class="k">Pipeline</div><div class="v" style="font-size:16px">$2.4M</div></div>
+            <div class="metric-card" style="padding:10px 12px"><div class="k">Active quotes</div><div class="v" style="font-size:16px">17</div></div>
+            <div class="metric-card" style="padding:10px 12px"><div class="k">Bind ratio</div><div class="v" style="font-size:16px">68%</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="nav"><span class="num">08</span>Navigation</h2>
+
+    <h3 class="sub">Sidebar items</h3>
+    <table class="spec">
+      <thead><tr><th>State</th><th>Background</th><th>Text</th><th>Icon</th></tr></thead>
+      <tbody>
+        <tr><td>Rest</td><td>transparent</td><td><code>--ink-2</code> 500</td><td><code>--ink-3</code></td></tr>
+        <tr><td>Hover</td><td><code>--hover</code></td><td><code>--ink-2</code> 500</td><td><code>--ink-3</code></td></tr>
+        <tr><td>Active</td><td><code>--accent-soft</code></td><td><code>--accent-ink</code> 600</td><td><code>--accent</code></td></tr>
+      </tbody>
+    </table>
+    <p>Items are 7px&times;10px padding, 7px radius, 13px font, 500 weight at rest / 600 active.</p>
+
+    <h3 class="sub">Sub-menu</h3>
+    <p>When a top-level item is active, its sub-menu shows below it: 22px left margin, 10px left padding, a 1px <code>--line</code> left rule. Active sub-item has no background &mdash; instead, a 2px <code>--accent</code> vertical bar sits in place of the rule for that one item.</p>
+
+    <h3 class="sub">Section header</h3>
+    <p>Within the sidebar, group dividers use an uppercase 10px <code>--ink-4</code> label at 16px top padding. We have one in the shipped screens: <b>Admin</b>.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="topbar"><span class="num">09</span>Topbar &amp; search</h2>
+    <p>The topbar holds three things: a left-aligned breadcrumb, a centered (right-floated) search field, and a notifications icon + avatar on the right.</p>
+
+    <div class="demo demo-row">
+      <div style="font-size:12.5px;color:var(--ink-3)">Workspace <span style="color:var(--ink-4)">/</span> <span style="color:var(--ink);font-weight:500">Submissions</span></div>
+      <div style="flex:1"></div>
+      <div class="field"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Search insureds, policies…"/></div>
+      <button class="btn ghost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></button>
+      <div style="width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-size:11px;font-weight:700">LP</div>
+    </div>
+
+    <p class="note"><b>Breadcrumbs:</b> 12.5px, <code>--ink-3</code>. Separator is &ldquo;/&rdquo; in <code>--ink-4</code>. The last segment (current page) is <code>--ink</code> 500.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="buttons"><span class="num">10</span>Buttons</h2>
+    <p class="sec-lead">Four variants &times; two sizes. That covers everything.</p>
+
+    <h3 class="sub">Variants</h3>
+    <div class="demo demo-row">
+      <button class="btn primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Primary</button>
+      <button class="btn outline">Outline</button>
+      <button class="btn ghost">Ghost</button>
+      <button class="btn danger">Danger</button>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Variant</th><th>Use</th><th>Rest</th><th>Hover</th></tr></thead>
+      <tbody>
+        <tr><td><b>Primary</b></td><td>The single most important action on a screen. Max one per area.</td><td><code>--accent</code> bg, white text</td><td><code>--accent-deep</code> bg</td></tr>
+        <tr><td><b>Outline</b></td><td>Secondary actions on the page (Import, Export, Edit).</td><td><code>--line</code> border, <code>--surface</code> bg, <code>--ink-2</code> text</td><td><code>--accent-light</code> border, <code>--hover</code> bg</td></tr>
+        <tr><td><b>Ghost</b></td><td>Tertiary / icon-only actions (notifications, menu).</td><td>transparent, <code>--ink-3</code> text</td><td><code>--hover</code> bg, <code>--ink</code> text</td></tr>
+        <tr><td><b>Danger</b></td><td>Destructive actions (decline quote, delete). Always confirms.</td><td><code>#f3c6be</code> border, <code>#9b2d1f</code> text</td><td><code>#fde0dc</code> bg, <code>#7a2318</code> text</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub">Sizes</h3>
+    <div class="demo demo-row">
+      <button class="btn primary">Default &middot; 32px</button>
+      <button class="btn primary sm">Small &middot; 26px</button>
+      <button class="btn-mini">Mini &middot; 24px</button>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Size</th><th>Height</th><th>Padding</th><th>Font</th><th>Radius</th></tr></thead>
+      <tbody>
+        <tr><td>Default</td><td>32px</td><td>0 12px</td><td>12.5px / 500</td><td><code>--r</code> 7px</td></tr>
+        <tr><td>Small (<code>.sm</code>)</td><td>26px</td><td>0 9px</td><td>12px / 500</td><td><code>--r-sm</code> 6px</td></tr>
+        <tr><td>Mini (<code>.btn-mini</code>)</td><td>24px</td><td>0 9px</td><td>11.5px / 500</td><td><code>--r-sm</code> 6px</td></tr>
+      </tbody>
+    </table>
+
+    <p class="note"><b>Icon-in-button:</b> always on the left, 6px gap to the label, 14px size. The whole button transition is <code>.12s</code>.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="pills"><span class="num">11</span>Status pills</h2>
+    <p class="sec-lead">A pill is a status badge. It carries the lifecycle states for submissions and quotes. Anatomy is fixed.</p>
+
+    <div class="anatomy" style="min-height:140px">
+      <div class="pill-big">Quoted</div>
+      <span class="annot" style="top:30px;left:130px"><b>dot &middot; 5px</b>currentColor at 85% opacity</span>
+      <span class="annot" style="top:80px;left:50px"><b>fg &middot; --pill-quoted-fg</b>color: #1B75BA</span>
+      <span class="annot" style="top:80px;left:280px"><b>bg &middot; --pill-quoted-bg</b>color: #e6f0f8</span>
+      <span class="annot" style="bottom:14px;left:24px"><b>padding</b>3px 9px</span>
+      <span class="annot" style="bottom:14px;left:160px"><b>radius</b>999px (--r-pill)</span>
+      <span class="annot" style="bottom:14px;left:260px"><b>font</b>11.5px / 600 / lh 1.3</span>
+    </div>
+
+    <h3 class="sub">All states</h3>
+    <div class="demo demo-row">
+      <span class="pill draft">Draft</span>
+      <span class="pill inprogress">In Progress</span>
+      <span class="pill quoted">Quoted</span>
+      <span class="pill bound">Bound</span>
+      <span class="pill declined">Declined</span>
+    </div>
+
+    <h3 class="sub">Semantic variants</h3>
+    <div class="demo demo-row">
+      <span class="pill ok">Clean</span>
+      <span class="pill warn">2 minor violations</span>
+      <span class="pill bad">1 major violation</span>
+    </div>
+
+    <p class="note"><b>Do not</b> add new pill variants without a token pair. The dot prefix is mandatory &mdash; it makes pills scannable when many sit in a column.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="tags"><span class="num">12</span>Tags &amp; chips</h2>
+    <p>Three flat micro-shapes for non-status metadata. None of them have a dot.</p>
+
+    <div class="demo demo-row">
+      <span class="lob">Commercial Auto</span>
+      <span class="lob">GL</span>
+      <span class="lob">Contractors Equipment</span>
+      <span class="state-chip">CA</span>
+      <span class="state-chip">TX</span>
+      <span class="state-chip">CO</span>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Element</th><th>Use</th><th>Style</th></tr></thead>
+      <tbody>
+        <tr><td><code>.lob</code></td><td>Line-of-business tags inside table cells.</td><td>10.5px Inter / 500, <code>--surface-2</code> bg, <code>--ink-2</code> text, <code>--r-xs</code> radius, 2px 7px padding.</td></tr>
+        <tr><td><code>.state-chip</code></td><td>Two-letter state codes, currency codes, short identifiers.</td><td>10.5px Reddit Mono / 600, <code>--surface-2</code> bg, <code>--ink-3</code> text, <code>--r-xs</code> radius.</td></tr>
+        <tr><td><code>.count-pill</code></td><td>Tab counts and queue counts (e.g. "12" beside a tab label).</td><td>11px Reddit Mono / 600, <code>--surface-2</code> bg, <code>--ink-3</code> text, <code>--r-pill</code> radius, min-width 22px.</td></tr>
+      </tbody>
+    </table>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="fields"><span class="num">13</span>Inputs &amp; fields</h2>
+    <p>Two input treatments. Both are 32px tall to match buttons so they sit on the same row cleanly.</p>
+
+    <h3 class="sub">Search / soft field</h3>
+    <p>Sits on <code>--surface-2</code> with no visible border at rest. On focus, the background flips to <code>--surface</code> and a 1px <code>--accent</code> border appears. Icon is 14px <code>--ink-3</code>.</p>
+
+    <div class="demo demo-row">
+      <div class="field"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Search insureds, policies…"/></div>
+      <div class="field" style="border-color:var(--accent);background:var(--surface)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Focused state" value="Ridgeline" /></div>
+    </div>
+
+    <h3 class="sub">Filter chip</h3>
+    <p>Used in toolbars above tables. Rest: <code>--line</code> border, <code>--surface</code> bg. Active: <code>--accent</code> border, <code>--accent-soft</code> bg, count tag inside.</p>
+
+    <div class="demo demo-row">
+      <button class="btn-mini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M7 12h10M10 18h4"/></svg>Status</button>
+      <button class="btn-mini" style="border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)">LOB <span style="background:var(--accent);color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;font-weight:600;margin-left:2px">3</span></button>
+      <button class="btn-mini">Producer</button>
+      <button class="btn-mini">Effective date</button>
+    </div>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="cards"><span class="num">14</span>Cards</h2>
+    <p>One card shape, applied to almost everything that holds content.</p>
+
+    <table class="spec">
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Background</td><td><code>--surface</code></td></tr>
+        <tr><td>Border</td><td><code>1px solid var(--line)</code></td></tr>
+        <tr><td>Radius</td><td><code>--r-xl</code> 12px (or <code>--r-lg</code> 10px for compact metric cards)</td></tr>
+        <tr><td>Shadow</td><td><code>--shadow-sm</code></td></tr>
+        <tr><td>Header padding</td><td><code>14px 18px</code> with a <code>1px solid var(--line)</code> bottom</td></tr>
+        <tr><td>Header title</td><td>14px / 600 with optional Reddit Mono count to the right</td></tr>
+        <tr><td>Body padding</td><td><code>18px</code> for prose, <code>0</code> when a table fills the card</td></tr>
+      </tbody>
+    </table>
+
+    <div class="demo">
+      <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-sm);overflow:hidden;max-width:480px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)">
+          <div style="margin:0;font-size:14px;font-weight:600">Coverage breakdown <span style="font-family:var(--font-mono);font-size:12px;color:var(--ink-3);font-weight:500;margin-left:6px">7 items</span></div>
+          <button class="btn-mini ghost">View all</button>
+        </div>
+        <div style="padding:18px;color:var(--ink-2);font-size:13px">
+          Card body content sits here. Padding follows the spec; the header above is sticky-eligible.
+        </div>
+      </div>
+    </div>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="metrics"><span class="num">15</span>Metric cards</h2>
+    <p>Used on Dashboard, Submissions list header, Quote Detail summary strip, and Exposures summary. Two visual variants &mdash; default, and the "hero" variant which carries an <code>--accent-soft</code> fill.</p>
+
+    <div class="demo demo-grid-4">
+      <div class="metric-card accent"><div class="k">Open pipeline</div><div class="v">$2.4M</div><div class="s">Quoted + In Progress</div></div>
+      <div class="metric-card"><div class="k">Active quotes</div><div class="v">17</div><div class="s">3 in review</div></div>
+      <div class="metric-card"><div class="k">Bind ratio (90d)</div><div class="v">68%</div><div class="s">11 bound &middot; 5 declined</div></div>
+      <div class="metric-card"><div class="k">Needs action</div><div class="v">4</div><div class="s">Info requests &middot; UW review</div></div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Part</th><th>Style</th></tr></thead>
+      <tbody>
+        <tr><td>Label (.k)</td><td>10.5px / 600 uppercase, <code>--ink-3</code>, 0.04em tracking</td></tr>
+        <tr><td>Value (.v)</td><td>20px / 600 / -0.015em / lh 1, tabular-nums</td></tr>
+        <tr><td>Sub (.s)</td><td>11.5px <code>--ink-3</code>, optional <code>b</code> in <code>--ink</code>/600 for inline emphasis</td></tr>
+        <tr><td>Hero variant</td><td><code>--accent-soft</code> bg, <code>#cfe0ef</code> border, value in <code>--accent-ink</code>. Reserved for the "primary number" on a screen.</td></tr>
+      </tbody>
+    </table>
+
+    <p class="note"><b>Larger value sizes</b> exist for the Quote Detail summary strip (28px) and the Dashboard hero KPI (36px). Use those only when the metric is the page's single most important number.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="tables"><span class="num">16</span>Data tables</h2>
+    <p class="sec-lead">The most-used component in SIMS. Density is deliberate. Every column has an opinion about alignment, font, and emphasis.</p>
+
+    <div class="demo flush">
+      <table class="demo-table">
+        <thead><tr><th>ID</th><th>Insured</th><th>LOB</th><th>Status</th><th class="num">Premium</th><th>Effective</th></tr></thead>
+        <tbody>
+          <tr class="row-quoted">
+            <td class="id">SUB-2026-00418</td>
+            <td class="insured">Ridgeline Carrier Services LLC<small>Boise, ID</small></td>
+            <td><span class="lob">Comm. Auto</span></td>
+            <td><span class="pill quoted">Quoted</span></td>
+            <td class="num">$164,800</td>
+            <td>May 01, 2026</td>
+          </tr>
+          <tr class="row-inprog">
+            <td class="id">SUB-2026-00412</td>
+            <td class="insured">Northwind Construction<small>Reno, NV</small></td>
+            <td><span class="lob">GL</span></td>
+            <td><span class="pill inprogress">In Progress</span></td>
+            <td class="num">$98,200</td>
+            <td>Apr 22, 2026</td>
+          </tr>
+          <tr class="row-bound">
+            <td class="id">SUB-2026-00399</td>
+            <td class="insured">Greenfield Equipment Rental<small>Bend, OR</small></td>
+            <td><span class="lob">Equipment</span></td>
+            <td><span class="pill bound">Bound</span></td>
+            <td class="num">$72,500</td>
+            <td>Apr 01, 2026</td>
+          </tr>
+          <tr class="row-declined">
+            <td class="id">SUB-2026-00388</td>
+            <td class="insured">Vista Painting Inc.<small>Sacramento, CA</small></td>
+            <td><span class="lob">GL</span></td>
+            <td><span class="pill declined">Declined</span></td>
+            <td class="num">$41,000</td>
+            <td>&mdash;</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Element</th><th>Style</th></tr></thead>
+      <tbody>
+        <tr><td>Header (<code>th</code>)</td><td>11px / 500 uppercase, <code>--ink-3</code>, 0.02em tracking, <code>--surface-2</code> bg, 9px 14px padding, <code>--line</code> bottom border.</td></tr>
+        <tr><td>Body cell (<code>td</code>)</td><td>13px / 400, <code>--ink</code>, 12px 14px padding. Bottom <code>--line-2</code> 1px (omitted on last row).</td></tr>
+        <tr><td>Row hover</td><td>Background <code>--hover</code>, cursor pointer.</td></tr>
+        <tr><td>Status-tinted row</td><td>One of the <code>--row-*</code> tokens. Hover still overrides.</td></tr>
+        <tr><td>ID column</td><td>11.5px Reddit Mono, <code>--ink-3</code>.</td></tr>
+        <tr><td>Primary text cell</td><td>13px / 600 <code>--ink</code>, optional <code>small</code> below at 11.5px / 400 <code>--ink-3</code>.</td></tr>
+        <tr><td>Numeric column</td><td>Right-aligned, <code>font-variant-numeric: tabular-nums</code>, 600 weight if it's a primary value.</td></tr>
+        <tr><td>Sort affordance</td><td>Header is clickable. Active sort header is <code>--ink</code>; arrow indicator (&#9660;/&#9650;/&#8597;) is 9px <code>--ink-4</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <p class="note"><b>Sort arrow:</b> &#8597; at rest, &#9660; for descending, &#9650; for ascending. Always to the right of the label, 4px gap.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="tabs"><span class="num">17</span>Tabs &amp; switches</h2>
+
+    <h3 class="sub">Pill tabs (in toolbars)</h3>
+    <p>Used inside table toolbars to switch between filtered sets (All / Quoted / Bound / etc).</p>
+    <div class="demo">
+      <div class="tabs-pill">
+        <button class="tab-p active">All <span class="c">42</span></button>
+        <button class="tab-p">Draft <span class="c">8</span></button>
+        <button class="tab-p">In Progress <span class="c">12</span></button>
+        <button class="tab-p">Quoted <span class="c">14</span></button>
+        <button class="tab-p">Bound <span class="c">6</span></button>
+        <button class="tab-p">Declined <span class="c">2</span></button>
+      </div>
+    </div>
+
+    <h3 class="sub">Underline tabs (page-level navigation)</h3>
+    <p>Used on detail screens to switch between sub-sections (Overview / Quotes / Documents / etc).</p>
+    <div class="demo">
+      <div class="tabs-under">
+        <button class="tab-u active">Overview</button>
+        <button class="tab-u">Quotes <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-4);font-weight:500">3</span></button>
+        <button class="tab-u">Documents <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-4);font-weight:500">14</span></button>
+        <button class="tab-u">Notes &amp; activity</button>
+        <button class="tab-u">Exposures</button>
+        <button class="tab-u">Loss runs</button>
+      </div>
+    </div>
+
+    <h3 class="sub">Segmented switch (LOB switcher, role switcher)</h3>
+    <p>Used when the user is choosing between mutually exclusive views &mdash; LOB on Exposures, role on Dashboard.</p>
+    <div class="demo">
+      <div class="seg-switch">
+        <button class="active">Commercial Auto <span style="font-family:var(--font-mono);font-size:11px;background:var(--accent-soft);color:var(--accent-ink);padding:2px 7px;border-radius:999px;font-weight:500">24</span></button>
+        <button>General Liability <span style="font-family:var(--font-mono);font-size:11px;background:var(--surface-2);color:var(--ink-3);padding:2px 7px;border-radius:999px;font-weight:500">6</span></button>
+        <button>Contractors Equipment <span style="font-family:var(--font-mono);font-size:11px;background:var(--surface-2);color:var(--ink-3);padding:2px 7px;border-radius:999px;font-weight:500">12</span></button>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Variant</th><th>Active treatment</th><th>Rest</th></tr></thead>
+      <tbody>
+        <tr><td>Pill tabs</td><td><code>--accent-soft</code> bg, <code>--accent-ink</code> 600 text, count in <code>--accent</code></td><td><code>--ink-3</code> 500, hover&rarr;<code>--hover</code></td></tr>
+        <tr><td>Underline tabs</td><td><code>--accent-ink</code> 600 text, <code>--accent</code> 2px bottom border</td><td><code>--ink-3</code> 500, hover&rarr;<code>--ink-2</code></td></tr>
+        <tr><td>Segmented</td><td><code>--surface</code> bg, <code>--ink</code> 600 text, <code>--shadow-sm</code></td><td>Transparent on <code>--surface-2</code> track</td></tr>
+      </tbody>
+    </table>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="checklist"><span class="num">18</span>Checklists</h2>
+    <p>Used on Quote Detail for the bind checklist. Three states per item: <b>done</b>, <b>open</b>, <b>blocker</b>.</p>
+
+    <div class="demo flush">
+      <div class="check done">
+        <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div><div class="label">Application signed (Acord 125)<small>Dominic V., Apr 04</small></div></div>
+        <div class="who">Underwriting</div>
+      </div>
+      <div class="check done">
+        <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div><div class="label">5-year loss runs reviewed<small>Lee P., Apr 08</small></div></div>
+        <div class="who">Underwriting</div>
+      </div>
+      <div class="check blocker">
+        <div class="box"></div>
+        <div><div class="label">MVR cleanup &mdash; driver #14<small>Pending expungement &middot; requested Apr 18</small></div></div>
+        <div class="who"><b>Blocker</b></div>
+      </div>
+      <div class="check">
+        <div class="box"></div>
+        <div><div class="label">Signed quote acceptance from insured<small>Sent Apr 18</small></div></div>
+        <div class="who">Producer</div>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>State</th><th>Box</th><th>Label</th></tr></thead>
+      <tbody>
+        <tr><td>Done</td><td><code>--accent</code> fill + white check inside</td><td>Strikethrough, <code>--ink-3</code></td></tr>
+        <tr><td>Open</td><td>1.5px <code>--ink-4</code> border, transparent</td><td><code>--ink</code> 500</td></tr>
+        <tr><td>Blocker</td><td>1.5px <code>#b33a2a</code> border, transparent</td><td><code>--ink</code> 500 + "Blocker" label on the right</td></tr>
+      </tbody>
+    </table>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="drawer"><span class="num">19</span>Entity drawer</h2>
+    <p>Right-anchored, 560px wide (<code>--drawer-w</code>), full viewport height. Used for drill-in on Driver / Vehicle / Equipment entries from the Exposures screen. Has prev/next paging across the source list and dismisses on Esc.</p>
+
+    <div class="drawer-demo">
+      <div class="drawer-back">
+        <div style="font-size:11px;color:var(--ink-4);margin-bottom:8px">Background page</div>
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:14px;font-size:12px">List of drivers / vehicles / equipment behind the drawer is dimmed but visible.</div>
+      </div>
+      <div class="drawer-side">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <h4>Marcus Whitfield</h4>
+            <div class="sub">Driver &middot; <span class="mono">DRV-014</span></div>
+          </div>
+          <div class="demo-row" style="gap:4px">
+            <button class="btn-mini ghost"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <button class="btn-mini ghost"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+          </div>
+        </div>
+        <div class="tabs-under" style="margin-bottom:14px">
+          <button class="tab-u active" style="padding:6px 10px;font-size:12px">Overview</button>
+          <button class="tab-u" style="padding:6px 10px;font-size:12px">MVR</button>
+          <button class="tab-u" style="padding:6px 10px;font-size:12px">Losses</button>
+        </div>
+        <div class="row"><span class="k">DOB</span><span class="v">04 / 12 / 1984</span></div>
+        <div class="row"><span class="k">License</span><span class="v">CDL Class A (CA)</span></div>
+        <div class="row"><span class="k">Hire date</span><span class="v">Jun 2019</span></div>
+        <div class="row"><span class="k">MVR status</span><span class="v"><span class="pill warn">2 minor</span></span></div>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Region</th><th>Style</th></tr></thead>
+      <tbody>
+        <tr><td>Width</td><td>560px fixed; full-height; right-anchored</td></tr>
+        <tr><td>Backdrop</td><td>rgba(12,17,28,0.32) over the page, click-outside dismisses</td></tr>
+        <tr><td>Header</td><td>Entity name (14px / 600) + entity type &middot; ID (11.5px <code>--ink-3</code>)</td></tr>
+        <tr><td>Paging</td><td>Two ghost mini-buttons (prev/next) top-right; cycles through the underlying list</td></tr>
+        <tr><td>Tabs</td><td>Underline tabs (see &sect;17), compressed: 6px 10px padding, 12px font</td></tr>
+        <tr><td>Dismiss</td><td>Esc key, click-outside, or close icon</td></tr>
+      </tbody>
+    </table>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="density"><span class="num">20</span>Density &amp; rhythm</h2>
+    <p class="sec-lead">SIMS is a high-density workbench. Get the rhythm right and the whole interface feels &ldquo;professional;&rdquo; get it wrong and it feels either airless or cheap.</p>
+
+    <h3 class="sub">Vertical rhythm</h3>
+    <table class="spec">
+      <thead><tr><th>Between</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td>Page H1 &rarr; next block</td><td>18px</td></tr>
+        <tr><td>Metric strip &rarr; toolbar/table</td><td>18px</td></tr>
+        <tr><td>Major card &rarr; major card</td><td>18&ndash;20px</td></tr>
+        <tr><td>Inside a card: header &rarr; body</td><td>14px header padding + 0 (border) + body padding</td></tr>
+        <tr><td>Inside a card body: section &rarr; section</td><td>16&ndash;22px</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub">Table density</h3>
+    <p>13px body, 12px 14px row padding, 1px <code>--line-2</code> dividers. <b>Do not loosen.</b> Sparser tables feel like a marketing site, not an underwriting tool.</p>
+
+    <h3 class="sub">Card-on-page</h3>
+    <p>Cards have <code>--shadow-sm</code> against a <code>--bg</code> page. Do not put a card inside another card &mdash; if a section needs visual separation inside a card, use an internal divider (<code>1px solid var(--line-2)</code>) and a slight padding bump, not a nested card.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="numbers"><span class="num">21</span>Numbers, money &amp; dates</h2>
+
+    <table class="spec">
+      <thead><tr><th>Type</th><th>Format</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td>Money (display)</td><td><code>$N,NNN</code> &mdash; no decimals</td><td><span class="mono">$164,800</span></td></tr>
+        <tr><td>Money (precise / breakdown rows)</td><td><code>$N,NNN.NN</code></td><td><span class="mono">$169,740.00</span></td></tr>
+        <tr><td>Money (null/unknown)</td><td>An em-dash in <code>--ink-4</code></td><td><span style="color:var(--ink-4)">&mdash;</span></td></tr>
+        <tr><td>Percent</td><td><code>NN%</code> &mdash; no decimals unless precision matters</td><td><span class="mono">68%</span></td></tr>
+        <tr><td>Counts</td><td>Plain integer, tabular-nums in tables</td><td><span class="mono">42</span></td></tr>
+        <tr><td>Delta &mdash; positive</td><td><code>+$N</code> or <code>+N%</code>, color <code>--good-fg</code></td><td><span style="color:#156b37;font-weight:500">+$12,700</span></td></tr>
+        <tr><td>Delta &mdash; negative</td><td><code>-$N</code> or <code>-N%</code>, color <code>#b33a2a</code></td><td><span style="color:#b33a2a;font-weight:500">-$4,200</span></td></tr>
+        <tr><td>ID (submission, quote, driver)</td><td>UPPERCASE-YYYY-NNNNN, Reddit Mono</td><td><span class="mono">SUB-2026-00418</span></td></tr>
+        <tr><td>Date (display)</td><td><code>Mmm DD, YYYY</code></td><td>May 01, 2026</td></tr>
+        <tr><td>Date (in table cell, secondary)</td><td><code>YYYY-MM-DD</code> in Reddit Mono <code>--ink-4</code>, below the primary date</td><td><span class="mono" style="color:var(--ink-4)">2026-05-01</span></td></tr>
+      </tbody>
+    </table>
+
+    <p class="note"><b>Delta direction is domain-driven, not arithmetic.</b> On premium, an <i>increase</i> over prior is shown red because it's bad news for the insured; a <i>decrease</i> is green. On bind ratio, the opposite. The component should be told whether "up is good" rather than guessing.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="voice"><span class="num">22</span>Voice &amp; copy</h2>
+
+    <h3 class="sub">Headings</h3>
+    <p>Sentence case. Short. The thing itself, not a description of the thing. <b>&ldquo;Submissions&rdquo;</b>, not &ldquo;Manage submissions.&rdquo; <b>&ldquo;Coverage breakdown&rdquo;</b>, not &ldquo;Here is the coverage breakdown.&rdquo;</p>
+
+    <h3 class="sub">Eyebrow labels</h3>
+    <p>UPPERCASE, 10.5px, 0.04em tracking, <code>--ink-3</code>. Three words max. <b>OPEN PIPELINE PREMIUM</b>, not &ldquo;Open pipeline premium total.&rdquo;</p>
+
+    <h3 class="sub">Buttons</h3>
+    <p>Verb + object. <b>New submission</b>, <b>Generate document</b>, <b>Bind quote</b>. Never <b>Submit</b> or <b>OK</b>. Never trailing dots.</p>
+
+    <h3 class="sub">Empty / null</h3>
+    <p>An em-dash in <code>--ink-4</code>. Not &ldquo;N/A,&rdquo; not blank. The dash means &ldquo;there is intentionally no value here.&rdquo;</p>
+
+    <h3 class="sub">Page subtitles</h3>
+    <p>Factual, no marketing. <i>&ldquo;All submissions across your book &middot; 42 records&rdquo;</i> &mdash; tells the user what they're looking at and how much of it there is. Skip if it doesn't add information.</p>
+
+    <h3 class="sub">Status labels</h3>
+    <p>Two words max. Fixed vocabulary: <b>Draft</b>, <b>In Progress</b>, <b>Quoted</b>, <b>Bound</b>, <b>Declined</b>. Do not rename these in copy &mdash; they're the data contract.</p>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="newpage"><span class="num">23</span>Spinning up a new page</h2>
+    <p class="sec-lead">When a screen comes in that isn't in the shipped mocks &mdash; or when you need to scaffold one before design catches up &mdash; use this. Every SIMS page is built from the same anatomy and resolves to one of four layout recipes. Follow the recipe, hit the tokens, and a new page will sit cleanly next to the existing ones without a design review.</p>
+
+    <h3 class="sub">Standard page anatomy</h3>
+    <p>Five regions, top to bottom. The first three are the same on every page. The bottom two are where the page differs.</p>
+
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;margin:14px 0">
+      <div style="display:grid;grid-template-columns:200px 1fr;min-height:340px">
+        <div style="padding:14px 12px;border-right:1px solid var(--line);background:var(--surface);font-size:12px;color:var(--ink-3)">
+          <div style="display:flex;gap:8px;align-items:center;padding-bottom:14px;margin-bottom:12px;border-bottom:1px solid var(--line);color:var(--ink);font-weight:600"><img src="assets/smm-symbol.png" alt="" style="width:22px;height:22px"/>SIMS</div>
+          <div style="padding:7px 9px;border-radius:var(--r);background:var(--accent-soft);color:var(--accent-ink);font-weight:600;font-size:12.5px;margin-bottom:1px">1 &middot; Sidebar</div>
+          <div style="padding:7px 9px;font-size:11.5px;color:var(--ink-4)">Persistent. Same on every page.</div>
+        </div>
+        <div style="display:flex;flex-direction:column">
+          <div style="padding:10px 22px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;justify-content:space-between;align-items:center;font-size:12px">
+            <span style="background:var(--accent-soft);color:var(--accent-ink);padding:4px 8px;border-radius:var(--r-sm);font-weight:600">2 &middot; Topbar</span>
+            <span style="color:var(--ink-4);font-size:11px">Breadcrumb &middot; search &middot; bell &middot; avatar</span>
+          </div>
+          <div style="padding:18px 22px;background:var(--bg);flex:1;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;padding:10px 14px;border:1px dashed var(--accent-light);border-radius:var(--r-md);background:var(--surface)">
+              <div>
+                <div style="font-size:11px;color:var(--ink-4);margin-bottom:3px">Optional</div>
+                <span style="background:var(--accent-soft);color:var(--accent-ink);padding:4px 8px;border-radius:var(--r-sm);font-weight:600;font-size:12px">3 &middot; Page head</span>
+                <span style="font-size:11.5px;color:var(--ink-3);margin-left:8px">H1 + subtitle + page-level actions</span>
+              </div>
+              <button class="btn primary sm">Primary CTA</button>
+            </div>
+            <div style="padding:10px 14px;border:1px dashed var(--accent-light);border-radius:var(--r-md);background:var(--surface);font-size:11.5px;color:var(--ink-3)">
+              <span style="background:var(--accent-soft);color:var(--accent-ink);padding:4px 8px;border-radius:var(--r-sm);font-weight:600;font-size:12px;margin-right:8px">4 &middot; Context strip</span>
+              Optional. Metric cards, tab bar, segmented switch, or filter toolbar &mdash; the &ldquo;at-a-glance&rdquo; layer.
+            </div>
+            <div style="padding:18px 14px;border:1px dashed var(--accent-light);border-radius:var(--r-md);background:var(--surface);flex:1;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px">
+              <span style="background:var(--accent-soft);color:var(--accent-ink);padding:4px 8px;border-radius:var(--r-sm);font-weight:600;font-size:12px;margin-right:8px">5 &middot; Main content</span>
+              The page itself &mdash; one of the four recipes below.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>Region</th><th>Required?</th><th>Spec</th></tr></thead>
+      <tbody>
+        <tr><td>1 &middot; Sidebar</td><td>Always</td><td>210px fixed. Use the canonical nav from &sect;08. New top-level item only if it represents a noun in the data model (Submission, Policy, Insured) &mdash; otherwise nest it under one.</td></tr>
+        <tr><td>2 &middot; Topbar</td><td>Always</td><td>48px. Breadcrumb on the left, search + bell + avatar on the right. Breadcrumb's last segment is the current page; no other variation.</td></tr>
+        <tr><td>3 &middot; Page head</td><td>Almost always</td><td>H1 (22&ndash;24px / 600), optional 13px <code>--ink-3</code> subtitle, page-level actions on the right. Margin-bottom 18px. Skip only for screens that are themselves a single card (e.g. a focused form).</td></tr>
+        <tr><td>4 &middot; Context strip</td><td>Optional</td><td>One of: metric strip (KPI cards), tab bar, segmented switch, or filter toolbar. Margin-bottom 18&ndash;22px. Use when the user needs to orient or filter <i>before</i> reading the main content.</td></tr>
+        <tr><td>5 &middot; Main content</td><td>Always</td><td>The page itself. Pick a recipe.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub">Four layout recipes</h3>
+    <p>Almost every page in SIMS resolves to one of these. If yours doesn't fit, that's a flag to raise &mdash; not to invent a fifth.</p>
+
+    <h4 class="label">Recipe A &middot; List page</h4>
+    <p>For collections of records. <i>Examples in flight:</i> Submissions List. <i>Future:</i> Policies List, Insureds List, Agents List, Renewals.</p>
+
+    <div class="demo flush" style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px">
+        <div>
+          <div style="font-size:18px;font-weight:600;letter-spacing:-.01em">Page H1</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-top:2px">Subtitle &middot; N records</div>
+        </div>
+        <button class="btn primary sm">+ New record</button>
+      </div>
+      <div class="demo-grid-4" style="margin-bottom:14px">
+        <div class="metric-card accent" style="padding:10px 12px"><div class="k">Hero metric</div><div class="v" style="font-size:16px">$2.4M</div></div>
+        <div class="metric-card" style="padding:10px 12px"><div class="k">Metric 2</div><div class="v" style="font-size:16px">17</div></div>
+        <div class="metric-card" style="padding:10px 12px"><div class="k">Metric 3</div><div class="v" style="font-size:16px">68%</div></div>
+        <div class="metric-card" style="padding:10px 12px"><div class="k">Metric 4</div><div class="v" style="font-size:16px">4</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl) var(--r-xl) 0 0;border-bottom:0">
+        <div class="tabs-pill"><button class="tab-p active">All <span class="c">42</span></button><button class="tab-p">Filtered <span class="c">14</span></button></div>
+        <div class="demo-row" style="gap:6px"><button class="btn-mini">Filter</button><button class="btn-mini">Filter</button></div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--line);border-top:0;border-radius:0 0 var(--r-xl) var(--r-xl);padding:30px 14px;text-align:center;color:var(--ink-3);font-size:12px">[ data table fills this card &mdash; see &sect;16 ]</div>
+    </div>
+
+    <ol style="font-size:13px;color:var(--ink-2);padding-left:20px;line-height:1.7">
+      <li>Page head with primary <b>+ New record</b> CTA on the right.</li>
+      <li>Metric strip (4&ndash;5 cards) above the table &mdash; one hero card on the left, the rest neutral.</li>
+      <li>Toolbar attached to the top of the table card (no gap, share border): pill tabs on the left, filter chips + search on the right.</li>
+      <li>Table fills the rest of the card; pagination footer if more than ~50 rows.</li>
+      <li>Row click opens the detail page in the same tab.</li>
+    </ol>
+
+    <h4 class="label">Recipe B &middot; Detail page</h4>
+    <p>For a single record with multiple sub-views. <i>Examples in flight:</i> Submission Detail, Quote Detail, Exposures. <i>Future:</i> Policy Detail, Insured Detail, Agent Detail.</p>
+
+    <div class="demo flush" style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:18px;font-weight:600;letter-spacing:-.01em;display:flex;gap:10px;align-items:center">Record name <span style="font-family:var(--font-mono);font-size:12px;color:var(--ink-3);background:var(--surface-2);padding:3px 7px;border-radius:6px;font-weight:500">REC-2026-00418</span> <span class="pill quoted">Quoted</span></div>
+          <div style="font-size:12px;color:var(--ink-3);margin-top:4px">Carrier &middot; LOB &middot; effective dates</div>
+        </div>
+        <div class="demo-row" style="gap:6px"><button class="btn-mini">Edit</button><button class="btn-mini">More</button><button class="btn primary sm">Primary action</button></div>
+      </div>
+      <div class="tabs-under" style="margin:14px 0 18px">
+        <button class="tab-u active">Overview</button>
+        <button class="tab-u">Section <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-4)">3</span></button>
+        <button class="tab-u">Section</button>
+        <button class="tab-u">Section</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:14px;font-size:12px;color:var(--ink-3);text-align:center">[ main content card ]</div>
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:14px;font-size:12px;color:var(--ink-3);text-align:center">[ secondary content card ]</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:var(--accent);color:#fff;border-radius:var(--r-lg);padding:14px;font-size:12px">[ sticky CTA card ]</div>
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:14px;font-size:12px;color:var(--ink-3);text-align:center">[ right-rail card ]</div>
+        </div>
+      </div>
+    </div>
+
+    <ol style="font-size:13px;color:var(--ink-2);padding-left:20px;line-height:1.7">
+      <li>Header: record name + ID chip + status pill on one line; metadata (carrier, LOB, dates) on the line below.</li>
+      <li>Page-level actions on the right (Edit, More, primary action).</li>
+      <li>Underline tabs for sub-sections (Overview &middot; Quotes &middot; Documents &middot; etc).</li>
+      <li>Two-column body: main content on the left, sticky right rail on the right (320px). Right rail can hold a CTA card, a summary, or activity log.</li>
+      <li>At &lt;1180px, collapse to single column; right rail flows below.</li>
+    </ol>
+
+    <h4 class="label">Recipe C &middot; Workbench / dashboard</h4>
+    <p>For a landing page that surfaces queues, metrics, and recent activity. <i>Future:</i> UW Workbench, Producer Dashboard, Admin Overview.</p>
+
+    <div class="demo flush" style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px">
+        <div>
+          <div style="font-size:18px;font-weight:600;letter-spacing:-.01em">Good morning, Lee</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-top:2px">14 open submissions &middot; 4 need action today</div>
+        </div>
+        <div class="seg-switch" style="padding:2px"><button class="active" style="padding:5px 10px;font-size:11.5px">UW</button><button style="padding:5px 10px;font-size:11.5px">Producer</button><button style="padding:5px 10px;font-size:11.5px">Admin</button></div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+        <div class="metric-card accent" style="padding:12px;background:linear-gradient(180deg,var(--accent-soft) 0%,var(--surface) 70%);border-color:#cfe0ef"><div class="k">Hero KPI</div><div class="v" style="font-size:24px;color:var(--accent-ink)">$2.4M</div></div>
+        <div class="metric-card" style="padding:12px"><div class="k">Metric</div><div class="v" style="font-size:16px">17</div></div>
+        <div class="metric-card" style="padding:12px"><div class="k">Metric</div><div class="v" style="font-size:16px">68%</div></div>
+        <div class="metric-card" style="padding:12px"><div class="k">Metric</div><div class="v" style="font-size:16px">4</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:14px;font-size:12px;color:var(--ink-3);text-align:center">[ my queue card ]</div>
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:14px;font-size:12px;color:var(--ink-3);text-align:center">[ pipeline chart card ]</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:14px;font-size:12px;color:var(--ink-3);text-align:center">[ tasks card ]</div>
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:14px;font-size:12px;color:var(--ink-3);text-align:center">[ recent activity ]</div>
+        </div>
+      </div>
+    </div>
+
+    <ol style="font-size:13px;color:var(--ink-2);padding-left:20px;line-height:1.7">
+      <li>Personalized H1 if it fits (&ldquo;Good morning, Lee&rdquo;), with concrete subtitle.</li>
+      <li>Role/view switcher on the right of the page head (segmented), if the dashboard differs by role.</li>
+      <li>KPI strip: <b>hero card spans 2 columns</b> on the left with a soft gradient wash, three neutral KPIs on the right.</li>
+      <li>1.8fr / 1fr grid below for the main work surfaces. Cards on the left are denser (queues, tables, charts); cards on the right are lighter (tasks, activity, quick links).</li>
+    </ol>
+
+    <h4 class="label">Recipe D &middot; Single-record form</h4>
+    <p>For creating or editing one record without sub-sections. <i>Future:</i> New Submission intake, Generate Document modal-as-page, settings screens.</p>
+
+    <div class="demo flush" style="padding:20px">
+      <div style="max-width:680px;margin:0 auto">
+        <div style="font-size:11px;color:var(--ink-3);margin-bottom:6px"><span style="color:var(--accent)">&larr;</span> Back to submissions</div>
+        <div style="font-size:22px;font-weight:600;letter-spacing:-.01em;margin-bottom:4px">New submission</div>
+        <div style="font-size:13px;color:var(--ink-3);margin-bottom:20px">ACORD upload, insured lookup, LOB selection</div>
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-sm);overflow:hidden">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--line);font-size:14px;font-weight:600">1 &middot; Insured</div>
+          <div style="padding:18px;font-size:12px;color:var(--ink-3)">[ form fields stacked, label + field rows ]</div>
+          <div style="padding:14px 18px;border-top:1px solid var(--line);background:var(--surface-2);font-size:14px;font-weight:600">2 &middot; Line of business</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:18px">
+          <button class="btn ghost">Cancel</button>
+          <div class="demo-row" style="gap:8px"><button class="btn outline">Save as draft</button><button class="btn primary">Continue</button></div>
+        </div>
+      </div>
+    </div>
+
+    <ol style="font-size:13px;color:var(--ink-2);padding-left:20px;line-height:1.7">
+      <li>Centered, max-width 680px column. Don't span the full page width &mdash; long form lines fatigue.</li>
+      <li>Optional back-link breadcrumb above H1.</li>
+      <li>One card holds the whole form; internal section dividers (<code>--line</code> bottom, <code>--surface-2</code> header strip) separate sub-groups. <b>No nested cards.</b></li>
+      <li>Footer actions: <b>Cancel</b> ghost on the left, <b>Save as draft</b> outline + <b>Continue</b> primary on the right.</li>
+      <li>Numbered section headers when the form has natural phases (1, 2, 3). Skip if it's a short single-purpose form.</li>
+    </ol>
+
+    <h3 class="sub">Skeleton snippet</h3>
+    <p>Copy this as the starting point for any new page. It hits the page head, the optional context strip, and the main content card &mdash; with all the right tokens and class names already in place.</p>
+
+    <div style="background:#0c111c;color:#d6dae3;border-radius:var(--r-md);padding:20px;font-family:var(--font-mono);font-size:11.5px;line-height:1.65;overflow-x:auto;margin:14px 0">
+<span style="color:#7a8294">{/* Inside the <code>&lt;main&gt;</code> column of the app shell */}</span>
+&lt;<span style="color:#7eb6ff">div</span> className=<span style="color:#c8e6a8">"top"</span>&gt;
+  &lt;<span style="color:#7eb6ff">nav</span> className=<span style="color:#c8e6a8">"crumbs"</span>&gt;
+    &lt;<span style="color:#7eb6ff">a</span>&gt;Workspace&lt;/<span style="color:#7eb6ff">a</span>&gt; <span style="color:#7a8294">/</span> &lt;<span style="color:#7eb6ff">span</span>&gt;Current page&lt;/<span style="color:#7eb6ff">span</span>&gt;
+  &lt;/<span style="color:#7eb6ff">nav</span>&gt;
+  &lt;<span style="color:#7eb6ff">div</span> className=<span style="color:#c8e6a8">"right"</span>&gt;<span style="color:#7a8294">{/* search + bell + avatar */}</span>&lt;/<span style="color:#7eb6ff">div</span>&gt;
+&lt;/<span style="color:#7eb6ff">div</span>&gt;
+
+&lt;<span style="color:#7eb6ff">div</span> className=<span style="color:#c8e6a8">"wrap"</span>&gt;
+  <span style="color:#7a8294">{/* 3 · Page head */}</span>
+  &lt;<span style="color:#7eb6ff">header</span> className=<span style="color:#c8e6a8">"page-head"</span>&gt;
+    &lt;<span style="color:#7eb6ff">div</span>&gt;
+      &lt;<span style="color:#7eb6ff">h1</span>&gt;Page title&lt;/<span style="color:#7eb6ff">h1</span>&gt;
+      &lt;<span style="color:#7eb6ff">p</span> className=<span style="color:#c8e6a8">"sub"</span>&gt;Concrete subtitle &middot; N records&lt;/<span style="color:#7eb6ff">p</span>&gt;
+    &lt;/<span style="color:#7eb6ff">div</span>&gt;
+    &lt;<span style="color:#7eb6ff">div</span> className=<span style="color:#c8e6a8">"head-actions"</span>&gt;
+      &lt;<span style="color:#7eb6ff">Button</span> variant=<span style="color:#c8e6a8">"outline"</span>&gt;Secondary&lt;/<span style="color:#7eb6ff">Button</span>&gt;
+      &lt;<span style="color:#7eb6ff">Button</span> variant=<span style="color:#c8e6a8">"primary"</span>&gt;Primary action&lt;/<span style="color:#7eb6ff">Button</span>&gt;
+    &lt;/<span style="color:#7eb6ff">div</span>&gt;
+  &lt;/<span style="color:#7eb6ff">header</span>&gt;
+
+  <span style="color:#7a8294">{/* 4 · Context strip (optional) */}</span>
+  &lt;<span style="color:#7eb6ff">section</span> className=<span style="color:#c8e6a8">"metrics"</span>&gt;
+    &lt;<span style="color:#7eb6ff">MetricCard</span> variant=<span style="color:#c8e6a8">"accent"</span> label=<span style="color:#c8e6a8">"Hero"</span> value=<span style="color:#c8e6a8">"$2.4M"</span> /&gt;
+    &lt;<span style="color:#7eb6ff">MetricCard</span> label=<span style="color:#c8e6a8">"Metric 2"</span> value=<span style="color:#c8e6a8">"17"</span> /&gt;
+  &lt;/<span style="color:#7eb6ff">section</span>&gt;
+
+  <span style="color:#7a8294">{/* 5 · Main content */}</span>
+  &lt;<span style="color:#7eb6ff">Card</span>&gt;
+    &lt;<span style="color:#7eb6ff">Card.Header</span>&gt;Section title&lt;/<span style="color:#7eb6ff">Card.Header</span>&gt;
+    &lt;<span style="color:#7eb6ff">Card.Body</span>&gt;<span style="color:#7a8294">{/* table / KV grid / form */}</span>&lt;/<span style="color:#7eb6ff">Card.Body</span>&gt;
+  &lt;/<span style="color:#7eb6ff">Card</span>&gt;
+&lt;/<span style="color:#7eb6ff">div</span>&gt;
+    </div>
+
+    <p class="note"><b>Don't ship without the breadcrumb.</b> Every page must locate itself in the workspace hierarchy. Even one-off screens (settings, intake) get one.</p>
+
+    <h3 class="sub">Empty / loading / error states</h3>
+    <p>These get skipped under deadline pressure and bite later. Every component that renders data needs all three. The patterns are simple and reusable.</p>
+
+    <div class="demo-grid-3">
+      <div>
+        <div style="font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:6px">Empty</div>
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:32px 18px;text-align:center">
+          <div style="width:36px;height:36px;border-radius:var(--r-md);background:var(--surface-2);display:grid;place-items:center;margin:0 auto 10px;color:var(--ink-3)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2zM14 2v6h6"/></svg></div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">No submissions yet</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-bottom:12px">Create your first submission to get started.</div>
+          <button class="btn primary sm">+ New submission</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:6px">Loading</div>
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:18px">
+          <div style="height:14px;background:var(--surface-2);border-radius:4px;margin-bottom:10px;width:70%"></div>
+          <div style="height:12px;background:var(--surface-2);border-radius:4px;margin-bottom:8px;width:90%"></div>
+          <div style="height:12px;background:var(--surface-2);border-radius:4px;margin-bottom:8px;width:60%"></div>
+          <div style="height:12px;background:var(--surface-2);border-radius:4px;margin-bottom:8px;width:80%"></div>
+          <div style="height:12px;background:var(--surface-2);border-radius:4px;width:50%"></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:6px">Error</div>
+        <div style="background:var(--surface);border:1px solid #f3c6be;border-left:4px solid #b33a2a;border-radius:var(--r-md);padding:18px">
+          <div style="font-size:13px;font-weight:600;color:var(--bad-fg);margin-bottom:4px">Couldn't load submissions</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-bottom:12px">The server returned an error. Your work is safe.</div>
+          <button class="btn outline sm">Try again</button>
+        </div>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th>State</th><th>Spec</th></tr></thead>
+      <tbody>
+        <tr><td><b>Empty</b></td><td>Centered in card. 36px icon-in-square (<code>--surface-2</code> bg) &middot; 13px / 600 headline &middot; 12px <code>--ink-3</code> body &middot; primary CTA to create the first record. <b>One sentence body, max.</b></td></tr>
+        <tr><td><b>Loading</b></td><td>Skeleton rows in <code>--surface-2</code> at the same rhythm as real content. No spinners on full pages &mdash; spinners belong only inside buttons during action submission.</td></tr>
+        <tr><td><b>Error</b></td><td>Card with a 4px <code>#b33a2a</code> left rule and <code>#f3c6be</code> border. Headline in <code>--bad-fg</code>. One-line body. <b>Retry</b> outline button. Never show raw error text to the user; log it for the engineer.</td></tr>
+        <tr><td><b>Filtered-to-zero</b></td><td>Variant of empty: &ldquo;No results match your filters.&rdquo; Primary CTA becomes <b>Clear filters</b>, not <b>+ New</b>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub">Quick checklist before shipping a new page</h3>
+    <ol style="font-size:13px;color:var(--ink-2);padding-left:20px;line-height:1.9">
+      <li>Breadcrumb in topbar with the correct trail and bolded current page.</li>
+      <li>H1 in sentence case, 22&ndash;24px / 600, with a concrete subtitle.</li>
+      <li>Page-level actions on the right of the head &mdash; max one primary.</li>
+      <li>Every metric / table cell that holds a number uses <code>tabular-nums</code>.</li>
+      <li>Every status uses a pill from the locked vocabulary &mdash; no new labels.</li>
+      <li>Every icon is the stroke style at 1.7 weight, inherits <code>currentColor</code>.</li>
+      <li>Empty + loading + error states all present.</li>
+      <li>At &lt;980px the sidebar collapses to a horizontal scroll strip; at &lt;1180px two-column detail layouts stack.</li>
+      <li>No raw hex anywhere &mdash; every color is a token reference.</li>
+      <li>No new tokens introduced without adding them to <code>tokens.css</code> first.</li>
+    </ol>
+
+    <!-- =============================================== -->
+    <h2 class="sec" id="dont"><span class="num">24</span>Avoid this</h2>
+    <p class="sec-lead">Patterns that look fine in isolation but break the SIMS feel. If you catch yourself reaching for one, pause.</p>
+
+    <div class="rule">
+      <div>
+        <b>No gradients (except the dashboard hero KPI)</b>
+        The interface is flat. <code>linear-gradient(...)</code> on a card, button, or chart background is wrong. The one exception is the optional <code>--accent-soft</code>&rarr;<code>--surface</code> wash on the hero KPI tile.
+      </div>
+    </div>
+
+    <div class="rule">
+      <div>
+        <b>No second blue, no purples, no teals</b>
+        We have one accent (<code>--accent</code>) with five variants. Charts, status, decorations, all use this family. Resist pulling in a separate &ldquo;chart palette&rdquo; without a token proposal.
+      </div>
+    </div>
+
+    <div class="rule">
+      <div>
+        <b>No 14px+ button heights or oversized CTAs</b>
+        Buttons are 32 / 26 / 24px. A big bouncy CTA pulls the eye away from data, which is what the user came for.
+      </div>
+    </div>
+
+    <div class="rule">
+      <div>
+        <b>No emoji in UI</b>
+        Status, severity, and counts are encoded with pills and color. Emoji are decorative noise in an underwriting context.
+      </div>
+    </div>
+
+    <div class="rule">
+      <div>
+        <b>No nested cards or card-in-card shadows</b>
+        Inside a card, use a 1px <code>--line-2</code> divider and padding, not another bordered box.
+      </div>
+    </div>
+
+    <div class="rule">
+      <div>
+        <b>No body copy on <code>--ink-4</code></b>
+        That's a placeholder / null tone. Sustained reading on it fails contrast.
+      </div>
+    </div>
+
+    <div class="rule">
+      <div>
+        <b>No new tokens silently introduced in code</b>
+        If the design here doesn't cover what you need, raise it. Add to <code>tokens.css</code> first &mdash; with a name and a rationale &mdash; then reference it. One unsanctioned hex in a vacuum is how design systems die.
+      </div>
+    </div>
+
+    <div class="rule do">
+      <div>
+        <b>When in doubt</b>
+        Use <code>--ink-2</code> for text, <code>--line</code> for the border, <code>--r-md</code> for the radius, <code>--shadow-sm</code> for elevation, <code>--s-4</code> for the gap. Those defaults are right ~80% of the time.
+      </div>
+    </div>
+
+    <footer class="doc-foot">
+      <div>SIMS &middot; UI &amp; Brand Guide &middot; v1.0 &middot; May 2026</div>
+      <div>Companion to <code>tokens.css</code> &middot; <code>FOR CLAUDE CODE.md</code></div>
+    </footer>
+
+  </main>
+</div>
+</body>
+</html>

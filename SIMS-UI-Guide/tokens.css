@@ -1,0 +1,105 @@
+/* ============================================================
+   SIMS — Design Tokens
+   Single source of truth for design ↔ engineering.
+   Extracted from: Submissions List, Submission Detail,
+                   Quote Detail, Submission Exposures.
+   Last updated: 2026-04-27
+   ============================================================ */
+
+:root {
+  /* ---------- SURFACES ---------- */
+  --bg:           #f7f8fa;   /* app background                    */
+  --surface:      #ffffff;   /* cards, tables, drawers            */
+  --surface-2:    #f3f4f7;   /* table headers, input chips, wells */
+
+  /* ---------- INK (text) ----------
+     Use in this order: ink → ink-2 → ink-3 → ink-4
+     ink-4 is for placeholders / tertiary labels only. */
+  --ink:          #0c111c;
+  --ink-2:        #353a47;
+  --ink-3:        #626876;
+  --ink-4:        #9aa0ad;
+
+  /* ---------- LINES ---------- */
+  --line:         #e6e8ed;   /* default borders                   */
+  --line-2:       #eef0f3;   /* internal/secondary dividers       */
+
+  /* ---------- ACCENT (brand blue) ----------
+     --accent      = primary CTA, focus, active nav
+     --accent-soft = nav/tab/row hover, active backgrounds
+     --accent-ink  = text on soft accent backgrounds
+     --accent-light= subtle borders on hover
+     --accent-deep = strongest blue (in-progress states) */
+  --accent:        #1B75BA;
+  --accent-soft:   #e6f0f8;
+  --accent-ink:    #064778;
+  --accent-light:  #63A2D2;
+  --accent-deep:   #085C9C;
+  --hover:         #e6f0f8;  /* alias of accent-soft, for clarity */
+
+  /* ---------- STATUS PILLS ----------
+     Paired bg/fg. Always use as a pair. */
+  --pill-draft-bg:    #eef0f3;  --pill-draft-fg:    #626876;
+  --pill-quoted-bg:   #e6f0f8;  --pill-quoted-fg:   #1B75BA;
+  --pill-bound-bg:    #d8e8f4;  --pill-bound-fg:    #064778;
+  --pill-declined-bg: #fde0dc;  --pill-declined-fg: #9b2d1f;
+  --pill-inprog-bg:   #e0edf7;  --pill-inprog-fg:   #085C9C;
+
+  /* ---------- SEMANTIC (good / warn / bad) ----------
+     For MVR badges, loss-run severity, validation, etc. */
+  --good-bg: #e6f2ea;  --good-fg: #156b37;
+  --warn-bg: #fdf3df;  --warn-fg: #8a5a0b;
+  --bad-bg:  #fde0dc;  --bad-fg:  #9b2d1f;
+
+  /* ---------- ELEVATION ---------- */
+  --shadow-sm: 0 1px 2px rgba(16,24,40,.04), 0 1px 1px rgba(16,24,40,.02);
+
+  /* ---------- TYPOGRAPHY ---------- */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Reddit Mono', ui-monospace, monospace;
+
+  --fs-xs:   10.5px;  /* eyebrows, micro labels                 */
+  --fs-sm:   11.5px;  /* state chips, ID columns                */
+  --fs-base: 12.5px;  /* buttons, tabs, nav, secondary UI       */
+  --fs-body: 13px;    /* table body, paragraph copy             */
+  --fs-app:  13.5px;  /* root body size                         */
+  --fs-md:   16px;    /* card titles                            */
+  --fs-lg:   20px;    /* metric values                          */
+  --fs-xl:   24px;    /* page H1                                */
+
+  --lh-tight:  1.3;
+  --lh-normal: 1.5;
+
+  /* ---------- RADII ---------- */
+  --r-xs: 4px;   /* state chips, LOB tags                       */
+  --r-sm: 6px;   /* small page buttons                          */
+  --r:    7px;   /* buttons, nav links, filters, tabs           */
+  --r-md: 8px;   /* search input, soft tags                     */
+  --r-lg: 10px;  /* metric cards                                */
+  --r-xl: 12px;  /* table card, toolbar                         */
+  --r-pill: 999px;
+
+  /* ---------- SPACING (4px grid) ---------- */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  28px;
+  --s-8:  32px;
+
+  /* ---------- LAYOUT ---------- */
+  --sidebar-w:     210px;
+  --topbar-h:      48px;
+  --drawer-w:      560px;
+  --container-pad: 28px;
+
+  /* ---------- ROW TINTS (Submissions list) ----------
+     "Quoted" sits one shade darker than the rest to pop. */
+  --row-draft:    transparent;
+  --row-quoted:   #eef6fc;
+  --row-bound:    #f4f9fd;
+  --row-declined: #fdf6f5;
+  --row-inprog:   #f3f8fc;
+}
