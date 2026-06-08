@@ -72,19 +72,19 @@ const emptyPremiumChargeForm = (): PremiumChargeForm => ({
 })
 
 function SectionHeader({ label }: { label: string }) {
-  return <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2 pb-1 border-b border-gray-100">{label}</h3>
+  return <h3 className="text-xs font-semibold uppercase tracking-wider pt-2 pb-1 border-b" style={{ color: 'var(--ink-4)', borderColor: 'var(--line-2)' }}>{label}</h3>
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-gray-600">{label}</span>
+      <span className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>{label}</span>
       <div className="mt-1">{children}</div>
     </label>
   )
 }
 
-const inputCls = 'w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
+const inputCls = 'sd-input w-full'
 const selectCls = inputCls
 
 export function FeesAdminPage() {
@@ -314,26 +314,26 @@ export function FeesAdminPage() {
 
   // ── VERSION EDITOR (shared by new + edit) ──────────────────────────────────
   const VersionEditor = (
-    <div className="bg-white border border-gray-200 rounded-lg flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+    <div className="border rounded-lg flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)', background: 'var(--surface)', borderColor: 'var(--line)' }}>
+      <div className="px-6 py-4 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--line)' }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => setView('versions')} className="text-gray-400 hover:text-gray-600"><ArrowLeft className="h-4 w-4" /></button>
+          <button onClick={() => setView('versions')} style={{ color: 'var(--ink-4)' }}><ArrowLeft className="h-4 w-4" /></button>
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
               {view === 'new-version' ? 'New Version' : `Edit Version`} — {selectedDef?.displayName}
             </h2>
             {view === 'edit-version' && editingVersion && (
-              <p className="text-xs text-gray-400">Effective {editingVersion.effectiveDate}{editingVersion.disabledDate ? ` → disabled ${editingVersion.disabledDate}` : ''}</p>
+              <p className="text-xs" style={{ color: 'var(--ink-4)' }}>Effective {editingVersion.effectiveDate}{editingVersion.disabledDate ? ` → disabled ${editingVersion.disabledDate}` : ''}</p>
             )}
           </div>
         </div>
         <div className="flex gap-2">
           {view === 'edit-version' && editingVersion && !isSuperseded(editingVersion) && (
             <button onClick={() => { if (confirm('Disable this version as of today?')) disableVersion() }}
-              className="px-3 py-1.5 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50">Disable</button>
+              className="px-3 py-1.5 text-xs border rounded" style={{ borderColor: 'var(--bad-fg)', color: 'var(--bad-fg)' }}>Disable</button>
           )}
           <button onClick={() => saveVersion()} disabled={savingVersion || missingVendorPayee || incompleteProgramScope}
-            className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+            className="sd-btn primary px-4 py-1.5 text-xs disabled:opacity-50">
             {savingVersion ? 'Saving…' : 'Save Version'}
           </button>
         </div>
@@ -370,33 +370,33 @@ export function FeesAdminPage() {
               </Field>
               <label className="flex items-center gap-2 cursor-pointer col-span-2">
                 <input type="checkbox" checked={form.percentOfNet} onChange={e => set('percentOfNet', e.target.checked)} className="rounded" />
-                <span className="text-sm text-gray-700">% of Net Premium (instead of gross)</span>
+                <span className="text-sm" style={{ color: 'var(--ink-2)' }}>% of Net Premium (instead of gross)</span>
               </label>
             </>
           )}
           {form.calcType === 'Stratified' && (
             <div className="col-span-2">
-              <table className="w-full text-sm border border-gray-200 rounded">
-                <thead className="bg-gray-50">
+              <table className="w-full text-sm border rounded" style={{ borderColor: 'var(--line)' }}>
+                <thead style={{ background: 'var(--surface-2)' }}>
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs text-gray-500">From ($)</th>
-                    <th className="px-3 py-2 text-left text-xs text-gray-500">To ($, blank = ∞)</th>
-                    <th className="px-3 py-2 text-left text-xs text-gray-500">Rate (decimal)</th>
+                    <th className="px-3 py-2 text-left text-xs" style={{ color: 'var(--ink-3)' }}>From ($)</th>
+                    <th className="px-3 py-2 text-left text-xs" style={{ color: 'var(--ink-3)' }}>To ($, blank = ∞)</th>
+                    <th className="px-3 py-2 text-left text-xs" style={{ color: 'var(--ink-3)' }}>Rate (decimal)</th>
                     <th className="px-3 py-2 w-8" />
                   </tr>
                 </thead>
                 <tbody>
                   {form.premiumBrackets.map((b, i) => (
-                    <tr key={i} className="border-t border-gray-100">
-                      <td className="px-2 py-1.5"><input type="number" step="0.01" value={b.tierFrom} onChange={e => { const bs = [...form.premiumBrackets]; bs[i] = { ...b, tierFrom: Number(e.target.value) }; set('premiumBrackets', bs) }} className="w-full border border-gray-200 rounded px-2 py-1 text-xs" /></td>
-                      <td className="px-2 py-1.5"><input type="number" step="0.01" value={b.tierTo ?? ''} onChange={e => { const bs = [...form.premiumBrackets]; bs[i] = { ...b, tierTo: e.target.value ? Number(e.target.value) : null }; set('premiumBrackets', bs) }} className="w-full border border-gray-200 rounded px-2 py-1 text-xs" /></td>
-                      <td className="px-2 py-1.5"><input type="number" step="0.000001" value={b.percentRate} onChange={e => { const bs = [...form.premiumBrackets]; bs[i] = { ...b, percentRate: Number(e.target.value) }; set('premiumBrackets', bs) }} className="w-full border border-gray-200 rounded px-2 py-1 text-xs" /></td>
-                      <td className="px-2 py-1.5"><button onClick={() => set('premiumBrackets', form.premiumBrackets.filter((_, j) => j !== i))}><X className="h-3 w-3 text-red-400" /></button></td>
+                    <tr key={i} className="border-t" style={{ borderColor: 'var(--line-2)' }}>
+                      <td className="px-2 py-1.5"><input type="number" step="0.01" value={b.tierFrom} onChange={e => { const bs = [...form.premiumBrackets]; bs[i] = { ...b, tierFrom: Number(e.target.value) }; set('premiumBrackets', bs) }} className="sd-input w-full px-2 py-1 text-xs" /></td>
+                      <td className="px-2 py-1.5"><input type="number" step="0.01" value={b.tierTo ?? ''} onChange={e => { const bs = [...form.premiumBrackets]; bs[i] = { ...b, tierTo: e.target.value ? Number(e.target.value) : null }; set('premiumBrackets', bs) }} className="sd-input w-full px-2 py-1 text-xs" /></td>
+                      <td className="px-2 py-1.5"><input type="number" step="0.000001" value={b.percentRate} onChange={e => { const bs = [...form.premiumBrackets]; bs[i] = { ...b, percentRate: Number(e.target.value) }; set('premiumBrackets', bs) }} className="sd-input w-full px-2 py-1 text-xs" /></td>
+                      <td className="px-2 py-1.5"><button onClick={() => set('premiumBrackets', form.premiumBrackets.filter((_, j) => j !== i))}><X className="h-3 w-3" style={{ color: 'var(--bad-fg)' }} /></button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <button onClick={() => set('premiumBrackets', [...form.premiumBrackets, { tierFrom: 0, tierTo: null, percentRate: 0 }])} className="mt-2 text-xs text-blue-600 hover:underline">+ Add Tier</button>
+              <button onClick={() => set('premiumBrackets', [...form.premiumBrackets, { tierFrom: 0, tierTo: null, percentRate: 0 }])} className="mt-2 text-xs hover:underline" style={{ color: 'var(--accent-ink)' }}>+ Add Tier</button>
             </div>
           )}
           <Field label="Minimum Amount ($)">
@@ -423,7 +423,7 @@ export function FeesAdminPage() {
               <option value="">{selectedProgram ? 'Program Carrier Default' : 'All Carriers'}</option>
               {carrierOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {programScopeMissingCarrier && <p className="mt-1 text-xs text-red-600">Select a carrier for this Program scope.</p>}
+            {programScopeMissingCarrier && <p className="mt-1 text-xs" style={{ color: 'var(--bad-fg)' }}>Select a carrier for this Program scope.</p>}
           </Field>
           <Field label="Line of Business">
             <select
@@ -446,7 +446,7 @@ export function FeesAdminPage() {
               <option value="">{selectedProgram ? 'All States for LOB' : 'All States'}</option>
               {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            {programScopeMissingLob && <p className="mt-1 text-xs text-red-600">Select a line of business before choosing a state.</p>}
+            {programScopeMissingLob && <p className="mt-1 text-xs" style={{ color: 'var(--bad-fg)' }}>Select a line of business before choosing a state.</p>}
           </Field>
           <Field label="License Type">
             <select value={form.licenseType ?? ''} onChange={e => set('licenseType', e.target.value || null)} className={selectCls}>
@@ -473,7 +473,7 @@ export function FeesAdminPage() {
         <div className="grid grid-cols-3 gap-4">
           <label className="flex items-center gap-2 cursor-pointer col-span-3">
             <input type="checkbox" checked={form.applyAutomatically} onChange={e => set('applyAutomatically', e.target.checked)} className="rounded" />
-            <span className="text-sm text-gray-700">Apply Automatically</span>
+            <span className="text-sm" style={{ color: 'var(--ink-2)' }}>Apply Automatically</span>
           </label>
           {([
             ['applyWhenPackagePolicyOnly', 'Apply when Package Policy Only'],
@@ -486,7 +486,7 @@ export function FeesAdminPage() {
           ] as [keyof VersionForm, string][]).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={!!form[key]} onChange={e => set(key, e.target.checked as any)} className="rounded" />
-              <span className="text-sm text-gray-700">{label}</span>
+              <span className="text-sm" style={{ color: 'var(--ink-2)' }}>{label}</span>
             </label>
           ))}
           <Field label="Min Premium ($)">
@@ -530,12 +530,12 @@ export function FeesAdminPage() {
                   </option>
                 ))}
               </select>
-              {missingVendorPayee && <p className="mt-1 text-xs text-red-600">Select the vendor that will receive the monthly payable.</p>}
+              {missingVendorPayee && <p className="mt-1 text-xs" style={{ color: 'var(--bad-fg)' }}>Select the vendor that will receive the monthly payable.</p>}
             </Field>
           )}
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={form.masterPayeeWhenHomeState} onChange={e => set('masterPayeeWhenHomeState', e.target.checked)} className="rounded" />
-            <span className="text-sm text-gray-700">Master payee when home state</span>
+            <span className="text-sm" style={{ color: 'var(--ink-2)' }}>Master payee when home state</span>
           </label>
         </div>
 
@@ -557,7 +557,7 @@ export function FeesAdminPage() {
           ] as [keyof VersionForm, string][]).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={!!form[key]} onChange={e => set(key, e.target.checked as any)} className="rounded" />
-              <span className="text-sm text-gray-700">{label}</span>
+              <span className="text-sm" style={{ color: 'var(--ink-2)' }}>{label}</span>
             </label>
           ))}
         </div>
@@ -584,10 +584,10 @@ export function FeesAdminPage() {
             <SectionHeader label="Change History" />
             <div className="space-y-1">
               {auditLog.map(entry => (
-                <div key={entry.id} className="flex gap-4 text-xs py-1.5 border-b border-gray-50">
-                  <span className="text-gray-400 w-36 flex-shrink-0">{new Date(entry.editedAt).toLocaleString()}</span>
+                <div key={entry.id} className="flex gap-4 text-xs py-1.5 border-b" style={{ borderColor: 'var(--line-2)' }}>
+                  <span className="w-36 flex-shrink-0" style={{ color: 'var(--ink-4)' }}>{new Date(entry.editedAt).toLocaleString()}</span>
                   <span className="font-medium w-24 flex-shrink-0">{entry.changeType}</span>
-                  <span className="text-gray-500">{entry.notes ?? '—'}</span>
+                  <span style={{ color: 'var(--ink-3)' }}>{entry.notes ?? '—'}</span>
                 </div>
               ))}
             </div>
@@ -604,18 +604,18 @@ export function FeesAdminPage() {
         subtitle="Premium charges, taxes, and fee rules with carrier and LOB-specific versions"
         action={
           activeTab === 'fees' ? (
-            <button onClick={() => setShowNewDef(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+            <button onClick={() => setShowNewDef(true)} className="sd-btn primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm">
               <Plus className="h-4 w-4" /> New Fee Type
             </button>
           ) : (
-            <button onClick={() => { setEditingPremiumChargeId(null); setPremiumChargeForm(emptyPremiumChargeForm()); setShowPremiumChargeForm(true) }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+            <button onClick={() => { setEditingPremiumChargeId(null); setPremiumChargeForm(emptyPremiumChargeForm()); setShowPremiumChargeForm(true) }} className="sd-btn primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm">
               <Plus className="h-4 w-4" /> New Premium Charge
             </button>
           )
         }
       />
 
-      <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+      <div className="inline-flex rounded-lg border p-1" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
         {([
           ['fees', 'Taxes & Fees'],
           ['premium-charges', 'Premium Charges'],
@@ -623,7 +623,8 @@ export function FeesAdminPage() {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`px-3 py-1.5 text-sm rounded-md ${activeTab === key ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-3 py-1.5 text-sm rounded-md ${activeTab === key ? 'sd-btn primary' : ''}`}
+            style={activeTab !== key ? { color: 'var(--ink-3)' } : undefined}
           >
             {label}
           </button>
@@ -633,47 +634,48 @@ export function FeesAdminPage() {
       {activeTab === 'fees' && (
       <div className="flex gap-6">
         {/* Definitions sidebar */}
-        <div className="w-64 flex-shrink-0 bg-white border border-gray-200 rounded-lg overflow-hidden self-start">
-          <div className="px-4 py-3 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fee Types</div>
-          <ul className="divide-y divide-gray-100">
+        <div className="w-64 flex-shrink-0 rounded-lg overflow-hidden self-start border" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
+          <div className="px-4 py-3 border-b text-xs font-semibold uppercase tracking-wider" style={{ borderColor: 'var(--line-2)', color: 'var(--ink-3)' }}>Fee Types</div>
+          <ul className="divide-y" style={{ '--tw-divide-opacity': 1 } as React.CSSProperties}>
             {definitions.map((def) => (
               <li key={def.id}>
                 <button
                   onClick={() => { setSelectedDef(def); setView('versions'); setEditingVersion(null) }}
-                  className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-gray-50 ${selectedDef?.id === def.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''}`}
+                  className={`w-full text-left px-4 py-3 flex items-center justify-between ${selectedDef?.id === def.id ? 'border-l-2 border-l-blue-500' : ''}`}
+                  style={selectedDef?.id === def.id ? { background: 'var(--surface-2)' } : undefined}
                 >
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">{def.displayName}</div>
-                    <div className="text-xs text-gray-400">{def.feeCategory} · order {def.calculationOrder}</div>
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{def.displayName}</div>
+                    <div className="text-xs" style={{ color: 'var(--ink-4)' }}>{def.feeCategory} · order {def.calculationOrder}</div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--ink-4)' }} />
                 </button>
               </li>
             ))}
-            {definitions.length === 0 && <li className="px-4 py-6 text-sm text-gray-400 text-center">No fee types yet</li>}
+            {definitions.length === 0 && <li className="px-4 py-6 text-sm text-center" style={{ color: 'var(--ink-4)' }}>No fee types yet</li>}
           </ul>
         </div>
 
         {/* Main panel */}
         <div className="flex-1 min-w-0">
           {view === 'list' && (
-            <div className="flex items-center justify-center h-48 text-sm text-gray-400 bg-white border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-center h-48 text-sm border rounded-lg" style={{ color: 'var(--ink-4)', background: 'var(--surface)', borderColor: 'var(--line)' }}>
               Select a fee type to see its rule versions
             </div>
           )}
 
           {view === 'versions' && selectedDef && (
-            <div className="bg-white border border-gray-200 rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="border rounded-lg" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
+              <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
                 <div>
-                  <h2 className="text-base font-semibold text-gray-900">{selectedDef.displayName}</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">{selectedDef.feeCategory} · {selectedDef.isTaxable ? 'Taxable' : 'Non-taxable'} · calc order {selectedDef.calculationOrder}</p>
+                  <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>{selectedDef.displayName}</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--ink-4)' }}>{selectedDef.feeCategory} · {selectedDef.isTaxable ? 'Taxable' : 'Non-taxable'} · calc order {selectedDef.calculationOrder}</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => { setNonTaxableEdit(versions[0]?.nonTaxableStates ?? []); setShowTaxability(true) }}
-                    className="px-3 py-1.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-50">Taxable States</button>
+                    className="sd-btn outline px-3 py-1.5 text-xs rounded">Taxable States</button>
                   <button onClick={() => openNewVersion()}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+                    className="sd-btn primary flex items-center gap-1 px-3 py-1.5 text-xs rounded">
                     <Plus className="h-3 w-3" /> New Version
                   </button>
                 </div>
@@ -681,7 +683,7 @@ export function FeesAdminPage() {
               {loadingVersions ? <div className="p-8 flex justify-center"><LoadingSpinner /></div> : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
+                    <tr className="border-b text-xs uppercase tracking-wider" style={{ borderColor: 'var(--line-2)', color: 'var(--ink-3)' }}>
                       <th className="px-6 py-3 text-left">Effective</th>
                       <th className="px-6 py-3 text-left">Disabled</th>
                       <th className="px-6 py-3 text-left">Scope</th>
@@ -695,29 +697,29 @@ export function FeesAdminPage() {
                       const sup = isSuperseded(v)
                       return (
                         <tr key={v.id} onClick={() => openEditVersion(v)} className={`cursor-pointer hover:bg-gray-50 ${sup ? 'opacity-40' : ''}`}>
-                          <td className={`px-6 py-3 ${sup ? 'line-through' : 'text-gray-900 font-medium'}`}>{v.effectiveDate}</td>
-                          <td className="px-6 py-3 text-gray-500">{v.disabledDate ?? <span className="text-green-600">Active</span>}</td>
-                          <td className="px-6 py-3 text-gray-500">{[
+                          <td className={`px-6 py-3 ${sup ? 'line-through' : 'font-medium'}`} style={!sup ? { color: 'var(--ink)' } : undefined}>{v.effectiveDate}</td>
+                          <td className="px-6 py-3" style={{ color: 'var(--ink-3)' }}>{v.disabledDate ?? <span style={{ color: 'var(--good-fg)' }}>Active</span>}</td>
+                          <td className="px-6 py-3" style={{ color: 'var(--ink-3)' }}>{[
                             v.programName ?? (v.programConfigurationId ? programs.find(program => program.id === v.programConfigurationId)?.name ?? 'Program' : null),
                             v.carrierId ? carriers.find(c => c.id === v.carrierId)?.name ?? 'Carrier' : null,
                             v.stateCode,
                             v.lineOfBusiness ? LOB_LABELS[v.lineOfBusiness as PolicyLineOfBusiness] ?? v.lineOfBusiness : null,
                             v.licenseType,
                           ].filter(Boolean).join(' · ') || 'All'}</td>
-                          <td className="px-6 py-3 text-gray-700">{v.calcType}</td>
-                          <td className="px-6 py-3 text-gray-700">
+                          <td className="px-6 py-3" style={{ color: 'var(--ink-2)' }}>{v.calcType}</td>
+                          <td className="px-6 py-3" style={{ color: 'var(--ink-2)' }}>
                             {v.calcType === 'Flat' && v.flatAmount != null && `$${Number(v.flatAmount).toFixed(2)}`}
                             {v.calcType === 'Percent' && v.percentRate != null && `${(Number(v.percentRate) * 100).toFixed(4)}%`}
                             {v.calcType === 'Stratified' && `${v.premiumBrackets.length} tiers`}
                           </td>
                           <td className="px-6 py-3 text-right" onClick={e => e.stopPropagation()}>
-                            {!sup && <button onClick={() => openNewVersion(v)} className="text-xs text-blue-600 hover:underline"><RefreshCw className="h-3 w-3 inline mr-1" />New Version</button>}
+                            {!sup && <button onClick={() => openNewVersion(v)} className="text-xs hover:underline" style={{ color: 'var(--accent-ink)' }}><RefreshCw className="h-3 w-3 inline mr-1" />New Version</button>}
                           </td>
                         </tr>
                       )
                     })}
                     {versions.length === 0 && (
-                      <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-400">No versions yet. Click "New Version" to add one.</td></tr>
+                      <tr><td colSpan={6} className="px-6 py-10 text-center" style={{ color: 'var(--ink-4)' }}>No versions yet. Click "New Version" to add one.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -731,14 +733,14 @@ export function FeesAdminPage() {
       )}
 
       {activeTab === 'premium-charges' && (
-        <div className="bg-white border border-gray-200 rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-gray-900">Additional Interest Premium Charges</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Blank carrier or LOB means the rule applies to all.</p>
+        <div className="border rounded-lg" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
+          <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--line)' }}>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>Additional Interest Premium Charges</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--ink-4)' }}>Blank carrier or LOB means the rule applies to all.</p>
           </div>
 
           {showPremiumChargeForm && (
-            <div className="p-4 border-b border-gray-200 bg-gray-50 space-y-3">
+            <div className="p-4 border-b space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
               <div className="grid grid-cols-4 gap-3">
                 <Field label="Carrier">
                   <select value={premiumChargeForm.carrierId ?? ''} onChange={e => setPremium('carrierId', e.target.value || undefined)} className={selectCls}>
@@ -788,14 +790,14 @@ export function FeesAdminPage() {
                 </Field>
                 <label className="flex items-center gap-2 cursor-pointer pt-6">
                   <input type="checkbox" checked={premiumChargeForm.isActive} onChange={e => setPremium('isActive', e.target.checked)} className="rounded" />
-                  <span className="text-sm text-gray-700">Active</span>
+                  <span className="text-sm" style={{ color: 'var(--ink-2)' }}>Active</span>
                 </label>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => savePremiumCharge()} disabled={savingPremiumCharge} className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                <button onClick={() => savePremiumCharge()} disabled={savingPremiumCharge} className="sd-btn primary px-4 py-1.5 text-xs disabled:opacity-50">
                   {savingPremiumCharge ? 'Saving...' : 'Save Premium Charge'}
                 </button>
-                <button onClick={() => { setShowPremiumChargeForm(false); setEditingPremiumChargeId(null); setPremiumChargeForm(emptyPremiumChargeForm()) }} className="px-4 py-1.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button onClick={() => { setShowPremiumChargeForm(false); setEditingPremiumChargeId(null); setPremiumChargeForm(emptyPremiumChargeForm()) }} className="sd-btn outline px-4 py-1.5 text-xs">Cancel</button>
               </div>
             </div>
           )}
@@ -803,7 +805,7 @@ export function FeesAdminPage() {
           {loadingPremiumCharges ? <div className="p-8 flex justify-center"><LoadingSpinner /></div> : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
+                <tr className="border-b text-xs uppercase tracking-wider" style={{ borderColor: 'var(--line-2)', color: 'var(--ink-3)' }}>
                   <th className="px-6 py-3 text-left">Carrier</th>
                   <th className="px-6 py-3 text-left">LOB</th>
                   <th className="px-6 py-3 text-left">Interest</th>
@@ -824,22 +826,22 @@ export function FeesAdminPage() {
                       : '-'
                   return (
                     <tr key={row.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-3 font-medium text-gray-900">{carrierName}</td>
-                      <td className="px-6 py-3 text-gray-600">{row.lineOfBusiness ? LOB_LABELS[row.lineOfBusiness as PolicyLineOfBusiness] ?? row.lineOfBusiness : 'All LOBs'}</td>
-                      <td className="px-6 py-3 text-gray-700">{ADDITIONAL_INTEREST_COVERAGE_LABELS[row.coverageType]}</td>
-                      <td className="px-6 py-3 text-gray-600">{ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS[row.chargeMethod]}</td>
-                      <td className="px-6 py-3 text-gray-700">{amount}</td>
-                      <td className="px-6 py-3 text-gray-500">{row.state ?? 'All'}</td>
-                      <td className="px-6 py-3">{row.isActive ? <span className="text-green-600">Active</span> : <span className="text-gray-400">Inactive</span>}</td>
+                      <td className="px-6 py-3 font-medium" style={{ color: 'var(--ink)' }}>{carrierName}</td>
+                      <td className="px-6 py-3" style={{ color: 'var(--ink-3)' }}>{row.lineOfBusiness ? LOB_LABELS[row.lineOfBusiness as PolicyLineOfBusiness] ?? row.lineOfBusiness : 'All LOBs'}</td>
+                      <td className="px-6 py-3" style={{ color: 'var(--ink-2)' }}>{ADDITIONAL_INTEREST_COVERAGE_LABELS[row.coverageType]}</td>
+                      <td className="px-6 py-3" style={{ color: 'var(--ink-3)' }}>{ADDITIONAL_INTEREST_CHARGE_METHOD_LABELS[row.chargeMethod]}</td>
+                      <td className="px-6 py-3" style={{ color: 'var(--ink-2)' }}>{amount}</td>
+                      <td className="px-6 py-3" style={{ color: 'var(--ink-3)' }}>{row.state ?? 'All'}</td>
+                      <td className="px-6 py-3">{row.isActive ? <span style={{ color: 'var(--good-fg)' }}>Active</span> : <span style={{ color: 'var(--ink-4)' }}>Inactive</span>}</td>
                       <td className="px-6 py-3 text-right">
-                        <button onClick={() => editPremiumCharge(row)} className="text-xs text-blue-600 hover:underline mr-3">Edit</button>
-                        <button onClick={() => { if (confirm('Delete this premium charge?')) deletePremiumCharge(row.id) }} className="text-xs text-red-500 hover:underline">Delete</button>
+                        <button onClick={() => editPremiumCharge(row)} className="text-xs hover:underline mr-3" style={{ color: 'var(--accent-ink)' }}>Edit</button>
+                        <button onClick={() => { if (confirm('Delete this premium charge?')) deletePremiumCharge(row.id) }} className="text-xs hover:underline" style={{ color: 'var(--bad-fg)' }}>Delete</button>
                       </td>
                     </tr>
                   )
                 })}
                 {premiumCharges.length === 0 && (
-                  <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400">No premium charges yet. Click "New Premium Charge" to add one.</td></tr>
+                  <tr><td colSpan={8} className="px-6 py-10 text-center" style={{ color: 'var(--ink-4)' }}>No premium charges yet. Click "New Premium Charge" to add one.</td></tr>
                 )}
               </tbody>
             </table>
@@ -850,10 +852,10 @@ export function FeesAdminPage() {
       {/* New Fee Type Modal */}
       {showNewDef && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">New Fee Type</h3>
-              <button onClick={() => setShowNewDef(false)}><X className="h-4 w-4 text-gray-400" /></button>
+          <div className="rounded-xl shadow-xl w-full max-w-md" style={{ background: 'var(--surface)' }}>
+            <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-semibold" style={{ color: 'var(--ink)' }}>New Fee Type</h3>
+              <button onClick={() => setShowNewDef(false)}><X className="h-4 w-4" style={{ color: 'var(--ink-4)' }} /></button>
             </div>
             <div className="p-6 space-y-4">
               <Field label="Code (e.g. TX_SL_TAX) *">
@@ -884,13 +886,13 @@ export function FeesAdminPage() {
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={defForm.isTaxable} onChange={e => setDefForm(p => ({ ...p, isTaxable: e.target.checked }))} className="rounded" />
-                <span className="text-sm text-gray-700">Taxable (can be taxed by SL taxes)</span>
+                <span className="text-sm" style={{ color: 'var(--ink-2)' }}>Taxable (can be taxed by SL taxes)</span>
               </label>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
-              <button onClick={() => setShowNewDef(false)} className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50">Cancel</button>
+            <div className="px-6 py-4 border-t flex justify-end gap-2" style={{ borderColor: 'var(--line)' }}>
+              <button onClick={() => setShowNewDef(false)} className="sd-btn outline px-4 py-2 text-sm">Cancel</button>
               <button onClick={() => createDef()} disabled={savingDef || !defForm.code || !defForm.displayName}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                className="sd-btn primary px-4 py-2 text-sm disabled:opacity-50">
                 {savingDef ? 'Creating…' : 'Create'}
               </button>
             </div>
@@ -901,13 +903,13 @@ export function FeesAdminPage() {
       {/* State Taxability Modal */}
       {showTaxability && selectedDef && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg" style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <div className="rounded-xl shadow-xl w-full max-w-lg" style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column', background: 'var(--surface)' }}>
+            <div className="px-6 py-4 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--line)' }}>
               <div>
-                <h3 className="font-semibold text-gray-900">Taxable States — {selectedDef.displayName}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Uncheck states where this fee is NOT taxable by SL tax</p>
+                <h3 className="font-semibold" style={{ color: 'var(--ink)' }}>Taxable States — {selectedDef.displayName}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--ink-4)' }}>Uncheck states where this fee is NOT taxable by SL tax</p>
               </div>
-              <button onClick={() => setShowTaxability(false)}><X className="h-4 w-4 text-gray-400" /></button>
+              <button onClick={() => setShowTaxability(false)}><X className="h-4 w-4" style={{ color: 'var(--ink-4)' }} /></button>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <div className="grid grid-cols-5 gap-2">
@@ -916,14 +918,14 @@ export function FeesAdminPage() {
                     <input type="checkbox" checked={!nonTaxableEdit.includes(st)}
                       onChange={e => setNonTaxableEdit(prev => e.target.checked ? prev.filter(s => s !== st) : [...prev, st])}
                       className="rounded" />
-                    <span className="text-sm text-gray-700">{st}</span>
+                    <span className="text-sm" style={{ color: 'var(--ink-2)' }}>{st}</span>
                   </label>
                 ))}
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
-              <button onClick={() => setShowTaxability(false)} className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button onClick={() => saveTaxability()} className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+            <div className="px-6 py-4 border-t flex justify-end gap-2 flex-shrink-0" style={{ borderColor: 'var(--line)' }}>
+              <button onClick={() => setShowTaxability(false)} className="sd-btn outline px-4 py-2 text-sm">Cancel</button>
+              <button onClick={() => saveTaxability()} className="sd-btn primary px-4 py-2 text-sm">Save</button>
             </div>
           </div>
         </div>

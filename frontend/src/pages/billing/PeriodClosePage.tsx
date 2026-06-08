@@ -22,14 +22,14 @@ function periodLabel(p: AccountingPeriod) {
 }
 
 function StatusBadge({ status }: { status: AccountingPeriod['status'] }) {
-  const styles: Record<string, string> = {
-    Open: 'bg-green-100 text-green-800',
-    Closing: 'bg-yellow-100 text-yellow-700',
-    Closed: 'bg-gray-200 text-gray-600',
-    Reopened: 'bg-blue-100 text-blue-700',
+  const styles: Record<string, React.CSSProperties> = {
+    Open:     { background: 'var(--good-bg)', color: 'var(--good-fg)' },
+    Closing:  { background: 'var(--warn-bg)', color: 'var(--warn-fg)' },
+    Closed:   { background: 'var(--surface-2)', color: 'var(--ink-3)' },
+    Reopened: { background: 'var(--surface-2)', color: 'var(--accent-ink)' },
   }
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${styles[status] ?? 'bg-gray-100 text-gray-600'}`}>
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={styles[status] ?? { background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
       {status}
     </span>
   )
@@ -37,25 +37,27 @@ function StatusBadge({ status }: { status: AccountingPeriod['status'] }) {
 
 function ChecklistRow({ item }: { item: ChecklistItem }) {
   const icon = item.passed
-    ? <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+    ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--good-fg)' }} />
     : item.isBlocking
-      ? <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
-      : <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+      ? <XCircle className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--bad-fg)' }} />
+      : <AlertTriangle className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--warn-fg)' }} />
 
   return (
-    <div className={`flex items-center justify-between px-4 py-3 rounded-lg border ${
-      item.passed
-        ? 'border-green-100 bg-green-50/50'
+    <div
+      className="flex items-center justify-between px-4 py-3 rounded-lg border"
+      style={item.passed
+        ? { borderColor: 'var(--line-2)', background: 'var(--good-bg)' }
         : item.isBlocking
-          ? 'border-red-100 bg-red-50/50'
-          : 'border-amber-100 bg-amber-50/50'
-    }`}>
+          ? { borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)' }
+          : { borderColor: 'var(--warn-fg)', background: 'var(--warn-bg)' }
+      }
+    >
       <div className="flex items-center gap-3">
         {icon}
         <div>
-          <p className="text-sm font-medium text-gray-900">{item.label}</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{item.label}</p>
           {!item.passed && (
-            <p className={`text-xs mt-0.5 ${item.isBlocking ? 'text-red-600' : 'text-amber-600'}`}>
+            <p className="text-xs mt-0.5" style={{ color: item.isBlocking ? 'var(--bad-fg)' : 'var(--warn-fg)' }}>
               {item.issueCount} item{item.issueCount !== 1 ? 's' : ''} outstanding
               {item.isBlocking ? ' — blocks close' : ' — warning only'}
             </p>
@@ -63,9 +65,9 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
         </div>
       </div>
       {item.passed ? (
-        <span className="text-xs text-green-600 font-medium">Clear</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--good-fg)' }}>Clear</span>
       ) : (
-        <span className={`text-xs font-mono font-semibold ${item.isBlocking ? 'text-red-600' : 'text-amber-600'}`}>
+        <span className="text-xs font-mono font-semibold" style={{ color: item.isBlocking ? 'var(--bad-fg)' : 'var(--warn-fg)' }}>
           {item.issueCount}
         </span>
       )}
@@ -125,13 +127,14 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-base font-semibold text-gray-900">{periodLabel(period)}</h2>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>{periodLabel(period)}</h2>
           <StatusBadge status={period.status} />
         </div>
         <button
           onClick={() => evaluateMutation.mutate()}
           disabled={evaluateMutation.isPending}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs border rounded px-2.5 py-1.5 disabled:opacity-50"
+          style={{ color: 'var(--ink-3)', borderColor: 'var(--line)' }}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${evaluateMutation.isPending ? 'animate-spin' : ''}`} />
           Refresh checklist
@@ -140,7 +143,7 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
 
       {/* Checklist */}
       {!checklistEvaluated ? (
-        <p className="text-sm text-gray-400 italic px-1">
+        <p className="text-sm italic px-1" style={{ color: 'var(--ink-4)' }}>
           Click "Refresh checklist" to evaluate close readiness.
         </p>
       ) : (
@@ -153,7 +156,7 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
 
       {/* Notes on closed/reopened */}
       {period.notes && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-600 whitespace-pre-line">
+        <div className="border rounded-lg px-4 py-3 text-xs whitespace-pre-line" style={{ background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--ink-3)' }}>
           {period.notes}
         </div>
       )}
@@ -166,21 +169,22 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
               onClick={() => setShowCloseForm(true)}
               disabled={hasBlockers}
               title={hasBlockers ? 'Resolve all blocking checklist items first' : undefined}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-md hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ color: 'white', background: 'var(--ink)' }}
             >
               <Lock className="h-4 w-4" />
               Close {periodLabel(period)}
               {hasWarnings && !hasBlockers && (
-                <span className="ml-1 text-amber-300 text-xs">(warnings)</span>
+                <span className="ml-1 text-xs" style={{ color: 'var(--warn-fg)' }}>(warnings)</span>
               )}
             </button>
           ) : (
-            <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-              <p className="text-sm font-medium text-gray-800">
+            <div className="border rounded-lg p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--ink-2)' }}>
                 Confirm close — {periodLabel(period)}
               </p>
               {hasWarnings && (
-                <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                <div className="flex items-start gap-2 text-xs border rounded p-2" style={{ color: 'var(--warn-fg)', background: 'var(--warn-bg)', borderColor: 'var(--warn-fg)' }}>
                   <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
                   There are unresolved warnings. You can proceed, but review them first.
                 </div>
@@ -190,19 +194,20 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
                 value={closeNotes}
                 onChange={(e) => setCloseNotes(e.target.value)}
                 placeholder="Close notes (optional)…"
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="sd-input w-full px-3 py-2 text-sm"
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => closeMutation.mutate()}
                   disabled={closeMutation.isPending}
-                  className="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-md hover:bg-gray-900 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium rounded-md disabled:opacity-50"
+                  style={{ color: 'white', background: 'var(--ink)' }}
                 >
                   {closeMutation.isPending ? 'Closing…' : 'Confirm Close'}
                 </button>
                 <button
                   onClick={() => setShowCloseForm(false)}
-                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100"
+                  className="sd-btn outline px-4 py-2 text-sm"
                 >
                   Cancel
                 </button>
@@ -217,14 +222,15 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
           {!showReopenForm ? (
             <button
               onClick={() => setShowReopenForm(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-md"
+              style={{ color: 'var(--accent-ink)', borderColor: 'var(--line)' }}
             >
               <LockOpen className="h-4 w-4" />
               Reopen Period
             </button>
           ) : (
-            <div className="border border-blue-200 rounded-lg p-4 space-y-3 bg-blue-50">
-              <p className="text-sm font-medium text-blue-900">
+            <div className="border rounded-lg p-4 space-y-3" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--accent-ink)' }}>
                 Reopen {periodLabel(period)}? This allows new postings.
               </p>
               <textarea
@@ -232,19 +238,19 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
                 value={reopenReason}
                 onChange={(e) => setReopenReason(e.target.value)}
                 placeholder="Reason for reopening (optional)…"
-                className="w-full border border-blue-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="sd-input w-full px-3 py-2 text-sm"
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => reopenMutation.mutate()}
                   disabled={reopenMutation.isPending}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="sd-btn primary px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   {reopenMutation.isPending ? 'Reopening…' : 'Confirm Reopen'}
                 </button>
                 <button
                   onClick={() => setShowReopenForm(false)}
-                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100"
+                  className="sd-btn outline px-4 py-2 text-sm"
                 >
                   Cancel
                 </button>
@@ -311,7 +317,7 @@ export function PeriodClosePage() {
             <button
               onClick={() => openCurrentMutation.mutate()}
               disabled={openCurrentMutation.isPending}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="sd-btn primary flex items-center gap-2 px-3 py-2 text-sm font-medium disabled:opacity-50"
             >
               Open {MONTH_NAMES[today.getMonth() + 1]} {today.getFullYear()}
             </button>
@@ -326,17 +332,17 @@ export function PeriodClosePage() {
           {/* Period list sidebar */}
           <div className="w-56 flex-shrink-0 space-y-1">
             {periods.length === 0 ? (
-              <p className="text-sm text-gray-400 italic px-2">No periods yet</p>
+              <p className="text-sm italic px-2" style={{ color: 'var(--ink-4)' }}>No periods yet</p>
             ) : (
               periods.map(p => (
                 <button
                   key={p.id}
                   onClick={() => setSelectedId(p.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                    selectedId === p.id
-                      ? 'bg-blue-50 border border-blue-200 text-blue-900'
-                      : 'hover:bg-gray-50 border border-transparent text-gray-700'
-                  }`}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors border"
+                  style={selectedId === p.id
+                    ? { background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--accent-ink)' }
+                    : { borderColor: 'transparent', color: 'var(--ink-2)' }
+                  }
                 >
                   <span className="font-medium">{periodLabel(p)}</span>
                   <StatusBadge status={p.status} />
@@ -346,7 +352,7 @@ export function PeriodClosePage() {
           </div>
 
           {/* Detail panel */}
-          <div className="flex-1 bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex-1 border rounded-lg p-6" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
             {selectedPeriod ? (
               <PeriodPanel
                 period={selectedPeriod}
@@ -354,7 +360,7 @@ export function PeriodClosePage() {
                 onUpdated={updatePeriod}
               />
             ) : (
-              <p className="text-sm text-gray-400 italic">Select a period or open the current month.</p>
+              <p className="text-sm italic" style={{ color: 'var(--ink-4)' }}>Select a period or open the current month.</p>
             )}
           </div>
         </div>

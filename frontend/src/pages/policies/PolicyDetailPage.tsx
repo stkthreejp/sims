@@ -276,7 +276,7 @@ export function PolicyDetailPage() {
   })
 
   if (isLoading) return <LoadingSpinner />
-  if (!policy) return <p className="p-6 text-slate-500">Policy not found.</p>
+  if (!policy) return <p className="p-6" style={{ color: 'var(--ink-3)' }}>Policy not found.</p>
 
   const sortedNotes = [...notes].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
@@ -298,9 +298,9 @@ export function PolicyDetailPage() {
   return (
     <div className="space-y-5 p-6">
       <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink-3)' }}>
-        <Link to="/policies" className="hover:text-slate-900">Policies</Link>
+        <Link to="/policies">Policies</Link>
         <span>/</span>
-        <Link to={`/insureds/${policy.insuredId}`} className="hover:text-slate-900">{policy.insuredName}</Link>
+        <Link to={`/insureds/${policy.insuredId}`}>{policy.insuredName}</Link>
         <span>/</span>
         <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{policy.policyNumber}</span>
       </div>
@@ -388,7 +388,7 @@ export function PolicyDetailPage() {
       </div>
 
       {postBindBlockedReason && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start gap-2 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--warn-fg)', background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <div className="font-semibold">Policy activity is blocked</div>
@@ -492,83 +492,83 @@ export function PolicyDetailPage() {
         </div>
         <div className="grid grid-cols-2 gap-4 p-5 text-sm md:grid-cols-4">
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Line of Business</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Line of Business</p>
           <p className="font-medium">{LOB_LABELS[policy.lineOfBusiness]}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Carrier</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Carrier</p>
           <p className="font-medium">{policy.carrierName}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Effective Date</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Effective Date</p>
           <p className="font-medium">{new Date(policy.effectiveDate).toLocaleDateString()}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Expiration Date</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Expiration Date</p>
           <p className="font-medium">{new Date(policy.expirationDate).toLocaleDateString()}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Premium</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Premium</p>
           <p className="font-medium">{formatCurrency(policy.premiumAmount)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Taxes & Fees</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Taxes & Fees</p>
           <p className="font-medium">{formatCurrency(policy.taxesAndFees)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Total Premium</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Total Premium</p>
           <p className="font-medium">{formatCurrency(policy.totalPremium)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Agent Commission</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Agent Commission</p>
           <p className="font-medium">{formatCurrency(policy.agentCommissionAmount)} ({(policy.agentCommissionRate * 100).toFixed(1)}%)</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Carrier Commission</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Carrier Commission</p>
           <p className="font-medium">{formatCurrency(policy.carrierCommissionAmount)} ({(policy.carrierCommissionRate * 100).toFixed(1)}%)</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">SMM Retention</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>SMM Retention</p>
           <p className="font-medium">{formatCurrency(policy.smmRetentionAmount)} ({(policy.smmRetentionRate * 100).toFixed(1)}%)</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Bound Date</p>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Bound Date</p>
           <p className="font-medium">{new Date(policy.boundDate).toLocaleDateString()}</p>
         </div>
         {policy.issuedDate && (
           <div>
-            <p className="text-xs text-slate-500 mb-0.5">Issued Date</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Issued Date</p>
             <p className="font-medium">{new Date(policy.issuedDate).toLocaleDateString()}</p>
           </div>
         )}
         {policy.nonRenewedDate && (
           <div>
-            <p className="text-xs text-slate-500 mb-0.5">Non-Renewed Date</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Non-Renewed Date</p>
             <p className="font-medium">{new Date(policy.nonRenewedDate).toLocaleDateString()}</p>
           </div>
         )}
         {policy.cancelledDate && (
           <div>
-            <p className="text-xs text-slate-500 mb-0.5">Cancelled Date</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Cancelled Date</p>
             <p className="font-medium">{new Date(policy.cancelledDate).toLocaleDateString()}</p>
           </div>
         )}
         {policy.limit != null && (
           <div>
-            <p className="text-xs text-slate-500 mb-0.5">Limit</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Limit</p>
             <p className="font-medium">{formatCurrency(policy.limit)}</p>
           </div>
         )}
         {policy.deductible != null && (
           <div>
-            <p className="text-xs text-slate-500 mb-0.5">Deductible</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Deductible</p>
             <p className="font-medium">{formatCurrency(policy.deductible)}</p>
           </div>
         )}
         {policy.coverageDescription && (
           <div className="col-span-2 md:col-span-4">
-            <p className="text-xs text-slate-500 mb-0.5">Coverage Description</p>
-            <p className="text-slate-700">{policy.coverageDescription}</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Coverage Description</p>
+            <p style={{ color: 'var(--ink-2)' }}>{policy.coverageDescription}</p>
           </div>
         )}
       </div>
@@ -606,13 +606,13 @@ export function PolicyDetailPage() {
           <table className="sd-table">
             <thead>
               <tr>
-                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Txn #</th>
-                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Type</th>
-                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
-                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Effective</th>
-                <th className="px-5 py-2 text-right text-xs font-semibold text-slate-500 uppercase">Premium Δ</th>
-                <th className="px-5 py-2 text-right text-xs font-semibold text-slate-500 uppercase">New Total</th>
-                <th className="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Processed By</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>Txn #</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>Type</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>Status</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>Effective</th>
+                <th className="px-5 py-2 text-right text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>Premium Δ</th>
+                <th className="px-5 py-2 text-right text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>New Total</th>
+                <th className="px-5 py-2 text-left text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>Processed By</th>
               </tr>
             </thead>
             <tbody>
@@ -727,18 +727,18 @@ export function PolicyDetailPage() {
                         {canEditNotes && (
                           <button onClick={() => togglePinMutation.mutate(note.id)} className="sims-icon-btn">
                             {note.isPinned
-                              ? <PinOff className="h-3.5 w-3.5 text-yellow-500" />
-                              : <Pin className="h-3.5 w-3.5 text-slate-400" />}
+                              ? <PinOff className="h-3.5 w-3.5" style={{ color: 'var(--warn-fg)' }} />
+                              : <Pin className="h-3.5 w-3.5" style={{ color: 'var(--ink-4)' }} />}
                           </button>
                         )}
                         {canEditNotes && (
                           <button onClick={() => { setEditingNote(note); setEditSubject(note.subject ?? ''); setEditBody(note.body) }} className="sims-icon-btn">
-                            <Pencil className="h-3.5 w-3.5 text-slate-400" />
+                            <Pencil className="h-3.5 w-3.5" style={{ color: 'var(--ink-4)' }} />
                           </button>
                         )}
                         {canDeleteNotes && (
-                          <button onClick={() => { if (confirm('Delete note?')) deleteNoteMutation.mutate(note.id) }} className="sims-icon-btn hover:text-red-500">
-                            <Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-500" />
+                          <button onClick={() => { if (confirm('Delete note?')) deleteNoteMutation.mutate(note.id) }} className="sims-icon-btn">
+                            <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--ink-4)' }} />
                           </button>
                         )}
                       </div>
@@ -828,10 +828,10 @@ function PolicyDocumentChecklistPanel({
               onChange={(e) => onToggle(item.id, e.target.checked)}
             />
             <span className="min-w-0 flex-1">
-              <span className={`block font-medium ${item.isCompleted ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{item.label}</span>
-              <span className="mt-0.5 flex flex-wrap gap-2 text-xs text-slate-400">
+              <span className="block font-medium" style={{ color: item.isCompleted ? 'var(--ink-3)' : 'var(--ink-2)', textDecoration: item.isCompleted ? 'line-through' : undefined }}>{item.label}</span>
+              <span className="mt-0.5 flex flex-wrap gap-2 text-xs" style={{ color: 'var(--ink-4)' }}>
                 <span>{item.stage === 'PostBind' ? 'Post-bind' : item.stage}</span>
-                {item.isBlocker && <span className="font-semibold text-amber-700">Required</span>}
+                {item.isBlocker && <span className="font-semibold" style={{ color: 'var(--warn-fg)' }}>Required</span>}
                 {item.completedAt && <span>Completed {new Date(item.completedAt).toLocaleString()}</span>}
                 {item.completedByName && <span>{item.completedByName}</span>}
               </span>
@@ -969,7 +969,7 @@ function PolicyIssuancePanel({
             <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)' }}>
               {includedForms.map((form) => (
                 <div key={form.id} className="flex items-center gap-3 border-b px-3 py-2.5 text-sm last:border-b-0" style={{ borderColor: 'var(--line-2)' }}>
-                  <span className="w-8 text-right font-mono text-xs font-semibold text-slate-400">{String(form.sequenceOrder).padStart(2, '0')}</span>
+                  <span className="w-8 text-right font-mono text-xs font-semibold" style={{ color: 'var(--ink-4)' }}>{String(form.sequenceOrder).padStart(2, '0')}</span>
                   <ReadinessIcon status={form.readinessStatus} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium" style={{ color: 'var(--ink)' }}>{form.formName}</div>
@@ -991,7 +991,7 @@ function PolicyIssuancePanel({
           </>
         )}
         {excludedForms.length > 0 && (
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs" style={{ color: 'var(--ink-3)' }}>
             {excludedForms.length} form{excludedForms.length === 1 ? '' : 's'} excluded from this packet.
           </p>
         )}
@@ -1002,7 +1002,7 @@ function PolicyIssuancePanel({
 
 function ReadinessIcon({ status }: { status: 'Ready' | 'Warning' | 'Blocked' }) {
   if (status === 'Ready') {
-    return <Check className="h-4 w-4 shrink-0 text-green-700" />
+    return <Check className="h-4 w-4 shrink-0" style={{ color: 'var(--good-fg)' }} />
   }
 
   return (
@@ -1142,7 +1142,7 @@ function TransactionRows({
       )}
       {expanded && !artifacts && (
         <tr>
-          <td colSpan={7} className="px-5 pb-4 text-sm text-slate-500">Loading transaction details...</td>
+          <td colSpan={7} className="px-5 pb-4 text-sm" style={{ color: 'var(--ink-3)' }}>Loading transaction details...</td>
         </tr>
       )}
     </>
@@ -1205,17 +1205,20 @@ function TransactionArtifactDetails({
   return (
     <tr>
       <td colSpan={7} className="px-5 pb-4">
-        <div className="rounded border bg-white p-3 text-sm">
+        <div className="rounded border p-3 text-sm" style={{ background: 'var(--surface)' }}>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {sections.map((section) => (
               <button
                 key={section.id}
                 type="button"
                 onClick={() => setActiveSection(section.id)}
-                className={`rounded border px-2.5 py-1 text-xs font-semibold ${activeSection === section.id ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'}`}
+                className="rounded border px-2.5 py-1 text-xs font-semibold"
+                style={activeSection === section.id
+                  ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent-ink)' }
+                  : { borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--ink-2)' }}
               >
                 {section.id}
-                <span className="ml-1 text-slate-400">{section.count}</span>
+                <span className="ml-1" style={{ color: 'var(--ink-4)' }}>{section.count}</span>
               </button>
             ))}
           </div>
@@ -1223,7 +1226,7 @@ function TransactionArtifactDetails({
           {activeSection === 'Versions' && (
             <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
               <VersionSummary label="Before" version={transaction.priorVersion} />
-              <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+              <div className="hidden items-center justify-center sm:flex" style={{ color: 'var(--ink-4)' }}>-&gt;</div>
               <VersionSummary label="After" version={transaction.resultingVersion} />
             </div>
           )}
@@ -1276,7 +1279,7 @@ function TransactionArtifactDetails({
                       href={communication.graphMessageWebLink}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-blue-600 hover:text-blue-700"
+                      style={{ color: 'var(--accent-ink)' }}
                     >
                       Open
                     </a>
@@ -1396,18 +1399,18 @@ function CompactList({ empty, children }: { empty: string; children: React.React
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="rounded border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-slate-500">{text}</div>
+  return <div className="rounded border border-dashed px-3 py-3" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }}>{text}</div>
 }
 
 function CompactRow({ title, meta, value, sub }: { title: string; meta?: string; value?: React.ReactNode; sub?: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded border border-slate-200 px-3 py-2">
+    <div className="flex items-start justify-between gap-3 rounded border px-3 py-2" style={{ borderColor: 'var(--line)' }}>
       <div className="min-w-0">
-        <div className="truncate font-medium text-slate-800">{title}</div>
-        {meta && <div className="text-xs text-slate-500">{meta}</div>}
-        {sub && <div className="mt-1 text-xs text-slate-600">{sub}</div>}
+        <div className="truncate font-medium" style={{ color: 'var(--ink-2)' }}>{title}</div>
+        {meta && <div className="text-xs" style={{ color: 'var(--ink-3)' }}>{meta}</div>}
+        {sub && <div className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>{sub}</div>}
       </div>
-      {value && <span className="shrink-0 text-xs font-medium text-slate-500">{value}</span>}
+      {value && <span className="shrink-0 text-xs font-medium" style={{ color: 'var(--ink-3)' }}>{value}</span>}
     </div>
   )
 }
@@ -1471,23 +1474,23 @@ function ReinstatementSummary({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="rounded-lg border p-3" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reinstatement</div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">{formatDate(detail.reinstatementEffectiveDate)}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Reinstatement</div>
+            <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{formatDate(detail.reinstatementEffectiveDate)}</div>
           </div>
           <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[transaction.status]}`}>{POLICY_TRANSACTION_STATUS_LABELS[transaction.status]}</span>
         </div>
-        <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-          <div><span className="text-slate-500">Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
-          <div><span className="text-slate-500">Premium change:</span> {formatCurrency(transaction.premiumChange)}</div>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2" style={{ color: 'var(--ink-2)' }}>
+          <div><span style={{ color: 'var(--ink-3)' }}>Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
+          <div><span style={{ color: 'var(--ink-3)' }}>Premium change:</span> {formatCurrency(transaction.premiumChange)}</div>
         </div>
-        {(detail.notes || transaction.notes) && <p className="mt-2 text-sm text-slate-600">{detail.notes ?? transaction.notes}</p>}
+        {(detail.notes || transaction.notes) && <p className="mt-2 text-sm" style={{ color: 'var(--ink-2)' }}>{detail.notes ?? transaction.notes}</p>}
       </div>
       <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
         <VersionSummary label="Cancelled version" version={transaction.priorVersion} />
-        <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+        <div className="hidden items-center justify-center sm:flex" style={{ color: 'var(--ink-4)' }}>-&gt;</div>
         <VersionSummary label="Reinstated version" version={transaction.resultingVersion} />
       </div>
       {canUploadProof && onUploadProof && (
@@ -1510,12 +1513,12 @@ function ReinstatementSummary({
       )}
       {documents.length > 0 && (
         <div className="space-y-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reinstatement Documents</div>
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Reinstatement Documents</div>
           {documents.map((doc) => (
-            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-white px-2.5 py-2 text-xs">
+            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border px-2.5 py-2 text-xs" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
               <div className="min-w-0">
-                <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
-                <div className="text-slate-500">{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
+                <div className="truncate font-medium" style={{ color: 'var(--ink-2)' }}>{doc.fileName}</div>
+                <div style={{ color: 'var(--ink-3)' }}>{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
               </div>
               <button
                 type="button"
@@ -1554,11 +1557,11 @@ function RewriteSummary({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="rounded-lg border p-3" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rewrite</div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">{formatDate(transaction.effectiveDate)}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Rewrite</div>
+            <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{formatDate(transaction.effectiveDate)}</div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`sd-pill ${POLICY_TRANSACTION_STATUS_PILL[transaction.status]}`}>{POLICY_TRANSACTION_STATUS_LABELS[transaction.status]}</span>
@@ -1575,28 +1578,28 @@ function RewriteSummary({
             )}
           </div>
         </div>
-        <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-          <div><span className="text-slate-500">Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2" style={{ color: 'var(--ink-2)' }}>
+          <div><span style={{ color: 'var(--ink-3)' }}>Reason:</span> {detail.reason || transaction.reasonText || 'Not recorded'}</div>
           <div>
-            <span className="text-slate-500">Replacement quote:</span>{' '}
-            <Link to={`/quotes/${detail.replacementQuoteId}`} className="text-blue-600 hover:text-blue-700">{detail.replacementQuoteNumber ?? 'Open quote'}</Link>
+            <span style={{ color: 'var(--ink-3)' }}>Replacement quote:</span>{' '}
+            <Link to={`/quotes/${detail.replacementQuoteId}`} style={{ color: 'var(--accent-ink)' }}>{detail.replacementQuoteNumber ?? 'Open quote'}</Link>
           </div>
           {detail.replacementPolicyId && (
             <div>
-              <span className="text-slate-500">Replacement policy:</span>{' '}
-              <Link to={`/policies/${detail.replacementPolicyId}`} className="text-blue-600 hover:text-blue-700">{detail.replacementPolicyNumber ?? 'Open policy'}</Link>
+              <span style={{ color: 'var(--ink-3)' }}>Replacement policy:</span>{' '}
+              <Link to={`/policies/${detail.replacementPolicyId}`} style={{ color: 'var(--accent-ink)' }}>{detail.replacementPolicyNumber ?? 'Open policy'}</Link>
             </div>
           )}
         </div>
-        {(detail.notes || transaction.notes) && <p className="mt-2 text-sm text-slate-600">{detail.notes ?? transaction.notes}</p>}
+        {(detail.notes || transaction.notes) && <p className="mt-2 text-sm" style={{ color: 'var(--ink-2)' }}>{detail.notes ?? transaction.notes}</p>}
       </div>
       <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
         <VersionSummary label="Source version" version={transaction.priorVersion} />
-        <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+        <div className="hidden items-center justify-center sm:flex" style={{ color: 'var(--ink-4)' }}>-&gt;</div>
         <div>
-          <div className="text-xs font-semibold uppercase text-slate-500">Replacement quote</div>
+          <div className="text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>Replacement quote</div>
           <div className="mt-1">
-            <Link to={`/quotes/${detail.replacementQuoteId}`} className="font-medium text-blue-600 hover:text-blue-700">{detail.replacementQuoteNumber ?? 'Open rewrite quote'}</Link>
+            <Link to={`/quotes/${detail.replacementQuoteId}`} className="font-medium" style={{ color: 'var(--accent-ink)' }}>{detail.replacementQuoteNumber ?? 'Open rewrite quote'}</Link>
           </div>
         </div>
       </div>
@@ -1643,29 +1646,29 @@ function CancellationSummary({
   }
 
   return (
-    <div className="rounded border border-red-100 bg-red-50/40 px-3 py-2 text-slate-700">
+    <div className="rounded border px-3 py-2" style={{ borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--ink-2)' }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-semibold text-slate-900">Cancellation Notice Detail</div>
+        <div className="font-semibold" style={{ color: 'var(--ink)' }}>Cancellation Notice Detail</div>
         <span className={`sd-pill ${hasProof ? 'bound' : 'warning'}`}>
           {hasProof ? 'Proof Filed' : 'Proof Not Filed'}
         </span>
       </div>
       <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
-        <div><span className="text-slate-500">Reason:</span> {detail?.reasonLabel || transaction.cancellationReason || 'Not recorded'}</div>
-        <div><span className="text-slate-500">Code:</span> {detail?.reasonCode || transaction.reasonCode || '-'}</div>
-        <div><span className="text-slate-500">Category:</span> {detail?.reasonCategory || '-'}</div>
-        <div><span className="text-slate-500">Mailing Date:</span> {formatDate(detail?.noticeMailingDate ?? null)}</div>
-        <div><span className="text-slate-500">Notice Days:</span> {detail ? `${detail.noticeRequirementDays} + ${detail.mailingDays} mailing` : '-'}</div>
-        <div><span className="text-slate-500">Cancellation Date:</span> {formatDate(detail?.cancellationEffectiveDate ?? transaction.effectiveDate)}</div>
-        <div><span className="text-slate-500">Method:</span> {detail?.method || transaction.cancellationMethod || 'Not recorded'}</div>
-        <div><span className="text-slate-500">Template:</span> {detail?.noticeTemplateName || (detail?.noticeTemplateId ? 'Selected template' : 'Default or not recorded')}</div>
-        <div><span className="text-slate-500">Proof:</span> {hasProof ? `${proofDocuments.length} document${proofDocuments.length === 1 ? '' : 's'} filed` : 'Not filed'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Reason:</span> {detail?.reasonLabel || transaction.cancellationReason || 'Not recorded'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Code:</span> {detail?.reasonCode || transaction.reasonCode || '-'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Category:</span> {detail?.reasonCategory || '-'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Mailing Date:</span> {formatDate(detail?.noticeMailingDate ?? null)}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Notice Days:</span> {detail ? `${detail.noticeRequirementDays} + ${detail.mailingDays} mailing` : '-'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Cancellation Date:</span> {formatDate(detail?.cancellationEffectiveDate ?? transaction.effectiveDate)}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Method:</span> {detail?.method || transaction.cancellationMethod || 'Not recorded'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Template:</span> {detail?.noticeTemplateName || (detail?.noticeTemplateId ? 'Selected template' : 'Default or not recorded')}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Proof:</span> {hasProof ? `${proofDocuments.length} document${proofDocuments.length === 1 ? '' : 's'} filed` : 'Not filed'}</div>
       </div>
       {detail?.resolvedReasonLanguage && (
-        <p className="mt-2 text-xs text-slate-700">{detail.resolvedReasonLanguage}</p>
+        <p className="mt-2 text-xs" style={{ color: 'var(--ink-2)' }}>{detail.resolvedReasonLanguage}</p>
       )}
       {!hasProof && (
-        <p className="mt-2 text-xs text-slate-500">Proof of notice is tracked here when applicable, but it is not required to complete every cancellation.</p>
+        <p className="mt-2 text-xs" style={{ color: 'var(--ink-3)' }}>Proof of notice is tracked here when applicable, but it is not required to complete every cancellation.</p>
       )}
       {canUploadProof && onUploadProof && (
         <div className="mt-3">
@@ -1687,12 +1690,12 @@ function CancellationSummary({
       )}
       {documents.length > 0 && (
         <div className="mt-3 space-y-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notice Documents</div>
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Notice Documents</div>
           {[...noticeDocuments, ...proofDocuments].map((doc) => (
-            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-red-100 bg-white/80 px-2.5 py-2 text-xs">
+            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border px-2.5 py-2 text-xs" style={{ borderColor: 'var(--bad-fg)', background: 'var(--surface)' }}>
               <div className="min-w-0">
-                <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
-                <div className="text-slate-500">{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
+                <div className="truncate font-medium" style={{ color: 'var(--ink-2)' }}>{doc.fileName}</div>
+                <div style={{ color: 'var(--ink-3)' }}>{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
               </div>
               <button
                 type="button"
@@ -1707,7 +1710,7 @@ function CancellationSummary({
           ))}
         </div>
       )}
-      {transaction.notes && <p className="mt-2 text-xs text-slate-600">{transaction.notes}</p>}
+      {transaction.notes && <p className="mt-2 text-xs" style={{ color: 'var(--ink-2)' }}>{transaction.notes}</p>}
     </div>
   )
 }
@@ -1751,24 +1754,24 @@ function NonRenewalSummary({
   }
 
   return (
-    <div className="rounded border border-orange-100 bg-orange-50/40 px-3 py-2 text-slate-700">
+    <div className="rounded border px-3 py-2" style={{ borderColor: 'var(--warn-fg)', background: 'var(--warn-bg)', color: 'var(--ink-2)' }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-semibold text-slate-900">Non-Renewal Notice Detail</div>
+        <div className="font-semibold" style={{ color: 'var(--ink)' }}>Non-Renewal Notice Detail</div>
         <span className={`sd-pill ${hasProof ? 'bound' : 'warning'}`}>
           {hasProof ? 'Proof Filed' : 'Proof Not Filed'}
         </span>
       </div>
       <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
-        <div><span className="text-slate-500">Reason:</span> {detail?.reason || transaction.reasonText || 'Not recorded'}</div>
-        <div><span className="text-slate-500">Mailing Date:</span> {formatDate(detail?.noticeMailingDate ?? null)}</div>
-        <div><span className="text-slate-500">Notice Days:</span> {detail ? `${detail.noticeRequirementDays} + ${detail.mailingDays} mailing` : '-'}</div>
-        <div><span className="text-slate-500">Non-Renewal Date:</span> {formatDate(detail?.nonRenewalEffectiveDate ?? transaction.effectiveDate)}</div>
-        <div><span className="text-slate-500">Method:</span> {detail?.method || 'Not recorded'}</div>
-        <div><span className="text-slate-500">Template:</span> {detail?.noticeTemplateName || (detail?.noticeTemplateId ? 'Selected template' : 'Default or not recorded')}</div>
-        <div><span className="text-slate-500">Proof:</span> {hasProof ? `${proofDocuments.length} document${proofDocuments.length === 1 ? '' : 's'} filed` : 'Not filed'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Reason:</span> {detail?.reason || transaction.reasonText || 'Not recorded'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Mailing Date:</span> {formatDate(detail?.noticeMailingDate ?? null)}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Notice Days:</span> {detail ? `${detail.noticeRequirementDays} + ${detail.mailingDays} mailing` : '-'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Non-Renewal Date:</span> {formatDate(detail?.nonRenewalEffectiveDate ?? transaction.effectiveDate)}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Method:</span> {detail?.method || 'Not recorded'}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Template:</span> {detail?.noticeTemplateName || (detail?.noticeTemplateId ? 'Selected template' : 'Default or not recorded')}</div>
+        <div><span style={{ color: 'var(--ink-3)' }}>Proof:</span> {hasProof ? `${proofDocuments.length} document${proofDocuments.length === 1 ? '' : 's'} filed` : 'Not filed'}</div>
       </div>
       {!hasProof && (
-        <p className="mt-2 text-xs text-slate-500">Proof of notice is tracked here when applicable, but it is not required to issue the notice.</p>
+        <p className="mt-2 text-xs" style={{ color: 'var(--ink-3)' }}>Proof of notice is tracked here when applicable, but it is not required to issue the notice.</p>
       )}
       {canUploadProof && onUploadProof && (
         <div className="mt-3">
@@ -1790,12 +1793,12 @@ function NonRenewalSummary({
       )}
       {documents.length > 0 && (
         <div className="mt-3 space-y-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notice Documents</div>
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Notice Documents</div>
           {[...noticeDocuments, ...proofDocuments].map((doc) => (
-            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border border-orange-100 bg-white/80 px-2.5 py-2 text-xs">
+            <div key={doc.id} className="flex items-center justify-between gap-3 rounded border px-2.5 py-2 text-xs" style={{ borderColor: 'var(--warn-fg)', background: 'var(--surface)' }}>
               <div className="min-w-0">
-                <div className="truncate font-medium text-slate-800">{doc.fileName}</div>
-                <div className="text-slate-500">{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
+                <div className="truncate font-medium" style={{ color: 'var(--ink-2)' }}>{doc.fileName}</div>
+                <div style={{ color: 'var(--ink-3)' }}>{DOCUMENT_TYPE_LABELS[doc.documentType]} - {formatDate(doc.createdAt)}</div>
               </div>
               <button
                 type="button"
@@ -1810,7 +1813,7 @@ function NonRenewalSummary({
           ))}
         </div>
       )}
-      {transaction.notes && <p className="mt-2 text-xs text-slate-600">{transaction.notes}</p>}
+      {transaction.notes && <p className="mt-2 text-xs" style={{ color: 'var(--ink-2)' }}>{transaction.notes}</p>}
     </div>
   )
 }
@@ -1826,9 +1829,9 @@ function VersionChangeDetails({ transaction }: { transaction: PolicyTransaction 
   return (
     <tr>
       <td colSpan={7} className="px-5 pb-4">
-        <div className="grid gap-3 rounded border bg-slate-50/70 p-3 text-sm sm:grid-cols-[1fr_auto_1fr]">
+        <div className="grid gap-3 rounded border p-3 text-sm sm:grid-cols-[1fr_auto_1fr]" style={{ background: 'var(--surface-2)' }}>
           <VersionSummary label="Before" version={prior} />
-          <div className="hidden items-center justify-center text-slate-400 sm:flex">-&gt;</div>
+          <div className="hidden items-center justify-center sm:flex" style={{ color: 'var(--ink-4)' }}>-&gt;</div>
           <VersionSummary label="After" version={resulting} />
         </div>
       </td>
@@ -1840,8 +1843,8 @@ function VersionSummary({ label, version }: { label: string; version: PolicyTran
   if (!version) {
     return (
       <div>
-        <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
-        <div className="mt-1 text-slate-500">No version snapshot</div>
+        <div className="text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>{label}</div>
+        <div className="mt-1" style={{ color: 'var(--ink-3)' }}>No version snapshot</div>
       </div>
     )
   }
@@ -1849,21 +1852,21 @@ function VersionSummary({ label, version }: { label: string; version: PolicyTran
   return (
     <div>
       <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase text-slate-500">{label}</span>
-        <span className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-700">v{version.versionNumber}</span>
+        <span className="text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>{label}</span>
+        <span className="rounded px-1.5 py-0.5 text-xs font-medium" style={{ background: 'var(--surface)', color: 'var(--ink-2)' }}>v{version.versionNumber}</span>
         <span className={`sd-pill ${POLICY_STATUS_PILL[version.status]}`}>{POLICY_STATUS_LABELS[version.status]}</span>
       </div>
-      <div className="mt-2 grid gap-2 text-slate-700 sm:grid-cols-3">
+      <div className="mt-2 grid gap-2 sm:grid-cols-3" style={{ color: 'var(--ink-2)' }}>
         <div>
-          <div className="text-xs text-slate-500">Term</div>
+          <div className="text-xs" style={{ color: 'var(--ink-3)' }}>Term</div>
           <div>{formatDate(version.effectiveDate)} - {formatDate(version.expirationDate)}</div>
         </div>
         <div>
-          <div className="text-xs text-slate-500">Premium</div>
+          <div className="text-xs" style={{ color: 'var(--ink-3)' }}>Premium</div>
           <div>{formatCurrency(version.premiumAmount)}</div>
         </div>
         <div>
-          <div className="text-xs text-slate-500">Total</div>
+          <div className="text-xs" style={{ color: 'var(--ink-3)' }}>Total</div>
           <div className="font-medium">{formatCurrency(version.totalPremium)}</div>
         </div>
       </div>
@@ -1875,37 +1878,37 @@ function CancellationTransactionDetails({ transaction }: { transaction: PolicyTr
   const legalSnapshot = parseLegalSnapshot(transaction.cancellationLegalRequirementSnapshotJson)
 
   return (
-    <tr className="bg-red-50/40">
+    <tr style={{ background: 'var(--bad-bg)' }}>
       <td colSpan={7} className="px-5 py-4">
         <div className="grid gap-4 text-sm md:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
           <div>
-            <div className="font-semibold text-slate-900">Cancellation Review</div>
-            <div className="mt-2 grid gap-2 text-slate-700 sm:grid-cols-2">
-              <div><span className="text-slate-500">Reason:</span> {transaction.cancellationReason || 'Not recorded'}</div>
-              <div><span className="text-slate-500">Method:</span> {transaction.cancellationMethod || 'Not recorded'}</div>
+            <div className="font-semibold" style={{ color: 'var(--ink)' }}>Cancellation Review</div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2" style={{ color: 'var(--ink-2)' }}>
+              <div><span style={{ color: 'var(--ink-3)' }}>Reason:</span> {transaction.cancellationReason || 'Not recorded'}</div>
+              <div><span style={{ color: 'var(--ink-3)' }}>Method:</span> {transaction.cancellationMethod || 'Not recorded'}</div>
             </div>
-            {transaction.notes && <p className="mt-2 text-slate-600">{transaction.notes}</p>}
+            {transaction.notes && <p className="mt-2" style={{ color: 'var(--ink-2)' }}>{transaction.notes}</p>}
             <div className="mt-3 space-y-1">
               {transaction.cancellationComplianceChecklist.length === 0 ? (
-                <p className="text-slate-500">No checklist was saved with this transaction.</p>
+                <p style={{ color: 'var(--ink-3)' }}>No checklist was saved with this transaction.</p>
               ) : transaction.cancellationComplianceChecklist.map((item) => (
-                <div key={item.key} className="flex items-start gap-2 text-slate-700">
-                  <span className={item.isCompleted ? 'text-green-700' : 'text-slate-400'}>{item.isCompleted ? '[x]' : '[ ]'}</span>
+                <div key={item.key} className="flex items-start gap-2" style={{ color: 'var(--ink-2)' }}>
+                  <span style={{ color: item.isCompleted ? 'var(--good-fg)' : 'var(--ink-4)' }}>{item.isCompleted ? '[x]' : '[ ]'}</span>
                   <span>{item.label}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="rounded border bg-white p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Saved Legal Snapshot</div>
+          <div className="rounded border p-3" style={{ background: 'var(--surface)' }}>
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Saved Legal Snapshot</div>
             {legalSnapshot.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No legal requirement snapshot was saved.</p>
+              <p className="mt-2 text-sm" style={{ color: 'var(--ink-3)' }}>No legal requirement snapshot was saved.</p>
             ) : (
               <div className="mt-2 max-h-52 space-y-2 overflow-auto pr-1">
                 {legalSnapshot.map((row) => (
                   <div key={row.id} className="text-sm">
-                    <div className="font-medium text-slate-800">{row.topic}</div>
-                    <div className="text-xs text-slate-500">{row.category}{row.state ? ` - ${row.state}` : ''}</div>
+                    <div className="font-medium" style={{ color: 'var(--ink-2)' }}>{row.topic}</div>
+                    <div className="text-xs" style={{ color: 'var(--ink-3)' }}>{row.category}{row.state ? ` - ${row.state}` : ''}</div>
                   </div>
                 ))}
               </div>
@@ -2001,8 +2004,8 @@ function ReinstatePolicyModal({
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
         </Field>
         <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
-          <div className="font-semibold text-slate-900">Reinstatement Preview</div>
-          <div className="mt-2 grid gap-1 text-xs text-slate-600">
+          <div className="font-semibold" style={{ color: 'var(--ink)' }}>Reinstatement Preview</div>
+          <div className="mt-2 grid gap-1 text-xs" style={{ color: 'var(--ink-2)' }}>
             <div><span className="font-medium">Policy:</span> {policy.policyNumber}</div>
             <div><span className="font-medium">Current status:</span> {POLICY_STATUS_LABELS[policy.status]}</div>
             <div><span className="font-medium">Reinstatement date:</span> {formatDate(reinstatedDate)}</div>
@@ -2056,8 +2059,8 @@ function StartRewritePolicyModal({
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
         </Field>
         <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
-          <div className="font-semibold text-slate-900">Rewrite Preview</div>
-          <div className="mt-2 grid gap-1 text-xs text-slate-600">
+          <div className="font-semibold" style={{ color: 'var(--ink)' }}>Rewrite Preview</div>
+          <div className="mt-2 grid gap-1 text-xs" style={{ color: 'var(--ink-2)' }}>
             <div><span className="font-medium">Source policy:</span> {policy.policyNumber}</div>
             <div><span className="font-medium">Current term:</span> {formatDate(policy.effectiveDate)} - {formatDate(policy.expirationDate)}</div>
             <div><span className="font-medium">Replacement term:</span> {formatDate(effectiveDate)} - {formatDate(expirationDate)}</div>
@@ -2202,8 +2205,8 @@ function CancelPolicyModal({
             <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={textareaClass} />
           </Field>
           <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
-            <div className="font-semibold text-slate-900">Notice Preview</div>
-            <div className="mt-2 grid gap-1 text-xs text-slate-600">
+            <div className="font-semibold" style={{ color: 'var(--ink)' }}>Notice Preview</div>
+            <div className="mt-2 grid gap-1 text-xs" style={{ color: 'var(--ink-2)' }}>
               <div><span className="font-medium">Reason:</span> {selectedReason ? `${selectedReason.code} - ${selectedReason.label}` : '-'}</div>
               <div><span className="font-medium">Mailing date:</span> {formatDate(noticeMailingDate)}</div>
               <div><span className="font-medium">Notice days:</span> {noticeRequirementDays || '0'} + {mailingDays || '0'} mailing days</div>
@@ -2211,9 +2214,9 @@ function CancelPolicyModal({
               <div><span className="font-medium">Template:</span> {cancellationTemplates.find((template) => template.id === noticeTemplateId)?.name ?? 'Default cancellation template'}</div>
             </div>
             {selectedReason?.requiresSpecialHandling && (
-              <p className="mt-2 text-xs font-medium text-amber-700">This reason requires special procedural review before use.</p>
+              <p className="mt-2 text-xs font-medium" style={{ color: 'var(--warn-fg)' }}>This reason requires special procedural review before use.</p>
             )}
-            {resolvedReason && <p className="mt-3 text-xs text-slate-700">{resolvedReason}</p>}
+            {resolvedReason && <p className="mt-3 text-xs" style={{ color: 'var(--ink-2)' }}>{resolvedReason}</p>}
           </div>
           <ModalActions saving={saving} disabled={!selectedReason || !requiredInputsComplete} onClose={onClose} submitLabel="Issue Notice" danger />
         </div>
@@ -2356,8 +2359,8 @@ function NonRenewPolicyModal({
             <textarea rows={5} value={reason} onChange={(e) => setReason(e.target.value)} className={textareaClass} />
           </Field>
           <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
-            <div className="font-semibold text-slate-900">Notice Preview</div>
-            <div className="mt-2 grid gap-1 text-xs text-slate-600">
+            <div className="font-semibold" style={{ color: 'var(--ink)' }}>Notice Preview</div>
+            <div className="mt-2 grid gap-1 text-xs" style={{ color: 'var(--ink-2)' }}>
               <div><span className="font-medium">Mailing date:</span> {formatDate(noticeMailingDate)}</div>
               <div><span className="font-medium">Notice days:</span> {noticeRequirementDays || '0'} + {mailingDays || '0'} mailing days</div>
               <div><span className="font-medium">Calculated date:</span> {formatDate(calculatedNonRenewalDate)}</div>

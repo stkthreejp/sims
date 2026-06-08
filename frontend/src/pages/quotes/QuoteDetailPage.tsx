@@ -86,7 +86,7 @@ function StageBar({ status, issuedDate }: { status: QuoteStatus; issuedDate: str
 
   if (isTerminal) {
     return (
-      <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
+      <div className="mb-5 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium" style={{ borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>
         <X className="h-4 w-4" />
         Quote {status} — no further action
       </div>
@@ -94,18 +94,19 @@ function StageBar({ status, issuedDate }: { status: QuoteStatus; issuedDate: str
   }
 
   return (
-    <div className="mb-5 flex overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="mb-5 flex overflow-hidden rounded-lg border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
       {QUOTE_STAGES.map((s, i) => {
         const done = i < idx
         const active = i === idx
         return (
           <div
             key={s.label}
-            className={`flex flex-1 items-center justify-center gap-1.5 border-r border-slate-200 px-3 py-2.5 text-xs font-semibold last:border-r-0 ${
-              done   ? 'bg-emerald-50 text-emerald-700'
-              : active ? 'bg-sky-50 text-sky-800'
-              : 'text-slate-400'
-            }`}
+            className="flex flex-1 items-center justify-center gap-1.5 border-r px-3 py-2.5 text-xs font-semibold last:border-r-0"
+            style={{
+              borderColor: 'var(--line)',
+              background: done ? 'var(--good-bg)' : active ? '#f0f9ff' : 'transparent',
+              color: done ? 'var(--good-fg)' : active ? '#075985' : 'var(--ink-4)',
+            }}
           >
             {done && <Check className="h-3 w-3" />}
             <span className="mr-0.5 font-mono text-[10px] opacity-60">{String(i + 1).padStart(2, '0')}</span>
@@ -145,7 +146,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <div className="sims-field-label">{label}</div>
-      <div className="text-sm font-medium text-slate-800 break-words">{value ?? '—'}</div>
+      <div className="text-sm font-medium break-words" style={{ color: 'var(--ink-2)' }}>{value ?? '—'}</div>
     </div>
   )
 }
@@ -170,16 +171,16 @@ function Btn({ children, onClick, variant = 'ghost', disabled, className = '', t
 // ── Bind checklist ─────────────────────────────────────────────────────────────
 
 function WriteupStatusPill({ status }: { status?: string }) {
-  const cls = status === 'Approved'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  const pillStyle: React.CSSProperties = status === 'Approved'
+    ? { borderColor: '#6ee7b7', background: 'var(--good-bg)', color: 'var(--good-fg)' }
     : status === 'Submitted'
-      ? 'border-sky-200 bg-sky-50 text-sky-700'
+      ? { borderColor: '#7dd3fc', background: '#f0f9ff', color: '#0369a1' }
       : status === 'Declined'
-        ? 'border-red-200 bg-red-50 text-red-700'
-        : 'border-slate-200 bg-slate-50 text-slate-600'
+        ? { borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }
+        : { borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }
 
   return (
-    <span className={`rounded-md border px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wide ${cls}`}>
+    <span className="rounded-md border px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wide" style={pillStyle}>
       {status ?? 'Draft'}
     </span>
   )
@@ -199,22 +200,22 @@ function InlineWriteupSection({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div className="border-t border-slate-100 first:border-t-0">
+    <div className="border-t first:border-t-0" style={{ borderColor: 'var(--line-2)' }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+        className="flex w-full items-center gap-3 px-5 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
       >
-        <span className="font-mono text-[11px] font-semibold text-slate-400">{number}</span>
-        <span className="text-sm font-semibold text-slate-800">{title}</span>
+        <span className="font-mono text-[11px] font-semibold" style={{ color: 'var(--ink-4)' }}>{number}</span>
+        <span className="text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>{title}</span>
         {open ? (
-          <ChevronDown className="ml-auto h-4 w-4 text-slate-400" />
+          <ChevronDown className="ml-auto h-4 w-4" style={{ color: 'var(--ink-4)' }} />
         ) : (
-          <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+          <ChevronRight className="ml-auto h-4 w-4" style={{ color: 'var(--ink-4)' }} />
         )}
       </button>
       {open && (
-        <div className="space-y-4 bg-slate-50/40 px-5 pb-5 pt-1">
+        <div className="space-y-4 px-5 pb-5 pt-1" style={{ background: 'color-mix(in srgb, var(--surface-2) 40%, transparent)' }}>
           {children}
         </div>
       )}
@@ -264,16 +265,17 @@ function InlineWriteupCheckbox({
   auto?: boolean
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-700">
+    <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink-2)' }}>
       <input
         type="checkbox"
         checked={checked}
         disabled={readOnly}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-slate-300"
+        className="h-4 w-4 rounded"
+        style={{ borderColor: 'var(--line)' }}
       />
-      <span className={checked ? 'font-semibold text-slate-800' : ''}>{label}</span>
-      {auto && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-amber-700">auto</span>}
+      <span className={checked ? 'font-semibold' : ''} style={checked ? { color: 'var(--ink-2)' } : undefined}>{label}</span>
+      {auto && <span className="rounded px-1.5 py-0.5 text-[10.5px] font-semibold" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>auto</span>}
     </label>
   )
 }
@@ -315,10 +317,10 @@ function ReferralBlockerNotice({ summary, submissionId }: { summary?: Underwriti
   if (openRequired.length === 0) return null
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+    <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--warn-fg)', background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
       <div className="font-semibold">{openRequired.length} required underwriting referral{openRequired.length === 1 ? '' : 's'} open</div>
-      <div className="mt-1 text-amber-700">Resolve before binding or issuing.</div>
-      <Link to={`/submissions/${submissionId}`} className="mt-2 inline-flex font-semibold text-amber-900 underline underline-offset-2">
+      <div className="mt-1" style={{ color: 'var(--warn-fg)' }}>Resolve before binding or issuing.</div>
+      <Link to={`/submissions/${submissionId}`} className="mt-2 inline-flex font-semibold underline underline-offset-2" style={{ color: 'var(--warn-fg)' }}>
         Open submission referrals
       </Link>
     </div>
@@ -388,9 +390,9 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
   return (
     <Card>
       <CardHead
-        title={<span className="flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" />Policy forms</span>}
+        title={<span className="flex items-center gap-2"><FileText className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />Policy forms</span>}
         count={
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${readyForWorkflow ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={readyForWorkflow ? { background: 'var(--good-bg)', color: 'var(--good-fg)' } : { background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
             {readyForWorkflow ? `${includedCount} selected` : 'Required'}
           </span>
         }
@@ -409,28 +411,29 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
         {isLoading ? (
           <div className="flex h-20 items-center justify-center"><LoadingSpinner /></div>
         ) : forms.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+          <div className="rounded-lg border border-dashed px-4 py-6 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
             No forms were found for this carrier, line, and state package yet.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          <div className="divide-y rounded-lg border" style={{ borderColor: 'var(--line)' }}>
             {forms.map((form, index) => (
               <div key={form.id || `${form.policyFormTemplateId}-${index}`} className="flex items-center gap-3 px-3 py-3">
-                <span className="w-7 shrink-0 text-right font-mono text-[11px] font-semibold text-slate-400">{String(index + 1).padStart(2, '0')}</span>
+                <span className="w-7 shrink-0 text-right font-mono text-[11px] font-semibold" style={{ color: 'var(--ink-4)' }}>{String(index + 1).padStart(2, '0')}</span>
                 <input
                   type="checkbox"
                   checked={form.isIncluded}
                   disabled={!canManage || form.formType === 'Mandatory' || saveMutation.isPending}
                   onChange={(e) => saveRows(forms.map((row, rowIndex) => rowIndex === index ? { ...row, isIncluded: e.target.checked } : row))}
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded"
+                  style={{ borderColor: 'var(--line)' }}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-slate-800">{form.formName}</div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                  <div className="truncate text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>{form.formName}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--ink-3)' }}>
                     <span className="font-mono">{form.formNumber}</span>
                     <span>{form.editionDate || '-'}</span>
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{form.formType}</span>
-                    {!form.isIncluded && <span className="rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700">Excluded</span>}
+                    <span className="rounded px-1.5 py-0.5 font-semibold" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>{form.formType}</span>
+                    {!form.isIncluded && <span className="rounded px-1.5 py-0.5 font-semibold" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>Excluded</span>}
                     {form.isSystemGenerated && <span className="rounded bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-700">Package</span>}
                   </div>
                 </div>
@@ -562,14 +565,14 @@ function ChecklistCard({ quoteId }: { quoteId: string }) {
     <Card>
       <CardHead
         title={<span className="flex items-center gap-2">Bind checklist</span>}
-        count={openBlockers > 0 ? <span className="rounded-full bg-amber-100 px-2 text-amber-700">{openBlockers} open</span> : undefined}
+        count={openBlockers > 0 ? <span className="rounded-full px-2" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>{openBlockers} open</span> : undefined}
       />
       {isLoading ? (
         <div className="flex items-center justify-center py-8"><LoadingSpinner /></div>
       ) : items.length === 0 ? (
-        <p className="px-5 py-4 text-sm text-slate-400">No checklist items.</p>
+        <p className="px-5 py-4 text-sm" style={{ color: 'var(--ink-4)' }}>No checklist items.</p>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y">
           {[...blockers, ...advisory].map((item) => (
             <div key={item.id} className="flex items-center gap-3 px-5 py-3">
               <button
@@ -585,18 +588,18 @@ function ChecklistCard({ quoteId }: { quoteId: string }) {
                 {item.isCompleted && <Check className="h-3 w-3" />}
               </button>
               <div className="min-w-0 flex-1">
-                <span className={`text-sm ${item.isCompleted ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                <span className={`text-sm ${item.isCompleted ? 'line-through' : ''}`} style={{ color: item.isCompleted ? 'var(--ink-4)' : 'var(--ink-2)' }}>
                   {item.label}
                 </span>
                 {item.isBlocker && !item.isCompleted && (
-                  <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-red-500">blocker</span>
+                  <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--bad-fg)' }}>blocker</span>
                 )}
                 {item.completionSource === 'System' && item.isCompleted && (
-                  <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-sky-500">auto</span>
+                  <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>auto</span>
                 )}
               </div>
               {item.isCompleted && item.completedByName && (
-                <span className="text-[10.5px] text-slate-400 flex-shrink-0">
+                <span className="text-[10.5px] flex-shrink-0" style={{ color: 'var(--ink-4)' }}>
                   {item.completionSource === 'System' ? 'System' : item.completedByName}
                 </span>
               )}
@@ -746,7 +749,7 @@ function NotesCard({ quoteId }: { quoteId: string }) {
         }
       />
       {adding && (
-        <div className="border-b border-slate-200 p-4">
+        <div className="border-b p-4" style={{ borderColor: 'var(--line)' }}>
           <textarea
             ref={textareaRef}
             value={draft}
@@ -768,16 +771,16 @@ function NotesCard({ quoteId }: { quoteId: string }) {
         </div>
       )}
       {sorted.length === 0 && !adding ? (
-        <p className="px-5 py-6 text-sm text-slate-400">No notes yet.</p>
+        <p className="px-5 py-6 text-sm" style={{ color: 'var(--ink-4)' }}>No notes yet.</p>
       ) : (
         <div>
           {sorted.map((note, i) => (
-            <div key={note.id} className={`flex gap-3 px-5 py-4 ${i < sorted.length - 1 ? 'border-b border-slate-100' : ''} ${note.isPinned ? 'bg-amber-50/50' : ''}`}>
-              {note.isPinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" />}
+            <div key={note.id} className={`flex gap-3 px-5 py-4 ${i < sorted.length - 1 ? 'border-b' : ''}`} style={{ borderColor: 'var(--line-2)', background: note.isPinned ? 'color-mix(in srgb, var(--warn-bg) 50%, transparent)' : undefined }}>
+              {note.isPinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--warn-fg)' }} />}
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-slate-700 leading-relaxed">{note.body}</p>
-                <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-400">
-                  <span className="font-medium text-slate-500">{note.createdByName}</span>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>{note.body}</p>
+                <div className="mt-1.5 flex items-center gap-2 text-xs" style={{ color: 'var(--ink-4)' }}>
+                  <span className="font-medium" style={{ color: 'var(--ink-3)' }}>{note.createdByName}</span>
                   <span>·</span>
                   <span>{formatDate(note.createdAt)}</span>
                 </div>
@@ -785,7 +788,8 @@ function NotesCard({ quoteId }: { quoteId: string }) {
               <div className="flex flex-shrink-0 items-start gap-1">
                 <button
                   onClick={() => pinMutation.mutate(note.id)}
-                  className={`sims-icon-btn ${note.isPinned ? 'text-amber-500 hover:text-amber-600' : ''}`}
+                  className="sims-icon-btn"
+                  style={note.isPinned ? { color: 'var(--warn-fg)' } : undefined}
                   title={note.isPinned ? 'Unpin' : 'Pin'}
                 >
                   <Pin className="h-3.5 w-3.5" />
@@ -883,7 +887,7 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
         />
       )}
       {attachments.length === 0 ? (
-        <p className="px-5 py-6 text-sm text-slate-400">No documents yet.</p>
+        <p className="px-5 py-6 text-sm" style={{ color: 'var(--ink-4)' }}>No documents yet.</p>
       ) : (
         <table className="sd-table w-full table-fixed">
           <colgroup>
@@ -907,12 +911,12 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
               <tr key={a.id}>
                 <td className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    <FileText className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                    <FileText className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--ink-4)' }} />
                     <span className="min-w-0 cursor-pointer break-all font-medium text-sky-700 hover:text-sky-800" onClick={() => downloadMutation.mutate(a.id)}>
                       {a.fileName}
                     </span>
                   </div>
-                  {a.description && <p className="mt-0.5 break-words pl-5.5 text-xs text-slate-400">{a.description}</p>}
+                  {a.description && <p className="mt-0.5 break-words pl-5.5 text-xs" style={{ color: 'var(--ink-4)' }}>{a.description}</p>}
                 </td>
                 <td className="id whitespace-normal">{fmtBytes(a.fileSizeBytes)}</td>
                 <td className="break-words">{a.uploadedByName}</td>
@@ -972,7 +976,7 @@ function ActivityCard({ quoteId }: { quoteId: string }) {
     <Card>
       <CardHead title="Activity" count={communications.length || undefined} />
       {communications.length === 0 ? (
-        <p className="px-5 py-6 text-sm text-slate-400">No quote communication activity yet.</p>
+        <p className="px-5 py-6 text-sm" style={{ color: 'var(--ink-4)' }}>No quote communication activity yet.</p>
       ) : (
         <table className="sd-table w-full table-fixed">
           <colgroup>
@@ -1185,7 +1189,7 @@ export function QuoteDetailPage() {
 
   if (isError || !quote) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-500">
+      <div className="flex h-64 flex-col items-center justify-center gap-3" style={{ color: 'var(--ink-3)' }}>
         <p className="text-sm">Quote not found.</p>
         <Btn variant="outline" onClick={() => navigate(-1)}><ArrowLeft className="h-3.5 w-3.5" /> Go back</Btn>
       </div>
@@ -1271,17 +1275,17 @@ export function QuoteDetailPage() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full" style={{ background: 'var(--surface-2)' }}>
       {/* Sticky top bar */}
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-2.5">
-        <nav className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Link to="/submissions" className="hover:text-slate-700">Submissions</Link>
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b px-6 py-2.5" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+        <nav className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ink-3)' }}>
+          <Link to="/submissions">Submissions</Link>
           <ChevronRight className="h-3 w-3" />
-          <Link to={`/insureds/${quote.insuredId}`} className="hover:text-slate-700">{quote.insuredName}</Link>
+          <Link to={`/insureds/${quote.insuredId}`}>{quote.insuredName}</Link>
           <ChevronRight className="h-3 w-3" />
-          <Link to={`/submissions/${quote.submissionId}`} className="hover:text-slate-700">{quote.submissionNumber}</Link>
+          <Link to={`/submissions/${quote.submissionId}`}>{quote.submissionNumber}</Link>
           <ChevronRight className="h-3 w-3" />
-          <span className="font-medium text-slate-700">{quote.quoteNumber}</span>
+          <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{quote.quoteNumber}</span>
         </nav>
         <Btn variant="ghost" onClick={() => navigate(`/submissions/${quote.submissionId}`)}>
           <ArrowLeft className="h-3.5 w-3.5" /> Back to submission
@@ -1292,24 +1296,24 @@ export function QuoteDetailPage() {
         {/* Header */}
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h1 className="flex flex-wrap items-center gap-2.5 text-xl font-semibold text-slate-900">
+            <h1 className="flex flex-wrap items-center gap-2.5 text-xl font-semibold" style={{ color: 'var(--ink)' }}>
               {quote.carrierName}
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-medium text-slate-500">
+              <span className="rounded-md px-2 py-0.5 font-mono text-xs font-medium" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
                 {quote.quoteNumber}
               </span>
               <span className={`sd-pill ${STATUS_PILL[quote.status]}`}>
                 {quote.status}
               </span>
             </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--ink-3)' }}>
               <span className="inline-flex items-center gap-1.5 rounded border border-sky-300 bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-800">
                 {LOB_LABELS[quote.lineOfBusiness]}
-                <span className="font-normal text-slate-400">· locked at creation</span>
+                <span className="font-normal" style={{ color: 'var(--ink-4)' }}>· locked at creation</span>
               </span>
-              <span className="text-slate-300">·</span>
-              <span>Insured <Link to={`/insureds/${quote.insuredId}`} className="font-semibold text-slate-700 hover:text-sky-700">{quote.insuredName}</Link></span>
-              <span className="text-slate-300">·</span>
-              <span>Submission <Link to={`/submissions/${quote.submissionId}`} className="font-semibold text-sky-700 hover:text-sky-800">{quote.submissionNumber}</Link></span>
+              <span style={{ color: 'var(--ink-4)' }}>·</span>
+              <span>Insured <Link to={`/insureds/${quote.insuredId}`} className="font-semibold hover:text-sky-700" style={{ color: 'var(--ink-2)' }}>{quote.insuredName}</Link></span>
+              <span style={{ color: 'var(--ink-4)' }}>·</span>
+              <span>Submission <Link to={`/submissions/${quote.submissionId}`} className="font-semibold hover:text-sky-800" style={{ color: 'var(--accent-ink)' }}>{quote.submissionNumber}</Link></span>
             </div>
           </div>
           <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
@@ -1328,7 +1332,7 @@ export function QuoteDetailPage() {
                   <FileOutput className="h-3.5 w-3.5" /> Send proposal
                 </MenuItem>
                 {proposalUnavailableReason && (
-                  <div className="max-w-64 px-3 py-2 text-xs font-medium text-amber-700">
+                  <div className="max-w-64 px-3 py-2 text-xs font-medium" style={{ color: 'var(--warn-fg)' }}>
                     {proposalUnavailableReason}
                   </div>
                 )}
@@ -1361,7 +1365,7 @@ export function QuoteDetailPage() {
         <StageBar status={quote.status} issuedDate={quote.issuedDate} />
 
         {showRating && (
-          <div ref={ratingPanelRef} className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div ref={ratingPanelRef} className="mb-5 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
             <QuoteRatingPanel
               quoteId={quoteId!}
               submissionId={quote.submissionId}
@@ -1372,31 +1376,33 @@ export function QuoteDetailPage() {
         )}
 
         {showReduce && (
-          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+          <div className="mb-5 rounded-xl border p-4 shadow-sm" style={{ borderColor: 'var(--warn-fg)', background: 'var(--warn-bg)' }}>
             <div className="mb-3 flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-amber-700" />
+              <TrendingDown className="h-4 w-4" style={{ color: 'var(--warn-fg)' }} />
               <div>
-                <h3 className="text-sm font-semibold text-amber-900">Reduce agent commission</h3>
-                <p className="text-xs text-amber-700">Carrier net and SMM commission stay unchanged. Agent give-back reduces total premium.</p>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--warn-fg)' }}>Reduce agent commission</h3>
+                <p className="text-xs" style={{ color: 'var(--warn-fg)' }}>Carrier net and SMM commission stay unchanged. Agent give-back reduces total premium.</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <div
-                className="flex overflow-hidden rounded-md bg-white text-sm"
+                className="flex overflow-hidden rounded-md text-sm"
+                style={{ background: 'var(--surface)' }}
                 style={{ border: '1px solid var(--line)' }}
               >
                 <button
                   type="button"
                   onClick={() => setOverrideMode('dollar')}
-                  className={`px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${overrideMode === 'dollar' ? 'bg-sky-700 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className="px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                  style={overrideMode === 'dollar' ? { background: '#0369a1', color: '#fff' } : { color: 'var(--ink-3)' }}
                 >
                   $ Give-back
                 </button>
                 <button
                   type="button"
                   onClick={() => setOverrideMode('rate')}
-                  className={`px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${overrideMode === 'rate' ? 'bg-sky-700 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                  style={{ borderLeft: '1px solid var(--line)' }}
+                  className="px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                  style={overrideMode === 'rate' ? { background: '#0369a1', color: '#fff', borderLeft: '1px solid var(--line)' } : { color: 'var(--ink-3)', borderLeft: '1px solid var(--line)' }}
                 >
                   % New rate
                 </button>
@@ -1448,38 +1454,38 @@ export function QuoteDetailPage() {
               )}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Commission (agent)</div>
-            <div className="text-3xl font-semibold tracking-tight text-slate-800">{fmt(agentCommAmt)}</div>
-            <div className="mt-2 text-xs text-slate-500">
+          <div className="rounded-xl border p-4 shadow-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Commission (agent)</div>
+            <div className="text-3xl font-semibold tracking-tight" style={{ color: 'var(--ink-2)' }}>{fmt(agentCommAmt)}</div>
+            <div className="mt-2 text-xs" style={{ color: 'var(--ink-3)' }}>
               <span className="font-semibold">{formatPercent(agentCommRate)}</span>
-              {quote.commissionOverride && <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-700">override</span>}
+              {quote.commissionOverride && <span className="ml-1.5 rounded px-1 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>override</span>}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{quote.lineOfBusiness === 'InlandMarine' ? 'Total TIV' : 'Limit / Deductible'}</div>
-            <div className="text-2xl font-semibold tracking-tight text-slate-800">
+          <div className="rounded-xl border p-4 shadow-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>{quote.lineOfBusiness === 'InlandMarine' ? 'Total TIV' : 'Limit / Deductible'}</div>
+            <div className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--ink-2)' }}>
               {displayLimit ? fmt(displayLimit) : '—'}
               {quote.deductible != null && (
-                <span className="ml-1.5 text-lg font-medium text-slate-400">/ {fmt(quote.deductible)}</span>
+                <span className="ml-1.5 text-lg font-medium" style={{ color: 'var(--ink-4)' }}>/ {fmt(quote.deductible)}</span>
               )}
             </div>
-            <div className="mt-2 text-xs text-slate-500">
+            <div className="mt-2 text-xs" style={{ color: 'var(--ink-3)' }}>
               {quote.lineOfBusiness === 'InlandMarine' ? (
-                anyOneItemLimit != null ? <>Any one item <span className="font-semibold">{fmt(anyOneItemLimit)}</span></> : <span className="text-slate-300">No scheduled items rated</span>
+                anyOneItemLimit != null ? <>Any one item <span className="font-semibold">{fmt(anyOneItemLimit)}</span></> : <span style={{ color: 'var(--ink-4)' }}>No scheduled items rated</span>
               ) : (
                 <>
                   {quote.uninsuredMotoristLimit ? `UM ${fmt(quote.uninsuredMotoristLimit)}` : ''}
                   {quote.medicalPaymentsLimit ? `  Med pay ${fmt(quote.medicalPaymentsLimit)}` : ''}
-                  {!quote.uninsuredMotoristLimit && !quote.medicalPaymentsLimit ? <span className="text-slate-300">No additional limits</span> : ''}
+                  {!quote.uninsuredMotoristLimit && !quote.medicalPaymentsLimit ? <span style={{ color: 'var(--ink-4)' }}>No additional limits</span> : ''}
                 </>
               )}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Term</div>
-            <div className="text-lg font-semibold tracking-tight text-slate-800">{formatDate(quote.effectiveDate)}</div>
-            <div className="mt-2 text-xs text-slate-500">
+          <div className="rounded-xl border p-4 shadow-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Term</div>
+            <div className="text-lg font-semibold tracking-tight" style={{ color: 'var(--ink-2)' }}>{formatDate(quote.effectiveDate)}</div>
+            <div className="mt-2 text-xs" style={{ color: 'var(--ink-3)' }}>
               Expires <span className="font-semibold">{formatDate(quote.expirationDate)}</span>
             </div>
           </div>
@@ -1515,25 +1521,25 @@ export function QuoteDetailPage() {
                 )}
               </div>
               {quote.coverageDescription && (
-                <div className="border-t border-slate-100 px-5 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Coverage description</p>
-                  <p className="text-sm text-slate-600 leading-relaxed">{quote.coverageDescription}</p>
+                <div className="border-t px-5 py-3" style={{ borderColor: 'var(--line-2)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--ink-4)' }}>Coverage description</p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>{quote.coverageDescription}</p>
                 </div>
               )}
               {ratingSnapshot && ratingSnapshot.lines.length > 0 && (
-                <div className="border-t border-slate-100">
+                <div className="border-t" style={{ borderColor: 'var(--line-2)' }}>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      <tr className="border-b text-[11px] font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-4)' }}>
                         <th className="px-5 py-2 text-left">Exposure</th>
                         <th className="px-4 py-2 text-right">Premium</th>
                       </tr>
                     </thead>
                     <tbody>
                       {ratingSnapshot.lines.map((line, i) => (
-                        <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                          <td className="px-5 py-2.5 font-medium text-slate-700">{line.exposureRef}</td>
-                          <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-800">{fmtFull(line.linePremium)}</td>
+                        <tr key={i} className="border-b last:border-0" style={{ borderColor: 'var(--line-2)' }}>
+                          <td className="px-5 py-2.5 font-medium" style={{ color: 'var(--ink-2)' }}>{line.exposureRef}</td>
+                          <td className="px-4 py-2.5 text-right font-mono tabular-nums" style={{ color: 'var(--ink-2)' }}>{fmtFull(line.linePremium)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1546,7 +1552,7 @@ export function QuoteDetailPage() {
             {isAuto && (
               <Card className="overflow-hidden">
                 <CardHead
-                  title={<span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-slate-500" />Auto safety</span>}
+                  title={<span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />Auto safety</span>}
                 />
                 <QuoteAutoSafetyPanel quoteId={quoteId!} />
               </Card>
@@ -1563,17 +1569,17 @@ export function QuoteDetailPage() {
                   { label: 'Taxes & fees', value: fmtFull(quote.taxesAndFees), negative: false },
                 ].map((row, i) => (
                   <div key={i} className="flex items-center justify-between py-2.5 text-sm">
-                    <span className="text-slate-500">{row.label}</span>
-                    <span className={`tabular-nums font-medium ${row.negative ? 'text-emerald-700' : 'text-slate-800'}`}>{row.value}</span>
+                    <span style={{ color: 'var(--ink-3)' }}>{row.label}</span>
+                    <span className="tabular-nums font-medium" style={{ color: row.negative ? 'var(--good-fg)' : 'var(--ink-2)' }}>{row.value}</span>
                   </div>
                 ))}
-                <div className="flex items-center justify-between py-3 text-sm font-bold text-slate-900">
+                <div className="flex items-center justify-between py-3 text-sm font-bold" style={{ color: 'var(--ink)' }}>
                   <span>Total premium</span>
                   <span className="text-base tabular-nums">{fmtFull(ratedTotalPremium)}</span>
                 </div>
-                <div className="flex items-center justify-between py-2 text-xs text-slate-400">
+                <div className="flex items-center justify-between py-2 text-xs" style={{ color: 'var(--ink-4)' }}>
                   <span>Agency commission ({formatPercent(agentCommRate)})</span>
-                  <span className="tabular-nums font-medium text-sky-800">{fmtFull(agentCommAmt)}</span>
+                  <span className="tabular-nums font-medium" style={{ color: 'var(--accent-ink)' }}>{fmtFull(agentCommAmt)}</span>
                 </div>
               </div>
             </Card>
@@ -1585,7 +1591,7 @@ export function QuoteDetailPage() {
             {/* Inline UW Writeup */}
             <Card>
               <CardHead
-                title={<span className="flex items-center gap-2"><Edit2 className="h-4 w-4 text-slate-500" />Underwriting writeup</span>}
+                title={<span className="flex items-center gap-2"><Edit2 className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />Underwriting writeup</span>}
                 right={
                   <>
                     <WriteupStatusPill status={writeup?.status} />
@@ -1601,11 +1607,11 @@ export function QuoteDetailPage() {
               {writeupLoading ? (
                 <div className="flex h-28 items-center justify-center"><LoadingSpinner /></div>
               ) : writeupIsError || !writeup ? (
-                <div className="px-5 py-4 text-sm text-red-700">Underwriting writeup could not be loaded.</div>
+                <div className="px-5 py-4 text-sm" style={{ color: 'var(--bad-fg)' }}>Underwriting writeup could not be loaded.</div>
               ) : (
                 <div>
                   {writeupReadOnly && (
-                    <div className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-xs font-medium text-slate-500">
+                    <div className="border-t px-5 py-3 text-xs font-medium" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
                       This writeup is {writeup.status.toLowerCase()} and can be reviewed here. Reopen the full writeup workflow to change status.
                     </div>
                   )}
@@ -1621,7 +1627,7 @@ export function QuoteDetailPage() {
                       <KV label="Effective" value={formatDate(writeup.effectiveDate)} />
                       <KV label="Operation type" value={writeup.operationType} />
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--ink-3)' }}>
                       {writeup.address || 'No address on the writeup yet.'}
                     </div>
                   </InlineWriteupSection>
@@ -1807,15 +1813,16 @@ export function QuoteDetailPage() {
                   <InlineWriteupSection number={isInlandMarine ? '07' : isAutoLiability || isGeneralLiability ? '09' : isAutoPhysicalDamage ? '10' : '06'} title="Conditions">
                     <div className="space-y-2">
                       {writeupConditions.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-sm text-slate-500">No conditions added yet.</div>
+                        <div className="rounded-lg border border-dashed px-3 py-3 text-sm" style={{ borderColor: 'var(--line)', background: 'var(--surface)', color: 'var(--ink-3)' }}>No conditions added yet.</div>
                       ) : writeupConditions.map((condition, index) => (
-                        <div key={condition.id || index} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <div key={condition.id || index} className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
                           <input
                             type="checkbox"
                             checked={condition.satisfied}
                             disabled={writeupReadOnly}
                             onChange={(e) => setWriteupConditions((conditions) => conditions.map((row, rowIndex) => rowIndex === index ? { ...row, satisfied: e.target.checked } : row))}
-                            className="h-4 w-4 rounded border-slate-300"
+                            className="h-4 w-4 rounded"
+                            style={{ borderColor: 'var(--line)' }}
                           />
                           <input
                             value={condition.text}
@@ -1873,7 +1880,7 @@ export function QuoteDetailPage() {
             {/* Bind invoice preview */}
             <Card>
               <div className="px-4 py-3">
-                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Bind invoice preview</h3>
+                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Bind invoice preview</h3>
                 {invoicePreview ? (
                   <>
                     {[
@@ -1881,29 +1888,29 @@ export function QuoteDetailPage() {
                       { label: 'Taxes & fees', value: formatCurrency(invoicePreview.totalFees) },
                       { label: 'Invoice total', value: formatCurrency(invoicePreview.totalAmount) },
                     ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between border-b border-slate-100 py-2 text-xs last:border-0">
-                        <span className="text-slate-500">{row.label}</span>
-                        <span className="font-medium text-slate-700">{row.value}</span>
+                      <div key={row.label} className="flex items-center justify-between border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--line-2)' }}>
+                        <span style={{ color: 'var(--ink-3)' }}>{row.label}</span>
+                        <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{row.value}</span>
                       </div>
                     ))}
                     <div className="mt-3 space-y-1">
                       {invoicePreview.lines.length > 0 ? invoicePreview.lines.map((line) => (
-                        <div key={`${line.feeCode}-${line.feeDisplayName}`} className="flex items-start justify-between rounded-md bg-slate-50 px-2 py-1.5 text-[11px]">
-                          <span className="min-w-0 pr-2 text-slate-600">
-                            <span className="font-medium text-slate-700">{line.feeDisplayName}</span>
-                            <span className="ml-1 text-slate-400">{line.feeCategory}</span>
+                        <div key={`${line.feeCode}-${line.feeDisplayName}`} className="flex items-start justify-between rounded-md px-2 py-1.5 text-[11px]" style={{ background: 'var(--surface-2)' }}>
+                          <span className="min-w-0 pr-2" style={{ color: 'var(--ink-3)' }}>
+                            <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{line.feeDisplayName}</span>
+                            <span className="ml-1" style={{ color: 'var(--ink-4)' }}>{line.feeCategory}</span>
                           </span>
-                          <span className="font-semibold tabular-nums text-slate-800">{formatCurrency(line.amount)}</span>
+                          <span className="font-semibold tabular-nums" style={{ color: 'var(--ink-2)' }}>{formatCurrency(line.amount)}</span>
                         </div>
                       )) : (
-                        <div className="rounded-md bg-amber-50 px-2 py-2 text-[11px] font-medium text-amber-700">
+                        <div className="rounded-md px-2 py-2 text-[11px] font-medium" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
                           No automatic fee rules match this quote.
                         </div>
                       )}
                     </div>
                   </>
                 ) : (
-                  <div className="rounded-md bg-slate-50 px-2 py-2 text-[11px] text-slate-500">
+                  <div className="rounded-md px-2 py-2 text-[11px]" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
                     Fee preview will appear when the quote is loaded.
                   </div>
                 )}
@@ -1912,7 +1919,7 @@ export function QuoteDetailPage() {
 
             {/* Bind CTA */}
             {showBindAction && (
-              <div className={`rounded-xl p-4 text-white shadow-sm ${canBind ? 'bg-sky-600' : 'bg-amber-500'}`}>
+              <div className="rounded-xl p-4 text-white shadow-sm" style={{ background: canBind ? 'var(--accent)' : 'var(--warn-fg)' }}>
                 <p className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/70">
                   {canBind ? 'Ready to bind' : 'Not ready to bind'}
                 </p>
@@ -1922,7 +1929,8 @@ export function QuoteDetailPage() {
                   disabled={!canBind}
                   title={bindUnavailableReason ?? 'Bind this quote'}
                   onClick={() => canBind && setShowBind(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-white py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ background: 'var(--surface)', color: 'var(--accent-ink)' }}
                 >
                   <CheckCircle2 className="h-4 w-4" /> Bind this quote
                 </button>
@@ -1942,7 +1950,7 @@ export function QuoteDetailPage() {
             {/* Quote details */}
             <Card>
               <div className="px-4 py-3">
-                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Quote details</h3>
+                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Quote details</h3>
                 {[
                   { label: 'Quote #', value: quote.quoteNumber },
                   { label: 'Carrier', value: quote.carrierName },
@@ -1953,14 +1961,14 @@ export function QuoteDetailPage() {
                   ...(quote.policyNumber ? [{ label: 'Policy #', value: quote.policyNumber }] : []),
                   ...(quote.isFilingState ? [{ label: 'Filing state', value: 'Yes' }] : []),
                 ].map((row) => (
-                  <div key={row.label} className="flex items-start justify-between border-b border-slate-100 py-2 text-xs last:border-0">
-                    <span className="text-slate-400">{row.label}</span>
-                    <span className="ml-3 text-right font-medium text-slate-700">{row.value}</span>
+                  <div key={row.label} className="flex items-start justify-between border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--line-2)' }}>
+                    <span style={{ color: 'var(--ink-4)' }}>{row.label}</span>
+                    <span className="ml-3 text-right font-medium" style={{ color: 'var(--ink-2)' }}>{row.value}</span>
                   </div>
                 ))}
                 {ratingSnapshot && (
-                  <div className="mt-2 rounded-lg bg-slate-50 px-2 py-2 text-[11px] leading-5 text-slate-500">
-                    Rated by <span className="font-medium text-slate-700">{ratingSnapshot.ratedByName ?? 'System'}</span> on <span className="font-medium text-slate-700">{formatDate(ratingSnapshot.ratedAt)}</span>
+                  <div className="mt-2 rounded-lg px-2 py-2 text-[11px] leading-5" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
+                    Rated by <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{ratingSnapshot.ratedByName ?? 'System'}</span> on <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{formatDate(ratingSnapshot.ratedAt)}</span>
                   </div>
                 )}
               </div>
@@ -1969,19 +1977,19 @@ export function QuoteDetailPage() {
             {/* Commission breakdown */}
             <Card>
               <div className="px-4 py-3">
-                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Commission split</h3>
+                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Commission split</h3>
                 {[
                   { label: 'Carrier commission', rate: quote.carrierCommissionRate, amt: carrierCommAmt },
                   { label: 'SMM retention', rate: quote.smmRetentionRate, amt: smmRetentionAmt },
                   { label: 'Agent commission', rate: agentCommRate, amt: agentCommAmt },
                 ].map((row) => (
-                  <div key={row.label} className="flex items-center justify-between border-b border-slate-100 py-2 text-xs last:border-0">
-                    <span className="text-slate-500">{row.label}</span>
-                    <span className="font-medium text-slate-700">{formatPercent(row.rate)} · {fmt(row.amt)}</span>
+                  <div key={row.label} className="flex items-center justify-between border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--line-2)' }}>
+                    <span style={{ color: 'var(--ink-3)' }}>{row.label}</span>
+                    <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{formatPercent(row.rate)} · {fmt(row.amt)}</span>
                   </div>
                 ))}
                 {quote.commissionOverride && (
-                  <div className="mt-2 flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1.5 text-[10.5px] font-medium text-amber-700">
+                  <div className="mt-2 flex items-center gap-1.5 rounded px-2 py-1.5 text-[10.5px] font-medium" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
                     <TrendingDown className="h-3 w-3" /> Override applied by {quote.commissionOverride.overrideBy}
                   </div>
                 )}
@@ -1992,18 +2000,19 @@ export function QuoteDetailPage() {
             {otherQuotes.length > 0 && (
               <Card>
                 <div className="px-4 py-3">
-                  <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Other quotes</h3>
+                  <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Other quotes</h3>
                   {otherQuotes.map((q) => (
                     <Link
                       key={q.id}
                       to={`/quotes/${q.id}`}
-                      className="flex items-center justify-between border-b border-slate-100 py-2.5 text-xs last:border-0 hover:bg-slate-50"
+                      className="flex items-center justify-between border-b py-2.5 text-xs last:border-0"
+                      style={{ borderColor: 'var(--line-2)' }}
                     >
                       <span className="min-w-0">
-                        <div className="font-medium text-slate-700 truncate">{q.carrierName}</div>
-                        <div className="font-mono text-slate-400">{q.quoteNumber}</div>
+                        <div className="font-medium truncate" style={{ color: 'var(--ink-2)' }}>{q.carrierName}</div>
+                        <div className="font-mono" style={{ color: 'var(--ink-4)' }}>{q.quoteNumber}</div>
                       </span>
-                      <span className={`ml-2 flex-shrink-0 font-semibold tabular-nums ${q.status === 'Declined' ? 'text-red-600' : 'text-slate-800'}`}>
+                      <span className="ml-2 flex-shrink-0 font-semibold tabular-nums" style={{ color: q.status === 'Declined' ? 'var(--bad-fg)' : 'var(--ink-2)' }}>
                         {q.status === 'Declined' ? 'Declined' : fmt(q.totalPremium)}
                       </span>
                     </Link>
@@ -2021,7 +2030,7 @@ export function QuoteDetailPage() {
             {/* Quick facts */}
             <Card>
               <div className="px-4 py-3">
-                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Quick facts</h3>
+                <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Quick facts</h3>
                 {[
                   { label: 'Submission', value: quote.submissionNumber },
                   { label: 'Insured', value: quote.insuredName },
@@ -2029,9 +2038,9 @@ export function QuoteDetailPage() {
                   ...(quote.boundDate ? [{ label: 'Bound', value: formatDate(quote.boundDate) }] : []),
                   ...(quote.policyNumber ? [{ label: 'Policy', value: quote.policyNumber }] : []),
                 ].map((row) => (
-                  <div key={row.label} className="flex items-start justify-between border-b border-slate-100 py-2 text-xs last:border-0">
-                    <span className="text-slate-400">{row.label}</span>
-                    <span className="ml-3 text-right font-medium text-slate-700">{row.value}</span>
+                  <div key={row.label} className="flex items-start justify-between border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--line-2)' }}>
+                    <span style={{ color: 'var(--ink-4)' }}>{row.label}</span>
+                    <span className="ml-3 text-right font-medium" style={{ color: 'var(--ink-2)' }}>{row.value}</span>
                   </div>
                 ))}
               </div>

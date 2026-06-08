@@ -16,13 +16,13 @@ import type {
 type Tab = 'schedule' | 'factors' | 'eligibility' | 'impact' | 'audit'
 
 function StatusBadge({ status }: { status: PlanStatus }) {
-  const map: Record<PlanStatus, { label: string; cls: string }> = {
-    Active:  { label: 'Active',  cls: 'bg-emerald-100 text-emerald-700' },
-    Draft:   { label: 'Draft',   cls: 'bg-amber-100 text-amber-700' },
-    Retired: { label: 'Retired', cls: 'bg-slate-100 text-slate-500' },
+  const map: Record<PlanStatus, { label: string; style: React.CSSProperties }> = {
+    Active:  { label: 'Active',  style: { background: 'var(--good-bg)', color: 'var(--good-fg)' } },
+    Draft:   { label: 'Draft',   style: { background: 'var(--warn-bg)', color: 'var(--warn-fg)' } },
+    Retired: { label: 'Retired', style: { background: 'var(--surface-2)', color: 'var(--ink-3)' } },
   }
-  const { label, cls } = map[status]
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{label}</span>
+  const { label, style } = map[status]
+  return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={style}>{label}</span>
 }
 
 // ─── Editable factor table panel ─────────────────────────────────────────────
@@ -110,15 +110,15 @@ function FactorTablePanel({
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="w-full flex items-center justify-between px-4 py-3 bg-slate-50">
+      <div className="w-full flex items-center justify-between px-4 py-3" style={{ background: 'var(--surface-2)' }}>
         <button
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-2 text-left flex-1"
         >
-          {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-          <span className="text-sm font-semibold text-slate-700 font-mono">{table.code}</span>
-          <span className="text-xs text-slate-400">{table.rows.length} rows · {table.dimensionNames.join(', ')}</span>
-          <span className="text-xs px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">{table.valueSemantics}</span>
+          {open ? <ChevronDown className="h-4 w-4" style={{ color: 'var(--ink-4)' }} /> : <ChevronRight className="h-4 w-4" style={{ color: 'var(--ink-4)' }} />}
+          <span className="text-sm font-semibold font-mono" style={{ color: 'var(--ink-2)' }}>{table.code}</span>
+          <span className="text-xs" style={{ color: 'var(--ink-4)' }}>{table.rows.length} rows · {table.dimensionNames.join(', ')}</span>
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>{table.valueSemantics}</span>
         </button>
 
         {isDraft && open && (
@@ -127,14 +127,14 @@ function FactorTablePanel({
               <>
                 <button
                   onClick={() => { setEditMode(false); setEditedFactors({}) }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs border rounded text-slate-600 hover:bg-slate-100"
+                  className="flex items-center gap-1 px-2 py-1 text-xs border rounded" style={{ color: 'var(--ink-3)' }}
                 >
                   <X className="h-3 w-3" /> Cancel
                 </button>
                 <button
                   onClick={() => saveMutation.mutate()}
                   disabled={saveMutation.isPending}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="sd-btn primary flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50"
                 >
                   <Save className="h-3 w-3" /> {saveMutation.isPending ? 'Saving…' : 'Save'}
                 </button>
@@ -143,13 +143,13 @@ function FactorTablePanel({
               <>
                 <button
                   onClick={() => { setPasteMode((p) => !p); setEditMode(false) }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs border rounded text-slate-600 hover:bg-slate-100"
+                  className="flex items-center gap-1 px-2 py-1 text-xs border rounded" style={{ color: 'var(--ink-3)' }}
                 >
                   <Upload className="h-3 w-3" /> Paste
                 </button>
                 <button
                   onClick={() => { setEditMode(true); setPasteMode(false) }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs border rounded text-slate-600 hover:bg-slate-100"
+                  className="flex items-center gap-1 px-2 py-1 text-xs border rounded" style={{ color: 'var(--ink-3)' }}
                 >
                   <Pencil className="h-3 w-3" /> Edit
                 </button>
@@ -163,9 +163,9 @@ function FactorTablePanel({
         <div>
           {/* Paste mode */}
           {pasteMode && (
-            <div className="px-4 py-3 border-b bg-amber-50 space-y-2">
-              <p className="text-xs text-amber-700 font-medium">
-                Paste tab-separated or CSV data (header row required, include a <code className="bg-amber-100 px-1 rounded">factor</code> column).
+            <div className="px-4 py-3 border-b space-y-2" style={{ background: 'var(--warn-bg)' }}>
+              <p className="text-xs font-medium" style={{ color: 'var(--warn-fg)' }}>
+                Paste tab-separated or CSV data (header row required, include a <code className="px-1 rounded" style={{ background: 'var(--warn-bg)' }}>factor</code> column).
               </p>
               <textarea
                 value={pasteText}
@@ -178,13 +178,13 @@ function FactorTablePanel({
                 <button
                   onClick={handleParsePaste}
                   disabled={!pasteText.trim()}
-                  className="px-3 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+                  className="px-3 py-1 text-xs rounded disabled:opacity-50" style={{ background: 'var(--warn-fg)', color: 'white' }}
                 >
                   Preview Changes
                 </button>
                 <button
                   onClick={() => { setPasteMode(false); setPasteText(''); setParsedPaste(null) }}
-                  className="px-3 py-1 text-xs border rounded text-slate-600 hover:bg-slate-50"
+                  className="px-3 py-1 text-xs border rounded" style={{ color: 'var(--ink-3)' }}
                 >
                   Cancel
                 </button>
@@ -192,11 +192,11 @@ function FactorTablePanel({
 
               {parsedPaste && (
                 <div className="mt-2 space-y-1">
-                  <p className="text-xs font-medium text-slate-700">{parsedPaste.length} rows parsed. Current: {table.rows.length} rows. <span className="text-amber-700">This will replace all existing rows.</span></p>
-                  <div className="max-h-40 overflow-y-auto border rounded bg-white">
+                  <p className="text-xs font-medium" style={{ color: 'var(--ink-2)' }}>{parsedPaste.length} rows parsed. Current: {table.rows.length} rows. <span style={{ color: 'var(--warn-fg)' }}>This will replace all existing rows.</span></p>
+                  <div className="max-h-40 overflow-y-auto border rounded" style={{ background: 'var(--surface)' }}>
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-slate-50 text-slate-500 border-b">
+                        <tr className="border-b" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
                           {Object.keys(parsedPaste[0]?.dims ?? {}).map((d) => (
                             <th key={d} className="px-3 py-1.5 text-left font-medium">{d}</th>
                           ))}
@@ -215,11 +215,11 @@ function FactorTablePanel({
                       </tbody>
                     </table>
                   </div>
-                  {parsedPaste.length > 20 && <p className="text-xs text-slate-400">…and {parsedPaste.length - 20} more rows</p>}
+                  {parsedPaste.length > 20 && <p className="text-xs" style={{ color: 'var(--ink-4)' }}>…and {parsedPaste.length - 20} more rows</p>}
                   <button
                     onClick={() => confirmPasteMutation.mutate()}
                     disabled={confirmPasteMutation.isPending}
-                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    className="sd-btn primary px-3 py-1 text-xs rounded disabled:opacity-50"
                   >
                     {confirmPasteMutation.isPending ? 'Applying…' : 'Apply Changes'}
                   </button>
@@ -228,9 +228,9 @@ function FactorTablePanel({
             </div>
           )}
 
-          <div className="px-4 py-2 border-b bg-white">
+          <div className="px-4 py-2 border-b" style={{ background: 'var(--surface)' }}>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: 'var(--ink-4)' }} />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -243,7 +243,7 @@ function FactorTablePanel({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-slate-500 border-b bg-slate-50">
+                <tr className="text-left border-b" style={{ color: 'var(--ink-3)', background: 'var(--surface-2)' }}>
                   {table.dimensionNames.map((d) => (
                     <th key={d} className="px-4 py-2 font-medium">{d}</th>
                   ))}
@@ -254,7 +254,7 @@ function FactorTablePanel({
                 {filteredRows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50">
                     {table.dimensionNames.map((d) => (
-                      <td key={d} className="px-4 py-1.5 text-slate-700">{row.dimensionValues[d] ?? '—'}</td>
+                      <td key={d} className="px-4 py-1.5" style={{ color: 'var(--ink-2)' }}>{row.dimensionValues[d] ?? '—'}</td>
                     ))}
                     <td className="px-4 py-1.5 text-right">
                       {editMode ? (
@@ -263,17 +263,17 @@ function FactorTablePanel({
                           step="0.0001"
                           value={currentFactor(row)}
                           onChange={(e) => setEditedFactors((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                          className="w-24 px-1.5 py-0.5 border rounded text-right font-mono text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                          className="w-24 px-1.5 py-0.5 border rounded text-right font-mono outline-none" style={{ color: 'var(--ink-2)' }}
                         />
                       ) : (
-                        <span className="font-mono font-medium text-slate-800">{row.factor.toFixed(4)}</span>
+                        <span className="font-mono font-medium" style={{ color: 'var(--ink-2)' }}>{row.factor.toFixed(4)}</span>
                       )}
                     </td>
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
                   <tr>
-                    <td colSpan={table.dimensionNames.length + 1} className="px-4 py-4 text-center text-slate-400">
+                    <td colSpan={table.dimensionNames.length + 1} className="px-4 py-4 text-center" style={{ color: 'var(--ink-4)' }}>
                       No rows match filter.
                     </td>
                   </tr>
@@ -327,9 +327,9 @@ function ImpactPreviewPanel({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800">Impact Preview</h3>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>Impact Preview</h3>
           {preview && (
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs mt-0.5" style={{ color: 'var(--ink-4)' }}>
               Computed {new Date(preview.computedAt).toLocaleString()} — {preview.quoteCount} open rated quote{preview.quoteCount !== 1 ? 's' : ''}
             </p>
           )}
@@ -338,7 +338,7 @@ function ImpactPreviewPanel({
           <button
             onClick={() => computeMutation.mutate()}
             disabled={computeMutation.isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="sd-btn primary flex items-center gap-1.5 px-3 py-1.5 text-sm rounded disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${computeMutation.isPending ? 'animate-spin' : ''}`} />
             {computeMutation.isPending ? 'Computing…' : preview ? 'Recompute' : 'Run Preview'}
@@ -350,10 +350,10 @@ function ImpactPreviewPanel({
 
       {!isLoading && !preview && (
         <div className="text-center py-10 border border-dashed rounded-lg">
-          <BarChart2 className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-400">No impact preview yet.</p>
+          <BarChart2 className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--ink-4)' }} />
+          <p className="text-sm" style={{ color: 'var(--ink-4)' }}>No impact preview yet.</p>
           {isDraft && (
-            <p className="text-xs text-slate-300 mt-1">Run the preview to see how this version affects open quotes.</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--ink-4)' }}>Run the preview to see how this version affects open quotes.</p>
           )}
         </div>
       )}
@@ -362,21 +362,21 @@ function ImpactPreviewPanel({
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="bg-white border rounded-lg p-3 text-center">
-              <div className="text-xs text-slate-500 mb-0.5">Open Quotes</div>
-              <div className="text-xl font-semibold text-slate-800">{preview.quoteCount}</div>
+            <div className="border rounded-lg p-3 text-center" style={{ background: 'var(--surface)' }}>
+              <div className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Open Quotes</div>
+              <div className="text-xl font-semibold" style={{ color: 'var(--ink-2)' }}>{preview.quoteCount}</div>
             </div>
-            <div className="bg-white border rounded-lg p-3 text-center">
-              <div className="text-xs text-slate-500 mb-0.5">Current Premium</div>
-              <div className="text-lg font-semibold text-slate-800">{fmtCurrency(preview.totalCurrentPremium)}</div>
+            <div className="border rounded-lg p-3 text-center" style={{ background: 'var(--surface)' }}>
+              <div className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Current Premium</div>
+              <div className="text-lg font-semibold" style={{ color: 'var(--ink-2)' }}>{fmtCurrency(preview.totalCurrentPremium)}</div>
             </div>
-            <div className="bg-white border rounded-lg p-3 text-center">
-              <div className="text-xs text-slate-500 mb-0.5">New Premium</div>
-              <div className="text-lg font-semibold text-slate-800">{fmtCurrency(preview.totalNewPremium)}</div>
+            <div className="border rounded-lg p-3 text-center" style={{ background: 'var(--surface)' }}>
+              <div className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>New Premium</div>
+              <div className="text-lg font-semibold" style={{ color: 'var(--ink-2)' }}>{fmtCurrency(preview.totalNewPremium)}</div>
             </div>
-            <div className={`bg-white border rounded-lg p-3 text-center ${preview.totalDeltaPct > 0 ? 'border-emerald-200 bg-emerald-50/30' : preview.totalDeltaPct < 0 ? 'border-red-200 bg-red-50/30' : ''}`}>
-              <div className="text-xs text-slate-500 mb-0.5">Total Change</div>
-              <div className={`text-xl font-semibold ${preview.totalDeltaPct > 0 ? 'text-emerald-700' : preview.totalDeltaPct < 0 ? 'text-red-700' : 'text-slate-700'}`}>
+            <div className="border rounded-lg p-3 text-center" style={{ background: 'var(--surface)', ...(preview.totalDeltaPct > 0 ? { borderColor: 'var(--line)' } : preview.totalDeltaPct < 0 ? { borderColor: 'var(--bad-fg)' } : {}) }}>
+              <div className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Total Change</div>
+              <div className="text-xl font-semibold" style={{ color: preview.totalDeltaPct > 0 ? 'var(--good-fg)' : preview.totalDeltaPct < 0 ? 'var(--bad-fg)' : 'var(--ink-2)' }}>
                 {fmtPct(preview.totalDeltaPct)}
               </div>
             </div>
@@ -384,38 +384,38 @@ function ImpactPreviewPanel({
 
           {/* Up / Down / Flat */}
           <div className="flex gap-3">
-            <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
-              <div className="text-xs text-emerald-600">Quotes Up</div>
-              <div className="text-xl font-semibold text-emerald-700">{preview.quotesUp}</div>
+            <div className="flex-1 border rounded-lg p-3 text-center" style={{ background: 'var(--good-bg)', borderColor: 'var(--line)' }}>
+              <div className="text-xs" style={{ color: 'var(--good-fg)' }}>Quotes Up</div>
+              <div className="text-xl font-semibold" style={{ color: 'var(--good-fg)' }}>{preview.quotesUp}</div>
             </div>
-            <div className="flex-1 bg-slate-50 border rounded-lg p-3 text-center">
-              <div className="text-xs text-slate-500">Flat</div>
-              <div className="text-xl font-semibold text-slate-700">{preview.quotesFlat}</div>
+            <div className="flex-1 border rounded-lg p-3 text-center" style={{ background: 'var(--surface-2)' }}>
+              <div className="text-xs" style={{ color: 'var(--ink-3)' }}>Flat</div>
+              <div className="text-xl font-semibold" style={{ color: 'var(--ink-2)' }}>{preview.quotesFlat}</div>
             </div>
-            <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-              <div className="text-xs text-red-600">Quotes Down</div>
-              <div className="text-xl font-semibold text-red-700">{preview.quotesDown}</div>
+            <div className="flex-1 border rounded-lg p-3 text-center" style={{ background: 'var(--bad-bg)', borderColor: 'var(--bad-fg)' }}>
+              <div className="text-xs" style={{ color: 'var(--bad-fg)' }}>Quotes Down</div>
+              <div className="text-xl font-semibold" style={{ color: 'var(--bad-fg)' }}>{preview.quotesDown}</div>
             </div>
           </div>
 
           {/* Distribution */}
           {preview.distributionBuckets.length > 0 && (
-            <div className="bg-white border rounded-lg p-4 space-y-2">
-              <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Premium Change Distribution</h4>
+            <div className="border rounded-lg p-4 space-y-2" style={{ background: 'var(--surface)' }}>
+              <h4 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Premium Change Distribution</h4>
               <div className="space-y-1.5">
                 {preview.distributionBuckets.map((b) => {
                   const maxCount = Math.max(...preview.distributionBuckets.map((x) => x.count), 1)
                   const pct = (b.count / maxCount) * 100
                   return (
                     <div key={b.rangeLabel} className="flex items-center gap-2 text-xs">
-                      <span className="w-28 text-right text-slate-500 shrink-0">{b.rangeLabel}</span>
-                      <div className="flex-1 bg-slate-100 rounded-full h-3 relative">
+                      <span className="w-28 text-right shrink-0" style={{ color: 'var(--ink-3)' }}>{b.rangeLabel}</span>
+                      <div className="flex-1 rounded-full h-3 relative" style={{ background: 'var(--surface-2)' }}>
                         <div
-                          className="h-3 rounded-full bg-blue-500"
-                          style={{ width: `${pct}%` }}
+                          className="h-3 rounded-full"
+                          style={{ width: `${pct}%`, background: 'var(--accent)' }}
                         />
                       </div>
-                      <span className="w-6 text-slate-700 font-medium">{b.count}</span>
+                      <span className="w-6 font-medium" style={{ color: 'var(--ink-2)' }}>{b.count}</span>
                     </div>
                   )
                 })}
@@ -425,13 +425,13 @@ function ImpactPreviewPanel({
 
           {/* Top movers */}
           {preview.topMovers.length > 0 && (
-            <div className="bg-white border rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b bg-slate-50">
-                <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Top Movers (by % change)</h4>
+            <div className="border rounded-lg overflow-hidden" style={{ background: 'var(--surface)' }}>
+              <div className="px-4 py-3 border-b" style={{ background: 'var(--surface-2)' }}>
+                <h4 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-3)' }}>Top Movers (by % change)</h4>
               </div>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-slate-500 border-b bg-slate-50/50">
+                  <tr className="text-left border-b" style={{ color: 'var(--ink-3)', background: 'var(--surface-2)' }}>
                     <th className="px-4 py-2 font-medium">Quote</th>
                     <th className="px-4 py-2 font-medium">Insured</th>
                     <th className="px-4 py-2 font-medium text-right">Current</th>
@@ -442,11 +442,11 @@ function ImpactPreviewPanel({
                 <tbody className="divide-y">
                   {preview.topMovers.map((m) => (
                     <tr key={m.quoteNumber} className="hover:bg-slate-50">
-                      <td className="px-4 py-2 font-mono text-slate-600">{m.quoteNumber}</td>
-                      <td className="px-4 py-2 text-slate-700">{m.insuredName}</td>
-                      <td className="px-4 py-2 text-right text-slate-600">{fmtCurrency(m.currentPremium)}</td>
-                      <td className="px-4 py-2 text-right text-slate-600">{fmtCurrency(m.newPremium)}</td>
-                      <td className={`px-4 py-2 text-right font-medium ${m.deltaPct > 0 ? 'text-emerald-700' : m.deltaPct < 0 ? 'text-red-700' : 'text-slate-500'}`}>
+                      <td className="px-4 py-2 font-mono" style={{ color: 'var(--ink-3)' }}>{m.quoteNumber}</td>
+                      <td className="px-4 py-2" style={{ color: 'var(--ink-2)' }}>{m.insuredName}</td>
+                      <td className="px-4 py-2 text-right" style={{ color: 'var(--ink-3)' }}>{fmtCurrency(m.currentPremium)}</td>
+                      <td className="px-4 py-2 text-right" style={{ color: 'var(--ink-3)' }}>{fmtCurrency(m.newPremium)}</td>
+                      <td className="px-4 py-2 text-right font-medium" style={{ color: m.deltaPct > 0 ? 'var(--good-fg)' : m.deltaPct < 0 ? 'var(--bad-fg)' : 'var(--ink-3)' }}>
                         {fmtPct(m.deltaPct)}
                       </td>
                     </tr>
@@ -486,66 +486,66 @@ function MetaEditForm({
     setForm((prev) => ({ ...prev, [key]: val }))
 
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+    <div className="border rounded-lg p-4 space-y-3" style={{ background: 'var(--warn-bg)', borderColor: 'var(--warn-fg)' }}>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Effective Date</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-3)' }}>Effective Date</label>
           <input
             type="date"
             value={form.effectiveDate}
             onChange={(e) => set('effectiveDate', e.target.value)}
-            className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+            className="sd-input w-full px-3 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Minimum Premium</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-3)' }}>Minimum Premium</label>
           <input
             type="number"
             min={0}
             value={form.minimumPremium ?? ''}
             onChange={(e) => set('minimumPremium', e.target.value ? parseFloat(e.target.value) : null)}
             placeholder="None"
-            className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+            className="sd-input w-full px-3 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Schedule Min (%)</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-3)' }}>Schedule Min (%)</label>
           <input
             type="number"
             step="0.01"
             value={(form.scheduleMin * 100).toFixed(0)}
             onChange={(e) => set('scheduleMin', parseFloat(e.target.value) / 100)}
-            className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+            className="sd-input w-full px-3 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Schedule Max (%)</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-3)' }}>Schedule Max (%)</label>
           <input
             type="number"
             step="0.01"
             value={(form.scheduleMax * 100).toFixed(0)}
             onChange={(e) => set('scheduleMax', parseFloat(e.target.value) / 100)}
-            className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+            className="sd-input w-full px-3 py-1.5 text-sm"
           />
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-3)' }}>Notes</label>
         <textarea
           rows={2}
           value={form.notes ?? ''}
           onChange={(e) => set('notes', e.target.value || null)}
-          className="w-full px-3 py-1.5 text-sm border rounded focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+          className="sd-input w-full px-3 py-1.5 text-sm resize-none"
         />
       </div>
       <div className="flex gap-2 justify-end">
-        <button onClick={onCancel} className="px-3 py-1.5 text-sm border rounded hover:bg-slate-50">
+        <button onClick={onCancel} className="sd-btn outline px-3 py-1.5 text-sm border rounded">
           Cancel
         </button>
         <button
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          className="sd-btn primary flex items-center gap-1.5 px-3 py-1.5 text-sm rounded disabled:opacity-50"
         >
           <Save className="h-3.5 w-3.5" /> {saveMutation.isPending ? 'Saving…' : 'Save'}
         </button>
@@ -576,12 +576,12 @@ function CsvUploadSection({ versionId, onDone }: { versionId: string; onDone: ()
   })
 
   return (
-    <div className="bg-slate-50 border rounded-lg p-4 space-y-2">
-      <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+    <div className="border rounded-lg p-4 space-y-2" style={{ background: 'var(--surface-2)' }}>
+      <h4 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'var(--ink-3)' }}>
         <Upload className="h-3.5 w-3.5" /> Bulk CSV Import
       </h4>
-      <p className="text-xs text-slate-500">
-        CSV must have columns: <code className="bg-slate-100 px-1 rounded">table_code</code>, dimension columns matching each table, and <code className="bg-slate-100 px-1 rounded">factor</code>. Multiple tables can be in one file.
+      <p className="text-xs" style={{ color: 'var(--ink-3)' }}>
+        CSV must have columns: <code className="px-1 rounded" style={{ background: 'var(--surface-2)' }}>table_code</code>, dimension columns matching each table, and <code className="px-1 rounded" style={{ background: 'var(--surface-2)' }}>factor</code>. Multiple tables can be in one file.
       </p>
       <div className="flex items-center gap-2">
         <input
@@ -593,7 +593,7 @@ function CsvUploadSection({ versionId, onDone }: { versionId: string; onDone: ()
         />
         <button
           onClick={() => inputRef.current?.click()}
-          className="px-3 py-1.5 text-xs border rounded hover:bg-white text-slate-600"
+          className="px-3 py-1.5 text-xs border rounded" style={{ color: 'var(--ink-3)' }}
         >
           {file ? file.name : 'Choose CSV file…'}
         </button>
@@ -601,13 +601,13 @@ function CsvUploadSection({ versionId, onDone }: { versionId: string; onDone: ()
           <button
             onClick={() => uploadMutation.mutate()}
             disabled={uploadMutation.isPending}
-            className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="sd-btn primary px-3 py-1.5 text-xs rounded disabled:opacity-50"
           >
             {uploadMutation.isPending ? 'Importing…' : 'Import'}
           </button>
         )}
         {file && (
-          <button onClick={() => setFile(null)} className="text-slate-400 hover:text-slate-600">
+          <button onClick={() => setFile(null)} style={{ color: 'var(--ink-4)' }}>
             <X className="h-4 w-4" />
           </button>
         )}
@@ -666,7 +666,7 @@ export function AdminRatingPlanVersionPage() {
   })
 
   if (vLoading) return <LoadingSpinner />
-  if (!version) return <div className="p-6 text-sm text-slate-500">Version not found.</div>
+  if (!version) return <div className="p-6 text-sm" style={{ color: 'var(--ink-3)' }}>Version not found.</div>
 
   const isDraft = version.status === 'Draft'
 
@@ -691,30 +691,30 @@ export function AdminRatingPlanVersionPage() {
   return (
     <div className="p-6 space-y-5 max-w-5xl">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-slate-500">
-        <Link to="/admin/rating" className="hover:text-slate-700 flex items-center gap-1">
+      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink-3)' }}>
+        <Link to="/admin/rating" className="flex items-center gap-1" style={{ color: 'var(--ink-3)' }}>
           <ArrowLeft className="h-4 w-4" /> Rating Engine
         </Link>
         <span>/</span>
-        <Link to={`/admin/rating/plans/${version.ratingPlanId}`} className="hover:text-slate-700">
+        <Link to={`/admin/rating/plans/${version.ratingPlanId}`} style={{ color: 'var(--ink-3)' }}>
           {version.planName}
         </Link>
         <span>/</span>
-        <span className="text-slate-800 font-medium">v{version.versionNumber}</span>
+        <span className="font-medium" style={{ color: 'var(--ink-2)' }}>v{version.versionNumber}</span>
       </div>
 
       {/* Header */}
-      <div className="bg-white border rounded-lg p-5">
+      <div className="border rounded-lg p-5" style={{ background: 'var(--surface)' }}>
         <div className="flex items-start justify-between">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold text-slate-900">{version.planName}</h1>
-              <span className="text-slate-400 font-mono text-sm">v{version.versionNumber}</span>
+              <h1 className="text-xl font-semibold" style={{ color: 'var(--ink)' }}>{version.planName}</h1>
+              <span className="font-mono text-sm" style={{ color: 'var(--ink-4)' }}>v{version.versionNumber}</span>
               <StatusBadge status={version.status} />
             </div>
-            <div className="flex items-center gap-3 text-sm text-slate-500">
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-100">{version.lobLabel}</span>
-              <span className="text-xs text-slate-400">{effectiveRange}</span>
+            <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--ink-3)' }}>
+              <span className="px-2 py-0.5 rounded text-xs" style={{ background: 'var(--surface-2)', color: 'var(--accent-ink)', borderColor: 'var(--line-2)', border: '1px solid' }}>{version.lobLabel}</span>
+              <span className="text-xs" style={{ color: 'var(--ink-4)' }}>{effectiveRange}</span>
             </div>
           </div>
 
@@ -722,7 +722,7 @@ export function AdminRatingPlanVersionPage() {
             {isDraft && (
               <button
                 onClick={() => setEditingMeta((v) => !v)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded hover:bg-slate-50 text-slate-600"
+                className="sd-btn outline flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded"
               >
                 <Pencil className="h-3.5 w-3.5" /> Edit Meta
               </button>
@@ -743,7 +743,7 @@ export function AdminRatingPlanVersionPage() {
                         promoteMutation.mutate()
                     }}
                     disabled={promoteMutation.isPending || !!blockedByMakerChecker || noPreview}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'var(--good-fg)', color: 'white' }}
                   >
                     <CheckCircle className="h-3.5 w-3.5" /> Promote
                   </button>
@@ -758,7 +758,7 @@ export function AdminRatingPlanVersionPage() {
                     retireMutation.mutate()
                 }}
                 disabled={retireMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 border rounded text-sm disabled:opacity-50" style={{ borderColor: 'var(--bad-fg)', color: 'var(--bad-fg)' }}
               >
                 <XCircle className="h-3.5 w-3.5" /> Retire
               </button>
@@ -768,7 +768,7 @@ export function AdminRatingPlanVersionPage() {
 
         {/* Promote gate notice */}
         {isDraft && !version.impactPreviewComputedAt && (
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">
+          <div className="mt-3 flex items-center gap-1.5 text-xs border rounded px-3 py-1.5" style={{ color: 'var(--warn-fg)', background: 'var(--warn-bg)', borderColor: 'var(--warn-fg)' }}>
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             Impact preview required before promoting. Go to the <button onClick={() => setActiveTab('impact')} className="underline font-medium">Impact Preview</button> tab.
           </div>
@@ -802,15 +802,12 @@ export function AdminRatingPlanVersionPage() {
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === t.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
+            className="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors border-transparent"
+            style={activeTab === t.id ? { borderColor: 'var(--accent-ink)', color: 'var(--accent-ink)' } : { color: 'var(--ink-3)' }}
           >
             {t.label}
             {t.id === 'impact' && !version.impactPreviewComputedAt && isDraft && (
-              <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-amber-400 align-middle" />
+              <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle" style={{ background: 'var(--warn-fg)' }} />
             )}
           </button>
         ))}
@@ -818,28 +815,28 @@ export function AdminRatingPlanVersionPage() {
 
       {/* Tab content */}
       {activeTab === 'schedule' && (
-        <div className="bg-white border rounded-lg p-5">
+        <div className="border rounded-lg p-5" style={{ background: 'var(--surface)' }}>
           <dl className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
             <div>
-              <dt className="text-xs font-medium text-slate-500 mb-0.5">Schedule Rating Min</dt>
-              <dd className="text-slate-800 font-mono">{(version.scheduleMin * 100).toFixed(0)}%</dd>
+              <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Schedule Rating Min</dt>
+              <dd className="font-mono" style={{ color: 'var(--ink-2)' }}>{(version.scheduleMin * 100).toFixed(0)}%</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-slate-500 mb-0.5">Schedule Rating Max</dt>
-              <dd className="text-slate-800 font-mono">{(version.scheduleMax * 100).toFixed(0)}%</dd>
+              <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Schedule Rating Max</dt>
+              <dd className="font-mono" style={{ color: 'var(--ink-2)' }}>{(version.scheduleMax * 100).toFixed(0)}%</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-slate-500 mb-0.5">Minimum Premium</dt>
-              <dd className="text-slate-800">{version.minimumPremium != null ? `$${version.minimumPremium.toLocaleString()}` : '—'}</dd>
+              <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Minimum Premium</dt>
+              <dd style={{ color: 'var(--ink-2)' }}>{version.minimumPremium != null ? `$${version.minimumPremium.toLocaleString()}` : '—'}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-slate-500 mb-0.5">Effective Date</dt>
-              <dd className="text-slate-800">{version.effectiveDate}</dd>
+              <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Effective Date</dt>
+              <dd style={{ color: 'var(--ink-2)' }}>{version.effectiveDate}</dd>
             </div>
             {version.notes && (
               <div className="col-span-2">
-                <dt className="text-xs font-medium text-slate-500 mb-0.5">Notes</dt>
-                <dd className="text-slate-700 whitespace-pre-wrap">{version.notes}</dd>
+                <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Notes</dt>
+                <dd className="whitespace-pre-wrap" style={{ color: 'var(--ink-2)' }}>{version.notes}</dd>
               </div>
             )}
           </dl>
@@ -858,8 +855,8 @@ export function AdminRatingPlanVersionPage() {
             <LoadingSpinner />
           ) : factors.length === 0 ? (
             <div className="text-center py-8 border border-dashed rounded-lg">
-              <p className="text-sm text-slate-400">No factor tables in this version.</p>
-              {isDraft && <p className="text-xs text-slate-300 mt-1">Use CSV import above or paste data into individual tables.</p>}
+              <p className="text-sm" style={{ color: 'var(--ink-4)' }}>No factor tables in this version.</p>
+              {isDraft && <p className="text-xs mt-1" style={{ color: 'var(--ink-4)' }}>Use CSV import above or paste data into individual tables.</p>}
             </div>
           ) : (
             factors.map((t) => (
@@ -876,17 +873,17 @@ export function AdminRatingPlanVersionPage() {
       )}
 
       {activeTab === 'eligibility' && (
-        <div className="bg-white border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-hidden" style={{ background: 'var(--surface)' }}>
           {eLoading ? (
             <LoadingSpinner />
           ) : eligibility.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-slate-400">No eligibility rules in this version.</p>
+              <p className="text-sm" style={{ color: 'var(--ink-4)' }}>No eligibility rules in this version.</p>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-slate-500 border-b bg-slate-50">
+                <tr className="text-left text-xs border-b" style={{ color: 'var(--ink-3)', background: 'var(--surface-2)' }}>
                   <th className="px-4 py-2 font-medium">#</th>
                   <th className="px-4 py-2 font-medium">Equipment Type</th>
                   <th className="px-4 py-2 font-medium">Status</th>
@@ -895,15 +892,15 @@ export function AdminRatingPlanVersionPage() {
               <tbody className="divide-y">
                 {eligibility.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2.5 text-slate-400 font-mono text-xs">{r.typeNumber}</td>
-                    <td className="px-4 py-2.5 text-slate-800">{r.equipmentTypeName}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs" style={{ color: 'var(--ink-4)' }}>{r.typeNumber}</td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--ink-2)' }}>{r.equipmentTypeName}</td>
                     <td className="px-4 py-2.5">
                       {r.accepted ? (
-                        <span className="flex items-center gap-1 text-emerald-700 text-xs">
+                        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--good-fg)' }}>
                           <CheckCircle className="h-3.5 w-3.5" /> Accepted
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 text-red-600 text-xs">
+                        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--bad-fg)' }}>
                           <XCircle className="h-3.5 w-3.5" /> Excluded
                         </span>
                       )}
@@ -921,34 +918,34 @@ export function AdminRatingPlanVersionPage() {
       )}
 
       {activeTab === 'audit' && (
-        <div className="bg-white border rounded-lg p-5">
+        <div className="border rounded-lg p-5" style={{ background: 'var(--surface)' }}>
           <dl className="space-y-4 text-sm">
             <div>
-              <dt className="text-xs font-medium text-slate-500 mb-0.5">Status</dt>
+              <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Status</dt>
               <dd><StatusBadge status={version.status} /></dd>
             </div>
             {version.promotedAt && (
               <>
                 <div>
-                  <dt className="text-xs font-medium text-slate-500 mb-0.5">Promoted at</dt>
-                  <dd className="text-slate-800">{new Date(version.promotedAt).toLocaleString()}</dd>
+                  <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Promoted at</dt>
+                  <dd style={{ color: 'var(--ink-2)' }}>{new Date(version.promotedAt).toLocaleString()}</dd>
                 </div>
                 {version.promotedByName && (
                   <div>
-                    <dt className="text-xs font-medium text-slate-500 mb-0.5">Promoted by</dt>
-                    <dd className="text-slate-800">{version.promotedByName}</dd>
+                    <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Promoted by</dt>
+                    <dd style={{ color: 'var(--ink-2)' }}>{version.promotedByName}</dd>
                   </div>
                 )}
               </>
             )}
             {version.impactPreviewComputedAt && (
               <div>
-                <dt className="text-xs font-medium text-slate-500 mb-0.5">Impact preview computed</dt>
-                <dd className="text-slate-800">{new Date(version.impactPreviewComputedAt).toLocaleString()}</dd>
+                <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Impact preview computed</dt>
+                <dd style={{ color: 'var(--ink-2)' }}>{new Date(version.impactPreviewComputedAt).toLocaleString()}</dd>
               </div>
             )}
             {!version.promotedAt && (
-              <p className="text-slate-400 text-xs italic">No promotion history yet.</p>
+              <p className="text-xs italic" style={{ color: 'var(--ink-4)' }}>No promotion history yet.</p>
             )}
           </dl>
         </div>

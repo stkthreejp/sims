@@ -360,6 +360,68 @@
 .sd-card-body { padding: 14px 16px; }
 .sd-card-body.tight { padding: 0; }
 
+/* Form inputs */
+.sd-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  transition: border-color .12s;
+}
+.sd-input::placeholder { color: var(--ink-4); }
+.sd-input:focus { border-color: var(--accent-light); }
+.sd-input:disabled { background: var(--surface-2); color: var(--ink-3); cursor: not-allowed; }
+.sd-input.error { border-color: var(--bad-fg); }
+.sd-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  resize: vertical;
+  transition: border-color .12s;
+}
+.sd-textarea:focus { border-color: var(--accent-light); }
+.sd-select {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0ad' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+  transition: border-color .12s;
+}
+.sd-select:focus { border-color: var(--accent-light); }
+.sd-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  margin-bottom: 4px;
+  display: block;
+}
+.sd-form-group { display: flex; flex-direction: column; gap: 4px; }
+.sd-form-error { font-size: 11px; color: var(--bad-fg); margin-top: 2px; }
+
 .sd-fields { display: flex; flex-direction: column; gap: 12px; }
 .sd-field { display: flex; flex-direction: column; gap: 2px; }
 .sd-field .lbl {

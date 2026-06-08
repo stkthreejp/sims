@@ -44,7 +44,6 @@ export function LoginPage() {
       setAuth(res.user, res.accessToken)
       navigate('/dashboard')
     } catch (err: unknown) {
-      // Ignore user-cancelled popup (BrowserAuthError with errorCode 'user_cancelled')
       const code = (err as { errorCode?: string })?.errorCode
       if (code === 'user_cancelled' || code === 'popup_window_error') return
 
@@ -59,18 +58,21 @@ export function LoginPage() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
-      <h2 className="text-lg font-semibold text-slate-900 mb-6">Sign in to your account</h2>
+    <div className="sd-card" style={{ padding: '28px 32px' }}>
+      <h2 style={{ margin: '0 0 20px', fontSize: 17, fontWeight: 600, color: 'var(--ink)' }}>
+        Sign in to your account
+      </h2>
 
       {/* Microsoft sign-in */}
       <button
         type="button"
         onClick={handleMicrosoftLogin}
         disabled={msLoading}
-        className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors mb-5"
+        className="sd-btn outline"
+        style={{ width: '100%', marginBottom: 16, height: 38 }}
       >
         {msLoading ? (
-          <span className="h-4 w-4 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" />
+          <span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--line)', borderTopColor: 'var(--ink-3)', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
         ) : (
           <MicrosoftLogo />
         )}
@@ -78,57 +80,53 @@ export function LoginPage() {
       </button>
 
       {/* Divider */}
-      <div className="relative mb-5">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-200" />
-        </div>
-        <div className="relative flex justify-center text-xs">
-          <span className="bg-white px-3 text-slate-400">or sign in with username</span>
-        </div>
+      <div style={{ position: 'relative', margin: '4px 0 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+        <span style={{ fontSize: 11.5, color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>or sign in with username</span>
+        <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
       </div>
 
       {/* Username / password form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="sd-form-group">
+          <label className="sd-label">Username</label>
           <input
             {...register('userName', { required: 'Username is required' })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`sd-input${errors.userName ? ' error' : ''}`}
             placeholder="Enter your username"
             autoComplete="username"
           />
-          {errors.userName && <p className="text-xs text-red-600 mt-1">{errors.userName.message}</p>}
+          {errors.userName && <p className="sd-form-error">{errors.userName.message}</p>}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+        <div className="sd-form-group">
+          <label className="sd-label">Password</label>
           <input
             {...register('password', { required: 'Password is required' })}
             type="password"
-            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`sd-input${errors.password ? ' error' : ''}`}
             placeholder="Enter your password"
             autoComplete="current-password"
           />
-          {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
+          {errors.password && <p className="sd-form-error">{errors.password.message}</p>}
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-md transition-colors"
+          className="sd-btn primary"
+          style={{ width: '100%', marginTop: 4, height: 38 }}
         >
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-
     </div>
   )
 }
 
-// Microsoft "four squares" logo SVG
 function MicrosoftLogo() {
   return (
-    <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+    <svg width="17" height="17" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
       <rect x="1" y="1" width="9" height="9" fill="#f25022" />
       <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
       <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />

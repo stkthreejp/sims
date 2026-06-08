@@ -20,12 +20,13 @@ function Section({ title, defaultOpen = true, children }: { title: string; defau
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
+        className="flex w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold"
+        style={{ color: 'var(--ink-2)' }}
       >
         {title}
-        {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        {open ? <ChevronDown className="h-4 w-4" style={{ color: 'var(--ink-4)' }} /> : <ChevronRight className="h-4 w-4" style={{ color: 'var(--ink-4)' }} />}
       </button>
-      {open && <div className="space-y-4 border-t border-slate-100 bg-slate-50/40 px-5 py-4">{children}</div>}
+      {open && <div className="space-y-4 border-t px-5 py-4" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>{children}</div>}
     </div>
   )
 }
@@ -34,7 +35,7 @@ function FieldRow({ label, value }: { label: string; value?: string | number | n
   return (
     <div className="min-w-0">
       <div className="sims-field-label">{label}</div>
-      <div className="break-words text-sm font-medium text-slate-800">{value ?? '-'}</div>
+      <div className="break-words text-sm font-medium" style={{ color: 'var(--ink-2)' }}>{value ?? '-'}</div>
     </div>
   )
 }
@@ -55,7 +56,7 @@ function NarrativeBlock({
   return (
     <div>
       <div className="sims-field-label">{label}</div>
-      <div className="mb-1 text-xs text-slate-500">{prompt}</div>
+      <div className="mb-1 text-xs" style={{ color: 'var(--ink-3)' }}>{prompt}</div>
       <textarea
         rows={4}
         value={value ?? ''}
@@ -82,17 +83,18 @@ function ReferralCheckbox({
   readOnly: boolean
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+    <label className="flex cursor-pointer items-center gap-2 text-sm" style={{ color: 'var(--ink-2)' }}>
       <input
         type="checkbox"
         checked={value}
         onChange={(e) => onChange(e.target.checked)}
         disabled={readOnly}
-        className="h-4 w-4 rounded border-slate-300"
+        className="h-4 w-4 rounded"
+        style={{ borderColor: 'var(--line)' }}
       />
-      <span className={value ? 'text-slate-800 font-medium' : 'text-slate-600'}>{label}</span>
+      <span style={value ? { color: 'var(--ink-2)', fontWeight: 500 } : { color: 'var(--ink-3)' }}>{label}</span>
       {autoChecked && (
-        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-amber-700">auto</span>
+        <span className="rounded px-1.5 py-0.5 text-[10.5px] font-semibold" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>auto</span>
       )}
     </label>
   )
@@ -113,7 +115,7 @@ function ShortText({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <span className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>{label}</span>
       <input
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
@@ -139,7 +141,7 @@ function NumericField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <span className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>{label}</span>
       <div className="mt-1 flex items-center gap-2">
         <input
           type="number"
@@ -148,7 +150,7 @@ function NumericField({
           readOnly={readOnly}
           className="sims-input"
         />
-        {suffix && <span className="text-sm text-slate-500">{suffix}</span>}
+        {suffix && <span className="text-sm" style={{ color: 'var(--ink-3)' }}>{suffix}</span>}
       </div>
     </label>
   )
@@ -228,10 +230,10 @@ export default function QuoteWriteupPage() {
   if (isError) {
     return (
       <div className="max-w-3xl mx-auto px-6 py-6">
-        <Link to="/submissions" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
+        <Link to="/submissions" className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--ink-3)' }}>
           <ArrowLeft className="h-4 w-4" /> Back to submissions
         </Link>
-        <div className="mt-5 rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-5 rounded-lg border p-4 text-sm" style={{ borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>
           <div className="font-semibold">Quote writeup could not be loaded.</div>
           <div className="mt-1">{getWriteupErrorMessage(error)}</div>
         </div>
@@ -241,7 +243,7 @@ export default function QuoteWriteupPage() {
 
   if (isLoading || !writeup) {
     return (
-      <div className="p-8 text-sm text-slate-400">Loading writeup…</div>
+      <div className="p-8 text-sm" style={{ color: 'var(--ink-4)' }}>Loading writeup…</div>
     )
   }
 
@@ -259,15 +261,15 @@ export default function QuoteWriteupPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link to={`/submissions`} className="text-slate-400 hover:text-slate-600">
+          <Link to={`/submissions`} style={{ color: 'var(--ink-4)' }}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <FlaskConical className="h-4 w-4 text-slate-400" />
+            <h1 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+              <FlaskConical className="h-4 w-4" style={{ color: 'var(--ink-4)' }} />
               {lobLabel} Underwriting Writeup
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs mt-0.5" style={{ color: 'var(--ink-4)' }}>
               {writeup.insuredName} · {writeup.effectiveDate}
             </p>
           </div>
@@ -294,14 +296,14 @@ export default function QuoteWriteupPage() {
             <FieldRow label="Address" value={writeup.address} />
           </div>
           {writeup.priorCarriers.length > 0 && (
-            <div className="col-span-2 space-y-1 pt-1 border-t border-slate-100">
-              <div className="text-xs text-slate-400 font-medium">Prior Carriers</div>
+            <div className="col-span-2 space-y-1 pt-1 border-t" style={{ borderColor: 'var(--line-2)' }}>
+              <div className="text-xs font-medium" style={{ color: 'var(--ink-4)' }}>Prior Carriers</div>
               {writeup.priorCarriers.map((pc, i) => (
-                <div key={i} className="text-sm text-slate-700">
+                <div key={i} className="text-sm" style={{ color: 'var(--ink-2)' }}>
                   {pc.carrierName}
-                  {pc.policyNumber && <span className="text-slate-400"> · {pc.policyNumber}</span>}
-                  {pc.expirationDate && <span className="text-slate-400"> · exp {pc.expirationDate}</span>}
-                  {pc.premiumAmount && <span className="text-slate-400"> · {fmt.format(pc.premiumAmount)}</span>}
+                  {pc.policyNumber && <span style={{ color: 'var(--ink-4)' }}> · {pc.policyNumber}</span>}
+                  {pc.expirationDate && <span style={{ color: 'var(--ink-4)' }}> · exp {pc.expirationDate}</span>}
+                  {pc.premiumAmount && <span style={{ color: 'var(--ink-4)' }}> · {fmt.format(pc.premiumAmount)}</span>}
                 </div>
               ))}
             </div>
@@ -315,7 +317,7 @@ export default function QuoteWriteupPage() {
                   onChange={(e) => patchPayload({ newVentureDocsOk: e.target.checked })}
                   disabled={isReadOnly}
                 />
-                <span className="text-slate-600">Additional new venture documents received and OK?</span>
+                <span style={{ color: 'var(--ink-3)' }}>Additional new venture documents received and OK?</span>
               </label>
             </div>
           )}
@@ -383,14 +385,14 @@ export default function QuoteWriteupPage() {
             </>
           )}
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-sm text-slate-500 shrink-0">Other:</span>
+            <span className="text-sm shrink-0" style={{ color: 'var(--ink-3)' }}>Other:</span>
             <input
               type="text"
               value={payload.referralOtherText ?? ''}
               onChange={(e) => patchPayload({ referralOtherText: e.target.value })}
               readOnly={isReadOnly}
               placeholder="Describe…"
-              className="flex-1 text-sm border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="sd-input flex-1 text-sm px-2.5 py-1.5"
             />
           </div>
         </div>
@@ -398,9 +400,9 @@ export default function QuoteWriteupPage() {
 
       {isGeneralLiability && (
         <Section title="GL Eligibility & Referral Facts">
-          <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <div className="rounded-md px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', color: 'var(--ink-2)' }}>
             Schedule credit from rater: <span className="font-semibold">{writeup.scheduleCreditPercent.toFixed(2)}%</span>
-            {writeup.scheduleModifier != null && <span className="text-slate-400"> (modifier {writeup.scheduleModifier.toFixed(2)})</span>}
+            {writeup.scheduleModifier != null && <span style={{ color: 'var(--ink-4)' }}> (modifier {writeup.scheduleModifier.toFixed(2)})</span>}
           </div>
           <div className="grid grid-cols-3 gap-3 max-[900px]:grid-cols-1">
             <NumericField label="Logging revenue" value={payload.glLoggingRevenuePercent} onChange={(v) => patchPayload({ glLoggingRevenuePercent: v })} readOnly={isReadOnly} suffix="%" />
@@ -465,9 +467,9 @@ export default function QuoteWriteupPage() {
             { label: 'Other', value: eq.countOther },
             { label: 'Total Units', value: eq.totalCount },
           ].map(({ label, value }) => (
-            <div key={label} className="bg-slate-50 rounded-lg px-3 py-2">
-              <div className="text-xs text-slate-400">{label}</div>
-              <div className="text-sm font-semibold text-slate-800 mt-0.5">{value}</div>
+            <div key={label} className="rounded-lg px-3 py-2" style={{ background: 'var(--surface-2)' }}>
+              <div className="text-xs" style={{ color: 'var(--ink-4)' }}>{label}</div>
+              <div className="text-sm font-semibold mt-0.5" style={{ color: 'var(--ink-2)' }}>{value}</div>
             </div>
           ))}
         </div>
@@ -478,7 +480,7 @@ export default function QuoteWriteupPage() {
             onChange={(e) => patchPayload({ eqValueChecked: e.target.checked })}
             disabled={isReadOnly}
           />
-          <span className="text-slate-600">Equipment values verified against appraisals / invoices</span>
+          <span style={{ color: 'var(--ink-3)' }}>Equipment values verified against appraisals / invoices</span>
         </label>
         {isAutoPhysicalDamage && (
           <>
@@ -517,7 +519,7 @@ export default function QuoteWriteupPage() {
                 onChange={(e) => patchPayload({ waterborneExposure: e.target.checked })}
                 disabled={isReadOnly}
               />
-              <span className="text-slate-600">Any waterborne exposure?</span>
+              <span style={{ color: 'var(--ink-3)' }}>Any waterborne exposure?</span>
             </label>
           )}
           {isGeneralLiability && (
@@ -531,22 +533,22 @@ export default function QuoteWriteupPage() {
             </>
           )}
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-500">Last Inspection Date</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>Last Inspection Date</label>
             <input
               type="date"
               value={payload.lastInspectionDate ?? ''}
               onChange={(e) => patchPayload({ lastInspectionDate: e.target.value })}
               readOnly={isReadOnly}
-              className="w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="sd-input w-full text-sm px-2.5 py-1.5"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-500">Website reviewed?</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>Website reviewed?</label>
             <select
               value={payload.websiteReviewed === true ? 'yes' : payload.websiteReviewed === false ? 'no' : ''}
               onChange={(e) => patchPayload({ websiteReviewed: e.target.value === 'yes' ? true : e.target.value === 'no' ? false : null })}
               disabled={isReadOnly}
-              className="w-full text-sm border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+              className="sd-input w-full text-sm px-2.5 py-1.5"
             >
               <option value="">—</option>
               <option value="yes">Yes — reviewed</option>
@@ -562,7 +564,7 @@ export default function QuoteWriteupPage() {
             disabled={isReadOnly}
             className="mt-0.5"
           />
-          <span className="text-slate-600">Recommendations outstanding from prior inspection?</span>
+          <span style={{ color: 'var(--ink-3)' }}>Recommendations outstanding from prior inspection?</span>
         </label>
         {payload.recommendationsOutstanding && (
           <textarea
@@ -571,7 +573,7 @@ export default function QuoteWriteupPage() {
             onChange={(e) => patchPayload({ recommendationsDetail: e.target.value })}
             readOnly={isReadOnly}
             placeholder="Describe recommendations…"
-            className="w-full rounded border border-slate-200 px-3 py-2 text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y"
+            className="sd-input w-full px-3 py-2 text-sm resize-y"
           />
         )}
         {payload.websiteReviewed && payload.websiteIssues !== undefined && (
@@ -581,7 +583,7 @@ export default function QuoteWriteupPage() {
             onChange={(e) => patchPayload({ websiteIssues: e.target.value })}
             readOnly={isReadOnly}
             placeholder="Note any website issues…"
-            className="w-full rounded border border-slate-200 px-3 py-2 text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y"
+            className="sd-input w-full px-3 py-2 text-sm resize-y"
           />
         )}
       </Section>
@@ -672,7 +674,7 @@ export default function QuoteWriteupPage() {
       <Section title="Conditions (if approving with conditions)">
         <div className="space-y-2">
           {conditions.length === 0 && (
-            <p className="text-sm text-slate-400 italic">No conditions added.</p>
+            <p className="text-sm italic" style={{ color: 'var(--ink-4)' }}>No conditions added.</p>
           )}
           {conditions.map((c) => (
             <div key={c.id} className="flex items-start gap-2">
@@ -682,12 +684,13 @@ export default function QuoteWriteupPage() {
                     type="text"
                     value={c.text}
                     onChange={(e) => setConditions((cs) => cs.map((x) => x.id === c.id ? { ...x, text: e.target.value } : x))}
-                    className="flex-1 text-sm border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className="sd-input flex-1 text-sm px-2.5 py-1.5"
                   />
                   <button
                     type="button"
                     onClick={() => removeCondition(c.id)}
-                    className="text-slate-300 hover:text-red-400 mt-1.5"
+                    className="mt-1.5"
+                    style={{ color: 'var(--ink-4)' }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -695,9 +698,9 @@ export default function QuoteWriteupPage() {
               ) : (
                 <div className="flex items-center gap-2 text-sm">
                   {c.satisfied
-                    ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    : <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />}
-                  <span className={c.satisfied ? 'text-slate-400 line-through' : 'text-slate-700'}>{c.text}</span>
+                    ? <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'var(--good-fg)' }} />
+                    : <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: 'var(--warn-fg)' }} />}
+                  <span style={c.satisfied ? { color: 'var(--ink-4)', textDecoration: 'line-through' } : { color: 'var(--ink-2)' }}>{c.text}</span>
                 </div>
               )}
             </div>
@@ -710,12 +713,13 @@ export default function QuoteWriteupPage() {
                 onChange={(e) => setNewConditionText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addCondition()}
                 placeholder="Add a condition…"
-                className="flex-1 text-sm border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="sd-input flex-1 text-sm px-2.5 py-1.5"
               />
               <button
                 type="button"
                 onClick={addCondition}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded text-slate-600"
+                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded"
+                style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add
@@ -744,7 +748,7 @@ export default function QuoteWriteupPage() {
           readOnly={isReadOnly}
         />
         {writeup.submittedAt && (
-          <div className="text-xs text-slate-400 pt-1">
+          <div className="text-xs pt-1" style={{ color: 'var(--ink-4)' }}>
             Submitted by {writeup.submittedByName} on {new Date(writeup.submittedAt).toLocaleDateString()}
             {writeup.approvedAt && ` · Approved by ${writeup.approvedByName} on ${new Date(writeup.approvedAt).toLocaleDateString()}`}
           </div>
@@ -753,7 +757,7 @@ export default function QuoteWriteupPage() {
 
       {/* Action bar */}
       {writeup.status === 'Draft' && (
-        <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-6 py-3 shadow-sm backdrop-blur">
+        <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t px-6 py-3 shadow-sm backdrop-blur" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
           <button
             type="button"
             onClick={() => saveMutation.mutate()}
@@ -775,7 +779,7 @@ export default function QuoteWriteupPage() {
       )}
 
       {writeup.status === 'Submitted' && (
-        <div className="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-6 py-3 shadow-sm backdrop-blur">
+        <div className="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 border-t px-6 py-3 shadow-sm backdrop-blur" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
           <button
             type="button"
             onClick={() => approveMutation.mutate()}
@@ -790,9 +794,9 @@ export default function QuoteWriteupPage() {
 
       {/* Submit decision panel */}
       {showSubmitPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.3)' }}>
           <div className="sims-modal w-full max-w-sm space-y-4 p-6">
-            <h2 className="text-base font-semibold text-slate-800">Submit Decision</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--ink-2)' }}>Submit Decision</h2>
             <div className="space-y-2">
               {(['Approve', 'ApproveWithConditions', 'ReferUp', 'Decline'] as const).map((d) => (
                 <label key={d} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -802,7 +806,8 @@ export default function QuoteWriteupPage() {
                     value={d}
                     checked={submitDecision === d}
                     onChange={() => setSubmitDecision(d)}
-                    className="h-4 w-4 border-slate-300"
+                    className="h-4 w-4"
+                    style={{ borderColor: 'var(--line)' }}
                   />
                   <span>{DECISION_LABELS[d]}</span>
                 </label>
@@ -850,14 +855,14 @@ function getWriteupErrorMessage(error: unknown) {
 
 function StatusBadge({ status, decision }: { status: UWWriteupDto['status']; decision?: string }) {
   const config = {
-    Draft: { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Draft' },
-    Submitted: { bg: 'bg-blue-100', text: 'text-blue-700', label: decision ? `Submitted · ${DECISION_LABELS[decision] ?? decision}` : 'Submitted' },
-    Approved: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Approved' },
-    Declined: { bg: 'bg-red-100', text: 'text-red-700', label: 'Declined' },
+    Draft:     { style: { background: 'var(--surface-2)', color: 'var(--ink-3)' }, label: 'Draft' },
+    Submitted: { style: { background: 'var(--surface-2)', color: 'var(--accent-ink)' }, label: decision ? `Submitted · ${DECISION_LABELS[decision] ?? decision}` : 'Submitted' },
+    Approved:  { style: { background: 'var(--good-bg)', color: 'var(--good-fg)' }, label: 'Approved' },
+    Declined:  { style: { background: 'var(--bad-bg)', color: 'var(--bad-fg)' }, label: 'Declined' },
   }[status]
 
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
+    <span className="px-2.5 py-1 rounded-full text-xs font-semibold" style={config.style}>
       {config.label}
     </span>
   )
