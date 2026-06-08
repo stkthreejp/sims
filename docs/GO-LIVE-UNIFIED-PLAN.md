@@ -37,8 +37,10 @@ For the internal UAT/staging target, SIMS is ready when **all** of the following
 3. Backend authorization passes an **ownership/entity-scope** audit on the core workflow surfaces (submissions, quotes, policies, accounting, documents, inbox).
 4. The **broken-link/placeholder list is zero**, and the High-priority UI pages (including Login) match the SIMS UI guide.
 5. At least **one full program is configured end-to-end** (program > carrier > LOB > state, rating assignment, fees, policy-number sequence, forms, checklists, UW controls, QBO/GL mapping) and a submission can go submission → quote → bind → issue against it.
-6. App + frontend are **deployed to the Azure test environment** (`sims-api-test` / `sims-frontend-test`) with App Insights, health checks, and a backup/rollback rehearsal done.
-7. CI gates on build/test/lint/audit; staging burn-in shows no open P0/P1.
+6. **Production visibility:** SMM can see the business it writes — bound/written premium and policy counts by program/carrier/LOB and period, plus the submission pipeline and renewals — for the launch program (WS9).
+7. **Loss-run capability:** claims data for at least the launch program (and a first historical load) is imported, and SIMS can generate a loss run for an insured/policy valued as of a date (WS10).
+8. App + frontend are **deployed to the Azure test environment** (`sims-api-test` / `sims-frontend-test`) with App Insights, health checks, and a backup/rollback rehearsal done.
+9. CI gates on build/test/lint/audit; staging burn-in shows no open P0/P1.
 
 ---
 
@@ -154,6 +156,25 @@ Bordereaux is a go-live blocker **only for launch carriers that require day-one 
 - [ ] **Full manual UAT script:** submission → quote → bind → issue (on the launch program), endorsement, cancellation, post-bind follow-up, accounting void approval, manager queue. → `phase-4-ui-links-workflow-qa.md`
 - [ ] Stakeholder sign-off; staging burn-in with no open P0/P1. → `go-live-plan.md`
 
+### WS9 — Production reporting / "what we write" visibility (P1)
+
+Moved into go-live scope: SMM needs to see the business it writes from day one. The Reports surface today is accounting-heavy and production-light, and three production reports are stubbed as "coming soon" (UI-LINK-003) — those become real here.
+
+- [ ] Implement the three stubbed reports with real data: **renewals-upcoming**, **bound-by-period** (bound/written premium), **hit-ratio-by-carrier**. (Resolves UI-LINK-003 in WS4.) → `ui-broken-links-tracker.md`
+- [ ] Add the core production views, all **program/carrier/LOB/state and period** scoped: written & bound premium; policy/transaction counts; submission pipeline (received → quoted → bound → declined) with **hit ratio**; renewals & expirations; UW workload. → `SIMS improvement 5.17.26.md` (Phase 9)
+- [ ] Reuse the existing Reports framework and the program-scope model so each program (Longleaf, Brace, etc.) can be viewed on its own or in aggregate.
+- [ ] Decide the **must-have day-one report set** for UAT vs. fast-follow (see §5). 
+
+### WS10 — Claims visibility & loss-run import (P1)
+
+Moved into go-live scope: SMM must be able to import claims feeds from current and prior carriers/TPAs and **produce loss runs**. Today only submission-stage loss history exists (prior loss runs keyed at intake) — there is no claims data model for the book itself.
+
+- [ ] Build a **claims data model** (claim, claimant, loss/reserve/paid amounts, status, dates, cause, link to policy/insured/program). → `SIMS improvement 5.17.26.md` (Phase 10)
+- [ ] Build a **claims import pipeline**: ingest a carrier/TPA feed (CSV/Excel to start, API later), map to the canonical claim schema, dedupe, and store **valuation-date snapshots** so a loss run can be produced as-of any date.
+- [ ] Import the **launch program's current claims** (e.g., Sedgwick for Brace/Longleaf) plus a **first historical load from prior carriers** for the legacy book. Full multi-carrier historical backfill can phase in after UAT.
+- [ ] **Loss-run generation**: produce a loss run for an insured/policy/program valued as of a date (PDF/Excel), reusing the document/export tooling — needed for renewals, broker requests, and reinsurer/treaty packages (ties to the AL re-placement projection work).
+- [ ] Decide **feed sources, formats, and historical-load approach** per carrier/TPA (see §5).
+
 ---
 
 ## 4. Reconciling overlaps & conflicts in the existing plans
@@ -179,6 +200,8 @@ These are business calls that gate the technical work; resolve early.
 4. **Cancellation accounting rules** — must midterm cancellation completion post full accounting? → WS3.
 5. **Actuarial workbook handoff** — when do AL/APD/GL rating workbooks arrive? Gates WS6 second-LOB rater.
 6. **Authority thresholds** — confirm deferral of deterministic bind/issue thresholds to post-UAT.
+7. **Claims feed sources & formats (WS10)** — which carriers/TPAs provide claims feeds, in what format (CSV/Excel/API), and how prior-carrier historical claims are obtained for the legacy book (one-time bulk load vs ongoing)? What valuation cadence?
+8. **Day-one report set (WS9)** — which production reports/views are must-have for UAT vs. fast-follow?
 
 ---
 
@@ -191,6 +214,7 @@ This project already has an agent-based review harness (`docs/ai-review/runbook.
 - **Visual consistency sweep (WS4)** — the `sims_frontend_ui_reviewer` agent can diff each High-priority page against `SIMS-UI-Guide/tokens.css` and flag off-token colors/spacing in bulk, so the human pass is just confirmation.
 - **Program-setup completeness (WS5)** — an agent can generate the orphan/incomplete Program-setup audit report and cross-check configured limits/territories against the SMM Underwriter context file, flagging mismatches per program×carrier×LOB.
 - **Bug triage (WS3)** — the `sims_qa_test_coverage_reviewer` and `sims_data_ef_reviewer` agents can confirm which backlog items are truly open vs already fixed in the uncommitted tree, and propose tests.
+- **Claims-feed mapping (WS10)** — an agent can profile each incoming carrier/TPA loss-run file and propose a field mapping to the canonical claim schema, flagging gaps and ambiguous columns. This is exactly the high-fan-out, well-bounded work agents do well, and it removes most of the manual toil from onboarding each new feed.
 - **Parallel reviewers + lead synthesizer** — run the 7 specialist reviewers read-only, then `sims_review_lead` to dedup/severity-rank into one punch list before each UAT cycle.
 
 Keep agents **read-only for audits**; apply fixes deliberately and commit to `main` per the AGENTS.md protocol.
@@ -205,8 +229,9 @@ A pragmatic ordering (dependencies, not calendar):
 2. **WS1** — config fail-closed + secret rotation. *(launch blocker)*
 3. **WS5 (one program)** + **WS6 shadow-rate** — get a single program rating correctly end-to-end. Run the security-auth agent (**WS2**) in parallel.
 4. **WS4** — broken links to zero, Login + High-priority pages aligned, route crawl. **WS3** — open bugs.
-5. **WS7** — only if the launch program needs day-one bordereaux.
-6. **WS8** — deploy to Azure test, CI/lint gates, burn-in, full UAT script, sign-off.
+5. **WS9** (production reporting) + **WS10** (claims import + loss runs) — stand these up in parallel with WS4/WS3; both are now in scope and don't block on the rating/UI work.
+6. **WS7** — only if the launch program needs day-one bordereaux.
+7. **WS8** — deploy to Azure test, CI/lint gates, burn-in, full UAT script, sign-off.
 
 Gate to "live testing" = §2 checklist fully satisfied with no open P0/P1.
 
@@ -271,10 +296,14 @@ All six tracked broken-link items remain **open** with verified locations:
 | WS6 rating | `rating-engine-plan.md`, `rating-engine-remaining-plan.md` |
 | WS7 bordereaux | `superpowers/plans/2026-05-24-phase-8-bordereaux-carrier-reporting.md`, `superpowers/plans/2026-05-25-phase-8-london-bdx-account-current.md` |
 | WS8 deploy/UAT | `go-live-plan.md`, `deployment.md`, `phase-4-ui-links-workflow-qa.md` |
-| Reconciled / historical | `SIMS improvement 5.17.26.md`, `phase-6-*`, `ai-underwriting-plan.md`, `SIMS_AI_Plan.docx`, `SMM_PolicyAdmin_*`, `SMMIMS Plan 4.11.26.docx` |
+| WS9 production reporting | `SIMS improvement 5.17.26.md` (Phase 9), `ui-broken-links-tracker.md` |
+| WS10 claims / loss runs | `SIMS improvement 5.17.26.md` (Phase 10) |
+| Reconciled / historical | `SIMS improvement 5.17.26.md` (Phases 11+), `phase-6-*`, `ai-underwriting-plan.md`, `SIMS_AI_Plan.docx`, `SMM_PolicyAdmin_*`, `SMMIMS Plan 4.11.26.docx` |
 
 ## Appendix B — Out of scope for UAT (post-launch backlog)
 
-Production reporting/dashboards (Phase 9), claims visibility (Phase 10), shared job/outbox/observability framework (Phase 11), full AI extraction + risk scoring + triage queue (AI plan Phases 1–7), FMCSA phases 2–7, compliance-doc module remaining build, document issuance automation beyond the IM pilot, and Program historical-interval versioning.
+Shared job/outbox/observability framework (Phase 11), full AI extraction + risk scoring + triage queue (AI plan Phases 1–7), FMCSA phases 2–7, compliance-doc module remaining build, document issuance automation beyond the IM pilot, and Program historical-interval versioning.
+
+> **Moved into scope (2026-06-08):** production reporting (now **WS9**) and claims visibility / loss-run import (now **WS10**) were pulled out of the post-launch backlog — SMM needs to see written business and produce loss runs (from current and prior carriers' claims feeds) for live operations.
 
 **Direct bill + electronic payments + notices/reminders** — a separate post-launch initiative (one program moving to direct bill, ePayPolicy electronic payment intake, a scheduled dunning engine, and cancellation-notice mailing with proof-of-mailing). See [`DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md`](DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md).

@@ -1,5 +1,8 @@
 # SIMS — SMM Insurance Management System
 
+## Roadmap & current priorities
+The active coordination doc is **`docs/GO-LIVE-UNIFIED-PLAN.md`** — it reconciles all prior plan docs and sequences the work to internal UAT/staging across workstreams WS0–WS10. Treat it as the source of truth for what to work on and in what order; older phase docs are reconciled into it (Appendix A) and the latest security/route audit findings are in §8. Post-launch initiatives (direct bill + electronic payments + notices/reminders) are specced in `docs/DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md`. The read-only AI review harness is in `docs/ai-review/runbook.md`.
+
 ## Stack
 - **Backend:** ASP.NET Core 8, Entity Framework Core, PostgreSQL, Azure Blob Storage
 - **Frontend:** React + TypeScript + Vite, deployed to Azure from Git
@@ -41,6 +44,7 @@ cd frontend && npm run dev
 This is a solo developer project. **Commit directly to `main`** — do not create feature branches or worktrees. Use `git push origin main` for all changes.
 After each completed scoped step, commit and push to `main` as long as only Codex-owned files for that step are staged.
 When the worktree contains unrelated changes, stage explicit files only and leave unrelated files untouched.
+Line endings are normalized to **LF** via `.gitattributes` — let git handle EOL; don't reformat files to re-introduce CRLF (this previously caused ~270-file phantom diffs). `.agents/`, `plugins/`, and `*.docx` planning docs are gitignored.
 
 ## Deployment / smoke testing
 Do not use the local frontend or local backend for normal SIMS smoke tests.
@@ -62,7 +66,7 @@ Frontend local log: `powershell -Command "Get-Content 'C:\Users\JeremiahPODonova
 - Avoid writing project files outside the SIMS workspace unless explicitly requested.
 - It is acceptable to request network access up front for package restore, npm/NuGet installs, GitHub work, documentation lookup, or dependency troubleshooting.
 
-#12-rule template
+# 10-rule template
 
 These rules apply to every task in this project unless explicitly overridden.
 Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
