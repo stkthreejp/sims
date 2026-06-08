@@ -117,7 +117,8 @@ All modules wrap Axios calls and are organized by domain. The base client (`api/
 ## Environment Variables
 
 ```bash
-VITE_API_URL=http://localhost:5000    # Backend API base URL
+# No VITE_API_URL needed — the API client uses relative /api/v1.
+# In dev, Vite proxies /api → http://localhost:5000 (see vite.config.ts).
 ```
 
 Set in `.env.local` for local development.

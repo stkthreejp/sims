@@ -94,6 +94,6 @@ The backend is not yet deployed to Azure. When ready:
 4. **Set environment variable** `ASPNETCORE_ENVIRONMENT=Production` on the App Service
 5. **Add App Service outbound IPs** to the PostgreSQL firewall (or set up VNet + private endpoint)
 6. **Remove developer IP** from PostgreSQL firewall
-7. **Point frontend** `VITE_API_URL` to the deployed API URL
+7. **Frontend API routing** — no env var needed; the client uses relative `/api/v1`. Ensure the frontend and API share a domain or sit behind a reverse proxy that routes `/api` to the backend.
 
 After this, `DefaultAzureCredential` will automatically use Managed Identity in production — no credential changes needed in code.

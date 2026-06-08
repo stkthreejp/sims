@@ -57,7 +57,7 @@ Or set up GitHub Actions / Azure DevOps pipeline for CI/CD.
 ### Option A — Azure Static Web Apps (recommended)
 1. Create Static Web App in Azure Portal
 2. Connect to GitHub repo, branch: `main`, app location: `frontend`
-3. Set environment variable: `VITE_API_URL=https://<your-api-app>.azurewebsites.net`
+3. No API URL env var needed — the frontend client uses the relative path `/api/v1`, which works when the frontend and API share a domain or are behind a reverse proxy.
 4. Azure will auto-build and deploy on push
 
 ### Option B — Azure Blob Storage + CDN
@@ -91,6 +91,5 @@ Or set up GitHub Actions / Azure DevOps pipeline for CI/CD.
 | `GeminiApi:ApiKey` | Key Vault (pending) | Google Gemini API |
 
 ### Frontend
-| Key | Description |
-|---|---|
-| `VITE_API_URL` | Backend API base URL |
+
+No frontend environment variables are required for deployment. The API client (`src/api/client.ts`) uses the relative base URL `/api/v1` — no `VITE_API_URL` is read or needed.
