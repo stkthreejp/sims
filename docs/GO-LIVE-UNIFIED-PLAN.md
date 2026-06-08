@@ -276,3 +276,5 @@ All six tracked broken-link items remain **open** with verified locations:
 ## Appendix B — Out of scope for UAT (post-launch backlog)
 
 Production reporting/dashboards (Phase 9), claims visibility (Phase 10), shared job/outbox/observability framework (Phase 11), full AI extraction + risk scoring + triage queue (AI plan Phases 1–7), FMCSA phases 2–7, compliance-doc module remaining build, document issuance automation beyond the IM pilot, and Program historical-interval versioning.
+
+**Direct bill + electronic payments + notices/reminders** — a separate post-launch initiative (one program moving to direct bill, ePayPolicy electronic payment intake, a scheduled dunning engine, and cancellation-notice mailing with proof-of-mailing). See [`DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md`](DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md).
