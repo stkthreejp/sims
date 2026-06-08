@@ -8,6 +8,45 @@ public static class StartupConfigurationValidator
 
     public static void ValidateSecurityConfiguration(this IConfiguration configuration, IHostEnvironment environment)
     {
+        ValidateJwt(configuration, environment);
+        ValidateConnectionString(configuration);
+
+        if (environment.IsDevelopment())
+            return;
+
+        // Staging / production: fail closed on every required external service.
+        ValidateNotPlaceholder(configuration, "Storage:AzureBlobConnectionString",
+            "Storage:AzureBlobConnectionString must be set in staging/production.");
+
+        ValidateNotPlaceholder(configuration, "Qbo:ClientId",
+            "Qbo:ClientId must be configured in staging/production.");
+        ValidateNotPlaceholder(configuration, "Qbo:ClientSecret",
+            "Qbo:ClientSecret must be configured in staging/production.");
+        ValidateNotPlaceholder(configuration, "Qbo:RefreshToken",
+            "Qbo:RefreshToken must be configured in staging/production.");
+        ValidateNotPlaceholder(configuration, "Qbo:RealmId",
+            "Qbo:RealmId must be configured in staging/production.");
+
+        var webhookToken = configuration["Qbo:WebhookVerifierToken"];
+        if (string.IsNullOrWhiteSpace(webhookToken) || webhookToken.Equals("PLACEHOLDER", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Qbo:WebhookVerifierToken must be set to a real secret in staging/production.");
+
+        ValidateNotPlaceholder(configuration, "GraphApi:ClientSecret",
+            "GraphApi:ClientSecret must be configured in staging/production.");
+
+        var origins = configuration.GetSection("AllowedOrigins").Get<string[]>();
+        if (origins == null || origins.Length == 0 || origins.All(o => o.Contains("localhost", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("AllowedOrigins must contain non-localhost origins in staging/production.");
+
+        var malwareProvider = configuration["Uploads:MalwareScanning:Provider"];
+        if (string.IsNullOrWhiteSpace(malwareProvider))
+            throw new InvalidOperationException(
+                "Uploads:MalwareScanning:Provider must be explicitly set in staging/production. " +
+                "Use 'ClamAV' to enable scanning, or 'NoOp' to acknowledge that uploads are not scanned.");
+    }
+
+    private static void ValidateJwt(IConfiguration configuration, IHostEnvironment environment)
+    {
         var jwtKey = configuration["Jwt:Key"];
         var issuer = configuration["Jwt:Issuer"];
         var audience = configuration["Jwt:Audience"];
@@ -35,6 +74,26 @@ public static class StartupConfigurationValidator
 
             if (forbiddenKeys.Any(k => jwtKey.Contains(k, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException("Jwt:Key is using a development placeholder and cannot be used in production.");
+        }
+    }
+
+    private static void ValidateConnectionString(IConfiguration configuration)
+    {
+        var conn = configuration.GetConnectionString("DefaultConnection");
+        if (string.IsNullOrWhiteSpace(conn) || conn.Contains("SET VIA", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "ConnectionStrings:DefaultConnection must be set via user secrets, Key Vault, or environment variable.");
+    }
+
+    private static void ValidateNotPlaceholder(IConfiguration configuration, string key, string errorMessage)
+    {
+        var value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value) ||
+            value.StartsWith("SET_VIA", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("SET VIA", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("PLACEHOLDER", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(errorMessage);
         }
     }
 }
