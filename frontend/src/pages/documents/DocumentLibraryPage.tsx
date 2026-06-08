@@ -102,8 +102,8 @@ export function DocumentLibraryPage() {
     <div>
       <PageHeader
         title="Document Library"
-        description="Manage document templates for policies, submissions, and more"
-        actions={
+        subtitle="Manage document templates for policies, submissions, and more"
+        action={
           <div className="flex gap-2">
             <label className="sd-btn">
               <Upload className="h-4 w-4" />

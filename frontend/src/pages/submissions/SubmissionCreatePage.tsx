@@ -173,7 +173,7 @@ export function SubmissionCreatePage() {
         </Link>
       )}
 
-      <PageHeader title="New Submission" description={insured ? `For ${insured.displayName}` : undefined} />
+      <PageHeader title="New Submission" subtitle={insured ? `For ${insured.displayName}` : undefined} />
 
       <form onSubmit={handleSubmit} className="bg-white border rounded-lg p-6 space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

@@ -211,7 +211,7 @@ export function UsersPage() {
 
   return (
     <div>
-      <PageHeader title="Users" description="Manage system users and roles" />
+      <PageHeader title="Users" subtitle="Manage system users and roles" />
 
       <div className="bg-white rounded-lg border border-slate-200">
         <div className="p-4 border-b border-slate-100 flex gap-3">

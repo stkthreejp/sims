@@ -751,6 +751,9 @@
 .subs-th:hover { color: var(--ink-2); }
 .subs-th.num { text-align: right; }
 .subs-th.sorted { color: var(--ink); }
+.subs-th.asc::after  { content: " ▲"; font-size: 9px; margin-left: 3px; }
+.subs-th.desc::after { content: " ▼"; font-size: 9px; margin-left: 3px; }
+.subs-th:not(.asc):not(.desc)::after { content: " ↕"; font-size: 9px; margin-left: 3px; color: var(--ink-4); }
 .subs-row { border-bottom: 1px solid var(--line-2); cursor: pointer; transition: background .1s; }
 .subs-row:hover { background: var(--hover) !important; }
 .subs-row:last-child { border-bottom: 0; }
@@ -787,6 +790,8 @@
 .sd-th { cursor: pointer; user-select: none; }
 .sd-th:hover { color: var(--ink-2); }
 .sd-th.sorted { color: var(--ink); }
+.sd-th.asc::after  { content: " ▲"; font-size: 9px; margin-left: 3px; }
+.sd-th.desc::after { content: " ▼"; font-size: 9px; margin-left: 3px; }
 
 /* ============================================================
    Sidebar nav items (Phase 2e)
@@ -806,6 +811,7 @@
 }
 .nav-item:hover { background: var(--hover); color: var(--ink); }
 .nav-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.nav-item.active:hover { background: var(--accent-soft); color: var(--accent-ink); }
 
 /* ============================================================
    Topbar logout (Phase 2e)

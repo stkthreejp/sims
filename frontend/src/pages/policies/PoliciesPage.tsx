@@ -123,18 +123,14 @@ export function PoliciesPage() {
     setPage(1)
   }
 
-  function SortIco({ k }: { k: SortKey }) {
-    if (sort.key !== k) return <span style={{ marginLeft: 4, color: 'var(--ink-4)', fontSize: 9 }}>↕</span>
-    return <span style={{ marginLeft: 4, fontSize: 9 }}>{sort.dir === 'desc' ? '▼' : '▲'}</span>
-  }
-
   function Th({ label, k, num }: { label: string; k: SortKey; num?: boolean }) {
+    const dir = sort.key === k ? sort.dir : null
     return (
       <th
-        className={'subs-th' + (sort.key === k ? ' sorted' : '') + (num ? ' num' : '')}
+        className={'subs-th' + (dir ? ` sorted ${dir}` : '') + (num ? ' num' : '')}
         onClick={() => toggleSort(k)}
       >
-        {label}<SortIco k={k} />
+        {label}
       </th>
     )
   }

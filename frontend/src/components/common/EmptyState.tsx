@@ -10,15 +10,17 @@ interface EmptyStateProps {
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
     <div
-      className="flex flex-col items-center justify-center text-center"
-      style={{ padding: '36px 16px', color: 'var(--ink-3)' }}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', textAlign: 'center',
+        padding: 'var(--s-8) var(--s-4)', color: 'var(--ink-3)',
+      }}
     >
       <div
-        className="grid place-items-center"
         style={{
-          width: 36,
-          height: 36,
-          marginBottom: 10,
+          display: 'grid', placeItems: 'center',
+          width: 36, height: 36,
+          marginBottom: 'var(--s-2)',
           borderRadius: 'var(--r-md)',
           background: 'var(--surface-2)',
           color: 'var(--ink-3)',

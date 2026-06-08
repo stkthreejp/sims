@@ -347,8 +347,8 @@ export function IntermediariesAdminPage() {
     <div className="p-6 space-y-5">
       <PageHeader
         title="Intermediaries"
-        description="Maintain broker records and effective-dated brokerage setup"
-        actions={
+        subtitle="Maintain broker records and effective-dated brokerage setup"
+        action={
           <button onClick={startCreate} className="sd-btn primary sm">
             <Plus className="h-3.5 w-3.5" /> New Intermediary
           </button>
