@@ -255,7 +255,7 @@ public class FmcsaSafetyAnalyticsService : IFmcsaSafetyAnalyticsService
             batch.RowsImported = carriersSeen.Count + measureCount;
             await analyticsDb.SaveChangesAsync(ct);
         }
-        catch (Exception ex) when (ex is HttpRequestException or DbUpdateException or JsonException)
+        catch (Exception ex) when (ex is HttpRequestException or DbUpdateException or JsonException or OperationCanceledException)
         {
             batch.Status = "Failed";
             batch.CompletedAt = DateTime.UtcNow;
