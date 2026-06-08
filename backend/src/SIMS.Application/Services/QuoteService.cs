@@ -105,7 +105,9 @@ public class QuoteService : IQuoteService
             .OrderByDescending(qt => qt.CreatedAt)
             .ToListAsync();
 
-        return quotes.Select(MapToListItemDto);
+        var dtos = quotes.Select(MapToListItemDto).ToList();
+        await PopulateBoundPolicyIdsAsync(dtos);
+        return dtos;
     }
 
     public async Task<IEnumerable<QuoteListItemDto>> GetBoundByInsuredAsync(Guid insuredId)
@@ -118,7 +120,9 @@ public class QuoteService : IQuoteService
             .OrderByDescending(qt => qt.BoundDate)
             .ToListAsync();
 
-        return quotes.Select(MapToListItemDto);
+        var dtos = quotes.Select(MapToListItemDto).ToList();
+        await PopulateBoundPolicyIdsAsync(dtos);
+        return dtos;
     }
 
     public async Task<Result<QuoteDto>> GetByIdAsync(Guid id, UserAccessScope access)
@@ -750,6 +754,24 @@ public class QuoteService : IQuoteService
         var labels = blockers.Take(3).Select(b => b.Label);
         var suffix = blockers.Count > 3 ? $" and {blockers.Count - 3} more" : "";
         return $"Resolve published underwriting control blockers before {action}: {string.Join(", ", labels)}{suffix}.";
+    }
+
+    private async Task PopulateBoundPolicyIdsAsync(List<QuoteListItemDto> dtos)
+    {
+        var quoteIds = dtos.Select(d => d.Id).ToList();
+        if (quoteIds.Count == 0) return;
+
+        var policies = await Db.Set<Policy>()
+            .Where(p => quoteIds.Contains(p.BoundQuoteId) && !p.IsDeleted)
+            .Select(p => new { p.BoundQuoteId, p.Id })
+            .ToListAsync();
+
+        var policyMap = policies.ToDictionary(p => p.BoundQuoteId, p => p.Id);
+        foreach (var dto in dtos)
+        {
+            if (policyMap.TryGetValue(dto.Id, out var policyId))
+                dto.BoundPolicyId = policyId;
+        }
     }
 
     private static QuoteListItemDto MapToListItemDto(Quote qt) => new()

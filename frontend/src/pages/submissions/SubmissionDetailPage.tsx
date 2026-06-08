@@ -1256,8 +1256,8 @@ export function SubmissionDetailPage() {
                   </div>
                 </div>
                 <div className="acts">
-                  {q.status === 'Bound' && (
-                    <Link to={`/policies/${q.id}`} className="sd-btn sm outline" onClick={(e) => e.stopPropagation()}>View Policy</Link>
+                  {q.status === 'Bound' && q.boundPolicyId && (
+                    <Link to={`/policies/${q.boundPolicyId}`} className="sd-btn sm outline" onClick={(e) => e.stopPropagation()}>View Policy</Link>
                   )}
                   {q.status !== 'Bound' && (
                     <button

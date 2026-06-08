@@ -120,7 +120,6 @@ interface DrawerProps {
 function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
   const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false)
 
-  const qbDeepLink = event.lines.some((l) => l.memo?.includes('QB')) ? '#' : null
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -233,11 +232,7 @@ function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
 
         {/* Actions */}
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {qbDeepLink ? (
-            <a href={qbDeepLink} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent-ink)', textDecoration: 'underline' }}>
-              Open QB Journal Entry ↗
-            </a>
-          ) : <div />}
+          <div />
           {event.postingStatus === 'Posted' && (
             event.canVoid ? (
               <button

@@ -82,6 +82,7 @@ public class QuoteListItemDto
     public decimal TotalPremium { get; set; }
     public bool HasCommissionOverride { get; set; }
     public DateTime CreatedAt { get; set; }
+    public Guid? BoundPolicyId { get; set; }
 }
 
 public class QuoteCreateDto

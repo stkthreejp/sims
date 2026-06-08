@@ -1346,7 +1346,8 @@ export function ReportsPage() {
             {cat.reports.map(r => (
               <button
                 key={r.id}
-                onClick={() => select(r.id, (r as any).external)}
+                onClick={() => !(r as any).soon && select(r.id, (r as any).external)}
+                disabled={(r as any).soon}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -1358,8 +1359,9 @@ export function ReportsPage() {
                   padding: '5px 10px',
                   fontSize: 12.5,
                   fontWeight: activeId === r.id ? 600 : 500,
-                  cursor: 'pointer',
+                  cursor: (r as any).soon ? 'default' : 'pointer',
                   marginBottom: 1,
+                  opacity: (r as any).soon ? 0.5 : 1,
                 }}
               >
                 {r.label}

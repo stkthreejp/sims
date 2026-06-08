@@ -227,7 +227,6 @@ export function InsuredDetailPage() {
     ['policies', 'Policies', policies.length],
     ['submissions', 'Submissions', submissions.length],
     ['documents', 'Documents', null],
-    ['activity', 'Activity', null],
   ]
 
   return (
@@ -598,15 +597,6 @@ export function InsuredDetailPage() {
           </div>
         )}
 
-        {/* ACTIVITY */}
-        {tab === 'activity' && (
-          <div className="sd-card">
-            <div className="sd-card-head"><h3>Activity</h3></div>
-            <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-              Activity log coming soon.
-            </div>
-          </div>
-        )}
       </div>
     </>
   )

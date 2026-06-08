@@ -97,6 +97,7 @@ const PeriodClosePage = lazy(() => import('@/pages/billing/PeriodClosePage').the
 const SyncHealthPage = lazy(() => import('@/pages/billing/SyncHealthPage').then((m) => ({ default: m.SyncHealthPage })))
 const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 const BordereauxWorkbenchPage = lazy(() => import('@/pages/reports/BordereauxWorkbenchPage').then((m) => ({ default: m.BordereauxWorkbenchPage })))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
 
 const PageFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -232,6 +233,7 @@ export default function App() {
               <Route path="/compliance-documentation/:id/report" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceEvidenceReportPage />)} />
               <Route path="/compliance-documentation/:id" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceDocumentDetailPage />)} />
 
+              {/* /tasks is intentionally available to all authenticated users — task queue is not role-restricted */}
               <Route path="/tasks" element={<TaskQueuePage />} />
 
               <Route path="/admin/task-types" element={withPermission(Permissions.AdminSystemManage, <TaskTypesAdminPage />)} />
@@ -269,7 +271,7 @@ export default function App() {
               <Route path="/reports/bordereaux" element={withPermission(Permissions.ReportsView, <BordereauxWorkbenchPage />)} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </ErrorBoundary>
       </BrowserRouter>

@@ -70,6 +70,7 @@ export interface QuoteListItem {
   totalPremium: number
   hasCommissionOverride: boolean
   createdAt: string
+  boundPolicyId: string | null
 }
 
 export interface CommissionOverride {

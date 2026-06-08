@@ -513,11 +513,8 @@ export function DashboardPage() {
           <Card>
             <CardHead>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Tasks</h3>
-              <CardAction>All →</CardAction>
+              <CardAction onClick={() => navigate('/tasks')}>All →</CardAction>
             </CardHead>
-            <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              Task management coming soon.
-            </div>
           </Card>
 
           {/* Pipeline funnel */}
