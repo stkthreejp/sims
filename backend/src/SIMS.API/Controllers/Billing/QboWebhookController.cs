@@ -12,6 +12,7 @@ namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
 [Route("api/v1/billing/qbo/webhook")]
+[AllowAnonymous]
 public class QboWebhookController : ControllerBase
 {
     private readonly QboSettings _settings;

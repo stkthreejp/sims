@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SIMS.Application.DTOs.UWWriteup;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 
 namespace SIMS.API.Controllers;
 
@@ -15,42 +16,51 @@ public class UWWriteupController : ControllerBase
 
     public UWWriteupController(IUWWriteupService service) => _service = service;
 
+    private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
+
     [HttpGet]
     public async Task<IActionResult> Get(Guid quoteId, CancellationToken ct)
     {
-        var userId = GetUserId();
-        var dto = await _service.GetOrCreateAsync(quoteId, userId, ct);
-        return Ok(dto);
+        try
+        {
+            var dto = await _service.GetOrCreateAsync(quoteId, CurrentUserId, CurrentAccess, ct);
+            return Ok(dto);
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
     }
 
     [HttpPut]
     public async Task<IActionResult> Save(Guid quoteId, [FromBody] SaveWriteupDto dto, CancellationToken ct)
     {
-        var result = await _service.SaveAsync(quoteId, dto, ct);
-        return Ok(result);
+        try
+        {
+            var result = await _service.SaveAsync(quoteId, dto, CurrentUserId, CurrentAccess, ct);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
     }
 
     [HttpPost("submit")]
     public async Task<IActionResult> Submit(Guid quoteId, [FromBody] SubmitWriteupDto dto, CancellationToken ct)
     {
-        var userId = GetUserId();
-        var result = await _service.SubmitAsync(quoteId, dto, userId, ct);
-        return Ok(result);
+        try
+        {
+            var result = await _service.SubmitAsync(quoteId, dto, CurrentUserId, CurrentAccess, ct);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
     }
 
     [HttpPost("approve")]
     [Authorize(Policy = AppPermissions.UnderwritingManage)]
     public async Task<IActionResult> Approve(Guid quoteId, CancellationToken ct)
     {
-        var userId = GetUserId();
-        var result = await _service.ApproveAsync(quoteId, userId, ct);
-        return Ok(result);
-    }
-
-    private Guid GetUserId()
-    {
-        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub");
-        return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
+        try
+        {
+            var result = await _service.ApproveAsync(quoteId, CurrentUserId, CurrentAccess, ct);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
     }
 }

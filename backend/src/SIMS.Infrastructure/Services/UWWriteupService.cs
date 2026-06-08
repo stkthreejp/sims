@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SIMS.Application.DTOs.UWWriteup;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 using SIMS.Domain.Entities.Rating;
@@ -26,8 +27,9 @@ public class UWWriteupService : IUWWriteupService
         _referrals = referrals;
     }
 
-    public async Task<UWWriteupDto> GetOrCreateAsync(Guid quoteId, Guid userId, CancellationToken ct = default)
+    public async Task<UWWriteupDto> GetOrCreateAsync(Guid quoteId, Guid userId, UserAccessScope access, CancellationToken ct = default)
     {
+        await AssertQuoteAccessAsync(quoteId, access, ct);
         var writeup = await _db.QuoteUWWriteups
             .Include(w => w.SubmittedBy)
             .Include(w => w.ApprovedBy)
@@ -44,8 +46,9 @@ public class UWWriteupService : IUWWriteupService
         return await BuildDtoAsync(writeup, quoteId, userId, ct);
     }
 
-    public async Task<UWWriteupDto> SaveAsync(Guid quoteId, SaveWriteupDto dto, CancellationToken ct = default)
+    public async Task<UWWriteupDto> SaveAsync(Guid quoteId, SaveWriteupDto dto, Guid userId, UserAccessScope access, CancellationToken ct = default)
     {
+        await AssertQuoteAccessAsync(quoteId, access, ct);
         var writeup = await _db.QuoteUWWriteups
             .Include(w => w.Conditions)
             .FirstOrDefaultAsync(w => w.QuoteId == quoteId && !w.IsDeleted, ct)
@@ -92,11 +95,12 @@ public class UWWriteupService : IUWWriteupService
 
         // Reload for fresh nav props
         await _db.Entry(writeup).Collection(w => w.Conditions).LoadAsync(ct);
-        return await BuildDtoAsync(writeup, quoteId, Guid.Empty, ct);
+        return await BuildDtoAsync(writeup, quoteId, userId, ct);
     }
 
-    public async Task<UWWriteupDto> SubmitAsync(Guid quoteId, SubmitWriteupDto dto, Guid userId, CancellationToken ct = default)
+    public async Task<UWWriteupDto> SubmitAsync(Guid quoteId, SubmitWriteupDto dto, Guid userId, UserAccessScope access, CancellationToken ct = default)
     {
+        await AssertQuoteAccessAsync(quoteId, access, ct);
         var writeup = await _db.QuoteUWWriteups
             .Include(w => w.Conditions)
             .FirstOrDefaultAsync(w => w.QuoteId == quoteId && !w.IsDeleted, ct)
@@ -135,8 +139,9 @@ public class UWWriteupService : IUWWriteupService
         return await BuildDtoAsync(writeup, quoteId, userId, ct);
     }
 
-    public async Task<UWWriteupDto> ApproveAsync(Guid quoteId, Guid userId, CancellationToken ct = default)
+    public async Task<UWWriteupDto> ApproveAsync(Guid quoteId, Guid userId, UserAccessScope access, CancellationToken ct = default)
     {
+        await AssertQuoteAccessAsync(quoteId, access, ct);
         var writeup = await _db.QuoteUWWriteups
             .Include(w => w.Conditions)
             .FirstOrDefaultAsync(w => w.QuoteId == quoteId && !w.IsDeleted, ct)
@@ -259,6 +264,13 @@ public class UWWriteupService : IUWWriteupService
                     SortOrder = c.SortOrder,
                 }).ToList(),
         };
+    }
+
+    private async Task AssertQuoteAccessAsync(Guid quoteId, UserAccessScope access, CancellationToken ct)
+    {
+        var accessible = await _db.Quotes.ForAccessScope(access).AnyAsync(q => q.Id == quoteId, ct);
+        if (!accessible)
+            throw new UnauthorizedAccessException(BusinessDataAccess.AccessDeniedMessage);
     }
 
     private async Task<EquipmentSummaryDto> ComputeEquipmentSummaryAsync(Guid quoteId, CancellationToken ct)

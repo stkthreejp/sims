@@ -11,6 +11,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
+[AllowAnonymous]
 public class AuthController : ControllerBase
 {
     private const string RefreshTokenCookieName = "sims-refresh";
