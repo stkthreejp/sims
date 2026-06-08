@@ -194,8 +194,8 @@ These ambiguities exist across the doc set and are resolved here so they don't c
 
 These are business calls that gate the technical work; resolve early.
 
-1. **Launch program scope** — which program(s) go live for UAT? (Recommend IM/Beazley first, then sequence.) Drives WS5, WS6, WS7.
-2. **Bordereaux day-one?** — does the launch program require bordereaux at go-live? If Brace/Longleaf is in scope, yes → WS7 becomes P1.
+1. ~~**Launch program scope**~~ **✅ DECIDED (2026-06-08):** Launch with **Lloyd's IM via Beazley (AFB 623/2623)** and **Lloyd's GL via DALE Syndicate 1729**. AL remains inactive/non-bindable. Other programs follow post-UAT.
+2. ~~**Bordereaux day-one?**~~ **✅ DECIDED (2026-06-08):** Yes — **Lloyd's GL requires BDX day one.** WS7 is P1.
 3. **Party/workflow role model** — who can manage which entities? Unblocks WS2 scoping.
 4. **Cancellation accounting rules** — must midterm cancellation completion post full accounting? → WS3.
 5. **Actuarial workbook handoff** — when do AL/APD/GL rating workbooks arrive? Gates WS6 second-LOB rater.
