@@ -59,3 +59,7 @@ backend/attachments/
 
 # Claude Code session files
 .claude/
+
+# Local agent / plugin tooling (not app code)
+.agents/
+plugins/
