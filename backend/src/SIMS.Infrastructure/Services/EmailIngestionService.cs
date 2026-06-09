@@ -44,11 +44,11 @@ public class EmailIngestionService : IEmailIngestionService
 
     public async Task IngestNewEmailsAsync(CancellationToken cancellationToken = default)
     {
-        MessageCollectionResponse? response;
+        MessageCollectionResponse? page;
 
         try
         {
-            response = await _graphClient
+            page = await _graphClient
                 .Users[_mailboxAddress]
                 .Messages
                 .GetAsync(config =>
@@ -64,23 +64,37 @@ public class EmailIngestionService : IEmailIngestionService
             return;
         }
 
-        var messages = response?.Value ?? [];
-
-        foreach (var message in messages)
+        while (page != null)
         {
-            if (message.Id == null) continue;
+            foreach (var message in page.Value ?? [])
+            {
+                if (message.Id == null) continue;
 
-            // Skip already-ingested messages (idempotency guard)
-            if (await _db.Set<InboundEmail>().AnyAsync(e => e.GraphMessageId == message.Id, cancellationToken))
-                continue;
+                if (await _db.Set<InboundEmail>().AnyAsync(e => e.GraphMessageId == message.Id, cancellationToken))
+                    continue;
+
+                try
+                {
+                    await IngestMessageAsync(message, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to ingest message {MessageId}", message.Id);
+                }
+            }
+
+            if (page.OdataNextLink == null) break;
 
             try
             {
-                await IngestMessageAsync(message, cancellationToken);
+                page = await _graphClient.Users[_mailboxAddress].Messages
+                    .WithUrl(page.OdataNextLink)
+                    .GetAsync(cancellationToken: cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to ingest message {MessageId}", message.Id);
+                _logger.LogError(ex, "Failed to fetch next page of messages for mailbox {Mailbox}", _mailboxAddress);
+                break;
             }
         }
     }
