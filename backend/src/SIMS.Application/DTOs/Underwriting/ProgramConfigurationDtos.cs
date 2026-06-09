@@ -93,3 +93,11 @@ public record UpsertProgramCarrierLobStateRequest(
 public record CopyProgramCarrierLobStateRequest(
     string SourceStateCode,
     string TargetStateCode);
+
+public record ProgramOrphanAuditDto(
+    IReadOnlyList<ProgramOrphanIssueDto> Issues);
+
+public record ProgramOrphanIssueDto(
+    string Severity,
+    string Path,
+    string Issue);

@@ -4,4 +4,5 @@ public enum UnderwritingClearanceCheckType
 {
     DuplicateSubmission = 1,
     ActivePolicyOverlap = 2,
+    AutoLiabilityNonBindable = 3,
 }

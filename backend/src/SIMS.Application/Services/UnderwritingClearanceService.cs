@@ -71,6 +71,16 @@ public class UnderwritingClearanceService : IUnderwritingClearanceService
         var lobs = ParseLinesOfBusiness(submission.LinesOfBusiness);
         var results = new List<UnderwritingClearanceResultDto>();
 
+        if (lobs.Contains(PolicyLineOfBusiness.AutoLiability))
+        {
+            results.Add(new UnderwritingClearanceResultDto
+            {
+                CheckType = UnderwritingClearanceCheckType.AutoLiabilityNonBindable,
+                Status = UnderwritingClearanceStatus.Blocked,
+                Explanation = "Auto Liability is not currently available for binding. This line of business requires manual underwriter review before it can proceed.",
+            });
+        }
+
         var duplicate = await FindDuplicateSubmissionAsync(submission, lobs, ct);
         if (duplicate != null)
         {

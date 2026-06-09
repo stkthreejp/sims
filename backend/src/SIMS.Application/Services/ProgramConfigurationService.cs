@@ -365,6 +365,67 @@ public class ProgramConfigurationService : IProgramConfigurationService
         return Result<ProgramCarrierLobStateDto>.Success(Map(copy));
     }
 
+    public async Task<ProgramOrphanAuditDto> GetOrphanAuditAsync(CancellationToken ct = default)
+    {
+        var programs = await _db.Set<ProgramConfiguration>()
+            .Include(p => p.ProgramCarriers)
+                .ThenInclude(c => c.Carrier)
+            .Include(p => p.ProgramCarriers)
+                .ThenInclude(c => c.LinesOfBusiness)
+                    .ThenInclude(l => l.States)
+            .OrderBy(p => p.Name)
+            .ToListAsync(ct);
+
+        var issues = new List<ProgramOrphanIssueDto>();
+
+        foreach (var program in programs)
+        {
+            var programPath = program.Code;
+            var activeCarriers = program.ProgramCarriers.Where(c => c.IsActive).ToList();
+
+            if (!program.ProgramCarriers.Any())
+            {
+                issues.Add(new ProgramOrphanIssueDto("error", programPath, "Program has no carriers configured."));
+                continue;
+            }
+
+            if (activeCarriers.Count == 0)
+                issues.Add(new ProgramOrphanIssueDto("warning", programPath, "Program has no active carriers."));
+
+            foreach (var carrier in program.ProgramCarriers)
+            {
+                var carrierPath = $"{programPath} / {carrier.Carrier?.Name ?? carrier.CarrierId.ToString()}";
+                var activeLobs = carrier.LinesOfBusiness.Where(l => l.IsActive).ToList();
+
+                if (!carrier.LinesOfBusiness.Any())
+                {
+                    issues.Add(new ProgramOrphanIssueDto("error", carrierPath, "Carrier has no lines of business configured."));
+                    continue;
+                }
+
+                if (activeLobs.Count == 0)
+                    issues.Add(new ProgramOrphanIssueDto("warning", carrierPath, "Carrier has no active lines of business."));
+
+                foreach (var lob in carrier.LinesOfBusiness)
+                {
+                    var lobPath = $"{carrierPath} / {GetLobLabel(lob.LineOfBusiness)}";
+                    var activeStates = lob.States.Where(s => s.IsActive).ToList();
+
+                    if (!lob.States.Any())
+                    {
+                        issues.Add(new ProgramOrphanIssueDto("error", lobPath, "Line of business has no states configured."));
+                        continue;
+                    }
+
+                    if (activeStates.Count == 0)
+                        issues.Add(new ProgramOrphanIssueDto("warning", lobPath, "Line of business has no active states."));
+                }
+            }
+        }
+
+        return new ProgramOrphanAuditDto(issues);
+    }
+
     private async Task CopyStatePolicyPackagesAsync(
         Guid programId,
         Guid programCarrierId,

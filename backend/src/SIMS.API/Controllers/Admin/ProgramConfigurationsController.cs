@@ -19,6 +19,10 @@ public class ProgramConfigurationsController : ControllerBase
     public async Task<IActionResult> Get([FromQuery] bool includeInactive = false, CancellationToken ct = default)
         => Ok(await _service.GetAsync(includeInactive, ct));
 
+    [HttpGet("orphan-audit")]
+    public async Task<IActionResult> OrphanAudit(CancellationToken ct = default)
+        => Ok(await _service.GetOrphanAuditAsync(ct));
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateProgramConfigurationRequest request, CancellationToken ct)
     {
