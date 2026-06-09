@@ -653,7 +653,7 @@ function ScanPanel({
               </thead>
               <tbody className="divide-y">
                 {runs.map((run) => (
-                  <tr key={run.id} className={run.id === selectedRunId ? 'bg-blue-50/60' : undefined}>
+                  <tr key={run.id} style={run.id === selectedRunId ? { background: 'var(--accent-soft)' } : undefined}>
                     <td className="px-3 py-2">
                       <div className="font-medium" style={{ color: 'var(--ink-2)' }}>{run.sourceName}</div>
                       <div className="text-xs" style={{ color: 'var(--ink-3)' }}>{run.sourceType}</div>

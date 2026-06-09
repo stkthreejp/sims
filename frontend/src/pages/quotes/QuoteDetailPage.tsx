@@ -434,7 +434,7 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
                     <span>{form.editionDate || '-'}</span>
                     <span className="rounded px-1.5 py-0.5 font-semibold" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>{form.formType}</span>
                     {!form.isIncluded && <span className="rounded px-1.5 py-0.5 font-semibold" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>Excluded</span>}
-                    {form.isSystemGenerated && <span className="rounded bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-700">Package</span>}
+                    {form.isSystemGenerated && <span className="rounded px-1.5 py-0.5 font-semibold" style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}>Package</span>}
                   </div>
                 </div>
                 <button
@@ -912,7 +912,7 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
                 <td className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <FileText className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--ink-4)' }} />
-                    <span className="min-w-0 cursor-pointer break-all font-medium text-sky-700 hover:text-sky-800" onClick={() => downloadMutation.mutate(a.id)}>
+                    <span className="min-w-0 cursor-pointer break-all font-medium hover:text-sky-800" style={{ color: 'var(--accent-ink)' }} onClick={() => downloadMutation.mutate(a.id)}>
                       {a.fileName}
                     </span>
                   </div>
@@ -1306,7 +1306,7 @@ export function QuoteDetailPage() {
               </span>
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--ink-3)' }}>
-              <span className="inline-flex items-center gap-1.5 rounded border border-sky-300 bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-800">
+              <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-bold" style={{ border: '1px solid var(--accent-light)', background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}>
                 {LOB_LABELS[quote.lineOfBusiness]}
                 <span className="font-normal" style={{ color: 'var(--ink-4)' }}>· locked at creation</span>
               </span>
@@ -1443,14 +1443,14 @@ export function QuoteDetailPage() {
 
         {/* Summary strip */}
         <div className="mb-5 grid grid-cols-4 gap-3 max-[900px]:grid-cols-2 max-[600px]:grid-cols-1">
-          <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-sky-600">Total premium</div>
-            <div className="text-3xl font-semibold tracking-tight text-sky-900">{fmt(ratedTotalPremium)}</div>
-            <div className="mt-2 text-xs text-sky-700">
+          <div className="rounded-xl p-4 shadow-sm" style={{ border: '1px solid var(--accent-light)', background: 'var(--accent-soft)' }}>
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>Total premium</div>
+            <div className="text-3xl font-semibold tracking-tight" style={{ color: 'var(--ink)' }}>{fmt(ratedTotalPremium)}</div>
+            <div className="mt-2 text-xs" style={{ color: 'var(--accent-ink)' }}>
               {ratingSnapshot ? (
                 <><span className="font-semibold">Rated</span> from current snapshot</>
               ) : (
-                <span className="text-sky-600/70">No rating snapshot yet</span>
+                <span style={{ color: 'var(--accent-light)' }}>No rating snapshot yet</span>
               )}
             </div>
           </div>
