@@ -55,7 +55,7 @@ public class EmailIngestionService : IEmailIngestionService
                 {
                     config.QueryParameters.Filter = "isRead eq false";
                     config.QueryParameters.Select = ["id", "from", "subject", "body", "receivedDateTime", "hasAttachments"];
-                    config.QueryParameters.Top = 50;
+                    config.QueryParameters.Top = 999;
                 }, cancellationToken);
         }
         catch (Exception ex)

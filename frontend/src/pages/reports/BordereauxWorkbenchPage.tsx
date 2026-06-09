@@ -68,10 +68,16 @@ function summarizeRows(rows: BordereauxPremiumPreviewRow[]) {
   )
 }
 
+const ERROR_CODES = new Set(['MISSING_POLICY_NUMBER', 'MISSING_INSURED_STATE'])
+
 interface ValidationSummary {
   status?: string
   errors?: number
   warnings?: number
+  missingPolicyNumberRows?: number
+  missingInsuredStateRows?: number
+  unissuedNewBusinessRows?: number
+  zeroGrossPremiumRows?: number
   missingLondonLobSetupRows?: number
   missingSurplusLinesSetupRows?: number
   items?: Array<{
@@ -105,42 +111,59 @@ function ValidationPanel({ run }: { run: BordereauxRun }) {
   const summary = parseValidationSummary(run)
   if (!summary) return null
 
-  const warningCount = summary.warnings ?? summary.items?.length ?? 0
   const errorCount = summary.errors ?? 0
-  const hasIssues = warningCount > 0 || errorCount > 0
+  const warningCount = summary.warnings ?? 0
+  const hasErrors = errorCount > 0
+  const hasIssues = errorCount > 0 || warningCount > 0
+
+  const errorItems = (summary.items ?? []).filter(item => ERROR_CODES.has(item.code ?? ''))
+  const warningItems = (summary.items ?? []).filter(item => !ERROR_CODES.has(item.code ?? ''))
+
+  const borderColor = hasErrors ? '#fca5a5' : hasIssues ? '#f59e0b' : '#bbf7d0'
+  const bgColor = hasErrors ? '#fef2f2' : hasIssues ? '#fffbeb' : '#f0fdf4'
+  const textColor = hasErrors ? '#991b1b' : hasIssues ? '#92400e' : '#166534'
 
   return (
-    <div style={{
-      border: `1px solid ${hasIssues ? '#f59e0b' : '#bbf7d0'}`,
-      borderRadius: 8,
-      background: hasIssues ? '#fffbeb' : '#f0fdf4',
-      padding: 12,
-      marginBottom: 12,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: hasIssues ? '#92400e' : '#166534', fontSize: 13, fontWeight: 750 }}>
+    <div style={{ border: `1px solid ${borderColor}`, borderRadius: 8, background: bgColor, padding: 12, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: textColor, fontSize: 13, fontWeight: 750 }}>
         {hasIssues ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
-        {hasIssues ? `${warningCount} setup warning${warningCount === 1 ? '' : 's'}` : 'No setup warnings recorded'}
+        {hasErrors
+          ? `${errorCount} blocking error${errorCount === 1 ? '' : 's'} — resolve before exporting`
+          : hasIssues
+          ? `${warningCount} warning${warningCount === 1 ? '' : 's'} — review before submitting`
+          : 'No issues recorded'}
       </div>
       {hasIssues && (
         <>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#92400e' }}>
-            <span>Missing London LOB setup: {summary.missingLondonLobSetupRows ?? 0}</span>
-            <span>Missing surplus lines setup: {summary.missingSurplusLinesSetupRows ?? 0}</span>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8, fontSize: 12 }}>
+            {(summary.missingPolicyNumberRows ?? 0) > 0 && <span style={{ color: '#991b1b', fontWeight: 600 }}>Missing policy #: {summary.missingPolicyNumberRows}</span>}
+            {(summary.missingInsuredStateRows ?? 0) > 0 && <span style={{ color: '#991b1b', fontWeight: 600 }}>Missing state: {summary.missingInsuredStateRows}</span>}
+            {(summary.unissuedNewBusinessRows ?? 0) > 0 && <span style={{ color: '#92400e' }}>Unissued NB: {summary.unissuedNewBusinessRows}</span>}
+            {(summary.zeroGrossPremiumRows ?? 0) > 0 && <span style={{ color: '#92400e' }}>$0 NB premium: {summary.zeroGrossPremiumRows}</span>}
+            {(summary.missingLondonLobSetupRows ?? 0) > 0 && <span style={{ color: '#92400e' }}>Missing London LOB setup: {summary.missingLondonLobSetupRows}</span>}
+            {(summary.missingSurplusLinesSetupRows ?? 0) > 0 && <span style={{ color: '#92400e' }}>Missing SL setup: {summary.missingSurplusLinesSetupRows}</span>}
           </div>
-          <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
-            {(summary.items ?? []).slice(0, 8).map((item, index) => (
-              <div key={`${item.code}-${item.policyNumber}-${item.transactionNumber}-${index}`} style={{ borderTop: '1px solid #fde68a', paddingTop: 6, fontSize: 12, color: '#78350f' }}>
-                <strong>{item.policyNumber ?? 'Policy'} {item.transactionNumber ? `/ ${item.transactionNumber}` : ''}</strong>
-                <span> - {item.message ?? item.code}</span>
-                <div style={{ marginTop: 2, color: '#92400e' }}>
-                  {[item.lineOfBusiness, item.insuredState, formatDate(item.reportingDate)].filter(Boolean).join(' / ')}
+          {errorItems.length > 0 && (
+            <div style={{ display: 'grid', gap: 5, marginTop: 8 }}>
+              {errorItems.slice(0, 5).map((item, i) => (
+                <div key={i} style={{ borderTop: '1px solid #fca5a5', paddingTop: 5, fontSize: 12, color: '#7f1d1d' }}>
+                  <strong>{item.policyNumber ?? '—'}</strong>{item.transactionNumber ? ` / ${item.transactionNumber}` : ''} — {item.message ?? item.code}
                 </div>
-              </div>
-            ))}
-            {(summary.items?.length ?? 0) > 8 && (
-              <div style={{ fontSize: 12, color: '#92400e' }}>{(summary.items?.length ?? 0) - 8} more warning rows in the audit JSON.</div>
-            )}
-          </div>
+              ))}
+              {errorItems.length > 5 && <div style={{ fontSize: 12, color: '#991b1b' }}>{errorItems.length - 5} more blocking errors…</div>}
+            </div>
+          )}
+          {warningItems.length > 0 && (
+            <div style={{ display: 'grid', gap: 5, marginTop: 8 }}>
+              {warningItems.slice(0, 5).map((item, i) => (
+                <div key={i} style={{ borderTop: '1px solid #fde68a', paddingTop: 5, fontSize: 12, color: '#78350f' }}>
+                  <strong>{item.policyNumber ?? '—'}</strong>{item.transactionNumber ? ` / ${item.transactionNumber}` : ''} — {item.message ?? item.code}
+                  <span style={{ color: '#92400e', marginLeft: 6 }}>{[item.lineOfBusiness, item.insuredState, formatDate(item.reportingDate)].filter(Boolean).join(' / ')}</span>
+                </div>
+              ))}
+              {warningItems.length > 5 && <div style={{ fontSize: 12, color: '#92400e' }}>{warningItems.length - 5} more warnings in the audit JSON.</div>}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -469,10 +492,32 @@ export function BordereauxWorkbenchPage() {
             {selectedRun && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <StatusPill status={selectedRun.reconciliationStatus} />
-                <button className="sd-btn outline" disabled={generatePackage.isPending} onClick={() => generatePackage.mutate(selectedRun.id)}>
-                  <FileSpreadsheet size={14} />
-                  Generate Files
-                </button>
+                {(() => {
+                  const s = parseValidationSummary(selectedRun)
+                  const hasErrors = (s?.errors ?? 0) > 0
+                  return (
+                    <>
+                      <button
+                        className="sd-btn outline"
+                        disabled={generatePackage.isPending || hasErrors}
+                        title={hasErrors ? 'Resolve blocking validation errors before generating files' : undefined}
+                        onClick={() => generatePackage.mutate(selectedRun.id)}
+                      >
+                        <FileSpreadsheet size={14} />
+                        Generate Files
+                      </button>
+                      <a
+                        href={`/api/v1/admin/bordereaux-profiles/premium-runs/${selectedRun.id}/csv`}
+                        download
+                        className="sd-btn outline"
+                        style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <Download size={14} />
+                        CSV
+                      </a>
+                    </>
+                  )
+                })()}
               </div>
             )}
           </div>

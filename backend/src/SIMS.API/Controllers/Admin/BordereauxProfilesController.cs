@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SIMS.Application.DTOs.Bordereaux;
@@ -106,6 +107,41 @@ public class BordereauxProfilesController : ControllerBase
             : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    [HttpGet("premium-runs/{runId:guid}/csv")]
+    public async Task<IActionResult> GetPremiumRunCsv(Guid runId, CancellationToken ct)
+    {
+        var result = await _service.GetRunSourceRowsAsync(runId, ct);
+        if (!result.IsSuccess)
+            return result.ErrorCode is "RUN_NOT_FOUND"
+                ? NotFound(new { result.ErrorCode, result.ErrorMessage })
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+
+        var sb = new StringBuilder();
+        sb.AppendLine("PolicyNumber,TransactionNumber,TransactionType,ReportingDate,InsuredName,InsuredState," +
+                      "LineOfBusiness,GrossPremium,GrossCommission,Fees,NetDueCarrier,InvoiceNumber,PolicyIssuanceDate");
+
+        foreach (var row in result.Value!)
+        {
+            sb.AppendLine(string.Join(",",
+                CsvEscape(row.PolicyNumber),
+                CsvEscape(row.TransactionNumber),
+                row.TransactionType,
+                row.ReportingDate.ToString("yyyy-MM-dd"),
+                CsvEscape(row.InsuredName),
+                CsvEscape(row.InsuredState),
+                row.LineOfBusiness,
+                row.GrossPremium.ToString("F2"),
+                row.GrossCommission.ToString("F2"),
+                row.Fees.ToString("F2"),
+                row.NetDueCarrier.ToString("F2"),
+                CsvEscape(row.InvoiceNumber),
+                row.PolicyIssuanceDate?.ToString("yyyy-MM-dd") ?? ""));
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+        return File(bytes, "text/csv", $"bordereaux-{runId:N}.csv");
+    }
+
     [HttpGet("premium-runs/{runId:guid}/london-bordereaux/download-url")]
     public Task<IActionResult> GetLondonBordereauxDownloadUrl(Guid runId, CancellationToken ct)
         => GetRunFileDownloadUrl(runId, BordereauxRunFileKind.LondonBordereaux, ct);
@@ -126,6 +162,14 @@ public class BordereauxProfilesController : ControllerBase
     {
         var result = await _service.UpdateProfileAsync(id, request, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    private static string CsvEscape(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+            return $"\"{value.Replace("\"", "\"\"")}\"";
+        return value;
     }
 
     private async Task<IActionResult> GetRunFileDownloadUrl(Guid runId, BordereauxRunFileKind fileKind, CancellationToken ct)

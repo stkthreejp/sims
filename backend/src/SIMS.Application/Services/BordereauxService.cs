@@ -1158,7 +1158,59 @@ public class BordereauxService : IBordereauxService
             .Where(row => ResolveSurplusLinesSetup(surplusLinesSetups, row, row.ReportingDate, profile.ProgramConfigurationId) is null)
             .ToList();
 
+        var errors = new List<object>();
         var warnings = new List<object>();
+
+        // Blocking errors — these must be resolved before the run can be exported
+        var missingPolicyNumberRows = rows.Where(r => string.IsNullOrWhiteSpace(r.PolicyNumber)).ToList();
+        errors.AddRange(missingPolicyNumberRows.Select(row => new
+        {
+            code = "MISSING_POLICY_NUMBER",
+            row.PolicyNumber,
+            row.TransactionNumber,
+            row.LineOfBusiness,
+            row.ReportingDate,
+            message = "Policy number is missing. The policy must be issued before it can appear on the bordereaux."
+        }));
+
+        var missingStateRows = rows.Where(r => string.IsNullOrWhiteSpace(r.InsuredState)).ToList();
+        errors.AddRange(missingStateRows.Select(row => new
+        {
+            code = "MISSING_INSURED_STATE",
+            row.PolicyNumber,
+            row.TransactionNumber,
+            row.LineOfBusiness,
+            row.ReportingDate,
+            message = "Insured state is missing. State is required for surplus lines tax and bordereaux reporting."
+        }));
+
+        // Warnings — should be reviewed but do not block export
+        var unissuedNbRows = rows
+            .Where(r => r.TransactionType == TransactionType.NewBusiness && r.PolicyIssuanceDate == null)
+            .ToList();
+        warnings.AddRange(unissuedNbRows.Select(row => new
+        {
+            code = "UNISSUED_POLICY_PACKET",
+            row.PolicyNumber,
+            row.TransactionNumber,
+            row.LineOfBusiness,
+            row.ReportingDate,
+            message = "New business policy has not been issued. Verify the policy packet is complete before submitting this run."
+        }));
+
+        var zeroNbPremiumRows = rows
+            .Where(r => r.TransactionType == TransactionType.NewBusiness && r.GrossPremium == 0)
+            .ToList();
+        warnings.AddRange(zeroNbPremiumRows.Select(row => new
+        {
+            code = "ZERO_GROSS_PREMIUM",
+            row.PolicyNumber,
+            row.TransactionNumber,
+            row.LineOfBusiness,
+            row.ReportingDate,
+            message = "New business row has zero gross premium. Verify the invoice is correct."
+        }));
+
         warnings.AddRange(missingLondonRows.Select(row => new
         {
             code = "MISSING_LONDON_LOB_SETUP",
@@ -1179,18 +1231,38 @@ public class BordereauxService : IBordereauxService
             message = "No active surplus lines setup matched this row's program, carrier, LOB, state, and reporting date."
         }));
 
+        var status = errors.Count > 0 ? "errors" : warnings.Count > 0 ? "warnings" : "clear";
+
         return JsonSerializer.Serialize(new
         {
-            status = warnings.Count == 0 ? "clear" : "warnings",
-            errors = 0,
+            status,
+            errors = errors.Count,
             warnings = warnings.Count,
             periodStart,
             periodEnd,
             rowCount = rows.Count,
+            missingPolicyNumberRows = missingPolicyNumberRows.Count,
+            missingInsuredStateRows = missingStateRows.Count,
+            unissuedNewBusinessRows = unissuedNbRows.Count,
+            zeroGrossPremiumRows = zeroNbPremiumRows.Count,
             missingLondonLobSetupRows = missingLondonRows.Count,
             missingSurplusLinesSetupRows = missingSurplusLinesRows.Count,
-            items = warnings,
+            items = errors.Concat(warnings).ToList(),
         }, SnapshotJsonOptions);
+    }
+
+    public async Task<Result<IReadOnlyList<BordereauxPremiumPreviewRowDto>>> GetRunSourceRowsAsync(Guid runId, CancellationToken ct = default)
+    {
+        var run = await _db.Set<BordereauxRun>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == runId, ct);
+        if (run is null)
+            return Result<IReadOnlyList<BordereauxPremiumPreviewRowDto>>.Failure("RUN_NOT_FOUND", "Bordereaux run not found.");
+        if (string.IsNullOrEmpty(run.SourceRowsSnapshotJson))
+            return Result<IReadOnlyList<BordereauxPremiumPreviewRowDto>>.Failure("NO_SNAPSHOT", "Run has no stored source rows snapshot.");
+
+        var rows = JsonSerializer.Deserialize<List<BordereauxPremiumPreviewRowDto>>(run.SourceRowsSnapshotJson, SnapshotJsonOptions);
+        return Result<IReadOnlyList<BordereauxPremiumPreviewRowDto>>.Success(rows ?? []);
     }
 
     private static string LondonTransactionCode(TransactionType transactionType, decimal grossPremium)
