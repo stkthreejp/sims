@@ -1387,8 +1387,7 @@ export function QuoteDetailPage() {
             <div className="flex flex-wrap items-center gap-3">
               <div
                 className="flex overflow-hidden rounded-md text-sm"
-                style={{ background: 'var(--surface)' }}
-                style={{ border: '1px solid var(--line)' }}
+                style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
               >
                 <button
                   type="button"

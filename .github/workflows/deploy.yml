@@ -5,7 +5,45 @@ on:
     branches: [main]
 
 jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Backend tests
+        run: |
+          dotnet test backend/tests/SIMS.Application.Tests/SIMS.Application.Tests.csproj --verbosity minimal
+          dotnet test backend/tests/SIMS.Application.Rating.Tests/SIMS.Application.Rating.Tests.csproj --verbosity minimal
+
+      - name: Frontend install
+        run: npm install
+        working-directory: frontend
+
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: frontend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+
   build-and-deploy:
+    needs: ci
     runs-on: ubuntu-latest
 
     steps:

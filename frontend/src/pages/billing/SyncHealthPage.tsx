@@ -21,7 +21,7 @@ const fmtDateTime = (s: string) =>
   new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 
 function StatusBadge({ status }: { status: RollupSummary['status'] }) {
-  const cfg: Record<string, { cls: string; icon: React.ReactNode }> = {
+  const cfg: Record<string, { cls: string; style?: React.CSSProperties; icon: React.ReactNode }> = {
     Pending:   { cls: '',  style: { background: 'var(--warn-bg)', color: 'var(--warn-fg)' },  icon: <Clock className="h-3 w-3" /> },
     Exported:  { cls: '',  style: { background: 'var(--good-bg)', color: 'var(--good-fg)' }, icon: <CheckCircle2 className="h-3 w-3" /> },
     Posted:    { cls: '',  style: { background: 'var(--surface-2)', color: 'var(--accent-ink)' }, icon: <CheckCircle2 className="h-3 w-3" /> },

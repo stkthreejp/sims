@@ -111,7 +111,7 @@ export function RolePermissionsPage() {
     <div>
       <PageHeader
         title="Role Permissions"
-        description="Control which sections and actions each role can access. Changes take effect on next login."
+        subtitle="Control which sections and actions each role can access. Changes take effect on next login."
       />
 
       <div className="admin-panel overflow-x-auto">

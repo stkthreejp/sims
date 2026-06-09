@@ -207,17 +207,17 @@ function AgingTab() {
     [aging, selected]
   )
 
-  if (isLoading || !aging) return <LoadingSpinner />
-
   const byPayee = useMemo(() => {
     const map = new Map<string, OpenPayable[]>()
-    for (const p of aging.payables) {
+    for (const p of aging?.payables ?? []) {
       const key = payeeSubledgerKey(p)
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(p)
     }
     return map
-  }, [aging.payables])
+  }, [aging?.payables])
+
+  if (isLoading || !aging) return <LoadingSpinner />
 
   const buckets = [
     { label: 'Current (0–30d)', value: aging.summary.current, border: 'var(--pill-bound-bg)', color: 'var(--pill-bound-fg)' },
