@@ -1,8 +1,67 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { FlaskConical } from 'lucide-react'
+import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
-import type { ShadowRatingResult } from '@/types/rating.types'
+import { LOB_LABELS } from '@/types/quote.types'
+import type { PolicyLineOfBusiness } from '@/types/quote.types'
+import type { ShadowRatingResult, ShadowRatingStatus } from '@/types/rating.types'
+
+const LOB_KEYS: Array<{ lob: PolicyLineOfBusiness; key: keyof ShadowRatingStatus }> = [
+  { lob: 'InlandMarine',        key: 'im' },
+  { lob: 'GeneralLiability',    key: 'gl' },
+  { lob: 'AutoLiability',       key: 'al' },
+  { lob: 'AutoPhysicalDamage',  key: 'apd' },
+]
+
+function LobToggle({ lob, lobKey, settings }: { lob: PolicyLineOfBusiness; lobKey: keyof ShadowRatingStatus; settings: ShadowRatingStatus }) {
+  const qc = useQueryClient()
+  const enabled = settings[lobKey]
+
+  const toggle = useMutation({
+    mutationFn: (val: boolean) => ratingApi.updateShadowLob(lob, val),
+    onSuccess: (updated) => {
+      qc.setQueryData(['shadow-status'], updated)
+      qc.invalidateQueries({ queryKey: ['shadow-results'] })
+      toast.success(`Shadow mode ${!enabled ? 'enabled' : 'disabled'} for ${LOB_LABELS[lob]}`)
+    },
+    onError: () => toast.error('Failed to update shadow mode'),
+  })
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '10px 14px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)',
+      background: enabled ? 'var(--accent-soft)' : 'var(--surface)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <FlaskConical size={13} style={{ color: enabled ? 'var(--accent-ink)' : 'var(--ink-4)' }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: enabled ? 'var(--accent-ink)' : 'var(--ink)' }}>
+          {LOB_LABELS[lob]}
+        </span>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: toggle.isPending ? 'not-allowed' : 'pointer' }}>
+        <span style={{ fontSize: 11, color: enabled ? 'var(--accent-ink)' : 'var(--ink-4)' }}>
+          {enabled ? 'Active' : 'Off'}
+        </span>
+        <div style={{ position: 'relative', width: 36, height: 20 }}>
+          <input type="checkbox" style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+            checked={enabled} disabled={toggle.isPending} onChange={e => toggle.mutate(e.target.checked)} />
+          <div onClick={() => !toggle.isPending && toggle.mutate(!enabled)} style={{
+            width: 36, height: 20, borderRadius: 10, cursor: toggle.isPending ? 'not-allowed' : 'pointer',
+            background: enabled ? 'var(--accent)' : 'var(--line)', opacity: toggle.isPending ? 0.5 : 1, transition: 'background 0.15s',
+          }}>
+            <div style={{
+              position: 'absolute', top: 3, left: enabled ? 19 : 3, width: 14, height: 14,
+              borderRadius: '50%', background: 'white', transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+            }} />
+          </div>
+        </div>
+      </label>
+    </div>
+  )
+}
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
@@ -38,6 +97,13 @@ export default function AdminShadowRatingPage() {
     queryKey: ['shadow-results', days],
     queryFn: () => ratingApi.getShadowResults(days),
   })
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['shadow-status'],
+    queryFn: () => ratingApi.getShadowStatus(),
+  })
+
+  const resolvedSettings: ShadowRatingStatus = data?.settings ?? settingsData ?? { gl: false, im: false, al: false, apd: false }
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100 }}>
@@ -86,6 +152,21 @@ export default function AdminShadowRatingPage() {
           </select>
         </div>
       </div>
+
+      {/* LOB toggles */}
+      <section style={{ marginBottom: 32 }}>
+        <h2 style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Enable Shadow Mode per LOB
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+          {LOB_KEYS.map(({ lob, key }) => (
+            <LobToggle key={lob} lob={lob} lobKey={key} settings={resolvedSettings} />
+          ))}
+        </div>
+        <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--ink-4)' }}>
+          Shadow mode runs the rating engine alongside the existing premium without overwriting quote values. Compare deltas until confident, then cut over.
+        </p>
+      </section>
 
       {/* Summary cards */}
       {data && (
