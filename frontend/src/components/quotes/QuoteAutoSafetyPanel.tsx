@@ -248,7 +248,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             <MapPin size={14} /> Radius Of Operations
           </div>
           {data.radiusSummary?.note && (
-            <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div className="mb-3 rounded border px-3 py-2 text-xs" style={{ borderColor: 'var(--warn-bg)', background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
               <span className="font-semibold">{data.radiusSummary.precision}:</span> {data.radiusSummary.note}
             </div>
           )}
@@ -257,8 +257,8 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
               {data.radiusSummary.precisionCounts
                 .filter((p) => p.count > 0)
                 .map((p) => (
-                  <span key={p.label} className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600">
-                    {p.label}: <span className="font-semibold text-slate-800">{p.count.toLocaleString()}</span>
+                  <span key={p.label} className="rounded border px-2 py-1" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
+                    {p.label}: <span className="font-semibold" style={{ color: 'var(--ink)' }}>{p.count.toLocaleString()}</span>
                   </span>
                 ))}
             </div>
@@ -269,18 +269,18 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
           ) : (
             <div className="grid grid-cols-5 gap-2">
               {data.radiusSummary.mapPoints.length > 0 ? data.radiusSummary.mapPoints.slice(0, 5).map((h, idx) => (
-                <div key={`${h.label}-${idx}`} className="rounded bg-slate-50 p-2">
-                  <div className="flex items-center gap-1 text-sm font-semibold text-slate-800">
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-200 text-[10px] text-slate-700">{idx + 1}</span>
+                <div key={`${h.label}-${idx}`} className="rounded p-2" style={{ background: 'var(--surface-2)' }}>
+                  <div className="flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                    <span className="grid h-5 w-5 place-items-center rounded-full text-[10px]" style={{ background: 'var(--line)', color: 'var(--ink-2)' }}>{idx + 1}</span>
                     <span className="truncate">{h.label}</span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">{h.inspectionCount} insp - {h.outOfServiceCount} OOS</div>
-                  <div className="mt-0.5 text-[11px] text-slate-400">{h.precision}</div>
+                  <div className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>{h.inspectionCount} insp - {h.outOfServiceCount} OOS</div>
+                  <div className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-4)' }}>{h.precision}</div>
                 </div>
               )) : data.geographicHotspots.map((h) => (
-                <div key={h.state} className="rounded bg-slate-50 p-2">
-                  <div className="text-sm font-semibold text-slate-800">{h.state}</div>
-                  <div className="text-xs text-slate-500">{h.inspectionCount} insp - {h.violationCount} viol</div>
+                <div key={h.state} className="rounded p-2" style={{ background: 'var(--surface-2)' }}>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{h.state}</div>
+                  <div className="text-xs" style={{ color: 'var(--ink-3)' }}>{h.inspectionCount} insp - {h.violationCount} viol</div>
                 </div>
               ))}
             </div>
@@ -289,11 +289,12 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             {(data.radiusSummary?.bands ?? []).map((band) => (
               <div
                 key={band.label}
-                className="rounded bg-slate-50 px-2 py-2 text-center"
+                className="rounded px-2 py-2 text-center"
+                style={{ background: 'var(--surface-2)' }}
               >
-                <div className="font-semibold text-slate-700">{band.label}</div>
-                <div className="mt-1 text-slate-500">{band.inspectionCount.toLocaleString()} insp</div>
-                {band.outOfServiceCount > 0 && <div className="mt-0.5 text-red-600">{band.outOfServiceCount.toLocaleString()} OOS</div>}
+                <div className="font-semibold" style={{ color: 'var(--ink-2)' }}>{band.label}</div>
+                <div className="mt-1" style={{ color: 'var(--ink-3)' }}>{band.inspectionCount.toLocaleString()} insp</div>
+                {band.outOfServiceCount > 0 && <div className="mt-0.5" style={{ color: 'var(--bad-fg)' }}>{band.outOfServiceCount.toLocaleString()} OOS</div>}
               </div>
             ))}
           </div>
@@ -384,7 +385,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
 function SnapshotHistoryList({ history }: { history: AutoSafetySnapshotHistory[] }) {
   if (history.length === 0) {
     return (
-      <div className="mt-3 rounded bg-slate-50 p-3 text-xs text-slate-500">
+      <div className="mt-3 rounded p-3 text-xs" style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
         Historical snapshots will appear as monthly FMCSA jobs accumulate records.
       </div>
     )
@@ -397,16 +398,16 @@ function SnapshotHistoryList({ history }: { history: AutoSafetySnapshotHistory[]
           .filter((b) => b.percentile != null || b.measure != null || b.eventCount > 0 || b.outOfServiceCount > 0)
           .slice(0, 2)
         return (
-          <div key={snapshot.snapshotMonth} className="rounded border border-slate-200 bg-slate-50 p-2">
+          <div key={snapshot.snapshotMonth} className="rounded border p-2" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-slate-800">{snapshot.snapshotMonth}</div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>{snapshot.snapshotMonth}</div>
+              <div className="text-[11px]" style={{ color: 'var(--ink-3)' }}>
                 {snapshot.powerUnits == null ? '-' : `${snapshot.powerUnits.toLocaleString()} PU`}
                 {snapshot.driverCount == null ? '' : ` | ${snapshot.driverCount.toLocaleString()} drv`}
               </div>
             </div>
             {snapshot.mileage != null && (
-              <div className="mt-1 text-[11px] text-slate-500">
+              <div className="mt-1 text-[11px]" style={{ color: 'var(--ink-3)' }}>
                 Mileage {snapshot.mileage.toLocaleString()}{snapshot.mileageYear ? ` (${snapshot.mileageYear})` : ''}
               </div>
             )}
@@ -414,15 +415,15 @@ function SnapshotHistoryList({ history }: { history: AutoSafetySnapshotHistory[]
               <div className="mt-1 space-y-1">
                 {topBasics.map((basic) => (
                   <div key={basic.basic} className="flex items-center justify-between gap-2 text-[11px]">
-                    <span className="truncate text-slate-600">{basic.basic}</span>
-                    <span className={basic.isPrioritized || (basic.percentile ?? 0) >= 75 ? 'font-semibold text-red-600' : 'text-slate-500'}>
+                    <span className="truncate" style={{ color: 'var(--ink-3)' }}>{basic.basic}</span>
+                    <span style={basic.isPrioritized || (basic.percentile ?? 0) >= 75 ? { fontWeight: 600, color: 'var(--bad-fg)' } : { color: 'var(--ink-3)' }}>
                       {basic.percentile == null ? `M ${basic.measure ?? '-'}` : `${Math.round(basic.percentile)}%`}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="mt-1 text-[11px] text-slate-400">Carrier snapshot only</div>
+              <div className="mt-1 text-[11px]" style={{ color: 'var(--ink-4)' }}>Carrier snapshot only</div>
             )}
           </div>
         )
@@ -588,13 +589,13 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
   }
 
   return (
-    <div className="mb-3 overflow-hidden rounded border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs text-slate-600">
-          <span className="font-semibold text-slate-800">{radiusMiles.toLocaleString()} mi radius</span>
+    <div className="mb-3 overflow-hidden rounded border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
+        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--ink-3)' }}>
+          <span className="font-semibold" style={{ color: 'var(--ink)' }}>{radiusMiles.toLocaleString()} mi radius</span>
           <span>{radiusSummary.points.toLocaleString()} points inside</span>
           <span>{radiusSummary.inspections.toLocaleString()} insp inside</span>
-          <span className={radiusSummary.oos > 0 ? 'text-red-600' : 'text-slate-500'}>{radiusSummary.oos.toLocaleString()} OOS</span>
+          <span style={{ color: radiusSummary.oos > 0 ? 'var(--bad-fg)' : 'var(--ink-3)' }}>{radiusSummary.oos.toLocaleString()} OOS</span>
         </div>
         <div className="flex items-center gap-1">
           {[50, 100, 250].map((value) => (
@@ -617,28 +618,28 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
             className="sims-input text-right"
             style={{ width: 64, height: 28 }}
           />
-          <span className="text-xs text-slate-500">mi</span>
+          <span className="text-xs" style={{ color: 'var(--ink-3)' }}>mi</span>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-3 py-2 text-[11px] text-slate-500">
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> Insured base</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Inspection point</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> OOS activity</span>
+      <div className="flex flex-wrap items-center gap-3 border-b px-3 py-2 text-[11px]" style={{ borderColor: 'var(--line-2)', color: 'var(--ink-3)' }}>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: 'var(--accent)' }} /> Insured base</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: 'var(--good-fg)' }} /> Inspection point</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: 'var(--bad-fg)' }} /> OOS activity</span>
         {summary.precisionCounts
           .filter((p) => p.count > 0)
           .slice(0, 4)
           .map((p) => (
-            <span key={p.label} className="rounded bg-slate-50 px-1.5 py-0.5">
+            <span key={p.label} className="rounded px-1.5 py-0.5" style={{ background: 'var(--surface-2)' }}>
               {p.label}: {p.count.toLocaleString()}
             </span>
           ))}
       </div>
       {mapError ? (
-        <div className="p-3 text-xs text-amber-700">{mapError}</div>
+        <div className="p-3 text-xs" style={{ color: 'var(--warn-fg)' }}>{mapError}</div>
       ) : (
         <div ref={mapRef} className="h-[300px] w-full" />
       )}
-      <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
+      <div className="border-t px-3 py-2 text-[11px]" style={{ borderColor: 'var(--line-2)', color: 'var(--ink-3)' }}>
         Drag the circle edge to resize. Marker size follows inspection count. County/state points are directional when exact inspection coordinates are not available.
       </div>
     </div>
@@ -647,13 +648,13 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
 
 function OosMetric({ label, count, oosCount, rate, nationalAverage, onClick }: { label: string; count: number; oosCount: number; rate: number | null; nationalAverage: number | null; onClick?: () => void }) {
   const difference = rate == null || nationalAverage == null ? null : Math.round((rate - nationalAverage) * 100) / 100
-  const differenceClass = difference == null
-    ? 'text-slate-400'
+  const differenceColor: string = difference == null
+    ? 'var(--ink-4)'
     : difference > 0
-      ? 'text-red-600'
+      ? 'var(--bad-fg)'
       : difference < 0
-        ? 'text-emerald-600'
-        : 'text-slate-500'
+        ? 'var(--good-fg)'
+        : 'var(--ink-3)'
 
   return (
     <button type="button" onClick={onClick} className="text-left" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', padding: 8 }}>
@@ -662,7 +663,7 @@ function OosMetric({ label, count, oosCount, rate, nationalAverage, onClick }: {
       <div style={{ marginTop: 4, color: 'var(--ink-3)', fontSize: 'var(--fs-sm)' }}>{oosCount.toLocaleString()} OOS / {count.toLocaleString()} insp</div>
       <div style={{ marginTop: 4, color: 'var(--ink-4)', fontSize: 'var(--fs-xs)' }}>
         Natl {nationalAverage == null ? '-' : `${nationalAverage}%`}
-        {difference != null && <span className={`ml-1 ${differenceClass}`}>{difference > 0 ? '+' : ''}{difference}%</span>}
+        {difference != null && <span className="ml-1" style={{ color: differenceColor }}>{difference > 0 ? '+' : ''}{difference}%</span>}
       </div>
     </button>
   )
@@ -672,9 +673,9 @@ function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
   const status = iss?.status ?? 'Unknown'
   const recommendation = iss?.label?.replace(' estimate', '') ?? 'Pending'
   const lights = [
-    { key: 'Red', className: status === 'Red' ? 'bg-red-500' : 'bg-slate-200' },
-    { key: 'Yellow', className: status === 'Yellow' ? 'bg-amber-400' : 'bg-slate-200' },
-    { key: 'Green', className: status === 'Green' ? 'bg-emerald-500' : 'bg-slate-200' },
+    { key: 'Red', activeColor: 'var(--bad-fg)' },
+    { key: 'Yellow', activeColor: 'var(--warn-fg)' },
+    { key: 'Green', activeColor: 'var(--good-fg)' },
   ]
   return (
     <div className="sd-card" style={{ padding: 12 }}>
@@ -686,7 +687,7 @@ function IssStoplight({ iss }: { iss?: AutoSafetyIss }) {
           </div>
         </div>
         <div className="flex h-12 w-7 flex-col items-center justify-center gap-1" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)' }}>
-          {lights.map((light) => <span key={light.key} className={`h-2.5 w-2.5 rounded-full ${light.className}`} />)}
+          {lights.map((light) => <span key={light.key} className="h-2.5 w-2.5 rounded-full" style={{ background: status === light.key ? light.activeColor : 'var(--line)' }} />)}
         </div>
       </div>
       <div className="mt-1 truncate" style={{ color: 'var(--ink-3)', fontSize: 'var(--fs-xs)' }} title={iss?.explanation ?? iss?.source ?? 'Pending ISS source'}>
@@ -702,43 +703,43 @@ function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; 
   const confidence = getBasicConfidenceLabel(basic)
   const dialValue = risk.value
   const color = risk.color === 'red' ? '#dc2626' : risk.color === 'yellow' ? '#d97706' : risk.color === 'green' ? '#059669' : '#94a3b8'
-  const bgColor = risk.color === 'red' ? 'bg-red-50' : risk.color === 'yellow' ? 'bg-amber-50' : risk.color === 'green' ? 'bg-emerald-50' : 'bg-slate-50'
-  const textColor = risk.color === 'red' ? 'text-red-700' : risk.color === 'yellow' ? 'text-amber-700' : risk.color === 'green' ? 'text-emerald-700' : 'text-slate-500'
+  const dialBg = risk.color === 'red' ? 'var(--bad-bg)' : risk.color === 'yellow' ? 'var(--warn-bg)' : risk.color === 'green' ? 'var(--good-bg)' : 'var(--surface-2)'
+  const statusColor = risk.color === 'red' ? 'var(--bad-fg)' : risk.color === 'yellow' ? 'var(--warn-fg)' : risk.color === 'green' ? 'var(--good-fg)' : 'var(--ink-3)'
   const dash = `${Math.max(0, Math.min(100, dialValue))}, 100`
 
   return (
     <button type="button" onClick={onClick} className="min-w-0 p-3 text-left hover:bg-slate-50">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-xs font-semibold text-slate-700" title={basic.basic}>{basic.basic}</div>
+          <div className="truncate text-xs font-semibold" style={{ color: 'var(--ink-2)' }} title={basic.basic}>{basic.basic}</div>
           <div className="mt-1 flex flex-wrap gap-1">
-            <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${source.className}`}>
+            <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${source.className}`} style={source.style}>
               {source.label}
             </span>
-            <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${confidence.className}`} title={confidence.title}>
+            <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${confidence.className}`} style={confidence.style} title={confidence.title}>
               {confidence.label}
             </span>
           </div>
         </div>
-        <div className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${bgColor}`}>
+        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: dialBg }}>
           <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
             <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e2e8f0" strokeWidth="4" />
             <circle cx="18" cy="18" r="15.5" fill="none" stroke={color} strokeWidth="4" strokeDasharray={dash} pathLength="100" strokeLinecap="round" />
           </svg>
-          <span className={`absolute text-[10px] font-bold ${textColor}`}>{risk.label}</span>
+          <span className="absolute text-[10px] font-bold" style={{ color: statusColor }}>{risk.label}</span>
         </div>
       </div>
       <div className="mt-2 flex items-center gap-1 text-xs">
-        {risk.color === 'red' ? <XCircle className="h-3.5 w-3.5 text-red-600" /> : <CheckCircle2 className={`h-3.5 w-3.5 ${risk.color === 'yellow' ? 'text-amber-600' : 'text-emerald-600'}`} />}
-        <span className={textColor}>{risk.status}</span>
+        {risk.color === 'red' ? <XCircle className="h-3.5 w-3.5" style={{ color: 'var(--bad-fg)' }} /> : <CheckCircle2 className="h-3.5 w-3.5" style={{ color: risk.color === 'yellow' ? 'var(--warn-fg)' : 'var(--good-fg)' }} />}
+        <span style={{ color: statusColor }}>{risk.status}</span>
       </div>
-      <div className="mt-1 text-xs text-slate-500">
+      <div className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>
         {basic.measure == null ? 'Measure -' : `Measure ${basic.measure}`}
         {basic.percentile == null ? '' : ` | ${basic.percentile}%`}
       </div>
-      <div className="mt-1 text-xs text-slate-500">{basic.eventCount} events{basic.outOfServiceCount > 0 ? ` | ${basic.outOfServiceCount} OOS` : ''}</div>
+      <div className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>{basic.eventCount} events{basic.outOfServiceCount > 0 ? ` | ${basic.outOfServiceCount} OOS` : ''}</div>
       {(basic.recentEventCount > 0 || basic.recentOutOfServiceCount > 0) && (
-        <div className="mt-1 text-[11px] text-slate-400">
+        <div className="mt-1 text-[11px]" style={{ color: 'var(--ink-4)' }}>
           12 mo: {basic.recentEventCount} events{basic.recentOutOfServiceCount > 0 ? ` | ${basic.recentOutOfServiceCount} OOS` : ''}
         </div>
       )}
@@ -746,29 +747,31 @@ function BasicKpiTile({ basic, powerUnits, onClick }: { basic: AutoSafetyBasic; 
   )
 }
 
-function getBasicSourceLabel(source: string): { label: string; className: string } {
+function getBasicSourceLabel(source: string): { label: string; className: string; style: CSSProperties } {
   if (source === 'Official SMS' || source === 'Official SMS measure') {
-    return { label: 'Official', className: 'border-blue-200 bg-blue-50 text-blue-700' }
+    return { label: 'Official', className: '', style: { borderColor: 'var(--accent-light)', background: 'var(--accent-soft)', color: 'var(--accent-ink)' } }
   }
   if (source === 'SIMS peer percentile') {
-    return { label: 'SIMS peer', className: 'border-violet-200 bg-violet-50 text-violet-700' }
+    return { label: 'SIMS peer', className: 'border-violet-200 bg-violet-50 text-violet-700', style: {} }
   }
-  return { label: 'SIMS signal', className: 'border-slate-200 bg-slate-50 text-slate-600' }
+  return { label: 'SIMS signal', className: '', style: { borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' } }
 }
 
-function getBasicConfidenceLabel(basic: AutoSafetyBasic): { label: string; title: string; className: string } {
+function getBasicConfidenceLabel(basic: AutoSafetyBasic): { label: string; title: string; className: string; style: CSSProperties } {
   if (basic.scoreSource === 'Official SMS' && basic.percentile != null) {
     return {
       label: 'High conf',
       title: 'Official SMS percentile is available for this BASIC.',
-      className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      className: '',
+      style: { borderColor: 'var(--good-fg)', background: 'var(--good-bg)', color: 'var(--good-fg)' },
     }
   }
   if (basic.scoreSource === 'Official SMS' || basic.scoreSource === 'Official SMS measure') {
     return {
       label: 'Med conf',
       title: 'Official SMS measure is available, but percentile is not public.',
-      className: 'border-sky-200 bg-sky-50 text-sky-700',
+      className: '',
+      style: { borderColor: 'var(--accent-light)', background: 'var(--accent-soft)', color: 'var(--accent-ink)' },
     }
   }
   if (basic.scoreSource === 'SIMS peer percentile') {
@@ -776,12 +779,14 @@ function getBasicConfidenceLabel(basic: AutoSafetyBasic): { label: string; title
       label: 'Med conf',
       title: 'SIMS percentile is estimated from the imported peer dataset.',
       className: 'border-violet-200 bg-violet-50 text-violet-700',
+      style: {},
     }
   }
   return {
     label: 'Directional',
     title: 'SIMS signal is based on imported inspections, violations, crashes, and recent OOS activity.',
-    className: 'border-amber-200 bg-amber-50 text-amber-700',
+    className: '',
+    style: { borderColor: 'var(--warn-bg)', background: 'var(--warn-bg)', color: 'var(--warn-fg)' },
   }
 }
 
@@ -837,15 +842,15 @@ function TrendChart({
   const max = Math.max(1, ...buckets.map((b) => b.totalCount))
 
   return (
-    <div className="rounded border bg-white p-3">
+    <div className="rounded border p-3" style={{ background: 'var(--surface)' }}>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="text-xs font-semibold uppercase text-slate-600">{title}</div>
-        <div className="flex items-center gap-3 text-[11px] text-slate-500">
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-red-500" />{oosLabel}</span>
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-emerald-500" />{totalLabel}</span>
+        <div className="text-xs font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>{title}</div>
+        <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--ink-3)' }}>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm" style={{ background: 'var(--bad-fg)' }} />{oosLabel}</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm" style={{ background: 'var(--good-fg)' }} />{totalLabel}</span>
         </div>
       </div>
-      <div className="grid h-36 grid-cols-6 items-end gap-2 border-b border-slate-200 px-1 pb-2">
+      <div className="grid h-36 grid-cols-6 items-end gap-2 border-b px-1 pb-2" style={{ borderColor: 'var(--line)' }}>
         {buckets.map((bucket) => {
           const totalHeight = Math.max(6, Math.round((bucket.totalCount / max) * 112))
           const oosHeight = bucket.outOfServiceCount === 0 ? 0 : Math.max(4, Math.round((bucket.outOfServiceCount / max) * 112))
@@ -857,17 +862,17 @@ function TrendChart({
               className="group flex h-32 flex-col justify-end rounded px-1 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
               title={`${bucket.label} months ago: ${bucket.outOfServiceCount} OOS / ${bucket.totalCount} total`}
             >
-              <div className="relative mx-auto w-full max-w-9 rounded-t bg-emerald-500/80 transition group-hover:bg-emerald-600" style={{ height: `${totalHeight}px` }}>
-                {oosHeight > 0 && <div className="absolute bottom-0 left-0 right-0 rounded-t bg-red-500" style={{ height: `${oosHeight}px` }} />}
+              <div className="relative mx-auto w-full max-w-9 rounded-t transition group-hover:bg-emerald-600" style={{ height: `${totalHeight}px`, background: 'var(--good-fg)' }}>
+                {oosHeight > 0 && <div className="absolute bottom-0 left-0 right-0 rounded-t" style={{ height: `${oosHeight}px`, background: 'var(--bad-fg)' }} />}
               </div>
             </button>
           )
         })}
       </div>
-      <div className="mt-2 grid grid-cols-6 gap-2 text-center text-[11px] text-slate-500">
+      <div className="mt-2 grid grid-cols-6 gap-2 text-center text-[11px]" style={{ color: 'var(--ink-3)' }}>
         {buckets.map((bucket) => (
           <button key={bucket.label} type="button" onClick={() => onBucketClick(bucket)} className="rounded px-1 py-1 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200">
-            <div className="font-medium text-slate-600">{bucket.label}</div>
+            <div className="font-medium" style={{ color: 'var(--ink-2)' }}>{bucket.label}</div>
             <div>{bucket.outOfServiceCount}/{bucket.totalCount}</div>
             <div>{bucket.outOfServiceRate == null ? '-' : `${bucket.outOfServiceRate}%`}</div>
           </button>
@@ -879,12 +884,12 @@ function TrendChart({
 
 function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: string; items: AutoSafetyDetail[]; isLoading: boolean; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end bg-slate-900/20 p-4">
-      <div className="mt-16 max-h-[72vh] w-full max-w-3xl overflow-y-auto rounded border border-slate-200 bg-white shadow-xl">
-        <div className="sticky top-0 flex items-center justify-between border-b bg-white px-4 py-3">
+    <div className="fixed inset-0 z-50 flex items-start justify-end p-4" style={{ background: 'rgba(12,17,28,0.20)' }}>
+      <div className="mt-16 max-h-[72vh] w-full max-w-3xl overflow-y-auto rounded border shadow-xl" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+        <div className="sticky top-0 flex items-center justify-between border-b px-4 py-3" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-            <p className="mt-1 text-xs text-slate-500">{isLoading ? 'Loading details...' : `${items.length} FMCSA event${items.length === 1 ? '' : 's'}`}</p>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{title}</h3>
+            <p className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>{isLoading ? 'Loading details...' : `${items.length} FMCSA event${items.length === 1 ? '' : 's'}`}</p>
           </div>
           <button type="button" onClick={onClose} className="sims-icon-btn">
             <X className="h-4 w-4" />
@@ -892,9 +897,9 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
         </div>
 
         {isLoading ? (
-          <div className="p-5 text-sm text-slate-500">Loading event details...</div>
+          <div className="p-5 text-sm" style={{ color: 'var(--ink-3)' }}>Loading event details...</div>
         ) : items.length === 0 ? (
-          <div className="p-5 text-sm text-slate-500">No matching FMCSA events found.</div>
+          <div className="p-5 text-sm" style={{ color: 'var(--ink-3)' }}>No matching FMCSA events found.</div>
         ) : (
           <div className="divide-y">
             {items.map((item, idx) => (
@@ -902,16 +907,16 @@ function AutoSafetyDetailDrawer({ title, items, isLoading, onClose }: { title: s
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-slate-800">{item.category}</span>
-                      {item.isOutOfService && <span className="rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">OOS</span>}
-                      {item.isDriverDisqualifying && <span className="rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">Driver disq</span>}
-                      {item.basic && <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{item.basic}</span>}
+                      <span className="font-semibold" style={{ color: 'var(--ink)' }}>{item.category}</span>
+                      {item.isOutOfService && <span className="rounded border px-1.5 py-0.5 text-[11px] font-semibold" style={{ borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>OOS</span>}
+                      {item.isDriverDisqualifying && <span className="rounded border px-1.5 py-0.5 text-[11px] font-semibold" style={{ borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>Driver disq</span>}
+                      {item.basic && <span className="rounded border px-1.5 py-0.5 text-[11px] font-medium" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }}>{item.basic}</span>}
                     </div>
-                    <div className="mt-0.5 text-xs text-slate-500">{formatDate(item.date)} · Report {item.reportNumber} · {item.source}</div>
+                    <div className="mt-0.5 text-xs" style={{ color: 'var(--ink-3)' }}>{formatDate(item.date)} · Report {item.reportNumber} · {item.source}</div>
                   </div>
-                  <div className="text-xs font-medium text-slate-500">{[item.city, item.state].filter(Boolean).join(', ') || '-'}</div>
+                  <div className="text-xs font-medium" style={{ color: 'var(--ink-3)' }}>{[item.city, item.state].filter(Boolean).join(', ') || '-'}</div>
                 </div>
-                <div className="mt-2 rounded border border-slate-100 bg-white px-3 py-2 text-slate-700">{item.description}</div>
+                <div className="mt-2 rounded border px-3 py-2" style={{ borderColor: 'var(--line-2)', background: 'var(--surface)', color: 'var(--ink-2)' }}>{item.description}</div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   {(item.violationCode || item.violationGroup || item.unitNumber || item.severityWeight != null || item.oosWeight != null) && (
                     <DetailSection
@@ -952,13 +957,13 @@ function DetailSection({ title, items, wide = false }: { title: string; items: A
   const visible = items.filter(([, value]) => !!value)
   if (visible.length === 0) return null
   return (
-    <div className={`rounded border border-slate-100 bg-slate-50/70 px-3 py-2 ${wide ? 'col-span-2' : ''}`}>
-      <div className="mb-1.5 text-[11px] font-semibold uppercase text-slate-500">{title}</div>
+    <div className={`rounded border px-3 py-2 ${wide ? 'col-span-2' : ''}`} style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
+      <div className="mb-1.5 text-[11px] font-semibold uppercase" style={{ color: 'var(--ink-3)' }}>{title}</div>
       <div className="space-y-1">
         {visible.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[96px_1fr] gap-2 text-xs">
-            <span className="text-slate-400">{label}</span>
-            <span className="font-medium text-slate-700">{value}</span>
+            <span style={{ color: 'var(--ink-4)' }}>{label}</span>
+            <span className="font-medium" style={{ color: 'var(--ink-2)' }}>{value}</span>
           </div>
         ))}
       </div>

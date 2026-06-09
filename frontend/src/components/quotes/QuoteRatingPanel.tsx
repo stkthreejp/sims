@@ -199,23 +199,23 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
                 if (!e.equipmentTypeId) missing.push('type')
                 if (!e.value) missing.push('value')
                 return (
-                  <tr key={e.id} className={missing.length ? 'bg-amber-50' : ''}>
-                    <td className="px-4 py-2 text-slate-500">{e.itemNumber}</td>
-                    <td className="px-4 py-2">{type?.name ?? <span className="text-amber-700">— missing —</span>}</td>
-                    <td className="px-4 py-2 text-slate-600">{[e.year, e.make, e.model].filter(Boolean).join(' ') || '—'}</td>
-                    <td className="px-4 py-2 text-right">{e.value != null ? formatCurrency(e.value) : <span className="text-amber-700">— missing —</span>}</td>
-                    <td className="px-4 py-2 text-slate-600">{dedLabel}</td>
+                  <tr key={e.id} style={missing.length ? { background: 'var(--warn-bg)' } : undefined}>
+                    <td className="px-4 py-2" style={{ color: 'var(--ink-3)' }}>{e.itemNumber}</td>
+                    <td className="px-4 py-2">{type?.name ?? <span style={{ color: 'var(--warn-fg)' }}>— missing —</span>}</td>
+                    <td className="px-4 py-2" style={{ color: 'var(--ink-2)' }}>{[e.year, e.make, e.model].filter(Boolean).join(' ') || '—'}</td>
+                    <td className="px-4 py-2 text-right">{e.value != null ? formatCurrency(e.value) : <span style={{ color: 'var(--warn-fg)' }}>— missing —</span>}</td>
+                    <td className="px-4 py-2" style={{ color: 'var(--ink-2)' }}>{dedLabel}</td>
                     <td className="px-4 py-2">
                       {missing.length > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                        <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--warn-fg)' }}>
                           <AlertTriangle className="h-3 w-3" /> Missing {missing.join(' & ')}
                         </span>
                       ) : ratedLine ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                        <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--good-fg)' }}>
                           <Check className="h-3 w-3" /> Rated {formatCurrency(ratedLine.linePremium)}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">Not yet rated</span>
+                        <span className="text-xs" style={{ color: 'var(--ink-4)' }}>Not yet rated</span>
                       )}
                     </td>
                   </tr>
@@ -257,8 +257,8 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
       <div className="sd-card">
         <div className="sd-card-body space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold text-slate-700 uppercase">Schedule Modifier (IRPM)</h4>
-          <span className="text-xs text-slate-500">Allowed range: {scheduleMin.toFixed(2)}–{scheduleMax.toFixed(2)}</span>
+          <h4 className="text-xs font-semibold uppercase" style={{ color: 'var(--ink-2)' }}>Schedule Modifier (IRPM)</h4>
+          <span className="text-xs" style={{ color: 'var(--ink-3)' }}>Allowed range: {scheduleMin.toFixed(2)}–{scheduleMax.toFixed(2)}</span>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
@@ -276,7 +276,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
           </div>
           <div className="col-span-2">
             <label className="sims-field-label">
-              Reason {reasonRequired && <span className="text-red-600">*</span>}
+              Reason {reasonRequired && <span style={{ color: 'var(--bad-fg)' }}>*</span>}
             </label>
             <input
               type="text"
@@ -316,18 +316,18 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
               </button>
             )}
             {blockedByMissingFields && (
-              <span className="text-xs text-amber-700">
+              <span className="text-xs" style={{ color: 'var(--warn-fg)' }}>
                 Fix missing fields on equipment items above before rating.
               </span>
             )}
           </div>
 
           {lastErrorCode && (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm">
-              <X className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 rounded-md px-3 py-2 text-sm" style={{ border: '1px solid var(--bad-fg)', background: 'var(--bad-bg)' }}>
+              <X className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--bad-fg)' }} />
               <div>
-                <p className="font-medium text-red-800">{describeRatingError(lastErrorCode)}</p>
-                {lastErrorMessage && <p className="text-xs text-red-700 mt-0.5">{lastErrorMessage}</p>}
+                <p className="font-medium" style={{ color: 'var(--bad-fg)' }}>{describeRatingError(lastErrorCode)}</p>
+                {lastErrorMessage && <p className="text-xs mt-0.5" style={{ color: 'var(--bad-fg)' }}>{lastErrorMessage}</p>}
               </div>
             </div>
           )}
@@ -336,7 +336,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
 
       {/* Results */}
       {snapshotLoading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <p className="text-sm" style={{ color: 'var(--ink-4)' }}>Loading…</p>
       ) : snapshot ? (
         <div className="sd-card">
           <div className="sd-card-head">
@@ -364,34 +364,34 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
                 const factors = safeParse(l.factorsApplied)
                 return (
                   <tr key={l.exposureRef}>
-                    <td className="px-4 py-2 font-mono text-xs text-slate-500">{l.exposureRef}</td>
+                    <td className="px-4 py-2 font-mono text-xs" style={{ color: 'var(--ink-3)' }}>{l.exposureRef}</td>
                     <td className="px-4 py-2">{String(inputs.type ?? '—')}</td>
                     <td className="px-4 py-2 text-right">{inputs.value != null ? formatCurrency(Number(inputs.value)) : '—'}</td>
-                    <td className="px-4 py-2 text-slate-600">{String(factors.age_band ?? '—')}</td>
-                    <td className="px-4 py-2 text-right text-slate-600">{factors.base_rate != null ? Number(factors.base_rate).toFixed(4) : '—'}</td>
-                    <td className="px-4 py-2 text-right text-slate-600">{factors.deductible_factor != null ? Number(factors.deductible_factor).toFixed(4) : '—'}</td>
+                    <td className="px-4 py-2" style={{ color: 'var(--ink-2)' }}>{String(factors.age_band ?? '—')}</td>
+                    <td className="px-4 py-2 text-right" style={{ color: 'var(--ink-2)' }}>{factors.base_rate != null ? Number(factors.base_rate).toFixed(4) : '—'}</td>
+                    <td className="px-4 py-2 text-right" style={{ color: 'var(--ink-2)' }}>{factors.deductible_factor != null ? Number(factors.deductible_factor).toFixed(4) : '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">{formatCurrency(l.linePremium)}</td>
                   </tr>
                 )
               })}
             </tbody>
-            <tfoot className="bg-slate-50 text-sm">
+            <tfoot className="text-sm" style={{ background: 'var(--surface-2)' }}>
               <tr>
-                <td colSpan={6} className="px-4 py-2 text-right text-slate-600">Manual Premium (sum of lines × modifier)</td>
+                <td colSpan={6} className="px-4 py-2 text-right" style={{ color: 'var(--ink-2)' }}>Manual Premium (sum of lines × modifier)</td>
                 <td className="px-4 py-2 text-right font-medium">{formatCurrency(snapshot.manualPremium)}</td>
               </tr>
               <tr>
-                <td colSpan={6} className="px-4 py-2 text-right text-slate-600">
+                <td colSpan={6} className="px-4 py-2 text-right" style={{ color: 'var(--ink-2)' }}>
                   Schedule Modifier
                   {snapshot.scheduleModifier !== 1.0 && snapshot.scheduleModifierReason && (
-                    <span className="block text-xs text-slate-500 italic">"{snapshot.scheduleModifierReason}"</span>
+                    <span className="block text-xs italic" style={{ color: 'var(--ink-3)' }}>"{snapshot.scheduleModifierReason}"</span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-right text-slate-600">× {snapshot.scheduleModifier.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right" style={{ color: 'var(--ink-2)' }}>× {snapshot.scheduleModifier.toFixed(2)}</td>
               </tr>
               {snapshot.minimumPremium != null && snapshot.grandTotalPremium === snapshot.minimumPremium && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-2 text-right text-amber-700 text-xs">
+                  <td colSpan={6} className="px-4 py-2 text-right text-xs" style={{ color: 'var(--warn-fg)' }}>
                     Minimum premium floor applied ({formatCurrency(snapshot.minimumPremium)})
                   </td>
                   <td />
@@ -399,7 +399,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
               )}
               {lineOfBusiness === 'InlandMarine' && snapshot.endorsementPremium > 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-2 text-right text-slate-600">Optional Endorsements</td>
+                  <td colSpan={6} className="px-4 py-2 text-right" style={{ color: 'var(--ink-2)' }}>Optional Endorsements</td>
                   <td className="px-4 py-2 text-right font-medium">{formatCurrency(snapshot.endorsementPremium)}</td>
                 </tr>
               )}
