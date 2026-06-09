@@ -98,8 +98,7 @@ public class InvoicingService : IInvoicingService
         decimal agentCommissionAmount = Math.Round(grossForCommission * agentCommRate, 4);
 
         var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
-        var seq = await db.Set<Invoice>()
-            .CountAsync(i => i.TenantId == 1 && i.InvoiceDate.Year == invoiceDate.Year, ct) + 1;
+        var seq = await db.Database.SqlQueryRaw<long>("SELECT nextval('invoice_number_seq')").FirstAsync(ct);
         var invoiceNumber = $"INV-{invoiceDate.Year}-{seq:D5}";
 
         var totalFees = calcResult.Lines.Sum(l => l.Amount);

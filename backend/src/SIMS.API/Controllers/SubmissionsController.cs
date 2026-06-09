@@ -78,7 +78,7 @@ public class SubmissionsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] SubmissionCreateDto dto)
     {
         var result = await _submissionService.CreateAsync(dto, CurrentUserId);
-        if (!result.IsSuccess) return BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        if (result.ToHttpErrorResult(this) is { } err) return err;
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
@@ -87,7 +87,7 @@ public class SubmissionsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] SubmissionUpdateDto dto)
     {
         var result = await _submissionService.UpdateAsync(id, dto, CurrentAccess);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        return result.ToHttpResult(this);
     }
 
     [HttpPatch("{id:guid}/lines-of-business")]
@@ -95,7 +95,7 @@ public class SubmissionsController : ControllerBase
     public async Task<IActionResult> SetLinesOfBusiness(Guid id, [FromBody] SetLinesOfBusinessRequest request)
     {
         var result = await _submissionService.SetLinesOfBusinessAsync(id, request.LinesOfBusiness, CurrentAccess);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        return result.ToHttpResult(this);
     }
 
     [HttpDelete("{id:guid}")]
@@ -103,6 +103,7 @@ public class SubmissionsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _submissionService.DeleteAsync(id, CurrentAccess);
-        return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+        if (result.ToHttpErrorResult(this) is { } err) return err;
+        return NoContent();
     }
 }

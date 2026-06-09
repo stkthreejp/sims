@@ -32,8 +32,7 @@ public class ReceiptsService : IReceiptsService
             return Result<ReceiptDetailDto>.Failure("MISSING_GL_ACCOUNTS",
                 "Required GL accounts (1100 Trust, 1250 Unapplied Cash) not found");
 
-        var seq = await db.Set<Receipt>()
-            .CountAsync(r => r.TenantId == 1 && r.ReceivedDate.Year == req.ReceivedDate.Year, ct) + 1;
+        var seq = await db.Database.SqlQueryRaw<long>("SELECT nextval('receipt_number_seq')").FirstAsync(ct);
         var receiptNumber = $"RCT-{req.ReceivedDate.Year}-{seq:D5}";
 
         var receipt = new Receipt
