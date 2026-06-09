@@ -15,6 +15,9 @@ import {
   getAuthorityApprovalActivity,
   getDeclineReasonReport,
   getClearanceOverrideReport,
+  getRenewalsUpcoming,
+  getBoundByPeriod,
+  getHitRatioByCarrier,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
@@ -32,6 +35,9 @@ import type {
   AgingBucket,
   AgingRow,
   BrokerArRow,
+  RenewalsUpcoming,
+  BoundByPeriod,
+  HitRatioByCarrier,
 } from '@/types/report.types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1238,6 +1244,247 @@ function OverrideBadge() {
   )
 }
 
+// ── Helpers (production reports) ────────────────────────────────────────────
+
+function lobLabel(lob: string) {
+  const map: Record<string, string> = {
+    GeneralLiability: 'General Liability',
+    InlandMarine: 'Inland Marine',
+    AutoLiability: 'Auto Liability',
+    AutoPhysicalDamage: 'Auto Physical Damage',
+  }
+  return map[lob] ?? lob
+}
+
+function DateRangeFilter({ dateFrom, dateTo, onFrom, onTo }: {
+  dateFrom: string; dateTo: string
+  onFrom: (v: string) => void; onTo: (v: string) => void
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
+      <label style={{ fontSize: 12, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        From <input type="date" value={dateFrom} onChange={e => onFrom(e.target.value)} className="sd-input" style={{ fontSize: 12, padding: '3px 8px', width: 140 }} />
+      </label>
+      <label style={{ fontSize: 12, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        To <input type="date" value={dateTo} onChange={e => onTo(e.target.value)} className="sd-input" style={{ fontSize: 12, padding: '3px 8px', width: 140 }} />
+      </label>
+    </div>
+  )
+}
+
+// ── Report: Renewals Upcoming ────────────────────────────────────────────────
+
+function RenewalsUpcomingReport() {
+  const [daysAhead, setDaysAhead] = useState(90)
+  const { data, isLoading, error } = useQuery<RenewalsUpcoming>({
+    queryKey: ['report', 'renewals-upcoming', daysAhead],
+    queryFn: () => getRenewalsUpcoming(daysAhead),
+  })
+
+  const renewalStarted = data?.rows.filter(r => r.hasRenewalSubmission).length ?? 0
+
+  return (
+    <ReportShell title="Renewals Upcoming" isLoading={isLoading} error={error as Error}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 24 }}>
+        <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Expiring within</span>
+        {[30, 60, 90, 120, 180, 365].map(d => (
+          <button key={d} onClick={() => setDaysAhead(d)} style={{
+            padding: '3px 10px', fontSize: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--line)',
+            background: daysAhead === d ? 'var(--accent-soft)' : 'var(--surface)',
+            color: daysAhead === d ? 'var(--accent-ink)' : 'var(--ink-3)',
+            cursor: 'pointer', fontWeight: daysAhead === d ? 600 : 400,
+          }}>{d}d</button>
+        ))}
+      </div>
+
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Expiring" value={data.totalCount.toLocaleString()} sub={`Next ${data.daysAhead} days`} />
+            <KpiCard label="Renewal Started" value={renewalStarted.toLocaleString()} highlight={renewalStarted === data.totalCount ? 'good' : data.totalCount > 0 ? 'warn' : undefined} />
+            <KpiCard label="Not Yet Started" value={(data.totalCount - renewalStarted).toLocaleString()} highlight={data.totalCount - renewalStarted > 0 ? 'warn' : 'good'} />
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Policy #', 'Insured', 'Agent', 'Program', 'Carrier', 'LOB', 'Eff Date', 'Exp Date', 'Days', 'Premium', 'Renewal'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: ['Premium', 'Days'].includes(h) ? 'right' : 'left' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map(r => (
+                  <tr key={r.policyId} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                    <td style={tdStyle}><Link to={`/policies/${r.policyId}`} style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>{r.policyNumber}</Link></td>
+                    <td style={tdStyle}>{r.insuredName}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{r.agentName ?? '—'}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{r.programCode ?? '—'}</td>
+                    <td style={tdStyle}>{r.carrierName}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{lobLabel(r.lineOfBusiness)}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{fmtDate(r.effectiveDate)}</td>
+                    <td style={tdStyle}>{fmtDate(r.expirationDate)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: r.daysUntilExpiry <= 30 ? 'var(--bad-fg)' : r.daysUntilExpiry <= 60 ? 'var(--warn-fg)' : 'var(--ink-3)' }}>{r.daysUntilExpiry}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(r.premiumAmount)}</td>
+                    <td style={{ ...tdStyle, color: r.hasRenewalSubmission ? 'var(--good-fg)' : 'var(--ink-4)' }}>{r.hasRenewalSubmission ? 'Started' : '—'}</td>
+                  </tr>
+                ))}
+                {data.rows.length === 0 && (
+                  <tr><td colSpan={11} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center', padding: '24px' }}>No policies expiring in this window</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
+// ── Report: Bound by Period ──────────────────────────────────────────────────
+
+function BoundByPeriodReport() {
+  const thisYear = new Date().getFullYear()
+  const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
+  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+
+  const { data, isLoading, error } = useQuery<BoundByPeriod>({
+    queryKey: ['report', 'bound-by-period', dateFrom, dateTo],
+    queryFn: () => getBoundByPeriod(dateFrom, dateTo),
+  })
+
+  return (
+    <ReportShell title="Bound by Period" isLoading={isLoading} error={error as Error}>
+      <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
+
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Policies Bound" value={data.totalPolicies.toLocaleString()} />
+            <KpiCard label="Gross Premium" value={fmt(data.totalGrossPremium)} />
+          </div>
+
+          <h3 style={{ ...sectionHead, marginBottom: 12 }}>By Month</h3>
+          <div style={{ overflowX: 'auto', marginBottom: 32 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Month', 'Policies', 'Gross Premium', 'Total Premium'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: h === 'Month' ? 'left' : 'right' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...data.periods].reverse().map((p, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                    <td style={tdStyle}>{fmtMonth(p.year, p.month)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{p.policyCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(p.totalPremium)}</td>
+                  </tr>
+                ))}
+                {data.periods.length === 0 && (
+                  <tr><td colSpan={4} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center', padding: '24px' }}>No policies bound in this period</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style={{ ...sectionHead, marginBottom: 12 }}>By Program / Carrier / LOB</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Program', 'Carrier', 'LOB', 'Policies', 'Gross Premium', 'Total Premium'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: ['Policies', 'Gross Premium', 'Total Premium'].includes(h) ? 'right' : 'left' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.breakdown.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                    <td style={tdStyle}>{r.programCode ?? 'Unassigned'}</td>
+                    <td style={tdStyle}>{r.carrierName}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{lobLabel(r.lineOfBusiness)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.policyCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(r.totalPremium)}</td>
+                  </tr>
+                ))}
+                {data.breakdown.length === 0 && (
+                  <tr><td colSpan={6} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center', padding: '24px' }}>No data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
+// ── Report: Hit Ratio by Carrier ─────────────────────────────────────────────
+
+function HitRatioByCarrierReport() {
+  const thisYear = new Date().getFullYear()
+  const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
+  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+
+  const { data, isLoading, error } = useQuery<HitRatioByCarrier>({
+    queryKey: ['report', 'hit-ratio-by-carrier', dateFrom, dateTo],
+    queryFn: () => getHitRatioByCarrier(dateFrom, dateTo),
+  })
+
+  const hitHighlight = (ratio: number) => ratio >= 40 ? 'good' : ratio >= 20 ? 'warn' : ratio > 0 ? 'bad' : undefined
+
+  return (
+    <ReportShell title="Hit Ratio by Carrier" isLoading={isLoading} error={error as Error}>
+      <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
+
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Total Quotes" value={data.totalQuotes.toLocaleString()} />
+            <KpiCard label="Bound" value={data.totalBound.toLocaleString()} />
+            <KpiCard label="Overall Hit Ratio" value={`${data.overallHitRatio}%`} highlight={hitHighlight(data.overallHitRatio)} sub="Bound ÷ closed quotes" />
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Carrier', 'Total', 'Bound', 'Declined', 'Expired', 'Open', 'Hit %'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: h === 'Carrier' ? 'left' : 'right' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map(r => (
+                  <tr key={r.carrierId} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                    <td style={tdStyle}>{r.carrierName}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.totalQuotes}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--good-fg)', fontWeight: 600 }}>{r.boundCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.declinedCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.expiredCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.openCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: r.hitRatio >= 40 ? 'var(--good-fg)' : r.hitRatio >= 20 ? 'var(--warn-fg)' : r.hitRatio > 0 ? 'var(--bad-fg)' : 'var(--ink-4)' }}>
+                      {r.hitRatio > 0 ? `${r.hitRatio}%` : '—'}
+                    </td>
+                  </tr>
+                ))}
+                {data.rows.length === 0 && (
+                  <tr><td colSpan={7} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center', padding: '24px' }}>No quote data for this period</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 function ComingSoon({ title }: { title: string }) {
   return (
     <ReportShell title={title}>
@@ -1279,9 +1526,9 @@ const REPORT_CATEGORIES = [
   {
     label: 'Production',
     reports: [
-      { id: 'renewals-upcoming', label: 'Renewals Upcoming', soon: true },
-      { id: 'bound-by-period', label: 'Bound by Period', soon: true },
-      { id: 'hit-ratio-by-carrier', label: 'Hit Ratio by Carrier', soon: true },
+      { id: 'renewals-upcoming', label: 'Renewals Upcoming' },
+      { id: 'bound-by-period', label: 'Bound by Period' },
+      { id: 'hit-ratio-by-carrier', label: 'Hit Ratio by Carrier' },
     ],
   },
 ]
@@ -1312,7 +1559,10 @@ function renderReport(id: string) {
     case 'clearance-overrides':    return <ClearanceOverrideReportView />
     case 'post-bind-follow-up':    return <PostBindFollowUpReport />
     case 'unassigned-program-cleanup': return <UnassignedProgramCleanupReport />
-    default:                       return null
+    case 'renewals-upcoming':        return <RenewalsUpcomingReport />
+    case 'bound-by-period':          return <BoundByPeriodReport />
+    case 'hit-ratio-by-carrier':     return <HitRatioByCarrierReport />
+    default:                         return null
   }
 }
 
