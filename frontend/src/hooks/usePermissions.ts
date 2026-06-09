@@ -62,6 +62,7 @@ export function usePermissions() {
     canViewRatingAdmin: hasPermission('nav.admin.rating') && hasPermission('rating.admin'),
     canViewTaskAdmin: hasPermission('nav.admin.tasks') && hasPermission('admin.system.manage'),
     canViewFeesAdmin: hasPermission('nav.admin.fees') && hasPermission('admin.system.manage'),
+    canViewBordereauxAdmin: hasPermission('nav.admin.bordereaux') && hasPermission('accounting.admin'),
 
     isAdmin,
   }

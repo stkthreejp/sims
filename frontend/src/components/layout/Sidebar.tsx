@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2, Hash, Bot, Boxes, Handshake } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2, Hash, Bot, Boxes, Handshake, FileBarChart2 } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
@@ -81,7 +81,7 @@ export function Sidebar() {
           </>
         )}
 
-        {(perms.canViewUsers || perms.canManageRoles || perms.canManageSystem || perms.canManageUnderwritingControls || perms.canManageUnderwriting || perms.canViewRatingAdmin || perms.canViewTaskAdmin || perms.canViewFeesAdmin || perms.canViewDocumentLibrary) && (
+        {(perms.canViewUsers || perms.canManageRoles || perms.canManageSystem || perms.canManageUnderwritingControls || perms.canManageUnderwriting || perms.canViewRatingAdmin || perms.canViewTaskAdmin || perms.canViewFeesAdmin || perms.canViewDocumentLibrary || perms.canViewBordereauxAdmin) && (
           <>
             <SectionLabel>Admin</SectionLabel>
             {perms.canViewUsers && <NavItem to="/users" label="Users" icon={Users} />}
@@ -100,6 +100,7 @@ export function Sidebar() {
             {perms.canViewFeesAdmin && <NavItem to="/admin/fees" label="Charges & Fees" icon={Receipt} />}
             {perms.canViewRatingAdmin && <NavItem to="/admin/rating" label="Rating Plans" icon={Sliders} />}
             {perms.canViewRatingAdmin && <NavItem to="/admin/rating/shadow" label="Shadow Mode" icon={FlaskConical} />}
+            {perms.canViewBordereauxAdmin && <NavItem to="/admin/bordereaux-profiles" label="Bordereaux Profiles" icon={FileBarChart2} />}
             {perms.canViewTaskAdmin && <NavItem to="/admin/task-types" label="Task Types" icon={ListChecks} />}
             {perms.canViewTaskAdmin && <NavItem to="/admin/workflows" label="Workflows" icon={GitMerge} />}
             {perms.canViewTaskAdmin && <NavItem to="/admin/holiday-calendar" label="Holidays" icon={Calendar} />}
