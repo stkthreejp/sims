@@ -347,7 +347,7 @@ public class QuoteServiceAccessTests
 
     private sealed class NoOpQuoteChecklistService : IQuoteChecklistService
     {
-        public Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
+        public Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, UserAccessScope access, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
             => Task.FromResult(Result<List<QuoteChecklistItemDto>>.Success([]));
 
         public Task<Result<QuoteChecklistItemDto>> ToggleAsync(Guid itemId, bool completed, Guid userId, string userName)

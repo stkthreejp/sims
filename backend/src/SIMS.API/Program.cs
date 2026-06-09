@@ -6,6 +6,7 @@ using SIMS.API.Middleware;
 using SIMS.API.Services;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Infrastructure.Extensions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;

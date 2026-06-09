@@ -16,6 +16,7 @@ public static class AppPermissions
     public const string PoliciesEndorse = "policies.endorse";
     public const string PoliciesRenew = "policies.renew";
     public const string PoliciesCancel = "policies.cancel";
+    public const string PoliciesVoidTestBind = "policies.void_test_bind";
 
     public const string NotesCreate = "policies.notes.create";
     public const string NotesEdit = "policies.notes.edit";
@@ -69,6 +70,7 @@ public static class AppPermissions
         new(PoliciesEndorse, "Endorse Policies", "Policies"),
         new(PoliciesRenew, "Renew Policies", "Policies"),
         new(PoliciesCancel, "Cancel Policies", "Policies"),
+        new(PoliciesVoidTestBind, "Void Test Binds", "Policies"),
 
         new(NotesCreate, "Create Notes", "Notes"),
         new(NotesEdit, "Edit Notes", "Notes"),

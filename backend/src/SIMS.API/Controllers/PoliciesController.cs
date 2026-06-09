@@ -100,10 +100,10 @@ public class PoliciesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/void-test-bind")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = AppPermissions.PoliciesVoidTestBind)]
     public async Task<IActionResult> VoidTestBind(Guid id, [FromBody] VoidTestBindDto dto)
     {
-        var result = await _policies.VoidTestBindAsync(id, dto, CurrentAccess, User.IsInRole("Admin"));
+        var result = await _policies.VoidTestBindAsync(id, dto, CurrentAccess, User.HasPermission(AppPermissions.PoliciesVoidTestBind));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 

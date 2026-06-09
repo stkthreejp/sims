@@ -224,7 +224,7 @@ public class PolicyLifecycleRegressionTests
         await db.SaveChangesAsync();
         var checklist = CreateQuoteChecklistService(db);
 
-        var issueItems = await checklist.GetForQuoteAsync(fixture.Quote.Id, [UnderwritingControlStage.Issue, UnderwritingControlStage.PostBind]);
+        var issueItems = await checklist.GetForQuoteAsync(fixture.Quote.Id, UserAccessScope.All(Guid.Empty), [UnderwritingControlStage.Issue, UnderwritingControlStage.PostBind]);
 
         Assert.True(issueItems.IsSuccess);
         Assert.NotNull(issueItems.Value);
@@ -3236,7 +3236,7 @@ public class PolicyLifecycleRegressionTests
 
     private sealed class NoOpQuoteChecklistService : IQuoteChecklistService
     {
-        public Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
+        public Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, UserAccessScope access, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
             => Task.FromResult(Result<List<QuoteChecklistItemDto>>.Success([]));
 
         public Task SeedDefaultsAsync(Guid quoteId, PolicyLineOfBusiness lob)
