@@ -21,12 +21,17 @@ public class QuoteChecklistController : ControllerBase
     private string CurrentUserName => User.FindFirstValue(ClaimTypes.Name)
         ?? User.FindFirstValue("name")
         ?? "Unknown";
+    private UserAccessScope CurrentAccess => User.ToBusinessDataAccessScope();
 
     [HttpGet]
     public async Task<IActionResult> GetForQuote(Guid quoteId, [FromQuery] UnderwritingControlStage[]? stages)
     {
-        var result = await _checklist.GetForQuoteAsync(quoteId, stages);
-        return result.IsSuccess ? Ok(result.Value) : NotFound();
+        try
+        {
+            var result = await _checklist.GetForQuoteAsync(quoteId, CurrentAccess, stages);
+            return result.IsSuccess ? Ok(result.Value) : NotFound();
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
     }
 
     [HttpPatch("{itemId:guid}/toggle")]

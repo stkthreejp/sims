@@ -433,7 +433,7 @@ public class PolicyService : IPolicyService
         var checklist = (IQuoteChecklistService?)_sp.GetService(typeof(IQuoteChecklistService));
         if (checklist != null)
         {
-            var issueDocuments = await checklist.GetForQuoteAsync(policy.BoundQuoteId, [UnderwritingControlStage.Issue]);
+            var issueDocuments = await checklist.GetForQuoteAsync(policy.BoundQuoteId, UserAccessScope.All(Guid.Empty), [UnderwritingControlStage.Issue]);
             if (!issueDocuments.IsSuccess)
                 return Result<PolicyDto>.Failure(issueDocuments.ErrorCode ?? "REQUIRED_DOCUMENTS_ERROR", issueDocuments.ErrorMessage ?? "Unable to load required issue documents.");
 
@@ -2072,7 +2072,7 @@ public class PolicyService : IPolicyService
         if (checklist == null)
             return Result.Success();
 
-        var postBindItems = await checklist.GetForQuoteAsync(quoteId, [UnderwritingControlStage.PostBind]);
+        var postBindItems = await checklist.GetForQuoteAsync(quoteId, UserAccessScope.All(Guid.Empty), [UnderwritingControlStage.PostBind]);
         if (!postBindItems.IsSuccess)
             return Result.Failure(postBindItems.ErrorCode ?? "POST_BIND_REQUIREMENTS_ERROR", postBindItems.ErrorMessage ?? "Unable to load post-bind requirements.");
 

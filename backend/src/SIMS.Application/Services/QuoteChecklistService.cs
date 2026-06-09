@@ -1,6 +1,7 @@
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Quotes;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Fmcsa;
 using SIMS.Domain.Entities.Rating;
@@ -65,8 +66,12 @@ public class QuoteChecklistService : IQuoteChecklistService
             await Db.SaveChangesAsync();
     }
 
-    public async Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
+    public async Task<Result<List<QuoteChecklistItemDto>>> GetForQuoteAsync(Guid quoteId, UserAccessScope access, IReadOnlyCollection<UnderwritingControlStage>? stages = null)
     {
+        var accessible = await Db.Set<Quote>().ForAccessScope(access).AnyAsync(q => q.Id == quoteId);
+        if (!accessible)
+            throw new UnauthorizedAccessException(BusinessDataAccess.AccessDeniedMessage);
+
         var requestedStages = stages is { Count: > 0 }
             ? stages.ToHashSet()
             : EarlyChecklistStages.ToHashSet();
