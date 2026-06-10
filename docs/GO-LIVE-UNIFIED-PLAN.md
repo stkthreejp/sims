@@ -1,309 +1,264 @@
-# SIMS — Unified Go-Live Plan (Internal UAT / Staging Target)
+# SIMS — Unified Go-Live Plan (Internal UAT / Staging → Live Business)
 
-> **Owner:** Jeremiah O'Donovan · **Created:** 2026-06-08 · **Target:** Internal UAT on staging — SMM staff running real-shaped data through auth + core workflows + at least one program end-to-end.
+> **Owner:** Jeremiah O'Donovan · **Created:** 2026-06-08 · **Reaudited & restructured:** 2026-06-10 · **Targets:** (1) Internal UAT on staging; (2) **Live business** — real submissions, binds, issuance, premium accounting, carrier reporting, and regulatory compliance.
 >
-> **What this is:** One plan that reconciles the ~40 plan/spec documents in `docs/` against the actual state of the repo, and sequences the remaining work to reach live testing. It supersedes the scattered phase plans as the *coordination* layer — the individual plans remain the detailed execution references (see crosswalk in Appendix A).
+> **What this is:** One plan that reconciles the ~40 plan/spec documents in `docs/` against the actual state of the repo, and sequences the remaining work. The 2026-06-10 reaudit (four parallel code-level reviews: workstream verification, MGA operating-cycle gap analysis, security closeout, frontend/ops readiness) found the codebase substantially ahead of the 6-08 plan on UI/security/bordereaux/reports — and behind it on **premium-accounting correctness**, which is now the critical path. Findings are in §8.
 >
-> **How to use it:** Work top-to-bottom by workstream. Each item is a checkbox. P0 blocks launch; P1 should be done before UAT; P2 can run during/after UAT. "→ source" points to the detailed plan.
+> **How to use it:** Work top-to-bottom by workstream. P0 blocks the stated gate; P1 before that gate is exited; P2 during/after. Two gates now exist: **Gate A (internal UAT)** and **Gate B (live business)** — see §2.
 
 ---
 
-## 1. Where SIMS actually is today
+## 1. Where SIMS actually is (verified against code, 2026-06-10)
 
-This is a genuinely built MGA platform, not a scaffold. The build substantially exceeds what several of the older plan docs imply, so a lot of "planned" work is in fact done.
+This is a genuinely built MGA platform. The 6-08 plan's frontier items have moved fast; the reaudit verified each claim against code rather than commit messages.
 
-**Already complete (do not re-plan as net-new):**
+**Complete and verified (do not re-plan):**
 
-- **Program configuration + Program-SOT DB contract.** Nested `Program > Carrier > LOB > State` setup with canonical foreign keys and enforcement across fees, bordereaux profiles, surplus lines, form packages, proposal configs, policy numbers, carrier & agent commissions, rating assignments, and intermediary/brokerage. This is the most heavily completed area.
-- **Underwriting control layer (Phase 6).** Clearance, referrals, published controls, stage-aware document checklists, post-bind gate, reusable authority-approval spine, manager queue. Closed as an operational baseline.
-- **Rating engine core.** `IM_v1` engine, versioning, bind-locked snapshots, Excel parity harness (24 IM fixtures), admin factor edit + impact preview + maker/checker.
-- **Policy lifecycle transactions.** Endorse / cancel / reinstate / rewrite / non-renew / renew endpoints all exist.
-- **Accounting + live QuickBooks Online integration**, compliance document register, FMCSA safety backend, LegiScan bill tracking.
-- **Security baseline.** No secrets in tracked source; `.env` and `appsettings.*` gitignored; MSAL/Azure AD frontend + JWT backend; the P0 hardcoded DB credential was already fixed and rotated (2026-05-27). 74 of 75 controllers carry `[Authorize]` (the one exception, the QBO webhook, uses HMAC verification by design).
-- Backend tests: ~70 service-test files across two projects; 174/174 passing at last go-live review.
+- **Program configuration + Program-SOT contract** — nested Program > Carrier > LOB > State with canonical FKs enforced across fees, bordereaux profiles, surplus lines, form packages, proposal configs, policy numbers, commissions, rating assignments. Plus: **program orphan audit endpoint** (`GET /admin/program-configurations/orphan-audit`) and **AL non-bindable clearance block** (`UnderwritingClearanceService.cs:74-82`).
+- **Underwriting control layer** — clearance, referrals, published controls, stage-aware checklists, post-bind gate, authority-approval spine, manager queue.
+- **Rating engine** — `IM_v1` + `GL_v1`, versioning, bind-locked snapshots, Excel parity harness, **shadow-rate mode live with per-LOB toggles** (`RatingSettings`, `AdminShadowRatingPage`), schedule bounds configurable per plan version, minimum premiums seeded.
+- **Policy lifecycle** — endorse / cancel / reinstate / rewrite / non-renew / renew endpoints; cancellation notice flow with effective-date math and legal-requirement snapshots.
+- **Policy issuance documents** — `PolicyAssemblyService` end-to-end: state-scoped form packages, Mandatory/Conditional triggers, PDF fill/merge, `IssuedPolicyPacket` with SHA-256 + version/transaction linkage. Generic across LOBs (not IM-only as previously believed).
+- **Bordereaux pipeline** — profiles admin, premium preview, snapshot runs, validation engine, CSV/XLSX export, **London BDX + Account Current XLSX (UMR / coverholder PIN / Auto-Veh / IM-Unit tabs)**, reconciliation gate, Bordereaux Workbench UI. Far more complete than the 6-08 plan implied. (Two defects: §WS7.)
+- **Production reports** — renewals-upcoming, bound-by-period, hit-ratio-by-carrier: backend + frontend fully wired (UI-LINK-003 resolved).
+- **Claims backend (WS10)** — Claim/ClaimImportBatch entities, CSV import with dedupe + policy matching, loss-run endpoint, ClaimsController CRUD/import/loss-run. (No frontend; security + valuation defects: §WS10.)
+- **Accounting core** — invoice → receipt → cash application → disbursement chain, double-entry ledger, trust account, distribution sweeps, trust reconciliation + SL-tax aging + payable/AR aging reports, atomic invoice/receipt numbering via DB sequence, live QBO integration.
+- **Security closeout** — C1 (UW writeup scope), H1 (FallbackPolicy), H2 (void tier), M1 (checklist scope), L2 (role remnants) **all verified fixed in code**. No `[Authorize(Roles=…)]` anywhere. Auth hardening: refresh-token-reuse revocation and inactive-user blocks exist and are correct.
+- **UI closeout** — UI-LINK-001/002/003/005 fixed and verified; sidebar-vs-route parity fixed; real 404 page; Login redesigned on the design system; zero "coming soon" / `href="#"` / TODO in rendered UI.
+- **CI/deploy** — `deploy.yml` gates on backend tests, `tsc`, lint, frontend build; Docker → ACR → App Service for both apps; health checks (`/health/live`, `/health/ready`) wired. Startup config validation fails closed (incl. malware-scanner provider and prod QBO-sandbox guard).
 
-**The current frontier:** Program-scope enforcement rollout (large, mostly *uncommitted* — see the immediate risk below), go-live hardening, UI alignment, and bordereaux runs.
-
-**Immediate risk to resolve first:** the working tree has ~283 uncommitted changes (mostly the program-scope enforcement migrations and configs), and a stale `.git/index.lock` was observed. Source on disk differs substantially from `main`. **Nothing else in this plan is safe to reason about until that work is committed, built, and tested.** See WS0.
-
----
-
-## 2. Definition of "ready for live testing"
-
-For the internal UAT/staging target, SIMS is ready when **all** of the following hold:
-
-1. Working tree committed; `dotnet build` + `dotnet test` + `npx tsc --noEmit` + `npm run build` all green; EF drift clean.
-2. Config **fails closed** in staging — every required secret/setting validated at startup, no committed keys, malware scanning real (or explicitly accepted).
-3. Backend authorization passes an **ownership/entity-scope** audit on the core workflow surfaces (submissions, quotes, policies, accounting, documents, inbox).
-4. The **broken-link/placeholder list is zero**, and the High-priority UI pages (including Login) match the SIMS UI guide.
-5. At least **one full program is configured end-to-end** (program > carrier > LOB > state, rating assignment, fees, policy-number sequence, forms, checklists, UW controls, QBO/GL mapping) and a submission can go submission → quote → bind → issue against it.
-6. **Production visibility:** SMM can see the business it writes — bound/written premium and policy counts by program/carrier/LOB and period, plus the submission pipeline and renewals — for the launch program (WS9).
-7. **Loss-run capability:** claims data for at least the launch program (and a first historical load) is imported, and SIMS can generate a loss run for an insured/policy valued as of a date (WS10).
-8. App + frontend are **deployed to the Azure test environment** (`sims-api-test` / `sims-frontend-test`) with App Insights, health checks, and a backup/rollback rehearsal done.
-9. CI gates on build/test/lint/audit; staging burn-in shows no open P0/P1.
+**The new frontier (what the reaudit surfaced):** the system can *sell and issue* policies but cannot yet *unwind or correctly account for* them — return premium does not exist anywhere, SL tax fails open, dec-page fees and invoice fees are never reconciled, and bordereaux has no once-and-only-once reporting guarantee. Those four are the P0 spine of Gate B (§3b). Secondarily: four frontend API clients are silently broken (billing/commissions UIs non-functional), the claims module has no UI and a High-severity scoping hole, and renewals are a dead-end workflow (visible, not actionable).
 
 ---
 
-## 3. Workstreams
+## 2. Definition of ready — two gates
 
-### WS0 — Stabilize the working tree (P0, do first)
+### Gate A — Internal UAT (staff testing on staging)
 
-- [ ] Clear the `.git/index.lock` only after confirming no git process is running. → repo
-- [ ] Review the ~283 uncommitted changes in logical groups (migrations, configurations, domain, controllers, services, seed CSVs, frontend, `deploy.yml`). Commit the program-scope enforcement work to `main` per the solo-dev workflow. → `AGENTS.md`, `CLAUDE.md`
-- [ ] Decide what to do with untracked `.agents/`, `plugins/`, `SIMS-UI-Guide/` (commit, gitignore, or relocate). The UI guide is referenced by the UI alignment work, so it should be tracked.
-- [ ] Run full build + test + type-check + frontend build; confirm EF migration drift is clean (`check-ef-drift.ps1`). → `docs/go-live-plan.md`
+1. ~~Working tree committed; build/test/typecheck/build green; EF drift clean.~~ ✅ (CI green 2026-06-10)
+2. ~~Config fails closed in staging.~~ ✅ code-side; **operational items remain** (Azure app settings, Entra redirect URIs, firewall — §WS1).
+3. ~~Backend authorization passes ownership-scope audit on core surfaces.~~ ✅ C1/H1/H2/M1 fixed; **except ClaimsService scoping (new High — §WS10)**.
+4. ~~Broken-link/placeholder list zero; High-priority pages match the UI guide.~~ ✅ except dashboard Tasks card body (cosmetic).
+5. One full program configured end-to-end and bindable. ❌ **Lloyd's carriers/programs not seeded** (§WS5) — open.
+6. Production visibility for the launch program. ✅ reports live (pipeline/UW-workload views are fast-follow).
+7. Loss-run capability for the launch program. ❌ backend yes / frontend none / valuation defects (§WS10).
+8. Deployed to Azure test env with health checks; backup/rollback rehearsal. ◐ deployed + healthy; **App Insights not wired; no post-deploy smoke test; rehearsal not done**.
+9. CI gates green; burn-in with no open P0/P1. ◐ gates green; burn-in pending.
+10. **The four broken frontend API clients fixed** (§WS4-R) — disbursements, cash distribution, agent & carrier commission tabs currently 401 on every call.
 
-### WS1 — Go-live hardening / config fail-closed (P0)
+### Gate B — Live business (new, from the 2026-06-10 MGA operating-cycle audit)
 
-- [ ] **Rotate and remove committed secrets.** A real LegiScan key sits in `appsettings.Development.json` — rotate it and remove it. Rotate `GraphApi:ClientSecret`. → `go-live-plan.md`, `deployment.md`
-- [ ] **Startup validation (fail closed).** Extend `StartupConfigurationValidator` so staging/prod refuse to boot without: DB, Blob, QBO, Graph, AI/Doc-AI, CORS `AllowedOrigins`, webhook token, and a configured malware scanner. → `go-live-plan.md`
-- [ ] **Malware scanning.** Either configure ClamAV or make the fallback to `NoOpFileScanService` an explicit, logged, environment-gated decision (not a silent default). → `go-live-plan.md`
-- [ ] **NuGet dependency audit.** Resolve or formally accept the high-severity transitive advisories in `Microsoft.Bcl.Memory 9.0.0` and `Microsoft.Kiota.Abstractions 1.17.1`. → `go-live-plan.md`
-- [ ] **Migration strategy.** Decide auto-`MigrateAsync()` on boot vs deploy-time migrations for staging/prod, and document it. → `go-live-plan.md`, `deployment.md`
-- [ ] Remove the `Host=localhost;…;Password=postgres` design-time fallback in `SafetyAnalyticsDesignTimeDbContextFactory.cs` for parity with the hardened primary factory. → security catalog
-- [ ] Configure Entra production/staging redirect URIs; remove dev IP from the Postgres firewall. → `deployment.md`
+Everything in Gate A, plus:
 
-### WS2 — Authorization & data-scope closeout (P1)
-
-The role/permission layer exists; the remaining work is **ownership/entity-scope** checks — making sure an authenticated user can only reach *their own* records. **A code-level audit on 2026-06-08 (§8.1) found the model is per-user ownership scope (`UserAccessScope`), not cross-tenant — so the residual risk is specific endpoints that bypass `ForAccessScope`.** Three of those are now confirmed (C1/H1/H2) and promoted below.
-
-- [ ] **(P0 — C1) Fix UW Writeup broken object-level authorization.** `UWWriteupController` Get/Save/Submit are `[Authorize]`-only and `UWWriteupService` loads by `QuoteId` with no scope filter — any authenticated user can read/overwrite any quote's underwriting writeup by enumerating IDs. Thread `UserAccessScope` through `IUWWriteupService` and gate on parent-quote access. → §8.1
-- [ ] **(P0 — H1) Add a fail-closed fallback authorization policy.** `Program.cs` registers per-permission policies but no `FallbackPolicy`; any unannotated controller is public by default. Add `RequireAuthenticatedUser()` fallback and explicitly `[AllowAnonymous]` the login/refresh/microsoft + webhook endpoints. → §8.1
-- [ ] **(P1 — H2) Align the disbursement-void permission tier.** `VoidController` is gated `accounting.manage` while the parallel `DisbursementsController` void requires `accounting.admin` — a `manage`-tier user can void via the other route. Raise `VoidController` to `accounting.admin`. → §8.1
-- [ ] Add entity-level ownership/scope checks to **submissions and all 11 submission child controllers, quotes, policies, accounting records, document-library items, and inbox documents** (the audit's named "highest-value next pass"). The §8.1 detail confirms reads on submissions/quotes/policies *are* correctly scoped via `CurrentAccess`; the remaining gaps are `QuoteChecklistController.GetForQuote` (M1) and the items above. → `docs/security/endpoint-authorization-audit.md`, §8.1
-- [ ] Finish granular CRUD policies on core parties (insureds/agents/carriers) and review cross-entity access. → security catalog
-- [ ] Add tests proving underwriters cannot reach `rating.admin` mutations; add refresh-token-reuse and inactive-external-user tests; confirm QBO webhook replay protection. → endpoint audit
-- [ ] Decide the **party/workflow role model** (who manages insureds/agents/carriers/quotes/submissions/legal sources/attachments) — this is a business decision that unblocks the scoping work above. → **Open decision, §5**
-
-### WS3 — Open bug fixes (P1/P2)
-
-Financial/data-integrity bugs are already resolved. Remaining open items from the code-review backlog:
-
-- [ ] **Email ingestion paging** — only the first 50 unread messages are processed; 51+ can starve. Add paging. (P1-Ops) → `ai-review/sims-code-review-backlog.md`
-- [ ] **Invoice/receipt number concurrency** — `Count + 1` races under load; use a sequence/atomic allocation. (P2)
-- [ ] **`NOT_FOUND` → returns 400 instead of 404** on quotes/submissions. (P2)
-- [ ] **Paging validation + `SortBy` not honored** — invalid page/pageSize accepted; sort contract misleading, can 500. (P2)
-- [ ] Decide **cancellation accounting rules** — should midterm cancellation completion require return premium, fee/tax reversal, commission chargeback, invoice, payable, ledger entries? Currently can complete with `PremiumChange = 0` and no accounting. → **Open decision, §5**
-
-### WS4 — UI alignment (P1)
-
-Two parts: dead/placeholder wiring (must be zero), and visual consistency with the SIMS UI guide. **The 2026-06-08 static route crawl (§8.2) confirmed all 6 tracked items are still open with exact file:line, found UI-DOC-001 is wider than recorded (three docs, one hardcoding `localhost:5000`), and surfaced three new issues — an unguarded `/tasks` route, a sidebar-vs-route guard mismatch, and no real 404 page.** Exact locations and fixes are in §8.2.
-
-Broken links / placeholders — **all 6 currently open** (→ `docs/ui-broken-links-tracker.md`, `docs/superpowers/plans/2026-05-25-phase-4-ui-links-workflow-qa.md`):
-
-- [ ] **UI-LINK-001** — bound-quote "View Policy" links to `/policies/${quote.id}` (quote id, wrong). Add `boundPolicyId` to the quote DTO from `Policy.BoundQuoteId`; only render when present.
-- [ ] **UI-LINK-002** — QuickBooks journal link is `'#'`. Remove the anchor unless a real external URL is exposed.
-- [ ] **UI-LINK-003** — Reports `renewals-upcoming`, `bound-by-period`, `hit-ratio-by-carrier` show "coming soon" but are clickable. Hide/disable or implement.
-- [ ] **UI-LINK-004** — Dashboard Tasks card says "coming soon" though `/tasks` exists; `All →` has no handler. Wire to `/tasks`.
-- [ ] **UI-LINK-005** — Insured detail Activity tab "coming soon." Hide/disable or wire real activity.
-- [ ] **UI-DOC-001** — stale `VITE_API_URL` in **three** docs: `deployment.md` (L60, L96), `frontend.md` (L120, which also hardcodes `localhost:5000`), and `infrastructure.md` (L97). Client truth is relative `/api/v1` (`api/client.ts:5`). Rewrite all three.
-- [ ] **(NEW) Guard the `/tasks` route** — `App.tsx:235` is the only top-level route with no `withPermission` wrapper; any authenticated user reaches the Task Queue. Wrap it (or confirm tasks are intentionally universal). → §8.2
-- [ ] **(NEW) Fix sidebar-vs-route guard mismatch** — sidebar hides Billing/Reports/Task-admin behind a compound `nav.* && <action>` check (`usePermissions.ts:60-64`) but the routes check only the action half (`App.tsx:237-241,259-268`); a user with the action permission but not the `nav.*` flag can reach the page by URL. Make route guards match the sidebar. → §8.2
-- [ ] **(NEW) Add a real 404 page** — `App.tsx:272` catch-all silently redirects every unknown URL to `/dashboard`, masking genuine broken links (including UI-LINK-001's bad id). Add a dedicated NotFound route. → §8.2
-
-Visual consistency (High-priority pages still "needs tweaking" per `docs/ui-design-audit-plan.md`):
-
-- [ ] **Login page** — never updated; first thing a tester sees. Highest priority.
-- [ ] Quote detail, quote writeup, policy detail, agent detail, carrier detail, quote rating panel, auto-safety panel, admin rating-version page, fees admin, legal-requirements page.
-- [ ] All billing pages (≈8/9) need the design-system pass.
-- [ ] Run the **browser route crawl** across Admin / Underwriter / CSR / ReadOnly roles (the crawl table in the tracker is still empty) to catch any 404s, console errors, or role-leak routes before UAT.
-
-### WS5 — Program / carrier alignment (P1 — the business-data gate)
-
-This is the gap most likely to bite at live testing. The platform's program-setup machinery is built, but the **actual SMM programs are not all configured**, and the system currently has only **Beazley** seeded as a rating carrier and **Longleaf** as the live program. SMM runs six live program×carrier×LOB combinations plus one paused line. The unified plan must get the launch programs configured correctly, with the right limits/territories/rating bases, and AL explicitly **non-bindable**.
-
-Reference for every value below: the SMM Underwriter program context (limits, territories, rating bases, referral triggers).
-
-- [ ] **Decide launch scope** — which program(s) must be live for UAT day one. Recommend piloting **one** end-to-end first (Inland Marine via Beazley is the most rating-complete) and adding the others in sequence. → **Open decision, §5**
-- [ ] Configure each launch **Program > Carrier > LOB > State** with correct eligible-state lists:
-  - **Lloyd's IM — Beazley (AFB 623/2623):** states AL, AR, FL, GA, LA, MS, NC, OK, SC, TN, TX, VA; per-item $500k / per-loss $1.5M; ACV; 7 territory bands; min ded $1k.
-  - **Lloyd's GL — DALE Syndicate 1729:** $1M occ / $2M agg; ISO loss-cost × LCM; CA pre-bind notice rules.
-  - **Lloyd's APD — Longleaf® via HWS Specialty:** states AL, AR, GA, LA, MD, MS, PA, TX, VA; $150k TIV/unit (ACV); referral at ≥$150k single unit.
-  - **Brace / Longleaf® GL:** states AL, AR, FL, GA, MS, NC, OK, SC, TN, TX; LCM 1.65; 12 eligible ISO classes.
-  - **Brace / Longleaf® APD:** Stated Amount basis; up to $250k TIV/unit; flat rate table.
-  - **Brace / Longleaf® IM:** 2 territory bands; min ded $2,500; per-loss $1M.
-- [ ] **Auto Liability (AL): configure as inactive / non-bindable.** SMM lost the treaty Feb 2025; no binding authority. Ensure the system cannot quote or bind AL (block at clearance/authority layer), and flag AL submissions as pending. → SMM context §5
-- [ ] Seed/verify per-program **rating assignments** beyond Beazley (the Carrier Rating Assignment UI, Phase 4A, unblocks non-Beazley carriers). → `rating-engine-remaining-plan.md`
-- [ ] Verify per-program **fees, surplus-lines setup, policy-number sequences, form packages, proposal configs, carrier & agent commissions, QBO/GL mappings**. → `phase-7-program-setup-closeout.md`
-- [ ] Run the **orphan / incomplete Program-setup audit report** (a documented pre-go-live Phase 7 item) to catch any program path with missing children. → `phase-7-program-setup-closeout.md`
-- [ ] Resolve the known **historical-versioning gap**: Program setup has path-only unique constraints and cannot yet represent multiple historical intervals for a program path. Decide if this matters for UAT (likely defer, but document). → `specs/2026-05-30-program-sot-database-contract-design.md`
-
-### WS6 — Rating engine readiness (P1/P2)
-
-- [ ] **Shadow-rate cutover** — run the new engine in shadow mode against the Excel raters before it becomes authoritative; this is the safe path and gates trusting the engine in UAT. → `rating-engine-remaining-plan.md` (Phase 5)
-- [ ] Set real **schedule-rating bounds** (currently placeholder 0.5–1.5) and **minimum premiums per program** (none seeded for IM; SMM context lists per-program minimums). → `rating-engine-remaining-plan.md`
-- [ ] Confirm **renewal rate-version policy** (default: renewal-effective-date rates) and **endorsement rating policy** (default: bound version + pro-rata). → `rating-engine-remaining-plan.md` 7D/7E
-- [ ] Second LOB rater (recommend APD next) — **blocked on the actuarial workbook handoff** (AL/APD/GL). Treat as post-UAT unless APD is in launch scope. → **Open decision / dependency, §5**
-- [ ] (P2) Per-role schedule-modifier authority; rating worksheet PDF from snapshot. → `rating-engine-remaining-plan.md` 7B/7C
-
-### WS7 — Bordereaux (conditional P1)
-
-Bordereaux is a go-live blocker **only for launch carriers that require day-one reporting.** BRACE/Longleaf reports monthly (15 days after interval), so if Brace/Longleaf is in launch scope, this is required. Profiles are already Program-SOT complete; the run/validation/export/reconciliation pipeline is the open work.
-
-- [ ] Premium-row preview (effective-or-bound date basis) + validation engine (missing policy#/state/txn-type/premium/tax/commission, unissued packet, unposted accounting, out-of-period). → `phase-8-bordereaux-carrier-reporting.md`
-- [ ] CSV + XLSX export with signed download URLs; run history; paging for large periods. → `phase-8` slice 8.10
-- [ ] **BRACE/Longleaf London premium BDX + Account Current from one dataset**, with the reconciliation gate (txn count/keys, gross premium, commission+brokerage vs AC gross, net vs net due carrier) and the required `Auto Veh Info` / `IM Unit Info` detail tabs. → `phase-8-london-bdx-account-current.md`
-- [ ] Replace any coming-soon placeholder in Reports/Admin with the real surface (no placeholders allowed at go-live). → `phase-8`
-- [ ] Report-template editor hardening so non-coders can change tabs/columns/static values/mapped fields/formulas. → `phase-8-london-bdx-account-current.md`
-
-### WS8 — Deploy, burn-in, rehearsal, UAT (P1)
-
-- [ ] **Deploy API + frontend to the Azure test environment.** Both are currently local-only; DB/KeyVault/Blob already on Azure. → `deployment.md`, `AGENTS.md`
-- [ ] CI gates: make `deploy.yml` gate on `dotnet test`, `npx tsc --noEmit`, `npm run build`, `npm run lint`, dependency audit, and a smoke test. → `go-live-plan.md`
-- [ ] **Fix the lint gate** — `npm run lint` currently fails (eslint not installed/configured). Make it a real, passing gate. → `go-live-plan.md`
-- [ ] App Insights + health-check wiring in staging; QBO sandbox → production decision; Postgres backup retention → 35 days; HA decision; KeyVault managed identity; worker double-run check. → `deployment.md`, `go-live-plan.md`
-- [ ] **Backup/rollback rehearsal** on staging. → `go-live-plan.md`
-- [ ] **Full manual UAT script:** submission → quote → bind → issue (on the launch program), endorsement, cancellation, post-bind follow-up, accounting void approval, manager queue. → `phase-4-ui-links-workflow-qa.md`
-- [ ] Stakeholder sign-off; staging burn-in with no open P0/P1. → `go-live-plan.md`
-
-### WS9 — Production reporting / "what we write" visibility (P1)
-
-Moved into go-live scope: SMM needs to see the business it writes from day one. The Reports surface today is accounting-heavy and production-light, and three production reports are stubbed as "coming soon" (UI-LINK-003) — those become real here.
-
-- [ ] Implement the three stubbed reports with real data: **renewals-upcoming**, **bound-by-period** (bound/written premium), **hit-ratio-by-carrier**. (Resolves UI-LINK-003 in WS4.) → `ui-broken-links-tracker.md`
-- [ ] Add the core production views, all **program/carrier/LOB/state and period** scoped: written & bound premium; policy/transaction counts; submission pipeline (received → quoted → bound → declined) with **hit ratio**; renewals & expirations; UW workload. → `SIMS improvement 5.17.26.md` (Phase 9)
-- [ ] Reuse the existing Reports framework and the program-scope model so each program (Longleaf, Brace, etc.) can be viewed on its own or in aggregate.
-- [ ] Decide the **must-have day-one report set** for UAT vs. fast-follow (see §5). 
-
-### WS10 — Claims visibility & loss-run import (P1)
-
-Moved into go-live scope: SMM must be able to import claims feeds from current and prior carriers/TPAs and **produce loss runs**. Today only submission-stage loss history exists (prior loss runs keyed at intake) — there is no claims data model for the book itself.
-
-- [ ] Build a **claims data model** (claim, claimant, loss/reserve/paid amounts, status, dates, cause, link to policy/insured/program). → `SIMS improvement 5.17.26.md` (Phase 10)
-- [ ] Build a **claims import pipeline**: ingest a carrier/TPA feed (CSV/Excel to start, API later), map to the canonical claim schema, dedupe, and store **valuation-date snapshots** so a loss run can be produced as-of any date.
-- [ ] Import the **launch program's current claims** (e.g., Sedgwick for Brace/Longleaf) plus a **first historical load from prior carriers** for the legacy book. Full multi-carrier historical backfill can phase in after UAT.
-- [ ] **Loss-run generation**: produce a loss run for an insured/policy/program valued as of a date (PDF/Excel), reusing the document/export tooling — needed for renewals, broker requests, and reinsurer/treaty packages (ties to the AL re-placement projection work).
-- [ ] Decide **feed sources, formats, and historical-load approach** per carrier/TPA (see §5).
+1. **Return premium exists**: midterm/flat cancellation and negative endorsement produce a credit invoice, carrier-payable reduction, SL-tax reversal, agent-commission chargeback, balanced ledger entries, and a negative-premium row on the next BDX. (§WS11)
+2. **SL tax fails closed**: a filing-state bind that produces no SL tax + stamping lines is blocked, not silently tax-free. State validated against the program's eligible list at bind. (§WS12)
+3. **Single source of premium truth**: dec page, ledger, and BDX cannot disagree — quote `TaxesAndFees` reconciled to (or replaced by) the fee engine at bind. (§WS11)
+4. **Once-and-only-once carrier reporting**: every premium transaction appears on exactly one submitted bordereau; late-arriving items carry forward; runs have a "submitted" closure state. (§WS7)
+5. **Cancellation notices are compliant**: statutory minimum days enforced from the in-system legal chart; proof-of-mailing captured; additional-interest/lienholder copies generated. (§WS13)
+6. **Claims are scoped and correct**: access scope threaded through ClaimsService; loss runs use real valuation snapshots; imports cannot regress newer valuations. (§WS10)
+7. **Staff can operate daily workflows in the UI**: claims list/import/loss-run, start-renewal action, bordereaux CSV download + mark-submitted. (§WS4-R, WS10, WS7)
+8. Producer licensing tracked at least manually with a documented SOP; binder-vs-direct-issue decision implemented. (§WS13)
 
 ---
 
-## 4. Reconciling overlaps & conflicts in the existing plans
+## 3. Workstreams — status after reaudit
 
-These ambiguities exist across the doc set and are resolved here so they don't cause double-work:
+### WS0 — Stabilize the working tree ✅ DONE
+Tree committed, CI green (build + 453 tests + tsc + lint + build), EF drift clean as of 2026-06-10.
 
-- **"Phase 6" is overloaded** — it means both the roadmap's UW Control Layer *and* the AI plan's triage queue. In this plan, "Phase 6" = UW Control Layer (done). The AI triage queue is post-UAT.
-- **Phase 6 control matrix vs closeout** — the matrix lists deterministic authority *thresholds* as "Missing" on most bind/issue/policy actions while the closeout declares Phase 6 done. **Decision:** authority thresholds on bind/issue/cancellation-complete are **post-UAT** for internal testing (the approval *spine* exists; thresholds are a tuning layer). Revisit before any external pilot.
-- **Rating worksheet PDF, renewal/endorsement rate policy, per-role schedule authority** appear in both `rating-engine-remaining-plan.md` (7B–7E) and roadmap Phase 7A — **one backlog**, tracked in WS6.
-- **AI plan exists in three forms** — the multi-model `ai-underwriting-plan.md` is authoritative; the Claude-only `SIMS_AI_Plan.docx` and the `SIMS_AI_Implementation_Guide.docx` are historical. Full AI (Doc AI extraction + scoring) is **out of scope for UAT** (Gemini/Doc-AI key not configured; feature is advisory-only and inactive). The guideline→control handoff that *is* live stays.
-- **Founding docx plans** (`SMMIMS Plan 4.11.26`, `SMM_PolicyAdmin_*`) describe the April MVP (Neon DB, NetRate, IMS naming) and are **superseded** — historical only.
-- **`VITE_API_URL`** stale guidance appears in four places; single fix (UI-DOC-001, WS4).
+### WS1 — Go-live hardening / config fail-closed — ✅ code-side / ❌ operational
+
+Code complete: startup validator covers JWT/DB/Blob/QBO×4/webhook/Graph/origins/malware-provider/QBO-sandbox-in-prod; secrets out of source; design-time factory throws; zero vulnerable NuGet packages; `MigrateAsync()` on boot (fine single-instance).
+
+Remaining — **operational punch list (Jeremiah)**:
+- [ ] Rotate the LegiScan API key at the provider (source is clean; old key may live).
+- [ ] Azure app settings on `sims-api-test`: `Uploads__MalwareScanning__Provider` (`NoOp` explicit for UAT), `GraphApi__ClientSecret`, `Qbo__WebhookVerifierToken`, `AllowedOrigins__0`.
+- [ ] Entra staging redirect URIs; remove dev IP from Postgres firewall.
+
+### WS2 — Authorization & data-scope — ✅ P0s closed / open P1-P2 backlog
+
+Verified fixed: C1, H1, H2, M1, L2 (file-level verification 2026-06-10).
+
+- [ ] **(P1) ClaimsService scoping** — moved to WS10 item 1; it is the only High finding in current code.
+- [ ] (P1) Remove class-level `[AllowAnonymous]` on `AuthController` — it neutralizes the per-action `[Authorize]` on `logout`/`me`/`me/password` (anonymous calls 500 instead of 401; future endpoints on that controller ship anonymous by default). Put `[AllowAnonymous]` on login/microsoft/refresh only.
+- [ ] (P1) **M3 idempotency keys** on accounting create/apply (`ReceiptsController`, `CashApplicationController`, `DisbursementsController`) — duplicate postings under live volume are expensive to unwind now that voids need admin authority. `Idempotency-Key` header + key→result table.
+- [ ] (P2) Entity-scope on the 11 submission child controllers (drivers carry DOB/license PII) and decide/document the shared-inbox stance for `InboundEmailsController`. Mitigated today only if every active user has `CanAccessAllBusinessData`.
+- [ ] (P2) Security regression tests: underwriter-cannot-reach-`rating.admin`, refresh-token-reuse, inactive-external-user (runtime logic exists and is correct; tests absent). Delete the dead `IsInRole("Admin")` in `VoidController:28`.
+
+### WS3 — Open bug fixes — ✅ DONE (remaining items absorbed into WS11)
+Email paging ✅, atomic numbering ✅ (DB sequence), NOT_FOUND→404 ✅, paging/sort validation ✅. The "cancellation accounting rules" open decision is **promoted from decision to build** — it is WS11.
+
+### WS4 — UI alignment — ✅ DONE, plus **WS4-R: frontend repair (new, P0 for Gate A)**
+
+Closeout verified: links fixed, guards aligned, 404 real, Login redesigned, no placeholders. Update `docs/ui-broken-links-tracker.md` statuses (rows still say "Open").
+
+**WS4-R — defects found 2026-06-10 that would visibly break in UAT:**
+- [ ] **(P0) Four API clients send unauthenticated requests** — `agentCommissions.api.ts`, `carrierCommissions.api.ts`, `disbursements.api.ts`, `cashDistribution.api.ts` each use a private raw-`fetch` reading `localStorage.getItem('token')`, **which is never written** (auth store keeps the token in memory/sessionStorage and excludes it from persistence). Every call → 401. Disbursements, Cash Distribution, and both commission-setup tabs are non-functional; `AgentDetailPage` swallows the error and renders an *empty* commission list (hidden-data-loss). Fix: replace all four helpers with the shared `apiClient`; surface query errors on those panels.
+- [ ] **(P1) Bordereaux CSV is a plain `<a href>` to a JWT-protected endpoint** (`BordereauxWorkbenchPage.tsx:510`) — always 401s. Fetch as blob via `apiClient`.
+- [ ] (P1) Bordereaux Workbench route guarded `reports.view` but every API it calls needs `accounting.admin` — reports-only users get a page of 403s. Align guard; same for the "QB Sync Health" link bouncing non-billing users.
+- [ ] (P1) Dashboard Tasks card has a working link but an empty body — render open/overdue counts from `tasks.api.ts` or drop the card.
+- [ ] (P2) Delete the now-dead `ComingSoon` component/`soon` handling in ReportsPage; remove dead `'activity'` Tab union member in InsuredDetailPage.
+
+### WS5 — Program / carrier setup — ❌ the open Gate-A blocker
+
+Machinery done (hierarchy, AL block, orphan audit). **Data missing: no carriers/programs are seeded** — Lloyd's IM (Beazley AFB 623/2623) and Lloyd's GL (DALE 1729) per the launch decision, with eligible states, limits, territories, rating assignments, fees, SL setup, policy-number sequences, form packages, commissions, QBO/GL mappings.
+
+- [ ] Configure both launch programs end-to-end (state lists/limits per the SMM Underwriter context).
+- [ ] Run the orphan audit; resolve every finding.
+- [ ] **(new, from §8.2) Per launch state, an SL "tax assertion" check**: a test bind in each filing state must produce SL tax + stamping lines and include the state's mandatory SL disclosure form. This is the WS12 fail-closed behavior exercised as a setup-verification step.
+- [ ] Historical-versioning gap: defer, documented.
+
+### WS6 — Rating — ✅ shadow-mode infrastructure done / cutover pending
+
+- [ ] **Shadow-rate cutover**: accumulate shadow-vs-actual deltas on real-shaped UAT quotes; flip per-LOB toggles to authoritative when deltas are explained. (The comparison data + admin UI exist.)
+- [ ] Confirm renewal rate-version + endorsement rating policy defaults.
+- [ ] Second LOB rater — blocked on actuarial workbook handoff (post-UAT unless APD enters scope).
+
+### WS7 — Bordereaux — ✅ pipeline done / ❌ reporting-integrity gaps (P0 for Gate B)
+
+- [ ] **(P0) Once-and-only-once ledger**: rows are currently selected purely by ReportingDate-within-period — an invoice that lands late (ReportingDate in an already-submitted period) is **never reported on any run**. Stamp `BordereauxRunId`/reported-period on inclusion at run *submission*; next preview = "ReportingDate ≤ periodEnd AND not yet reported"; add an "N unreported prior-period items" validation row. Test: late invoice appears in the following run; no transaction ever appears on two submitted runs.
+- [ ] **(P0, lands with WS11)** Return-premium rows flow onto the BDX automatically once credit invoices exist (preview already joins Invoice→PolicyTransaction).
+- [ ] (P1) **Mark-submitted closure state** in the Workbench (status fields exist; no UI action) — also the hook for the once-only stamping.
+- [ ] (P2) Carrier settlement netting: Account Current ↔ disbursement linkage (today payables are per-invoice due +30; London settlement is a manual match). Acceptable manual at launch.
+
+### WS8 — Deploy, burn-in, UAT — ◐
+
+- [ ] **App Insights** (zero references in code today) — or at minimum Azure log streaming before testers arrive; container logs are currently the only triage surface.
+- [ ] deploy.yml: add post-deploy smoke (`curl /health/ready` loop — a bad container currently ships silently), `dotnet build backend` in the ci job (API-only compile errors currently surface late, in the docker build), dependency audit step.
+- [ ] Backup/rollback rehearsal; QBO sandbox→production decision; KeyVault managed identity; worker double-run check.
+- [ ] Full manual UAT script (submission → quote → bind → issue on launch program; endorsement; cancellation **with return premium once WS11 lands**; void approval; manager queue; bordereaux month-end; claims import + loss run).
+- [ ] Burn-in, sign-off.
+
+### WS9 — Production reporting — ✅ day-one set done / fast-follow open
+
+- [ ] (P2) Written premium by program/carrier/LOB/state; submission pipeline (received→quoted→bound→declined); UW workload. The three launch reports are live.
+
+### WS10 — Claims & loss runs — backend ✅ / **four defects + no UI**
+
+- [ ] **(P0 for any claims rollout — High security finding)** Thread `UserAccessScope` through `ClaimsService` reads *and* writes: today any `claims.view` holder can pull the whole book's claims (claimant PII, financials) and any insured's loss run by ID; `claims.manage` can rewrite any claim's financials with no scope check and no `UpdatedById` audit. Scope via linked Policy/Insured `ForAccessScope`; decide how unlinked imported claims (PolicyId null) are scoped; stamp the modifying user; consider blocking manual edits of imported rows.
+- [ ] **(P1) Valuation correctness**: (a) loss-run `asOfDate` is mislabeled — it filters `DateOfLoss <= asOf` over *current* values rather than valuation snapshots; (b) import unconditionally overwrites — an older file regresses newer valuations (`valuationDate >= LastValuationDate` guard missing); (c) `expense` is hardcoded `0m` while `paid` mixes loss+expense, so the loss-run expense column is always zero. Decide snapshot table vs batch-keyed history per the valuation-cadence answer (§5.7).
+- [ ] (P1) Import hardening: cap rows/batch, batch the per-row existing-claim lookup (currently N+1), protect against client-controlled `(SourcePolicyReference, ClaimNumber)` collisions clobbering manual claims.
+- [ ] **(P1) Frontend — entirely missing**: no claims api/types/pages/routes/nav. Build: claims list + detail, import page surfacing batch results, **loss-run generate/download action on insured & policy detail** (a daily MGA task), guarded by `claims.view`/`claims.manage`.
+- [ ] (P1) Loss-run export endpoint (PDF/XLSX via existing document tooling) — `GetLossRunAsync` returns a DTO only.
+- [ ] Import the launch program's current claims (Sedgwick) + first historical load.
+
+---
+
+## 3b. New workstreams for live business (from the 2026-06-10 MGA audit)
+
+### WS11 — Return premium & financial integrity (P0, the critical path to Gate B)
+
+Today: negative endorsements are hard-blocked (`RETURN_PREMIUM_ENDORSEMENT_ACCOUNTING_REQUIRED`), `CompleteCancellationAsync` books **zero accounting**, credit invoices skip payables (`if (GrossPremium > 0)`), the fee engine's `MinimumAmount` would flip a negative tax to a *positive minimum* on a credit, and `CancelAsync` accepts an arbitrary `PremiumChange` with no pro-rata validation. A midterm cancellation would over-remit SL tax, over-owe carriers on paper, and misreport written premium to Lloyd's.
+
+Build (one coherent unit):
+- [ ] **Earned-premium calculator** — pro-rata / short-rate / minimum-earned-premium, per program+reason (no MEP concept exists anywhere today). Gated on decision §5.1.
+- [ ] **Credit-invoice path** in `InvoicingService`: negative `GrossPremium`; carrier-payable *reduction* (or receivable-from-carrier); agent-commission chargeback ledger lines; SL tax/stamping reversal per state refundability (decision §5.1).
+- [ ] **Fee-engine negative-base guards**: `MinimumAmount` and `Stratified` must handle credits correctly.
+- [ ] Wire `CompleteCancellationAsync` and `IssueEndorsementAsync` (negative path) to the credit-invoice flow; validate `PremiumChange` against the calculator.
+- [ ] **Premium single-source-of-truth**: at bind, reconcile or replace user-keyed `quote.TaxesAndFees`/`TotalPremium` with fee-engine output so dec page = ledger = BDX. (Today a quote keyed `TaxesAndFees=0` binds with a $0-tax dec page and a taxed invoice.)
+- [ ] Regression tests: 50%-term pro-rata cancel → −50% premium invoice, negative SL tax line, payable reduced, ledger balanced, negative BDX row; flat cancel → 100% return; short-rate by reason; quote-vs-invoice parity assertion.
+
+### WS12 — Surplus-lines compliance (P0 fail-closed + P1 filing surface)
+
+- [ ] **(P0) Fail-closed SL tax**: validate insured state at bind (non-empty + in program eligible list — today `State ?? ""` silently produces a tax-free invoice); after fee calc, assert filing-state binds produced lines for the configured `SurplusLinesTaxFeeDefinitionId`/`StampingFeeDefinitionId` (those FKs exist and are currently decorative). Explicit `SlHomeState` field (NRRA home state ≠ mailing state for multi-state trucking risks — decision §5.3).
+- [ ] (P1) **SL document merge**: `StampingWording`/`RequiredNoticeText` are stored but consumed nowhere; `BuildPolicyData` has zero `SurplusLines.*` merge fields (broker name/license, tax amounts). Interim workaround: static per-state mandatory forms (supported today) — verify per launch state in WS5.
+- [ ] (P1) **Diligent-effort enforcement**: `DiligentSearchRequired`/`AffidavitRequired` config is never read at bind. Wire as bind blocker or filing-checklist item per state (decision §5.4).
+- [ ] (P1) **SL filing report**: per-state period detail (policy, premium, tax, stamping) for SLAS/SLTX-style filings + filing calendar/tasks. `FilingFrequency`/`FilingDueDayOfMonth`/`FilingPaymentTermsDays`/`CreateFilingPayable` are dead config today; payables are hardcoded due `InvoiceDate+30`.
+
+### WS13 — Issuance & notice compliance (P1)
+
+- [ ] **Cancellation notices**: enforce `NoticeRequirementDays >=` the statutory minimum already in-system (`LegalRequirementSection` via `GetCancellationGuidanceAsync`) instead of accepting any integer; add proof-of-mailing fields/evidence to `PolicyCancellationDetail` (hang on existing `ComplianceEvidence`); generate notice copies per `SubmissionAdditionalInterest` (lienholders/loss payees — data already loaded for assembly). The direct-bill/notices memo defers *mailing automation* post-launch — that's fine; *capturing* compliance evidence is not deferrable for UW-initiated cancellations.
+- [ ] **Endorsement documents**: `IssueEndorsementAsync` posts accounting but produces no paper; `GenerateForPolicyTransactionAsync` is only called for cancel/non-renew notices today.
+- [ ] **Binder/certificate at bind**: `DocumentType.Binder` exists, nothing generates one; Lloyd's binding authorities expect prompt evidence of coverage between bind and issue. Implementation hinges on decision §5.5 (binder vs same-day issue).
+- [ ] **Mandatory-form server guard**: issuance requires only "≥1 included form" — add a server-side check that `Mandatory` package forms cannot be deselected.
+- [ ] **Producer licensing (minimum viable)**: Agent today = name + one free-text license number. For launch: documented manual SOP + license/E&O attachment types (exist); per-state license model with expirations and bind-block/warn (decision §5.6) post-UAT.
+
+### WS14 — Post-launch backlog additions (P2, scheduled but not gating)
+
+Premium-finance-company workflows (PFC entity, NOC intake, return-premium assignment — trucking E&S is heavily financed; schedule right behind WS11). Renewal automation worker (report exists; auto-task at X days pre-expiry). FNOL intake/TPA referral. Treaty/reinsurance model before Brace onboarding. Retention/legal-hold policy (document an SOP now; soft-deletes can currently remove records). Agent commission statements + automated commission disbursements. Installments + late notices (see direct-bill memo).
+
+---
+
+## 4. Reconciling overlaps & conflicts
+(unchanged from 2026-06-08 — see git history for the original text; key calls: "Phase 6" = UW Control Layer; AI triage post-UAT; founding docx plans historical; one rating backlog in WS6.)
 
 ---
 
 ## 5. Open decisions needed from Jeremiah
 
-These are business calls that gate the technical work; resolve early.
+Resolved: launch scope (Lloyd's IM Beazley + Lloyd's GL DALE; AL non-bindable) ✅; BDX day one (yes, GL) ✅.
 
-1. ~~**Launch program scope**~~ **✅ DECIDED (2026-06-08):** Launch with **Lloyd's IM via Beazley (AFB 623/2623)** and **Lloyd's GL via DALE Syndicate 1729**. AL remains inactive/non-bindable. Other programs follow post-UAT.
-2. ~~**Bordereaux day-one?**~~ **✅ DECIDED (2026-06-08):** Yes — **Lloyd's GL requires BDX day one.** WS7 is P1.
-3. **Party/workflow role model** — who can manage which entities? Unblocks WS2 scoping.
-4. **Cancellation accounting rules** — must midterm cancellation completion post full accounting? → WS3.
-5. **Actuarial workbook handoff** — when do AL/APD/GL rating workbooks arrive? Gates WS6 second-LOB rater.
-6. **Authority thresholds** — confirm deferral of deterministic bind/issue thresholds to post-UAT.
-7. **Claims feed sources & formats (WS10)** — which carriers/TPAs provide claims feeds, in what format (CSV/Excel/API), and how prior-carrier historical claims are obtained for the legacy book (one-time bulk load vs ongoing)? What valuation cadence?
-8. **Day-one report set (WS9)** — which production reports/views are must-have for UAT vs. fast-follow?
+**New, from the MGA audit — these gate WS11–WS13 builds:**
+
+1. **Earned-premium basis** — pro-rata vs short-rate (table? per program/state?) vs minimum-earned-premium percent per program; commission chargeback full vs earned-basis; SL tax refundable vs net-against-next-filing per launch state. *Gates WS11.*
+2. **Fee earned semantics** — are policy/broker fees fully earned on cancellation? (`AppliesToFlatCancellations` exists; earned-fee semantics don't.)
+3. **NRRA home state** — who determines home state for multi-state trucking risks, captured where at submission?
+4. **Diligent effort** — which launch states require pre-bind affidavits vs filing-time? Determines blocker vs checklist in WS12.
+5. **Binder vs direct-to-issue** — will SMM issue same-day at bind, or do the Beazley/DALE binding-authority wordings require a binder/certificate? *Gates WS13 binder item.*
+6. **Producer licensing** — NIPR verification before appointment? Bind-block on expired license/E&O or warn?
+7. **Claims valuation cadence** — monthly Sedgwick feed? Determines snapshot-table vs batch-keyed history in WS10.
+8. Party/workflow role model (carried over — unblocks WS2 P2 scoping).
+9. Day-one report set beyond the three live production reports (carried over).
 
 ---
 
 ## 6. Where agents can simplify this
-
-This project already has an agent-based review harness (`docs/ai-review/runbook.md`) and a solo-dev Codex workflow (`AGENTS.md`). Lean on agents for the high-fan-out, well-bounded work:
-
-- **Authorization audit (WS2)** — the `sims_security_auth_reviewer` agent is purpose-built: read-only, cites file/line, gives attack paths. Run it across the named controller surfaces to produce the ownership-scope gap list, then fix from its findings. Highest-leverage agent use in this plan.
-- **UI route crawl (WS4)** — a browser agent (Claude in Chrome) can crawl every route per role, capturing 404s, console errors, dead buttons, and role-leak routes far faster than manual clicking. Feeds the empty "Route Crawl Findings" table directly.
-- **Visual consistency sweep (WS4)** — the `sims_frontend_ui_reviewer` agent can diff each High-priority page against `SIMS-UI-Guide/tokens.css` and flag off-token colors/spacing in bulk, so the human pass is just confirmation.
-- **Program-setup completeness (WS5)** — an agent can generate the orphan/incomplete Program-setup audit report and cross-check configured limits/territories against the SMM Underwriter context file, flagging mismatches per program×carrier×LOB.
-- **Bug triage (WS3)** — the `sims_qa_test_coverage_reviewer` and `sims_data_ef_reviewer` agents can confirm which backlog items are truly open vs already fixed in the uncommitted tree, and propose tests.
-- **Claims-feed mapping (WS10)** — an agent can profile each incoming carrier/TPA loss-run file and propose a field mapping to the canonical claim schema, flagging gaps and ambiguous columns. This is exactly the high-fan-out, well-bounded work agents do well, and it removes most of the manual toil from onboarding each new feed.
-- **Parallel reviewers + lead synthesizer** — run the 7 specialist reviewers read-only, then `sims_review_lead` to dedup/severity-rank into one punch list before each UAT cycle.
-
-Keep agents **read-only for audits**; apply fixes deliberately and commit to `main` per the AGENTS.md protocol.
+(unchanged in substance from 2026-06-08; the 2026-06-10 reaudit itself followed this model — four parallel read-only reviewers. Continue using: security-auth reviewer per release, frontend reviewer for the WS4-R fixes, insurance-workflow reviewer to re-verify WS11/WS12 after build, browser route crawl per role before UAT.)
 
 ---
 
-## 7. Sequenced path to live testing
+## 7. Sequenced path
 
-A pragmatic ordering (dependencies, not calendar):
+**To Gate A (internal UAT):**
+1. **WS4-R** broken API clients (small, restores billing/commission UIs) + **WS10 ClaimsService scoping** (small, closes the High).
+2. **WS5** seed both launch programs end-to-end; orphan audit clean; SL tax-assertion check per state.
+3. **WS1 operational** items + **WS8** App Insights/smoke-test/rehearsal.
+4. UAT script + burn-in. *(WS6 shadow data accumulates during UAT.)*
 
-1. **WS0** — commit and stabilize the tree, green build/test. *(blocks everything)*
-2. **WS1** — config fail-closed + secret rotation. *(launch blocker)*
-3. **WS5 (one program)** + **WS6 shadow-rate** — get a single program rating correctly end-to-end. Run the security-auth agent (**WS2**) in parallel.
-4. **WS4** — broken links to zero, Login + High-priority pages aligned, route crawl. **WS3** — open bugs.
-5. **WS9** (production reporting) + **WS10** (claims import + loss runs) — stand these up in parallel with WS4/WS3; both are now in scope and don't block on the rating/UI work.
-6. **WS7** — only if the launch program needs day-one bordereaux.
-7. **WS8** — deploy to Azure test, CI/lint gates, burn-in, full UAT script, sign-off.
+**To Gate B (live business):**
+5. **WS11** return premium & financial integrity ← *the critical path; start the §5.1 decisions now.*
+6. **WS12** SL fail-closed (small, do with WS11) + filing report.
+7. **WS7** BDX once-only + mark-submitted (before the first real DALE submission).
+8. **WS13** notice compliance + endorsement docs + binder decision.
+9. **WS10** claims valuation fixes + claims/loss-run UI; first Sedgwick import.
 
-Gate to "live testing" = §2 checklist fully satisfied with no open P0/P1.
+Gate B = §2 Gate-B checklist fully satisfied with no open P0/P1.
 
 ---
 
-## 8. Live audit findings (audited 2026-06-08)
+## 8. Live audit findings
 
-These are the concrete results of the code-level security audit and the static route/links crawl. They feed WS2 and WS4. (Servers were not running, so the route crawl is a static code crawl — more complete than a click-through for catching wiring/guard issues.)
+### 8.0 Reaudit summary (2026-06-10, four parallel code-level reviews)
 
-### 8.1 Security / authorization (code-level)
+| Review | Headline |
+|---|---|
+| Workstream verification | WS7/WS9 further along than planned; WS5 has **no seeded carrier data**; WS10 backend-only; App Insights absent; no installments/late-notices/agent-statements. |
+| MGA operating cycle | **4 P0s**: return premium nonexistent; SL tax fails open; quote-vs-invoice fee divergence; BDX once-only gap. 9 P1s incl. notice compliance, SL filing surface, endorsement/binder docs, claims valuation, producer licensing. |
+| Security closeout | C1/H1/H2/M1/L2 all verified fixed. **New High: ClaimsService unscoped.** M3 idempotency + child-controller scoping remain. AuthController class-level `[AllowAnonymous]` (Low). |
+| Frontend/ops | WS4 verified closed. **4 API clients silently broken (401 everything)**; bordereaux CSV anchor 401s; renewal workflow is a dead-end (no Start Renewal caller); claims UI absent; no post-deploy smoke. |
 
-**Threat-model context (important):** SIMS is a **single-tenant, internal-staff** app. There is *no* agent/tenant claim on the JWT (`AuthService.GenerateAccessToken`) and `User` has no `AgentId`. So classic cross-agent IDOR does not apply. The real object model is **per-user ownership scope** via `UserAccessScope` / `BusinessDataAccess.ForAccessScope`: a user without `underwriting.manage` or `admin.system.manage` sees only records where they are `CreatedById`/`UnderwriterId`/`AssistantUWId`; users with `underwriting.manage` see all business data **by design**. The residual risk is therefore endpoints that **bypass `ForAccessScope`**, exposing data to lower-privilege authenticated users.
+Full detail lives in the workstream sections above (§3, §3b), which supersede the 6-08 tables below where they conflict.
 
-| ID | Sev | Finding | Location | Fix |
-|---|---|---|---|---|
-| **C1** | Critical | UW Writeup broken object-level authorization. Get/Save/Submit are `[Authorize]`-only; service loads by `QuoteId` with no scope filter (`SaveAsync` doesn't even take `userId`). Any authenticated user can read/overwrite any quote's underwriting writeup, conditions, and referral content by enumerating quote IDs. | `UWWriteupController.cs:18-39`; `UWWriteupService.cs:29,47,98` | Thread `UserAccessScope` into `IUWWriteupService`; verify parent-quote access (reuse `QuoteService.GetByIdAsync(quoteId, access)`) before load; `SaveAsync` must take/use `userId`. |
-| **H1** | High | No fallback authorization policy → fail-open default. Per-permission policies are registered but no `FallbackPolicy`/`DefaultPolicy`; any controller/action a dev forgets to annotate is publicly reachable. | `Program.cs:59-66` | Add `FallbackPolicy = RequireAuthenticatedUser()`, then explicitly `[AllowAnonymous]` the public auth endpoints (login/microsoft/refresh) and the QBO webhook. |
-| **H2** | High | Disbursement-void permission tier gap. `VoidController` is class-gated `accounting.manage`; the parallel `DisbursementsController` void requires `accounting.admin`. A `manage`-tier user can void disbursements (and receipts/cash-apps/invoices) via the Void route. | `VoidController.cs:15,63`; cf. `DisbursementsController.cs:57-59` | Raise `VoidController` to `accounting.admin`. (An authority-approval gate already compensates partially.) |
-| **M1** | Medium | Quote checklist read not scope-checked — any authenticated user can read UW checklist/gating info for any quote. | `QuoteChecklistController.cs:25-30` | Pass `CurrentAccess` into `GetForQuoteAsync` (or front with the scoped quote lookup). |
-| **M2** | Medium | Submissions/Quotes/Policies list+read are base `[Authorize]` (no `*.view` permission). **Not a true IDOR** — all correctly pass `CurrentAccess`. Flagged for least-privilege only. | `SubmissionsController.cs:38-47`, `QuotesController.cs:41-50`, `PoliciesController.cs:38-62` | Optionally add `policies.view`/`submissions.view` for defense-in-depth. |
-| **M3** | Medium | No idempotency keys on accounting create/apply — a retried/double-clicked `CreateReceipt`/`Apply` can create duplicate ledger entries (double-void is already guarded). | `ReceiptsController.cs:30`, `CashApplicationController.cs:23`, `DisbursementsController.cs:39-50` | Add idempotency-key header + dedup table on create/apply. |
-| **L1** | Low | DocumentGeneration merges entity PII before the object-level access check (final download IS access-controlled, so no leak — just early work). | `DocumentGenerationService.cs:30-100` | Call `CanAccessEntityAsync` as step 0, before building the data dictionary. |
-| **L2** | Low | `[Authorize(Roles="Admin")]` still used despite the audit doc claiming none remain — bypasses the permission catalog. | `PoliciesController.cs:102-104`, `VoidController.cs:28` | Replace with a permission policy; update the audit doc. |
+### 8.1 Security / authorization (2026-06-08 baseline — closeout state now in WS2)
 
-**Confirmed already correctly scoped (the "done" column):** `AttachmentService` object-level checks (the 2026-05-27 fix — solid: download/delete/list/upload across Submission/Policy/Carrier/Agent/Insured, returns 403); `PoliciesController`/`QuotesController` consistently pass `CurrentAccess`; all submission child controllers bind child→parent (`v.SubmissionId == submissionId`); `NotesController` fully scoped + per-action gated; Users/Insureds/Agents/Carriers method-level gated with typed DTOs (no mass-assignment); accounting reads `accounting.manage` / mutations `accounting.admin` (except H2); QBO webhook unauthenticated-by-design but HMAC-verified and rejects an unconfigured token; no `[AllowAnonymous]` anywhere; auth endpoints rate-limited.
+Historical reference: C1 (UW writeup), H1 (fallback policy), H2 (void tier), M1 (checklist scope), M2 (least-privilege view perms), M3 (idempotency), L1 (doc-gen ordering), L2 (role remnants). C1/H1/H2/M1/L2 verified fixed 2026-06-10; M3 open (WS2); M2/L1 unchanged (P2).
 
-**Top 3 before go-live: C1, H1, H2.**
+### 8.2 Route + links crawl (2026-06-08 — now closed)
 
-### 8.2 Route + links crawl (static)
-
-All six tracked broken-link items remain **open** with verified locations:
-
-| ID | Still open? | Exact location | Fix |
-|---|---|---|---|
-| UI-LINK-001 | Yes | `SubmissionDetailPage.tsx:1260` builds `/policies/${q.id}` from the **quote** id; root cause `quote.types.ts:57-73` (`QuoteListItem` lacks `boundPolicyId`). | Add `boundPolicyId` to `QuoteListItem` + backend DTO; render link only when present. |
-| UI-LINK-002 | Yes | `billing/ActivityPage.tsx:123` (`qbDeepLink = '#'`), rendered `:236-239`. | Remove the anchor unless a real `externalJournalUrl` is returned. |
-| UI-LINK-003 | Yes | `reports/ReportsPage.tsx:1282-1284` (def), `:1347-1369` (clickable), `:1245` (msg). | `disabled`/`aria-disabled`, no select, until backed by data. |
-| UI-LINK-004 | Yes | `dashboard/DashboardPage.tsx:516` (`All →` has no `onClick`), `:519` (stub text); `/tasks` exists. | `onClick={() => navigate('/tasks')}`; replace stub. |
-| UI-LINK-005 | Yes | `insureds/InsuredDetailPage.tsx:230` (tab), `:606` (stub text). | Hide/disable tab until wired. |
-| UI-DOC-001 | Yes (wider) | Client truth `api/client.ts:5` (`/api/v1`); stale docs `deployment.md:60,96`, `frontend.md:120` (+hardcoded `localhost:5000`), `infrastructure.md:97`. | Rewrite all three to the same-origin proxy. |
-
-**New issues not in the tracker:**
-
-1. **`/tasks` route unguarded** — `App.tsx:235` is the only top-level route without `withPermission`. Any authenticated user reaches the Task Queue. Wrap it, or confirm it's intentionally universal.
-2. **Sidebar-vs-route guard mismatch** — sidebar uses compound `nav.* && <action>` (`usePermissions.ts:60-64`); routes check only the action half (`App.tsx:237-241,259-268`). A user with the action permission but not the `nav.*` flag can reach Billing/Reports/Task-admin by URL. Align the route guards.
-3. **No real 404 page** — `App.tsx:272` catch-all redirects all unknown URLs to `/dashboard`, masking genuine broken links. Add a dedicated NotFound route.
-
-**Route-guard coverage (good news):** all 60 page components have routes (no orphans/stubbed route targets); every `<Link>`/`navigate()` target except UI-LINK-001 resolves to a defined route; no other `href="#"`, empty `onClick`, or hardcoded `localhost` exists in `src`. Admin routes are correctly gated (`admin.system.manage`, `rating.admin`, etc.); `/dashboard` open is acceptable (it's the fallback landing).
+UI-LINK-001/002/003/005, UI-DOC-001, 404 page, sidebar parity, `/tasks` guard: all resolved and verified 2026-06-10 (UI-LINK-004 partial — empty card body). Update `docs/ui-broken-links-tracker.md` to match. New frontend findings are in **WS4-R**.
 
 ---
 
 ## Appendix A — Source-plan crosswalk
+(unchanged from 2026-06-08, plus:)
 
-| Workstream | Primary source plan(s) |
+| Workstream | Primary source |
 |---|---|
-| WS0 stabilize tree | `AGENTS.md`, `CLAUDE.md`, `go-live-plan.md` |
-| WS1 hardening/config | `go-live-plan.md`, `deployment.md`, `infrastructure.md` |
-| WS2 authorization | `security/endpoint-authorization-audit.md`, `ai-review/sims-code-review-backlog.md` |
-| WS3 bugs | `ai-review/sims-code-review-backlog.md` |
-| WS4 UI alignment | `ui-broken-links-tracker.md`, `ui-design-audit-plan.md`, `superpowers/plans/2026-05-25-phase-4-ui-links-workflow-qa.md`, `SIMS-UI-Guide/` |
-| WS5 program/carrier | `superpowers/plans/2026-05-25-phase-7-program-setup-closeout.md`, `superpowers/specs/2026-05-30-program-sot-database-contract-design.md`, SMM Underwriter context |
-| WS6 rating | `rating-engine-plan.md`, `rating-engine-remaining-plan.md` |
-| WS7 bordereaux | `superpowers/plans/2026-05-24-phase-8-bordereaux-carrier-reporting.md`, `superpowers/plans/2026-05-25-phase-8-london-bdx-account-current.md` |
-| WS8 deploy/UAT | `go-live-plan.md`, `deployment.md`, `phase-4-ui-links-workflow-qa.md` |
-| WS9 production reporting | `SIMS improvement 5.17.26.md` (Phase 9), `ui-broken-links-tracker.md` |
-| WS10 claims / loss runs | `SIMS improvement 5.17.26.md` (Phase 10) |
-| Reconciled / historical | `SIMS improvement 5.17.26.md` (Phases 11+), `phase-6-*`, `ai-underwriting-plan.md`, `SIMS_AI_Plan.docx`, `SMM_PolicyAdmin_*`, `SMMIMS Plan 4.11.26.docx` |
+| WS11 return premium | 2026-06-10 MGA audit (§8.0); `InvoicingService.cs`, `PolicyService.cs:898-1106`, `FeeCalculationService.cs` |
+| WS12 SL compliance | 2026-06-10 MGA audit; `SurplusLinesStateSetup.cs`, `QuoteService.cs:476` |
+| WS13 issuance/notices | 2026-06-10 MGA audit; `DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md` (mailing automation stays post-launch) |
+| WS4-R frontend repair | 2026-06-10 frontend audit; the four `*.api.ts` raw-fetch clients |
 
 ## Appendix B — Out of scope for UAT (post-launch backlog)
 
-Shared job/outbox/observability framework (Phase 11), full AI extraction + risk scoring + triage queue (AI plan Phases 1–7), FMCSA phases 2–7, compliance-doc module remaining build, document issuance automation beyond the IM pilot, and Program historical-interval versioning.
-
-> **Moved into scope (2026-06-08):** production reporting (now **WS9**) and claims visibility / loss-run import (now **WS10**) were pulled out of the post-launch backlog — SMM needs to see written business and produce loss runs (from current and prior carriers' claims feeds) for live operations.
-
-**Direct bill + electronic payments + notices/reminders** — a separate post-launch initiative (one program moving to direct bill, ePayPolicy electronic payment intake, a scheduled dunning engine, and cancellation-notice mailing with proof-of-mailing). See [`DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md`](DIRECT-BILL-AND-NOTICES-ARCHITECTURE.md).
+Unchanged: shared job/outbox framework, full AI extraction/scoring/triage, FMCSA 2–7, compliance-doc remaining build, issuance automation beyond pilot, program historical-interval versioning, **direct bill + ePay + dunning + mailing automation** (see architecture memo). Newly scheduled (WS14): PFC workflows, renewal worker, FNOL, treaty model (pre-Brace), retention SOP, agent statements, installments.
