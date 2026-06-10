@@ -40,7 +40,7 @@ This is a genuinely built MGA platform. The 6-08 plan's frontier items have move
 3. ~~Backend authorization passes ownership-scope audit on core surfaces.~~ ✅ C1/H1/H2/M1 fixed; **except ClaimsService scoping (new High — §WS10)**.
 4. ~~Broken-link/placeholder list zero; High-priority pages match the UI guide.~~ ✅ except dashboard Tasks card body (cosmetic).
 5. One full program configured end-to-end and bindable. ❌ **Lloyd's carriers/programs not seeded** (§WS5) — open.
-6. Production visibility for the launch program. ✅ reports live (pipeline/UW-workload views are fast-follow).
+6. Production visibility for the launch program. ◐ launch trio live; **written-premium, pipeline, and UW-workload views promoted to day-one (§5.9)** — open in WS9.
 7. Loss-run capability for the launch program. ❌ backend yes / frontend none / valuation defects (§WS10).
 8. Deployed to Azure test env with health checks; backup/rollback rehearsal. ◐ deployed + healthy; **App Insights not wired; no post-deploy smoke test; rehearsal not done**.
 9. CI gates green; burn-in with no open P0/P1. ◐ gates green; burn-in pending.
@@ -82,7 +82,7 @@ Verified fixed: C1, H1, H2, M1, L2 (file-level verification 2026-06-10).
 - [ ] **(P1) ClaimsService scoping** — moved to WS10 item 1; it is the only High finding in current code.
 - [ ] (P1) Remove class-level `[AllowAnonymous]` on `AuthController` — it neutralizes the per-action `[Authorize]` on `logout`/`me`/`me/password` (anonymous calls 500 instead of 401; future endpoints on that controller ship anonymous by default). Put `[AllowAnonymous]` on login/microsoft/refresh only.
 - [ ] (P1) **M3 idempotency keys** on accounting create/apply (`ReceiptsController`, `CashApplicationController`, `DisbursementsController`) — duplicate postings under live volume are expensive to unwind now that voids need admin authority. `Idempotency-Key` header + key→result table.
-- [ ] (P2) Entity-scope on the 11 submission child controllers (drivers carry DOB/license PII) and decide/document the shared-inbox stance for `InboundEmailsController`. Mitigated today only if every active user has `CanAccessAllBusinessData`.
+- [ ] (P2) Entity-scope on the 11 submission child controllers (drivers carry DOB/license PII) and decide/document the shared-inbox stance for `InboundEmailsController`. Mitigated today only if every active user has `CanAccessAllBusinessData`. **Role model decided (§5.8 — tiered): underwriters manage insureds; agents/carriers admin-managed — apply when scoping.**
 - [ ] (P2) Security regression tests: underwriter-cannot-reach-`rating.admin`, refresh-token-reuse, inactive-external-user (runtime logic exists and is correct; tests absent). Delete the dead `IsInRole("Admin")` in `VoidController:28`.
 
 ### WS3 — Open bug fixes — ✅ DONE (remaining items absorbed into WS11)
@@ -106,6 +106,7 @@ Machinery done (hierarchy, AL block, orphan audit). **Data missing: no carriers/
 - [ ] Configure both launch programs end-to-end (state lists/limits per the SMM Underwriter context).
 - [ ] Run the orphan audit; resolve every finding.
 - [ ] **(new, from §8.2) Per launch state, an SL "tax assertion" check**: a test bind in each filing state must produce SL tax + stamping lines and include the state's mandatory SL disclosure form. This is the WS12 fail-closed behavior exercised as a setup-verification step.
+- [ ] **(new, §5.4) Per launch state, diligent-effort research**: determine which launch states mandate pre-bind diligent effort/affidavits vs filing-time, and set `DiligentSearchRequired`/`AffidavitRequired` accordingly — feeds the WS12 bind blocker.
 - [ ] Historical-versioning gap: defer, documented.
 
 ### WS6 — Rating — ✅ shadow-mode infrastructure done / cutover pending
@@ -129,14 +130,16 @@ Machinery done (hierarchy, AL block, orphan audit). **Data missing: no carriers/
 - [ ] Full manual UAT script (submission → quote → bind → issue on launch program; endorsement; cancellation **with return premium once WS11 lands**; void approval; manager queue; bordereaux month-end; claims import + loss run).
 - [ ] Burn-in, sign-off.
 
-### WS9 — Production reporting — ✅ day-one set done / fast-follow open
+### WS9 — Production reporting — ✅ launch trio done / **three more promoted to P1 pre-UAT (§5.9)**
 
-- [ ] (P2) Written premium by program/carrier/LOB/state; submission pipeline (received→quoted→bound→declined); UW workload. The three launch reports are live.
+- [ ] **(P1)** Written premium by program/carrier/LOB/state and period.
+- [ ] **(P1)** Submission pipeline funnel (received→quoted→bound→declined, conversion %, by program/agent).
+- [ ] **(P1)** UW workload (open submissions/quotes/tasks per underwriter).
 
 ### WS10 — Claims & loss runs — backend ✅ / **four defects + no UI**
 
 - [ ] **(P0 for any claims rollout — High security finding)** Thread `UserAccessScope` through `ClaimsService` reads *and* writes: today any `claims.view` holder can pull the whole book's claims (claimant PII, financials) and any insured's loss run by ID; `claims.manage` can rewrite any claim's financials with no scope check and no `UpdatedById` audit. Scope via linked Policy/Insured `ForAccessScope`; decide how unlinked imported claims (PolicyId null) are scoped; stamp the modifying user; consider blocking manual edits of imported rows.
-- [ ] **(P1) Valuation correctness**: (a) loss-run `asOfDate` is mislabeled — it filters `DateOfLoss <= asOf` over *current* values rather than valuation snapshots; (b) import unconditionally overwrites — an older file regresses newer valuations (`valuationDate >= LastValuationDate` guard missing); (c) `expense` is hardcoded `0m` while `paid` mixes loss+expense, so the loss-run expense column is always zero. Decide snapshot table vs batch-keyed history per the valuation-cadence answer (§5.7).
+- [ ] **(P1) Valuation correctness (cadence decided §5.7 — mixed daily/weekly/monthly feeds)**: build **batch-keyed valuation history** — each import batch is a snapshot keyed by its valuation date, loss runs select the latest snapshot ≤ asOfDate per claim. Fixes in the same pass: (a) loss-run `asOfDate` currently filters `DateOfLoss <= asOf` over *current* values; (b) import unconditionally overwrites — an older file regresses newer valuations (`valuationDate >= LastValuationDate` guard missing); (c) `expense` is hardcoded `0m` while `paid` mixes loss+expense, so the loss-run expense column is always zero.
 - [ ] (P1) Import hardening: cap rows/batch, batch the per-row existing-claim lookup (currently N+1), protect against client-controlled `(SourcePolicyReference, ClaimNumber)` collisions clobbering manual claims.
 - [ ] **(P1) Frontend — entirely missing**: no claims api/types/pages/routes/nav. Build: claims list + detail, import page surfacing batch results, **loss-run generate/download action on insured & policy detail** (a daily MGA task), guarded by `claims.view`/`claims.manage`.
 - [ ] (P1) Loss-run export endpoint (PDF/XLSX via existing document tooling) — `GetLossRunAsync` returns a DTO only.
@@ -161,18 +164,18 @@ Build (one coherent unit — ruleset decided, see §5.1):
 
 ### WS12 — Surplus-lines compliance (P0 fail-closed + P1 filing surface)
 
-- [ ] **(P0) Fail-closed SL tax**: validate insured state at bind (non-empty + in program eligible list — today `State ?? ""` silently produces a tax-free invoice); after fee calc, assert filing-state binds produced lines for the configured `SurplusLinesTaxFeeDefinitionId`/`StampingFeeDefinitionId` (those FKs exist and are currently decorative). Explicit `SlHomeState` field (NRRA home state ≠ mailing state for multi-state trucking risks — decision §5.3).
+- [ ] **(P0) Fail-closed SL tax**: validate state at bind (non-empty + in program eligible list — today `State ?? ""` silently produces a tax-free invoice); after fee calc, assert filing-state binds produced lines for the configured `SurplusLinesTaxFeeDefinitionId`/`StampingFeeDefinitionId` (those FKs exist and are currently decorative). **`SlHomeState` field on submission (decided §5.3): defaults to insured's state, UW-overridable; this field — not the raw insured state — drives tax calc and filings.**
 - [ ] (P1) **SL document merge**: `StampingWording`/`RequiredNoticeText` are stored but consumed nowhere; `BuildPolicyData` has zero `SurplusLines.*` merge fields (broker name/license, tax amounts). Interim workaround: static per-state mandatory forms (supported today) — verify per launch state in WS5.
-- [ ] (P1) **Diligent-effort enforcement**: `DiligentSearchRequired`/`AffidavitRequired` config is never read at bind. Wire as bind blocker or filing-checklist item per state (decision §5.4).
+- [ ] (P1) **Diligent-effort enforcement (decided §5.4 — per-state bind blocker)**: wire `DiligentSearchRequired`/`AffidavitRequired` (config exists, never read at bind) as a bind blocker in states that mandate pre-bind diligent effort, filing-checklist item elsewhere. Per-state research happens during WS5 setup.
 - [ ] (P1) **SL filing report**: per-state period detail (policy, premium, tax, stamping) for SLAS/SLTX-style filings + filing calendar/tasks. `FilingFrequency`/`FilingDueDayOfMonth`/`FilingPaymentTermsDays`/`CreateFilingPayable` are dead config today; payables are hardcoded due `InvoiceDate+30`.
 
 ### WS13 — Issuance & notice compliance (P1)
 
 - [ ] **Cancellation notices**: enforce `NoticeRequirementDays >=` the statutory minimum already in-system (`LegalRequirementSection` via `GetCancellationGuidanceAsync`) instead of accepting any integer; add proof-of-mailing fields/evidence to `PolicyCancellationDetail` (hang on existing `ComplianceEvidence`); generate notice copies per `SubmissionAdditionalInterest` (lienholders/loss payees — data already loaded for assembly). The direct-bill/notices memo defers *mailing automation* post-launch — that's fine; *capturing* compliance evidence is not deferrable for UW-initiated cancellations.
 - [ ] **Endorsement documents**: `IssueEndorsementAsync` posts accounting but produces no paper; `GenerateForPolicyTransactionAsync` is only called for cancel/non-renew notices today.
-- [ ] **Binder/certificate at bind**: `DocumentType.Binder` exists, nothing generates one; Lloyd's binding authorities expect prompt evidence of coverage between bind and issue. Implementation hinges on decision §5.5 (binder vs same-day issue).
+- [ ] **Binder/certificate at bind (decided §5.5)**: auto-generate a binder at bind via the existing document-generation pipeline (`DocumentType.Binder` exists, nothing generates one); full packet issues after checklist completion. Binder shows coverage, carrier/syndicate, effective dates, SL disclosures where required.
 - [ ] **Mandatory-form server guard**: issuance requires only "≥1 included form" — add a server-side check that `Mandatory` package forms cannot be deselected.
-- [ ] **Producer licensing (minimum viable)**: Agent today = name + one free-text license number. For launch: documented manual SOP + license/E&O attachment types (exist); per-state license model with expirations and bind-block/warn (decision §5.6) post-UAT.
+- [ ] **Producer licensing — hard block (decided §5.6, promoted to Gate B build)**: per-state producer license + E&O model with expiration dates on Agent (today: name + one free-text license number); bind blocks when the producing agent's license for the risk state is missing/expired, surfaced through the existing clearance/control layer. Admin UI for license entry; expiration report.
 
 ### WS14 — Post-launch backlog additions (P2, scheduled but not gating)
 
@@ -201,13 +204,15 @@ Resolved: launch scope (Lloyd's IM Beazley + Lloyd's GL DALE; AL non-bindable) �
    - **Flat endorsement charges:** fully earned at issuance — never returned on later cancellation.
    - **Flat cancellation (inception):** full unwind — 100% of premium, tax, stamping, and fees returned; full commission chargeback; policy recorded as flat-cancelled.
 2. ~~**Fee earned semantics**~~ **✅ DECIDED (2026-06-10):** policy/broker fees are **fully earned** on midterm cancellation — no fee reversal on the credit invoice. The single exception is **flat cancellation** (inception), where the full unwind per §5.1 returns fees too.
-3. **NRRA home state** — who determines home state for multi-state trucking risks, captured where at submission?
-4. **Diligent effort** — which launch states require pre-bind affidavits vs filing-time? Determines blocker vs checklist in WS12.
-5. **Binder vs direct-to-issue** — will SMM issue same-day at bind, or do the Beazley/DALE binding-authority wordings require a binder/certificate? *Gates WS13 binder item.*
-6. **Producer licensing** — NIPR verification before appointment? Bind-block on expired license/E&O or warn?
-7. **Claims valuation cadence** — monthly Sedgwick feed? Determines snapshot-table vs batch-keyed history in WS10.
-8. Party/workflow role model (carried over — unblocks WS2 P2 scoping).
-9. Day-one report set beyond the three live production reports (carried over).
+3. ~~**NRRA home state**~~ **✅ DECIDED (2026-06-10):** explicit `SlHomeState` field on the submission, **defaulting to the insured's state with UW override** for principal-place-of-business cases. The field (not the raw insured state) drives tax calc and filings.
+4. ~~**Diligent effort**~~ **✅ DECIDED (2026-06-10):** **per-state bind blocker** — during WS5 setup, research each launch state; where the state mandates pre-bind diligent effort, bind blocks until affidavit/declination info is recorded; other states get a filing-time checklist item.
+5. ~~**Binder vs direct-to-issue**~~ **✅ DECIDED (2026-06-10):** **binder at bind, policy follows** — the system auto-generates a binder/certificate at bind as evidence of coverage; the full packet issues after checklist completion. WS13 binder item is now a definite build.
+6. ~~**Producer licensing**~~ **✅ DECIDED (2026-06-10):** **hard block at bind** — build the per-state producer license/E&O model with expirations now; bind blocks when the producing agent's license for the risk state is missing or expired. Promoted from post-UAT to a Gate B build (WS13).
+7. ~~**Claims valuation cadence**~~ **✅ DECIDED (2026-06-10):** **mixed cadence** — some feeds monthly, some historical feeds weekly or daily. Valuation history must be **batch-keyed by valuation date** (each import batch is a snapshot), supporting arbitrary cadence; no fixed monthly snapshot table.
+8. ~~**Party/workflow role model**~~ **✅ DECIDED (2026-06-10):** **tiered** — underwriters create/edit insureds in the normal workflow; agents and carriers are admin-managed setup data. Unblocks WS2 P2 permission scoping.
+9. ~~**Day-one report set**~~ **✅ DECIDED (2026-06-10):** all three additional views are must-have for UAT day one — **written premium by program/carrier/LOB/state, submission pipeline funnel, and UW workload**. WS9 fast-follow items promoted to P1 pre-UAT.
+
+**All §5 decisions are now resolved.** WS11–WS13 are fully unblocked.
 
 ---
 
