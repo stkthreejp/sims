@@ -39,10 +39,19 @@ public static class StartupConfigurationValidator
             throw new InvalidOperationException("AllowedOrigins must contain non-localhost origins in staging/production.");
 
         var malwareProvider = configuration["Uploads:MalwareScanning:Provider"];
-        if (string.IsNullOrWhiteSpace(malwareProvider))
+        if (string.IsNullOrWhiteSpace(malwareProvider) ||
+            malwareProvider.StartsWith("SET_VIA", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
                 "Uploads:MalwareScanning:Provider must be explicitly set in staging/production. " +
                 "Use 'ClamAV' to enable scanning, or 'NoOp' to acknowledge that uploads are not scanned.");
+
+        if (environment.IsProduction())
+        {
+            var qboEnv = configuration["Qbo:Environment"];
+            if (string.IsNullOrWhiteSpace(qboEnv) || qboEnv.Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    "Qbo:Environment must be set to 'production' — the sandbox value cannot be used in production.");
+        }
     }
 
     private static void ValidateJwt(IConfiguration configuration, IHostEnvironment environment)
