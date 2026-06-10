@@ -12,6 +12,9 @@ import type {
   AuthorityApprovalActivity,
   DeclineReasonReport,
   ClearanceOverrideReport,
+  RenewalsUpcoming,
+  BoundByPeriod,
+  HitRatioByCarrier,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -54,3 +57,12 @@ export const getDeclineReasonReport = (): Promise<DeclineReasonReport> =>
 
 export const getClearanceOverrideReport = (): Promise<ClearanceOverrideReport> =>
   apiClient.get(`${BASE}/operations/clearance-overrides`).then(r => r.data)
+
+export const getRenewalsUpcoming = (daysAhead = 90): Promise<RenewalsUpcoming> =>
+  apiClient.get(`${BASE}/production/renewals-upcoming`, { params: { daysAhead } }).then(r => r.data)
+
+export const getBoundByPeriod = (dateFrom?: string, dateTo?: string): Promise<BoundByPeriod> =>
+  apiClient.get(`${BASE}/production/bound-by-period`, { params: { dateFrom, dateTo } }).then(r => r.data)
+
+export const getHitRatioByCarrier = (dateFrom?: string, dateTo?: string): Promise<HitRatioByCarrier> =>
+  apiClient.get(`${BASE}/production/hit-ratio-by-carrier`, { params: { dateFrom, dateTo } }).then(r => r.data)

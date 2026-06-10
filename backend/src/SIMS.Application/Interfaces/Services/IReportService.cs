@@ -18,4 +18,7 @@ public interface IReportService
     Task<AuthorityApprovalActivityDto> GetAuthorityApprovalActivityAsync(CancellationToken ct = default);
     Task<DeclineReasonReportDto> GetDeclineReasonReportAsync(CancellationToken ct = default);
     Task<ClearanceOverrideReportDto> GetClearanceOverrideReportAsync(CancellationToken ct = default);
+    Task<RenewalsUpcomingDto> GetRenewalsUpcomingAsync(int daysAhead = 90, CancellationToken ct = default);
+    Task<BoundByPeriodDto> GetBoundByPeriodAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default);
+    Task<HitRatioByCarrierDto> GetHitRatioByCarrierAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default);
 }

@@ -66,4 +66,19 @@ public class ReportsController : ControllerBase
     [HttpGet("operations/clearance-overrides")]
     public async Task<IActionResult> GetClearanceOverrideReport(CancellationToken ct)
         => Ok(await _svc.GetClearanceOverrideReportAsync(ct));
+
+    [HttpGet("production/renewals-upcoming")]
+    public async Task<IActionResult> GetRenewalsUpcoming(
+        [FromQuery] int daysAhead = 90, CancellationToken ct = default)
+        => Ok(await _svc.GetRenewalsUpcomingAsync(daysAhead, ct));
+
+    [HttpGet("production/bound-by-period")]
+    public async Task<IActionResult> GetBoundByPeriod(
+        [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken ct = default)
+        => Ok(await _svc.GetBoundByPeriodAsync(dateFrom, dateTo, ct));
+
+    [HttpGet("production/hit-ratio-by-carrier")]
+    public async Task<IActionResult> GetHitRatioByCarrier(
+        [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken ct = default)
+        => Ok(await _svc.GetHitRatioByCarrierAsync(dateFrom, dateTo, ct));
 }

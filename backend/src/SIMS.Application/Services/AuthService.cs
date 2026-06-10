@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Claim = System.Security.Claims.Claim;
 using System.Text;
 using SIMS.Application.Common;
 using SIMS.Application.Configuration;

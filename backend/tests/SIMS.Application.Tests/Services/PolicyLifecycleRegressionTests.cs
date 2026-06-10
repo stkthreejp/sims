@@ -458,7 +458,13 @@ public class PolicyLifecycleRegressionTests
     [Fact]
     public async Task Invoice_CanReconcileToResultingPolicyVersion()
     {
-        await using var db = CreateDb();
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        long seq = 0;
+        connection.CreateFunction("nextval", (string _) => ++seq);
+        var dbOptions = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new SqlitePolicyLifecycleDbContext(dbOptions);
+        await db.Database.EnsureCreatedAsync();
         var fixture = await SeedBoundPolicyAsync(db);
         await SeedLedgerAccountsAsync(db);
         var version = new PolicyVersion

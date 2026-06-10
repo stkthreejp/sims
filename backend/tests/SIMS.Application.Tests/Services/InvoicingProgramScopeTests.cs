@@ -1,4 +1,6 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Application.Services;
@@ -14,7 +16,8 @@ public class InvoicingProgramScopeTests
     [Fact]
     public async Task BindAsync_UsesProgramScopedFeeRulesWhenProgramIsProvided()
     {
-        await using var db = CreateDb();
+        await using var connection = await OpenSqliteAsync();
+        await using var db = await CreateSqliteDbAsync(connection);
         SeedLedgerAccounts(db);
         var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
         var fee = new FeeDefinition
@@ -51,7 +54,8 @@ public class InvoicingProgramScopeTests
     [Fact]
     public async Task BindAsync_CreatesEntityFeePayableForConfiguredPayee()
     {
-        await using var db = CreateDb();
+        await using var connection = await OpenSqliteAsync();
+        await using var db = await CreateSqliteDbAsync(connection);
         SeedLedgerAccounts(db);
         var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
         var payee = new Payee { Id = 91, Name = "MS Surplus Lines Office", PayeeType = "State", IsActive = true };
@@ -128,13 +132,67 @@ public class InvoicingProgramScopeTests
             new LedgerAccount { Id = 5100, InternalCode = "5100", ExternalLabel = "Commission Expense", AccountType = "Expense", IsActive = true });
     }
 
-    private static ApplicationDbContext CreateDb()
+    private static async Task<SqliteConnection> OpenSqliteAsync()
+    {
+        var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        long seq = 0;
+        connection.CreateFunction("nextval", (string _) => ++seq);
+        return connection;
+    }
+
+    private static async Task<ApplicationDbContext> CreateSqliteDbAsync(SqliteConnection connection)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .UseSqlite(connection)
             .Options;
+        var db = new SqliteInvoicingDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        return db;
+    }
 
-        return new ApplicationDbContext(options);
+    private sealed class SqliteInvoicingDbContext(DbContextOptions<ApplicationDbContext> options)
+        : ApplicationDbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+            RemoveNpgsqlAnnotations(builder.Model);
+            foreach (var entity in builder.Model.GetEntityTypes())
+            {
+                RemoveNpgsqlAnnotations(entity);
+                foreach (var property in entity.GetProperties())
+                {
+                    RemoveNpgsqlAnnotations(property);
+                    NormalizeSqliteProperty(property);
+                }
+                foreach (var key in entity.GetKeys())
+                    RemoveNpgsqlAnnotations(key);
+                foreach (var index in entity.GetIndexes())
+                {
+                    RemoveNpgsqlAnnotations(index);
+                    index.SetFilter(null);
+                }
+                foreach (var fk in entity.GetForeignKeys())
+                    RemoveNpgsqlAnnotations(fk);
+            }
+        }
+
+        private static void RemoveNpgsqlAnnotations(IMutableAnnotatable annotatable)
+        {
+            foreach (var a in annotatable.GetAnnotations()
+                .Where(a => a.Name.StartsWith("Npgsql:", StringComparison.Ordinal))
+                .ToList())
+                annotatable.RemoveAnnotation(a.Name);
+        }
+
+        private static void NormalizeSqliteProperty(IMutableProperty property)
+        {
+            if (property.GetColumnType() is "jsonb" or "text[]")
+                property.SetColumnType("TEXT");
+            if (property.GetDefaultValueSql()?.Contains("::", StringComparison.Ordinal) == true)
+                property.SetDefaultValueSql(null);
+        }
     }
 
     private sealed class TestServiceProvider(DbContext db) : IServiceProvider

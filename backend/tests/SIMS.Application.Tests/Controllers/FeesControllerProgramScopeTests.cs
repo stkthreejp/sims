@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Claim = System.Security.Claims.Claim;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

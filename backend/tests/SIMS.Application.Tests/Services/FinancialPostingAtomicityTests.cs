@@ -128,6 +128,8 @@ public class FinancialPostingAtomicityTests
     {
         var connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
+        long seq = 0;
+        connection.CreateFunction("nextval", (string _) => ++seq);
         return connection;
     }
 

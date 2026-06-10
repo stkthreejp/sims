@@ -93,6 +93,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<SubmissionPriorCarrier> SubmissionPriorCarriers => Set<SubmissionPriorCarrier>();
     public DbSet<SubmissionLossYear> SubmissionLossYears => Set<SubmissionLossYear>();
     public DbSet<SubmissionLossClaim> SubmissionLossClaims => Set<SubmissionLossClaim>();
+    public DbSet<Claim> Claims => Set<Claim>();
+    public DbSet<ClaimImportBatch> ClaimImportBatches => Set<ClaimImportBatch>();
     public DbSet<SubmissionSupplemental> SubmissionSupplementals => Set<SubmissionSupplemental>();
     public DbSet<SubmissionGLCoverages> SubmissionGLCoverages => Set<SubmissionGLCoverages>();
     public DbSet<SubmissionGLClassification> SubmissionGLClassifications => Set<SubmissionGLClassification>();

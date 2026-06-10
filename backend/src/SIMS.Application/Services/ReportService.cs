@@ -952,6 +952,148 @@ public class ReportService : IReportService
         return null;
     }
 
+    public async Task<RenewalsUpcomingDto> GetRenewalsUpcomingAsync(int daysAhead = 90, CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var horizon = today.AddDays(daysAhead < 1 ? 90 : daysAhead);
+
+        var policies = await Db.Set<Policy>()
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Include(p => p.Submission).ThenInclude(s => s.Agent)
+            .Include(p => p.Carrier)
+            .Include(p => p.Program)
+            .Where(p => !p.IsDeleted
+                        && p.Status == PolicyStatus.Active
+                        && p.ExpirationDate >= today
+                        && p.ExpirationDate <= horizon)
+            .OrderBy(p => p.ExpirationDate)
+            .ToListAsync(ct);
+
+        var policyIds = policies.Select(p => p.Id).ToHashSet();
+        var renewedPolicyIds = (await Db.Set<Submission>()
+            .Where(s => !s.IsDeleted && s.RenewingPolicyId.HasValue
+                        && policyIds.Contains(s.RenewingPolicyId!.Value))
+            .Select(s => s.RenewingPolicyId!.Value)
+            .Distinct()
+            .ToListAsync(ct))
+            .ToHashSet();
+
+        var rows = policies.Select(p => new RenewalsUpcomingRowDto(
+            p.Id,
+            p.PolicyNumber,
+            p.Submission.Insured.DisplayName,
+            p.Submission.Agent?.Name,
+            p.ProgramId,
+            p.Program?.Code,
+            p.Program?.Name,
+            p.CarrierId,
+            p.Carrier.Name,
+            p.LineOfBusiness,
+            p.EffectiveDate,
+            p.ExpirationDate,
+            p.ExpirationDate.DayNumber - today.DayNumber,
+            p.PremiumAmount,
+            renewedPolicyIds.Contains(p.Id)
+        )).ToList();
+
+        return new RenewalsUpcomingDto(daysAhead, rows.Count, rows);
+    }
+
+    public async Task<BoundByPeriodDto> GetBoundByPeriodAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = dateFrom ?? new DateOnly(today.Year, 1, 1);
+        var to = dateTo ?? today;
+
+        var policies = await Db.Set<Policy>()
+            .Include(p => p.Carrier)
+            .Include(p => p.Program)
+            .Where(p => !p.IsDeleted && p.BoundDate >= from && p.BoundDate <= to)
+            .OrderBy(p => p.BoundDate)
+            .ToListAsync(ct);
+
+        var periods = policies
+            .GroupBy(p => new { p.BoundDate.Year, p.BoundDate.Month })
+            .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
+            .Select(g => new BoundByPeriodPeriodRowDto(
+                g.Key.Year, g.Key.Month,
+                g.Count(),
+                g.Sum(p => p.PremiumAmount),
+                g.Sum(p => p.TotalPremium)))
+            .ToList();
+
+        var breakdown = policies
+            .GroupBy(p => new
+            {
+                p.ProgramId,
+                ProgramCode = p.Program?.Code,
+                ProgramName = p.Program?.Name ?? "Unassigned",
+                p.CarrierId,
+                CarrierName = p.Carrier?.Name ?? "Unknown",
+                p.LineOfBusiness
+            })
+            .OrderByDescending(g => g.Sum(p => p.PremiumAmount))
+            .Select(g => new BoundByPeriodBreakdownRowDto(
+                g.Key.ProgramId,
+                g.Key.ProgramCode,
+                g.Key.ProgramName,
+                g.Key.CarrierId,
+                g.Key.CarrierName,
+                g.Key.LineOfBusiness,
+                g.Count(),
+                g.Sum(p => p.PremiumAmount),
+                g.Sum(p => p.TotalPremium)))
+            .ToList();
+
+        return new BoundByPeriodDto(
+            from, to,
+            policies.Count,
+            policies.Sum(p => p.PremiumAmount),
+            periods, breakdown);
+    }
+
+    public async Task<HitRatioByCarrierDto> GetHitRatioByCarrierAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = dateFrom ?? new DateOnly(today.Year, 1, 1);
+        var to = dateTo ?? today;
+
+        var quotes = await Db.Set<Quote>()
+            .Include(q => q.Carrier)
+            .Where(q => !q.IsDeleted
+                        && q.EffectiveDate >= from
+                        && q.EffectiveDate <= to)
+            .ToListAsync(ct);
+
+        var rows = quotes
+            .GroupBy(q => new { q.CarrierId, CarrierName = q.Carrier?.Name ?? "Unknown" })
+            .OrderByDescending(g => g.Count())
+            .Select(g =>
+            {
+                var bound = g.Count(q => q.Status == QuoteStatus.Bound);
+                var declined = g.Count(q => q.Status == QuoteStatus.Declined);
+                var expired = g.Count(q => q.Status == QuoteStatus.Expired);
+                var open = g.Count(q => q.Status is QuoteStatus.Draft or QuoteStatus.Submitted or QuoteStatus.Quoted);
+                var closed = bound + declined + expired;
+                return new HitRatioByCarrierRowDto(
+                    g.Key.CarrierId,
+                    g.Key.CarrierName,
+                    g.Count(),
+                    bound, declined, expired, open,
+                    closed > 0 ? Math.Round((decimal)bound / closed * 100, 1) : 0m);
+            })
+            .ToList();
+
+        var totalBound = rows.Sum(r => r.BoundCount);
+        var totalClosed = rows.Sum(r => r.BoundCount + r.DeclinedCount + r.ExpiredCount);
+
+        return new HitRatioByCarrierDto(
+            from, to,
+            quotes.Count, totalBound,
+            totalClosed > 0 ? Math.Round((decimal)totalBound / totalClosed * 100, 1) : 0m,
+            rows);
+    }
+
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)
     {
         decimal Bucket(OpenPayableDto p, int from, int to)

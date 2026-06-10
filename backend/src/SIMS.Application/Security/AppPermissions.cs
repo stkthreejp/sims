@@ -53,6 +53,10 @@ public static class AppPermissions
     public const string NavAdminRating = "nav.admin.rating";
     public const string NavAdminTasks = "nav.admin.tasks";
     public const string NavAdminFees = "nav.admin.fees";
+    public const string NavAdminBordereaux = "nav.admin.bordereaux";
+
+    public const string ClaimsView = "claims.view";
+    public const string ClaimsManage = "claims.manage";
 
     public static readonly PermissionDefinition[] All =
     [
@@ -107,6 +111,10 @@ public static class AppPermissions
         new(NavAdminRating, "Rating Engine Admin", "Navigation"),
         new(NavAdminTasks, "Task Engine Admin", "Navigation"),
         new(NavAdminFees, "Fee Rules Admin", "Navigation"),
+        new(NavAdminBordereaux, "Bordereaux Admin", "Navigation"),
+
+        new(ClaimsView, "View Claims", "Claims"),
+        new(ClaimsManage, "Manage Claims (create, edit, import)", "Claims"),
     ];
 }
 

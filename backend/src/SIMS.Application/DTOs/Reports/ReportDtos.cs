@@ -275,6 +275,74 @@ public record ClearanceOverrideSummaryDto(
     int Count
 );
 
+// ── Production Reports ────────────────────────────────────────────────────────
+
+public record RenewalsUpcomingDto(
+    int DaysAhead,
+    int TotalCount,
+    IReadOnlyList<RenewalsUpcomingRowDto> Rows);
+
+public record RenewalsUpcomingRowDto(
+    Guid PolicyId,
+    string PolicyNumber,
+    string InsuredName,
+    string? AgentName,
+    Guid? ProgramId,
+    string? ProgramCode,
+    string? ProgramName,
+    Guid CarrierId,
+    string CarrierName,
+    PolicyLineOfBusiness LineOfBusiness,
+    DateOnly EffectiveDate,
+    DateOnly ExpirationDate,
+    int DaysUntilExpiry,
+    decimal PremiumAmount,
+    bool HasRenewalSubmission);
+
+public record BoundByPeriodDto(
+    DateOnly DateFrom,
+    DateOnly DateTo,
+    int TotalPolicies,
+    decimal TotalGrossPremium,
+    IReadOnlyList<BoundByPeriodPeriodRowDto> Periods,
+    IReadOnlyList<BoundByPeriodBreakdownRowDto> Breakdown);
+
+public record BoundByPeriodPeriodRowDto(
+    int Year,
+    int Month,
+    int PolicyCount,
+    decimal GrossPremium,
+    decimal TotalPremium);
+
+public record BoundByPeriodBreakdownRowDto(
+    Guid? ProgramId,
+    string? ProgramCode,
+    string ProgramName,
+    Guid CarrierId,
+    string CarrierName,
+    PolicyLineOfBusiness LineOfBusiness,
+    int PolicyCount,
+    decimal GrossPremium,
+    decimal TotalPremium);
+
+public record HitRatioByCarrierDto(
+    DateOnly DateFrom,
+    DateOnly DateTo,
+    int TotalQuotes,
+    int TotalBound,
+    decimal OverallHitRatio,
+    IReadOnlyList<HitRatioByCarrierRowDto> Rows);
+
+public record HitRatioByCarrierRowDto(
+    Guid CarrierId,
+    string CarrierName,
+    int TotalQuotes,
+    int BoundCount,
+    int DeclinedCount,
+    int ExpiredCount,
+    int OpenCount,
+    decimal HitRatio);
+
 public record ClearanceOverrideRowDto(
     Guid Id,
     Guid SubmissionId,

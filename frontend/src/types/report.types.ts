@@ -287,6 +287,81 @@ export interface ClearanceOverrideRow {
   actionUrl: string
 }
 
+// Production reports
+
+export interface RenewalsUpcomingRow {
+  policyId: string
+  policyNumber: string
+  insuredName: string
+  agentName: string | null
+  programId: string | null
+  programCode: string | null
+  programName: string | null
+  carrierId: string
+  carrierName: string
+  lineOfBusiness: string
+  effectiveDate: string
+  expirationDate: string
+  daysUntilExpiry: number
+  premiumAmount: number
+  hasRenewalSubmission: boolean
+}
+
+export interface RenewalsUpcoming {
+  daysAhead: number
+  totalCount: number
+  rows: RenewalsUpcomingRow[]
+}
+
+export interface BoundByPeriodPeriodRow {
+  year: number
+  month: number
+  policyCount: number
+  grossPremium: number
+  totalPremium: number
+}
+
+export interface BoundByPeriodBreakdownRow {
+  programId: string | null
+  programCode: string | null
+  programName: string
+  carrierId: string
+  carrierName: string
+  lineOfBusiness: string
+  policyCount: number
+  grossPremium: number
+  totalPremium: number
+}
+
+export interface BoundByPeriod {
+  dateFrom: string
+  dateTo: string
+  totalPolicies: number
+  totalGrossPremium: number
+  periods: BoundByPeriodPeriodRow[]
+  breakdown: BoundByPeriodBreakdownRow[]
+}
+
+export interface HitRatioByCarrierRow {
+  carrierId: string
+  carrierName: string
+  totalQuotes: number
+  boundCount: number
+  declinedCount: number
+  expiredCount: number
+  openCount: number
+  hitRatio: number
+}
+
+export interface HitRatioByCarrier {
+  dateFrom: string
+  dateTo: string
+  totalQuotes: number
+  totalBound: number
+  overallHitRatio: number
+  rows: HitRatioByCarrierRow[]
+}
+
 export interface ClearanceOverrideReport {
   totalOverrides: number
   blockedOverrideCount: number
