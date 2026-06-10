@@ -32,7 +32,7 @@ public class ReceiptsService : IReceiptsService
             return Result<ReceiptDetailDto>.Failure("MISSING_GL_ACCOUNTS",
                 "Required GL accounts (1100 Trust, 1250 Unapplied Cash) not found");
 
-        var seq = await db.Database.SqlQueryRaw<long>("SELECT nextval('receipt_number_seq')").FirstAsync(ct);
+        var seq = await NextSequenceValueAsync(db, "receipt_number_seq", ct);
         var receiptNumber = $"RCT-{req.ReceivedDate.Year}-{seq:D5}";
 
         var receipt = new Receipt
@@ -108,5 +108,15 @@ public class ReceiptsService : IReceiptsService
                     a.GrossApplied, a.CommissionAmount, a.NetApplied, a.CreatedAt))
                 .ToList()
         );
+    }
+
+    private static async Task<long> NextSequenceValueAsync(DbContext db, string sequenceName, CancellationToken ct)
+    {
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await db.Database.OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"SELECT nextval('{sequenceName}')";
+        return (long)(await cmd.ExecuteScalarAsync(ct))!;
     }
 }

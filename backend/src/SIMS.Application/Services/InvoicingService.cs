@@ -98,7 +98,7 @@ public class InvoicingService : IInvoicingService
         decimal agentCommissionAmount = Math.Round(grossForCommission * agentCommRate, 4);
 
         var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
-        var seq = await db.Database.SqlQueryRaw<long>("SELECT nextval('invoice_number_seq')").FirstAsync(ct);
+        var seq = await NextSequenceValueAsync(db, "invoice_number_seq", ct);
         var invoiceNumber = $"INV-{invoiceDate.Year}-{seq:D5}";
 
         var totalFees = calcResult.Lines.Sum(l => l.Amount);
@@ -313,6 +313,16 @@ public class InvoicingService : IInvoicingService
                 t.Memo))
                 .ToList()
         );
+    }
+
+    private static async Task<long> NextSequenceValueAsync(DbContext db, string sequenceName, CancellationToken ct)
+    {
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await db.Database.OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"SELECT nextval('{sequenceName}')";
+        return (long)(await cmd.ExecuteScalarAsync(ct))!;
     }
 
     private static InvoiceSummaryDto MapSummary(Invoice invoice, PolicyTransaction? transaction, PolicyVersion? version) => new(
