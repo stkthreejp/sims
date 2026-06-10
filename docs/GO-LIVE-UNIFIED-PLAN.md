@@ -150,13 +150,14 @@ Machinery done (hierarchy, AL block, orphan audit). **Data missing: no carriers/
 
 Today: negative endorsements are hard-blocked (`RETURN_PREMIUM_ENDORSEMENT_ACCOUNTING_REQUIRED`), `CompleteCancellationAsync` books **zero accounting**, credit invoices skip payables (`if (GrossPremium > 0)`), the fee engine's `MinimumAmount` would flip a negative tax to a *positive minimum* on a credit, and `CancelAsync` accepts an arbitrary `PremiumChange` with no pro-rata validation. A midterm cancellation would over-remit SL tax, over-owe carriers on paper, and misreport written premium to Lloyd's.
 
-Build (one coherent unit):
-- [ ] **Earned-premium calculator** — pro-rata / short-rate / minimum-earned-premium, per program+reason (no MEP concept exists anywhere today). Gated on decision §5.1.
-- [ ] **Credit-invoice path** in `InvoicingService`: negative `GrossPremium`; carrier-payable *reduction* (or receivable-from-carrier); agent-commission chargeback ledger lines; SL tax/stamping reversal per state refundability (decision §5.1).
-- [ ] **Fee-engine negative-base guards**: `MinimumAmount` and `Stratified` must handle credits correctly.
-- [ ] Wire `CompleteCancellationAsync` and `IssueEndorsementAsync` (negative path) to the credit-invoice flow; validate `PremiumChange` against the calculator.
+Build (one coherent unit — ruleset decided, see §5.1):
+- [ ] **Earned-premium calculator** — methods: pro-rata / short-rate / flat. Short-rate config per program (table **or** penalty-% of unearned). MEP support as an earned floor, configured at Program > Carrier (all LOBs) with per-LOB override — capability only, no MEP values at launch. Flat charges fully earned at issuance, excluded from return calcs. Flat cancellation = 100% unwind of premium, tax, stamping, fees, commission.
+- [ ] **Method selection UX + governance**: cancellation/endorsement transactions get a method picker defaulted by reason (insured request → short rate; company-initiated/non-pay → pro rata); changing the default routes through the existing **authority-approval queue** before the transaction completes; chosen method + approver recorded on the transaction.
+- [ ] **Credit-invoice path** in `InvoicingService`: negative `GrossPremium`; carrier-payable *reduction* (or receivable-from-carrier); **proportional agent-commission chargeback** ledger lines; **proportional SL tax/stamping reversal** that nets against the next filing while still appearing as a (negative) payable line — routed to the **filing vendor** payee normally, to the **state** payee when late (uses the existing `SurplusLinesStateSetup` filing-payee config).
+- [ ] **Fee-engine negative-base guards**: `MinimumAmount` and `Stratified` must handle credits correctly; flat-earned charges must not re-enter the credit calc.
+- [ ] Wire `CompleteCancellationAsync` and `IssueEndorsementAsync` (negative path) to the credit-invoice flow; `PremiumChange` is computed by the calculator, not user-keyed.
 - [ ] **Premium single-source-of-truth**: at bind, reconcile or replace user-keyed `quote.TaxesAndFees`/`TotalPremium` with fee-engine output so dec page = ledger = BDX. (Today a quote keyed `TaxesAndFees=0` binds with a $0-tax dec page and a taxed invoice.)
-- [ ] Regression tests: 50%-term pro-rata cancel → −50% premium invoice, negative SL tax line, payable reduced, ledger balanced, negative BDX row; flat cancel → 100% return; short-rate by reason; quote-vs-invoice parity assertion.
+- [ ] Regression tests: 50%-term pro-rata cancel → −50% premium invoice, negative SL tax line, payable reduced, ledger balanced, negative BDX row; short-rate (table and penalty-% variants) with approval-gated override; MEP floor honored when configured; flat endorsement charge survives later cancellation un-returned; flat cancel → 100% unwind; quote-vs-invoice parity assertion.
 
 ### WS12 — Surplus-lines compliance (P0 fail-closed + P1 filing surface)
 
@@ -190,7 +191,15 @@ Resolved: launch scope (Lloyd's IM Beazley + Lloyd's GL DALE; AL non-bindable) �
 
 **New, from the MGA audit — these gate WS11–WS13 builds:**
 
-1. **Earned-premium basis** — pro-rata vs short-rate (table? per program/state?) vs minimum-earned-premium percent per program; commission chargeback full vs earned-basis; SL tax refundable vs net-against-next-filing per launch state. *Gates WS11.*
+1. ~~**Earned-premium basis**~~ **✅ DECIDED (2026-06-10):**
+   - **Methods:** Pro-rata (default), Short-rate, and Flat — selectable per cancellation/endorsement transaction. Flat covers endorsement charges that are never prorated regardless of when in the term they occur.
+   - **Short-rate calculation:** configurable per program — either a short-rate table or a penalty-% of unearned; program setup chooses.
+   - **Reason-driven defaults:** insured's request → short rate; company-initiated / non-pay / UW reasons → pro rata. Changing the method away from the default requires **override + authority approval** (route through the existing authority-approval queue before the transaction completes).
+   - **MEP:** not used today, but build the capability — configured in **Program > Carrier setup (applies to all LOBs) with optional per-LOB override**. Calculator enforces it as an earned floor when set.
+   - **Commission chargeback:** proportional — agent returns commission on returned premium at the rate paid.
+   - **SL tax/stamping on returns:** reverse proportionally on the credit invoice; insured refund includes it; SMM nets the credit against the next filing — **and the net transaction must still appear in the payable**. Tax payables route to the **filing vendor** in the normal case, payable **directly to the state when late**.
+   - **Flat endorsement charges:** fully earned at issuance — never returned on later cancellation.
+   - **Flat cancellation (inception):** full unwind — 100% of premium, tax, stamping, and fees returned; full commission chargeback; policy recorded as flat-cancelled.
 2. **Fee earned semantics** — are policy/broker fees fully earned on cancellation? (`AppliesToFlatCancellations` exists; earned-fee semantics don't.)
 3. **NRRA home state** — who determines home state for multi-state trucking risks, captured where at submission?
 4. **Diligent effort** — which launch states require pre-bind affidavits vs filing-time? Determines blocker vs checklist in WS12.
