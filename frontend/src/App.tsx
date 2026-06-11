@@ -288,7 +288,7 @@ export default function App() {
               <Route path="/billing/period-close" element={withAllPermissions([Permissions.NavBilling, Permissions.AccountingManage], <PeriodClosePage />)} />
               <Route path="/billing/sync-health" element={withAllPermissions([Permissions.NavBilling, Permissions.AccountingManage], <SyncHealthPage />)} />
               <Route path="/reports" element={withAllPermissions([Permissions.NavReports, Permissions.ReportsView], <ReportsPage />)} />
-              <Route path="/reports/bordereaux" element={withAllPermissions([Permissions.NavReports, Permissions.ReportsView], <BordereauxWorkbenchPage />)} />
+              <Route path="/reports/bordereaux" element={withAllPermissions([Permissions.NavReports, Permissions.AccountingAdmin], <BordereauxWorkbenchPage />)} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

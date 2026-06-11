@@ -277,7 +277,7 @@ export function AgentDetailPage() {
     enabled: !!id,
   })
 
-  const { data: commissions = [] } = useQuery({
+  const { data: commissions = [], isError: commissionsError } = useQuery({
     queryKey: ['agent-commissions', id],
     queryFn: () => getAgentCommissions(id!),
     enabled: !!id,
@@ -727,7 +727,11 @@ export function AgentDetailPage() {
             </div>
           )}
 
-          {commissions.length === 0 && !showAddCommission ? (
+          {commissionsError ? (
+            <div className="sd-form-error" style={{ padding: 12 }}>
+              Could not load commission rates. Refresh to retry.
+            </div>
+          ) : commissions.length === 0 && !showAddCommission ? (
             <EmptyState
               icon={BanknoteIcon}
               title="No commission rates configured"

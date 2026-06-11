@@ -1,3 +1,4 @@
+import { apiClient } from './client'
 import type {
   NettedPayee,
   BatchSummary,
@@ -6,39 +7,22 @@ import type {
   MarkExecutedRequest,
 } from '@/types/cashDistribution.types'
 
-const BASE = '/api/v1/billing/cash-distribution'
-
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token')
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.errorMessage ?? `Request failed: ${res.status}`)
-  }
-  return res.json()
-}
+const BASE = '/billing/cash-distribution'
 
 export const getPendingInstructions = (): Promise<NettedPayee[]> =>
-  apiFetch(`${BASE}/pending`)
+  apiClient.get<NettedPayee[]>(`${BASE}/pending`).then((r) => r.data)
 
 export const getBatches = (): Promise<BatchSummary[]> =>
-  apiFetch(`${BASE}/batches`)
+  apiClient.get<BatchSummary[]>(`${BASE}/batches`).then((r) => r.data)
 
 export const getBatch = (id: number): Promise<BatchDetail> =>
-  apiFetch(`${BASE}/batches/${id}`)
+  apiClient.get<BatchDetail>(`${BASE}/batches/${id}`).then((r) => r.data)
 
 export const createBatch = (req: CreateBatchRequest): Promise<BatchDetail> =>
-  apiFetch(`${BASE}/batches`, { method: 'POST', body: JSON.stringify(req) })
+  apiClient.post<BatchDetail>(`${BASE}/batches`, req).then((r) => r.data)
 
 export const markExecuted = (id: number, req: MarkExecutedRequest): Promise<BatchDetail> =>
-  apiFetch(`${BASE}/batches/${id}/mark-executed`, { method: 'POST', body: JSON.stringify(req) })
+  apiClient.post<BatchDetail>(`${BASE}/batches/${id}/mark-executed`, req).then((r) => r.data)
 
 export const getBatchPdfUrl = (id: number): Promise<{ url: string }> =>
-  apiFetch(`${BASE}/batches/${id}/pdf-url`)
+  apiClient.get<{ url: string }>(`${BASE}/batches/${id}/pdf-url`).then((r) => r.data)

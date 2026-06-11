@@ -1,3 +1,4 @@
+import { apiClient } from './client'
 import type {
   PayableAging,
   OpenPayable,
@@ -6,42 +7,25 @@ import type {
   CreateDisbursementRequest,
 } from '@/types/disbursement.types'
 
-const BASE = '/api/v1/billing/disbursements'
-
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token')
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.errorMessage ?? `Request failed: ${res.status}`)
-  }
-  return res.json()
-}
+const BASE = '/billing/disbursements'
 
 export const getAging = (): Promise<PayableAging> =>
-  apiFetch(`${BASE}/aging`)
+  apiClient.get<PayableAging>(`${BASE}/aging`).then((r) => r.data)
 
 export const getOpenPayables = (): Promise<OpenPayable[]> =>
-  apiFetch(`${BASE}/open-payables`)
+  apiClient.get<OpenPayable[]>(`${BASE}/open-payables`).then((r) => r.data)
 
 export const getDisbursements = (): Promise<DisbursementSummary[]> =>
-  apiFetch(`${BASE}`)
+  apiClient.get<DisbursementSummary[]>(BASE).then((r) => r.data)
 
 export const getDisbursement = (id: number): Promise<DisbursementDetail> =>
-  apiFetch(`${BASE}/${id}`)
+  apiClient.get<DisbursementDetail>(`${BASE}/${id}`).then((r) => r.data)
 
 export const createDisbursement = (req: CreateDisbursementRequest): Promise<DisbursementDetail> =>
-  apiFetch(`${BASE}`, { method: 'POST', body: JSON.stringify(req) })
+  apiClient.post<DisbursementDetail>(BASE, req).then((r) => r.data)
 
 export const postDisbursement = (id: number): Promise<DisbursementDetail> =>
-  apiFetch(`${BASE}/${id}/post`, { method: 'POST', body: '{}' })
+  apiClient.post<DisbursementDetail>(`${BASE}/${id}/post`, {}).then((r) => r.data)
 
 export const voidDisbursement = (id: number, reason?: string): Promise<DisbursementDetail> =>
-  apiFetch(`${BASE}/${id}/void`, { method: 'POST', body: JSON.stringify({ reason }) })
+  apiClient.post<DisbursementDetail>(`${BASE}/${id}/void`, { reason }).then((r) => r.data)

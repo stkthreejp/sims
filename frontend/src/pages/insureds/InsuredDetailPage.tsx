@@ -173,7 +173,7 @@ function SubmissionTable({ subs, onOpen }: { subs: useSubmissions; onOpen: (id: 
 
 // ─── main component ──────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'policies' | 'submissions' | 'documents' | 'activity'
+type Tab = 'overview' | 'policies' | 'submissions' | 'documents'
 
 export function InsuredDetailPage() {
   const { id } = useParams<{ id: string }>()

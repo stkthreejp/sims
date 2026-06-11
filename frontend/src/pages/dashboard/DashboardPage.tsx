@@ -4,6 +4,7 @@ import { Plus, Calendar, ChevronRight, Clock, Star, FileText } from 'lucide-reac
 import { quotesApi } from '@/api/quotes.api'
 import { submissionsApi } from '@/api/submissions.api'
 import { insuredsApi } from '@/api/insureds.api'
+import { tasksApi } from '@/api/tasks.api'
 import { useAuthStore } from '@/store/authStore'
 import type { SubmissionListItem } from '@/types/submission.types'
 import type { QuoteListItem } from '@/types/quote.types'
@@ -212,6 +213,11 @@ export function DashboardPage() {
   const { data: insuredsData } = useQuery({
     queryKey: ['insureds', 'dashboard-count'],
     queryFn: () => insuredsApi.getAll({ pageSize: 1, page: 1, sortBy: 'createdAt', sortDir: 'desc' }),
+  })
+
+  const { data: myTasks = [] } = useQuery({
+    queryKey: ['tasks', 'my-queue'],
+    queryFn: tasksApi.getMyQueue,
   })
 
   const allSubs = subsData?.items ?? []
@@ -509,12 +515,47 @@ export function DashboardPage() {
         {/* ── Right column ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Tasks stub */}
+          {/* Tasks */}
           <Card>
             <CardHead>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Tasks</h3>
               <CardAction onClick={() => navigate('/tasks')}>All →</CardAction>
             </CardHead>
+            {myTasks.length === 0 ? (
+              <div style={{ padding: '14px 16px', color: 'var(--ink-3)', fontSize: 12.5 }}>
+                No open tasks in your queue.
+              </div>
+            ) : (
+              <div style={{ padding: '4px 16px 12px' }}>
+                <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 12.5 }}>
+                  <span style={{ color: 'var(--ink-2)' }}>
+                    <strong>{myTasks.length}</strong> open
+                  </span>
+                  {myTasks.filter((t) => t.isOverdue).length > 0 && (
+                    <span style={{ color: 'var(--danger, #b91c1c)' }}>
+                      <strong>{myTasks.filter((t) => t.isOverdue).length}</strong> overdue
+                    </span>
+                  )}
+                </div>
+                {[...myTasks]
+                  .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                  .slice(0, 4)
+                  .map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => navigate('/tasks')}
+                      style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '4px 0', fontSize: 12.5, cursor: 'pointer' }}
+                    >
+                      <span style={{ color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {t.taskTypeName}
+                      </span>
+                      <span style={{ color: t.isOverdue ? 'var(--danger, #b91c1c)' : 'var(--ink-4)', flexShrink: 0 }}>
+                        {new Date(`${t.dueDate.slice(0, 10)}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
           </Card>
 
           {/* Pipeline funnel */}

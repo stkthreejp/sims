@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCcw, Sav
 import { toast } from 'sonner'
 import {
   createBordereauxPremiumRun,
+  downloadBordereauxRunCsv,
   generateBordereauxExportPackage,
   getAccountCurrentDownloadUrl,
   getBordereauxPremiumPreview,
@@ -506,15 +507,16 @@ export function BordereauxWorkbenchPage() {
                         <FileSpreadsheet size={14} />
                         Generate Files
                       </button>
-                      <a
-                        href={`/api/v1/admin/bordereaux-profiles/premium-runs/${selectedRun.id}/csv`}
-                        download
+                      <button
                         className="sd-btn outline"
-                        style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        onClick={() =>
+                          downloadBordereauxRunCsv(selectedRun.id).catch(() =>
+                            toast.error('Could not download CSV'))
+                        }
                       >
                         <Download size={14} />
                         CSV
-                      </a>
+                      </button>
                     </>
                   )
                 })()}

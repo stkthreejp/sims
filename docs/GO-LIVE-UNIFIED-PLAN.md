@@ -92,12 +92,12 @@ Email paging ✅, atomic numbering ✅ (DB sequence), NOT_FOUND→404 ✅, pagin
 
 Closeout verified: links fixed, guards aligned, 404 real, Login redesigned, no placeholders. Update `docs/ui-broken-links-tracker.md` statuses (rows still say "Open").
 
-**WS4-R — defects found 2026-06-10 that would visibly break in UAT:**
-- [ ] **(P0) Four API clients send unauthenticated requests** — `agentCommissions.api.ts`, `carrierCommissions.api.ts`, `disbursements.api.ts`, `cashDistribution.api.ts` each use a private raw-`fetch` reading `localStorage.getItem('token')`, **which is never written** (auth store keeps the token in memory/sessionStorage and excludes it from persistence). Every call → 401. Disbursements, Cash Distribution, and both commission-setup tabs are non-functional; `AgentDetailPage` swallows the error and renders an *empty* commission list (hidden-data-loss). Fix: replace all four helpers with the shared `apiClient`; surface query errors on those panels.
-- [ ] **(P1) Bordereaux CSV is a plain `<a href>` to a JWT-protected endpoint** (`BordereauxWorkbenchPage.tsx:510`) — always 401s. Fetch as blob via `apiClient`.
-- [ ] (P1) Bordereaux Workbench route guarded `reports.view` but every API it calls needs `accounting.admin` — reports-only users get a page of 403s. Align guard; same for the "QB Sync Health" link bouncing non-billing users.
-- [ ] (P1) Dashboard Tasks card has a working link but an empty body — render open/overdue counts from `tasks.api.ts` or drop the card.
-- [ ] (P2) Delete the now-dead `ComingSoon` component/`soon` handling in ReportsPage; remove dead `'activity'` Tab union member in InsuredDetailPage.
+**WS4-R — ✅ DONE (2026-06-10):**
+- [x] **(P0)** Four API clients (`agentCommissions`, `carrierCommissions`, `disbursements`, `cashDistribution`) rewritten on the shared `apiClient` (in-memory token + 401-refresh); Agent/Carrier detail pages now surface commission-load errors instead of rendering an empty list.
+- [x] **(P1)** Bordereaux CSV download fetches as an authenticated blob (`downloadBordereauxRunCsv`) instead of a plain anchor.
+- [x] **(P1)** Bordereaux Workbench route now requires `accounting.admin`; the Workbench and QB Sync Health entries in the Reports sidebar are permission-filtered.
+- [x] **(P1)** Dashboard Tasks card renders open/overdue counts and the next four tasks from the user's queue.
+- [x] **(P2)** Dead `ComingSoon`/`soon` code removed from ReportsPage; dead `'activity'` Tab member removed from InsuredDetailPage.
 
 ### WS5 — Program / carrier setup — ❌ the open Gate-A blocker
 

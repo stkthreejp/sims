@@ -1,6 +1,7 @@
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { usePermissions } from '@/hooks/usePermissions'
 import {
   getTrustReconciliation,
   getCarrierPayableAging,
@@ -1485,16 +1486,6 @@ function HitRatioByCarrierReport() {
   )
 }
 
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <ReportShell title={title}>
-      <div style={{ color: 'var(--ink-4)', fontSize: 13, padding: '40px 0', textAlign: 'center' }}>
-        This report is coming soon.
-      </div>
-    </ReportShell>
-  )
-}
-
 // ── Sidebar config ──────────────────────────────────────────────────────────
 
 const REPORT_CATEGORIES = [
@@ -1519,8 +1510,8 @@ const REPORT_CATEGORIES = [
       { id: 'commission-summary', label: 'Commission Summary' },
       { id: 'invoice-totals-by-program', label: 'Invoice Totals by Program' },
       { id: 'invoice-totals-by-transaction', label: 'Invoice Totals by Transaction' },
-      { id: 'bordereaux-workbench', label: 'Bordereaux Workbench', external: '/reports/bordereaux' },
-      { id: 'qb-sync-health', label: 'QB Sync Health', external: '/billing/sync-health' },
+      { id: 'bordereaux-workbench', label: 'Bordereaux Workbench', external: '/reports/bordereaux', requires: 'accountingAdmin' },
+      { id: 'qb-sync-health', label: 'QB Sync Health', external: '/billing/sync-health', requires: 'billing' },
     ],
   },
   {
@@ -1569,7 +1560,14 @@ function renderReport(id: string) {
 export function ReportsPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const { canAdminAccounting, canViewBilling } = usePermissions()
   const activeId = params.get('r') ?? 'trust-reconciliation'
+
+  function canSee(r: { requires?: string }) {
+    if (r.requires === 'accountingAdmin') return canAdminAccounting
+    if (r.requires === 'billing') return canViewBilling
+    return true
+  }
 
   function select(id: string, external?: string) {
     if (external) { navigate(external); return }
@@ -1593,11 +1591,10 @@ export function ReportsPage() {
         {REPORT_CATEGORIES.map(cat => (
           <div key={cat.label}>
             <div style={sectionHead}>{cat.label}</div>
-            {cat.reports.map(r => (
+            {cat.reports.filter(canSee).map(r => (
               <button
                 key={r.id}
-                onClick={() => !(r as any).soon && select(r.id, (r as any).external)}
-                disabled={(r as any).soon}
+                onClick={() => select(r.id, (r as any).external)}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -1609,15 +1606,11 @@ export function ReportsPage() {
                   padding: '5px 10px',
                   fontSize: 12.5,
                   fontWeight: activeId === r.id ? 600 : 500,
-                  cursor: (r as any).soon ? 'default' : 'pointer',
+                  cursor: 'pointer',
                   marginBottom: 1,
-                  opacity: (r as any).soon ? 0.5 : 1,
                 }}
               >
                 {r.label}
-                {(r as any).soon && (
-                  <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>soon</span>
-                )}
               </button>
             ))}
           </div>
@@ -1630,7 +1623,6 @@ export function ReportsPage() {
           const allReports = REPORT_CATEGORIES.flatMap(c => c.reports)
           const active = allReports.find(r => r.id === activeId)
           if (!active) return null
-          if ((active as any).soon) return <ComingSoon title={active.label} />
           if ((active as any).external) return null
           return renderReport(activeId)
         })()}

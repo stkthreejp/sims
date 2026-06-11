@@ -67,6 +67,18 @@ export const reconcileBordereauxRun = (
 export const generateBordereauxExportPackage = (runId: string): Promise<BordereauxRun> =>
   apiClient.post<BordereauxRun>(`${BASE}/premium-runs/${runId}/export-package`).then((r) => r.data)
 
+export const downloadBordereauxRunCsv = async (runId: string): Promise<void> => {
+  const res = await apiClient.get<Blob>(`${BASE}/premium-runs/${runId}/csv`, { responseType: 'blob' })
+  const disposition = res.headers['content-disposition'] as string | undefined
+  const fileName = disposition?.match(/filename="?([^";]+)"?/)?.[1] ?? `bordereaux-run-${runId}.csv`
+  const url = URL.createObjectURL(res.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 export const getLondonBordereauxDownloadUrl = (runId: string): Promise<string> =>
   apiClient.get<{ url: string }>(`${BASE}/premium-runs/${runId}/london-bordereaux/download-url`).then((r) => r.data.url)
 
