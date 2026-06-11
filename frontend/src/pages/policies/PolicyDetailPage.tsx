@@ -8,6 +8,7 @@ import { quotesApi } from '@/api/quotes.api'
 import { submissionsApi } from '@/api/submissions.api'
 import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
 import { attachmentsApi } from '@/api/attachments.api'
+import { downloadLossRunCsv } from '@/api/claims.api'
 import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LOB_LABELS } from '@/types/quote.types'
@@ -95,7 +96,7 @@ export function PolicyDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] }),
   })
 
-  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canIssuePolicies, canEndorsePolicies, canCancelPolicies, canManageUnderwriting, canOverrideClearance, isAdmin } = usePermissions()
+  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canIssuePolicies, canEndorsePolicies, canCancelPolicies, canManageUnderwriting, canOverrideClearance, canViewClaims, isAdmin } = usePermissions()
 
   const { data: issuancePacket } = useQuery({
     queryKey: ['policies', id, 'issuance-packet'],
@@ -321,6 +322,20 @@ export function PolicyDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {canViewClaims && (
+            <button
+              onClick={() =>
+                downloadLossRunCsv({ policyId: id }).catch((err) =>
+                  toast.error(err?.response?.status === 403
+                    ? 'You do not have access to this policy’s loss run'
+                    : 'Could not generate loss run'))
+              }
+              title="Download a loss run for this policy"
+              className="sd-btn outline"
+            >
+              <Download className="h-3.5 w-3.5" /> Loss Run
+            </button>
+          )}
           {policy.status === 'Active' && canEndorsePolicies && (
             <>
               <button

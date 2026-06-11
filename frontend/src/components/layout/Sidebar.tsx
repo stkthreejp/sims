@@ -61,6 +61,7 @@ export function Sidebar() {
         {perms.canViewInsureds && <NavItem to="/insureds" label="Insureds" icon={Building2} />}
         {perms.canViewPolicies && <NavItem to="/policies" label="Policies" icon={FileText} />}
         {perms.canViewSubmissions && <NavItem to="/submissions" label="Submissions" icon={FileText} />}
+        {perms.canViewClaims && <NavItem to="/claims" label="Claims" icon={AlertOctagon} />}
         {perms.canViewCarriers && <NavItem to="/carriers" label="Carriers" icon={ShieldCheck} />}
         {perms.canViewAgents && <NavItem to="/agents" label="Agents" icon={UserCheck} />}
         {perms.canViewReports && <NavItem to="/reports" label="Reports" icon={BarChart2} />}

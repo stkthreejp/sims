@@ -59,4 +59,20 @@ public static class BusinessDataAccess
             n.Quote.Submission.UnderwriterId == scope.UserId ||
             n.Quote.Submission.AssistantUWId == scope.UserId);
     }
+
+    // Claims scope through their linked policy; unlinked imported claims
+    // (PolicyId null) cannot be ownership-attributed, so they are visible
+    // only to users with full business-data access (fail closed).
+    public static IQueryable<Claim> ForAccessScope(this IQueryable<Claim> query, UserAccessScope scope)
+    {
+        if (scope.CanAccessAllBusinessData)
+            return query;
+
+        return query.Where(c =>
+            c.Policy != null && (
+                c.Policy.Submission.CreatedById == scope.UserId ||
+                c.Policy.Submission.UnderwriterId == scope.UserId ||
+                c.Policy.Submission.AssistantUWId == scope.UserId ||
+                c.Policy.BoundQuote.CreatedById == scope.UserId));
+    }
 }

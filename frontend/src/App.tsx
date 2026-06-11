@@ -98,6 +98,7 @@ const PeriodClosePage = lazy(() => import('@/pages/billing/PeriodClosePage').the
 const SyncHealthPage = lazy(() => import('@/pages/billing/SyncHealthPage').then((m) => ({ default: m.SyncHealthPage })))
 const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 const BordereauxWorkbenchPage = lazy(() => import('@/pages/reports/BordereauxWorkbenchPage').then((m) => ({ default: m.BordereauxWorkbenchPage })))
+const ClaimsPage = lazy(() => import('@/pages/claims/ClaimsPage').then((m) => ({ default: m.ClaimsPage })))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
 
 const PageFallback = () => (
@@ -133,6 +134,7 @@ const Permissions = {
   NavAdminFees: 'nav.admin.fees',
   NavAdminBordereaux: 'nav.admin.bordereaux',
   AccountingAdmin: 'accounting.admin',
+  ClaimsView: 'claims.view',
 } as const
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -289,6 +291,7 @@ export default function App() {
               <Route path="/billing/sync-health" element={withAllPermissions([Permissions.NavBilling, Permissions.AccountingManage], <SyncHealthPage />)} />
               <Route path="/reports" element={withAllPermissions([Permissions.NavReports, Permissions.ReportsView], <ReportsPage />)} />
               <Route path="/reports/bordereaux" element={withAllPermissions([Permissions.NavReports, Permissions.AccountingAdmin], <BordereauxWorkbenchPage />)} />
+              <Route path="/claims" element={withPermission(Permissions.ClaimsView, <ClaimsPage />)} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

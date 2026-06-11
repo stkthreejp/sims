@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SIMS.Application.Common;
 using SIMS.Application.DTOs.Claims;
 using SIMS.Application.Interfaces.Services;
+using SIMS.Application.Security;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 
@@ -9,11 +10,15 @@ namespace SIMS.Application.Services;
 
 public class ClaimsService : IClaimsService
 {
+    // Backstop against runaway/malicious import payloads; real feeds are far smaller.
+    public const int MaxImportRows = 20_000;
+
     private readonly DbContext _db;
 
     public ClaimsService(DbContext db) => _db = db;
 
     public async Task<IReadOnlyList<ClaimListItemDto>> GetClaimsAsync(
+        UserAccessScope access,
         Guid? policyId = null,
         Guid? insuredId = null,
         ClaimStatus? status = null,
@@ -21,7 +26,9 @@ public class ClaimsService : IClaimsService
         DateOnly? toDate = null,
         CancellationToken ct = default)
     {
-        var query = _db.Set<Claim>().AsNoTracking().Where(c => !c.IsDeleted);
+        var query = _db.Set<Claim>().AsNoTracking()
+            .Where(c => !c.IsDeleted)
+            .ForAccessScope(access);
 
         if (policyId.HasValue) query = query.Where(c => c.PolicyId == policyId.Value);
         if (insuredId.HasValue) query = query.Where(c => c.InsuredId == insuredId.Value);
@@ -35,16 +42,18 @@ public class ClaimsService : IClaimsService
             .ToListAsync(ct);
     }
 
-    public async Task<Result<ClaimDto>> GetClaimAsync(Guid id, CancellationToken ct = default)
+    public async Task<Result<ClaimDto>> GetClaimAsync(Guid id, UserAccessScope access, CancellationToken ct = default)
     {
         var claim = await _db.Set<Claim>().AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct);
+            .Where(c => c.Id == id && !c.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync(ct);
         if (claim is null)
             return Result<ClaimDto>.Failure("CLAIM_NOT_FOUND", $"Claim {id} not found.");
         return Result<ClaimDto>.Success(ToDto(claim));
     }
 
-    public async Task<Result<ClaimDto>> CreateClaimAsync(UpsertClaimRequest request, Guid createdById, CancellationToken ct = default)
+    public async Task<Result<ClaimDto>> CreateClaimAsync(UpsertClaimRequest request, Guid createdById, UserAccessScope access, CancellationToken ct = default)
     {
         // Resolve policy/insured names when a PolicyId is provided
         string? policyNumber = null;
@@ -55,12 +64,20 @@ public class ClaimsService : IClaimsService
         {
             var policy = await _db.Set<Policy>().AsNoTracking()
                 .Include(p => p.Submission).ThenInclude(s => s.Insured)
-                .FirstOrDefaultAsync(p => p.Id == request.PolicyId.Value && !p.IsDeleted, ct);
+                .Where(p => p.Id == request.PolicyId.Value && !p.IsDeleted)
+                .ForAccessScope(access)
+                .FirstOrDefaultAsync(ct);
             if (policy is null)
                 return Result<ClaimDto>.Failure("POLICY_NOT_FOUND", $"Policy {request.PolicyId} not found.");
             policyNumber = policy.PolicyNumber;
             insuredId = policy.Submission.InsuredId;
             insuredName = policy.Submission.Insured.DisplayName;
+        }
+        else if (!access.CanAccessAllBusinessData)
+        {
+            // Unlinked claims are outside the per-user ownership model.
+            return Result<ClaimDto>.Failure(BusinessDataAccess.AccessDeniedCode,
+                "Claims without a linked policy require full business-data access.");
         }
 
         // Unique check: SourcePolicyReference + ClaimNumber
@@ -103,16 +120,22 @@ public class ClaimsService : IClaimsService
             LastValuationDate = request.LastValuationDate,
             IsManualEntry = true,
             Notes = request.Notes,
+            UpdatedById = createdById,
         };
 
         _db.Set<Claim>().Add(claim);
+        UpsertValuation(claim, claim.LastValuationDate, importBatchId: null);
         await _db.SaveChangesAsync(ct);
         return Result<ClaimDto>.Success(ToDto(claim));
     }
 
-    public async Task<Result<ClaimDto>> UpdateClaimAsync(Guid id, UpsertClaimRequest request, CancellationToken ct = default)
+    public async Task<Result<ClaimDto>> UpdateClaimAsync(Guid id, UpsertClaimRequest request, Guid updatedById, UserAccessScope access, CancellationToken ct = default)
     {
-        var claim = await _db.Set<Claim>().FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct);
+        var claim = await _db.Set<Claim>()
+            .Include(c => c.Valuations)
+            .Where(c => c.Id == id && !c.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync(ct);
         if (claim is null)
             return Result<ClaimDto>.Failure("CLAIM_NOT_FOUND", $"Claim {id} not found.");
 
@@ -133,13 +156,22 @@ public class ClaimsService : IClaimsService
         claim.AdjusterName = request.AdjusterName;
         claim.TpaName = request.TpaName;
         claim.TpaClaimNumber = request.TpaClaimNumber;
-        claim.Paid = request.Paid;
-        claim.Reserved = request.Reserved;
-        claim.Expense = request.Expense;
-        claim.Recovery = request.Recovery;
-        claim.Incurred = request.Paid + request.Reserved + request.Expense;
-        claim.LastValuationDate = request.LastValuationDate;
         claim.Notes = request.Notes;
+
+        // Financials on imported claims are owned by the carrier/TPA feed;
+        // manual edits may only touch descriptive fields.
+        if (claim.IsManualEntry)
+        {
+            claim.Paid = request.Paid;
+            claim.Reserved = request.Reserved;
+            claim.Expense = request.Expense;
+            claim.Recovery = request.Recovery;
+            claim.Incurred = request.Paid + request.Reserved + request.Expense;
+            claim.LastValuationDate = request.LastValuationDate;
+            UpsertValuation(claim, claim.LastValuationDate, importBatchId: null);
+        }
+
+        claim.UpdatedById = updatedById;
         claim.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -148,6 +180,10 @@ public class ClaimsService : IClaimsService
 
     public async Task<Result<ClaimImportBatchDto>> ImportClaimsAsync(ImportClaimsRequest request, Guid importedById, CancellationToken ct = default)
     {
+        if (request.Rows.Count > MaxImportRows)
+            return Result<ClaimImportBatchDto>.Failure("IMPORT_TOO_LARGE",
+                $"Import contains {request.Rows.Count} rows; the maximum per batch is {MaxImportRows}. Split the file and retry.");
+
         var batch = new ClaimImportBatch
         {
             FileName = request.FileName,
@@ -173,6 +209,19 @@ public class ClaimsService : IClaimsService
             .Where(p => policyRefs.Contains(p.PolicyNumber) && !p.IsDeleted)
             .ToListAsync(ct);
         var policyByNumber = policies.GroupBy(p => p.PolicyNumber)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // One batched lookup for all existing claims this file could touch
+        var srcRefs = request.Rows
+            .Select(r => r.CarrierPolicyNum?.Trim() ?? string.Empty)
+            .Distinct()
+            .ToList();
+        var existingClaims = await _db.Set<Claim>()
+            .Include(c => c.Valuations)
+            .Where(c => srcRefs.Contains(c.SourcePolicyReference!) && !c.IsDeleted)
+            .ToListAsync(ct);
+        var existingByKey = existingClaims
+            .GroupBy(c => (c.SourcePolicyReference ?? string.Empty, c.ClaimNumber))
             .ToDictionary(g => g.Key, g => g.First());
 
         var errors = new List<string>();
@@ -217,14 +266,16 @@ public class ClaimsService : IClaimsService
 
             policyByNumber.TryGetValue(srcRef, out var matchedPolicy);
 
-            var paid = (row.TotalLossPaid ?? 0m) + (row.TotalExpPaid ?? 0m);
-            var reserved = (row.TotalOsLoss ?? 0m) + (row.TotalOsExp ?? 0m);
-            var expense = 0m;
+            // Loss-run column semantics: Paid = loss paid, Reserved = loss O/S,
+            // Expense = ALAE (paid + O/S). The old mapping folded expense into
+            // paid/reserved and hardcoded Expense = 0.
+            var paid = row.TotalLossPaid ?? 0m;
+            var reserved = row.TotalOsLoss ?? 0m;
+            var expense = (row.TotalExpPaid ?? 0m) + (row.TotalOsExp ?? 0m);
             var recovery = row.TotalRecovery ?? 0m;
-            var incurred = row.TotalIncurred ?? (paid + reserved);
+            var incurred = row.TotalIncurred ?? (paid + reserved + expense);
 
-            var existing = await _db.Set<Claim>()
-                .FirstOrDefaultAsync(c => c.SourcePolicyReference == srcRef && c.ClaimNumber == claimNum && !c.IsDeleted, ct);
+            existingByKey.TryGetValue((srcRef, claimNum), out var existing);
 
             if (existing is null)
             {
@@ -261,31 +312,46 @@ public class ClaimsService : IClaimsService
                     IsManualEntry = false,
                 };
                 _db.Set<Claim>().Add(claim);
+                UpsertValuation(claim, valuationDate, batch.Id);
+                existingByKey[(srcRef, claimNum)] = claim;
                 created++;
+            }
+            else if (existing.IsManualEntry)
+            {
+                // Never let a feed silently clobber a manually entered claim.
+                errors.Add($"Row {rowNum}: claim {claimNum} for '{srcRef}' exists as a manual entry; resolve manually");
+                skipped++;
             }
             else
             {
-                existing.Status = status;
-                existing.ClosedDate = closedDate;
-                existing.AdjusterName = row.AdjusterName ?? existing.AdjusterName;
-                existing.ClaimTypeDesc = row.ClaimTypeDesc ?? existing.ClaimTypeDesc;
-                existing.LossCause = row.AccidentCauseDesc ?? existing.LossCause;
-                existing.Description = row.AccidentDescription ?? existing.Description;
-                existing.Paid = paid;
-                existing.Reserved = reserved;
-                existing.Expense = expense;
-                existing.Recovery = recovery;
-                existing.Incurred = incurred;
-                existing.LastValuationDate = valuationDate;
-                existing.ImportBatchId = batch.Id;
-                if (matchedPolicy is not null && existing.PolicyId is null)
+                // Snapshot is always recorded; current values only move forward —
+                // an older file must not regress newer valuations.
+                UpsertValuation(existing, valuationDate, batch.Id, status, paid, reserved, expense, recovery, incurred);
+
+                if (valuationDate >= existing.LastValuationDate)
                 {
-                    existing.PolicyId = matchedPolicy.Id;
-                    existing.PolicyNumber = matchedPolicy.PolicyNumber;
-                    existing.InsuredId = matchedPolicy.Submission?.InsuredId;
-                    existing.InsuredName = matchedPolicy.Submission?.Insured?.DisplayName;
+                    existing.Status = status;
+                    existing.ClosedDate = closedDate;
+                    existing.AdjusterName = row.AdjusterName ?? existing.AdjusterName;
+                    existing.ClaimTypeDesc = row.ClaimTypeDesc ?? existing.ClaimTypeDesc;
+                    existing.LossCause = row.AccidentCauseDesc ?? existing.LossCause;
+                    existing.Description = row.AccidentDescription ?? existing.Description;
+                    existing.Paid = paid;
+                    existing.Reserved = reserved;
+                    existing.Expense = expense;
+                    existing.Recovery = recovery;
+                    existing.Incurred = incurred;
+                    existing.LastValuationDate = valuationDate;
+                    existing.ImportBatchId = batch.Id;
+                    if (matchedPolicy is not null && existing.PolicyId is null)
+                    {
+                        existing.PolicyId = matchedPolicy.Id;
+                        existing.PolicyNumber = matchedPolicy.PolicyNumber;
+                        existing.InsuredId = matchedPolicy.Submission?.InsuredId;
+                        existing.InsuredName = matchedPolicy.Submission?.Insured?.DisplayName;
+                    }
+                    existing.UpdatedAt = DateTime.UtcNow;
                 }
-                existing.UpdatedAt = DateTime.UtcNow;
                 updated++;
             }
         }
@@ -316,17 +382,78 @@ public class ClaimsService : IClaimsService
             .ToListAsync(ct);
     }
 
-    public async Task<Result<LossRunDto>> GetLossRunAsync(Guid? insuredId, Guid? policyId, DateOnly asOfDate, CancellationToken ct = default)
+    public async Task<Result<LossRunDto>> GetLossRunAsync(Guid? insuredId, Guid? policyId, DateOnly asOfDate, UserAccessScope access, CancellationToken ct = default)
     {
         if (!insuredId.HasValue && !policyId.HasValue)
             return Result<LossRunDto>.Failure("MISSING_FILTER", "insuredId or policyId is required.");
 
-        var query = _db.Set<Claim>().AsNoTracking().Where(c => !c.IsDeleted && c.DateOfLoss <= asOfDate);
+        // The requested target must itself be accessible — a foreign id is a
+        // scope violation, not an empty result.
+        if (policyId.HasValue)
+        {
+            var policyVisible = await _db.Set<Policy>().AsNoTracking()
+                .Where(p => p.Id == policyId.Value && !p.IsDeleted)
+                .ForAccessScope(access)
+                .AnyAsync(ct);
+            if (!policyVisible)
+                return Result<LossRunDto>.Failure(BusinessDataAccess.AccessDeniedCode, BusinessDataAccess.AccessDeniedMessage);
+        }
+        else if (insuredId.HasValue && !access.CanAccessAllBusinessData)
+        {
+            var insuredVisible = await _db.Set<Policy>().AsNoTracking()
+                .Where(p => p.Submission.InsuredId == insuredId.Value && !p.IsDeleted)
+                .ForAccessScope(access)
+                .AnyAsync(ct);
+            if (!insuredVisible)
+                return Result<LossRunDto>.Failure(BusinessDataAccess.AccessDeniedCode, BusinessDataAccess.AccessDeniedMessage);
+        }
+
+        // Claims known as of the valuation date
+        var query = _db.Set<Claim>().AsNoTracking()
+            .Where(c => !c.IsDeleted && c.DateOfLoss <= asOfDate && c.ReportDate <= asOfDate)
+            .ForAccessScope(access);
         if (insuredId.HasValue) query = query.Where(c => c.InsuredId == insuredId.Value);
         if (policyId.HasValue) query = query.Where(c => c.PolicyId == policyId.Value);
 
-        var claims = await query.OrderByDescending(c => c.DateOfLoss)
-            .Select(c => ToListItem(c)).ToListAsync(ct);
+        var matched = await query.OrderByDescending(c => c.DateOfLoss).ToListAsync(ct);
+
+        // Value each claim as of the date: latest snapshot <= asOf; claims with
+        // no snapshot fall back to current values when their valuation predates
+        // asOf, otherwise they were not yet valued and are excluded.
+        var claimIds = matched.Select(c => c.Id).ToList();
+        var valuations = await _db.Set<ClaimValuation>().AsNoTracking()
+            .Where(v => claimIds.Contains(v.ClaimId) && v.ValuationDate <= asOfDate && !v.IsDeleted)
+            .ToListAsync(ct);
+        var latestByClaim = valuations
+            .GroupBy(v => v.ClaimId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(v => v.ValuationDate).First());
+        var hasAnyValuation = (await _db.Set<ClaimValuation>().AsNoTracking()
+            .Where(v => claimIds.Contains(v.ClaimId) && !v.IsDeleted)
+            .Select(v => v.ClaimId)
+            .Distinct()
+            .ToListAsync(ct)).ToHashSet();
+
+        var claims = new List<ClaimListItemDto>();
+        foreach (var c in matched)
+        {
+            if (latestByClaim.TryGetValue(c.Id, out var snap))
+            {
+                var item = ToListItem(c);
+                item.Status = snap.Status;
+                item.Paid = snap.Paid;
+                item.Reserved = snap.Reserved;
+                item.Expense = snap.Expense;
+                item.Recovery = snap.Recovery;
+                item.Incurred = snap.Incurred;
+                item.LastValuationDate = snap.ValuationDate;
+                claims.Add(item);
+            }
+            else if (!hasAnyValuation.Contains(c.Id) && c.LastValuationDate <= asOfDate)
+            {
+                claims.Add(ToListItem(c));
+            }
+            // else: claim has snapshots but none <= asOf — not yet valued as of that date
+        }
 
         string? insuredName = null;
         string? policyNumber = null;
@@ -359,6 +486,33 @@ public class ClaimsService : IClaimsService
             TotalIncurred = claims.Sum(c => c.Incurred),
             Claims = claims,
         });
+    }
+
+    // ── Valuation snapshots ─────────────────────────────────────────────────────
+
+    private void UpsertValuation(Claim claim, DateOnly valuationDate, Guid? importBatchId)
+        => UpsertValuation(claim, valuationDate, importBatchId,
+            claim.Status, claim.Paid, claim.Reserved, claim.Expense, claim.Recovery, claim.Incurred);
+
+    private void UpsertValuation(
+        Claim claim, DateOnly valuationDate, Guid? importBatchId,
+        ClaimStatus status, decimal paid, decimal reserved, decimal expense, decimal recovery, decimal incurred)
+    {
+        var existing = claim.Valuations.FirstOrDefault(v => v.ValuationDate == valuationDate && !v.IsDeleted);
+        if (existing is null)
+        {
+            existing = new ClaimValuation { Claim = claim, ClaimId = claim.Id, ValuationDate = valuationDate };
+            claim.Valuations.Add(existing);
+            _db.Set<ClaimValuation>().Add(existing);
+        }
+        existing.Status = status;
+        existing.Paid = paid;
+        existing.Reserved = reserved;
+        existing.Expense = expense;
+        existing.Recovery = recovery;
+        existing.Incurred = incurred;
+        existing.ImportBatchId = importBatchId;
+        existing.UpdatedAt = DateTime.UtcNow;
     }
 
     // ── Projections ────────────────────────────────────────────────────────────

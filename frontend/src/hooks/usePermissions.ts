@@ -49,6 +49,8 @@ export function usePermissions() {
     canManageRating: hasPermission('rating.manage'),
     canAdminRating: hasPermission('rating.admin'),
     canViewReportData: hasPermission('reports.view'),
+    canViewClaims: hasPermission('claims.view'),
+    canManageClaims: hasPermission('claims.manage'),
 
     // Navigation sections (control sidebar visibility)
     canViewSubmissions: hasPermission('nav.submissions'),

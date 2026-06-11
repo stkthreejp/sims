@@ -136,14 +136,15 @@ Machinery done (hierarchy, AL block, orphan audit). **Data missing: no carriers/
 - [ ] **(P1)** Submission pipeline funnel (received→quoted→bound→declined, conversion %, by program/agent).
 - [ ] **(P1)** UW workload (open submissions/quotes/tasks per underwriter).
 
-### WS10 — Claims & loss runs — backend ✅ / **four defects + no UI**
+### WS10 — Claims & loss runs — ✅ DONE except data loads (2026-06-11)
 
-- [ ] **(P0 for any claims rollout — High security finding)** Thread `UserAccessScope` through `ClaimsService` reads *and* writes: today any `claims.view` holder can pull the whole book's claims (claimant PII, financials) and any insured's loss run by ID; `claims.manage` can rewrite any claim's financials with no scope check and no `UpdatedById` audit. Scope via linked Policy/Insured `ForAccessScope`; decide how unlinked imported claims (PolicyId null) are scoped; stamp the modifying user; consider blocking manual edits of imported rows.
-- [ ] **(P1) Valuation correctness (cadence decided §5.7 — mixed daily/weekly/monthly feeds)**: build **batch-keyed valuation history** — each import batch is a snapshot keyed by its valuation date, loss runs select the latest snapshot ≤ asOfDate per claim. Fixes in the same pass: (a) loss-run `asOfDate` currently filters `DateOfLoss <= asOf` over *current* values; (b) import unconditionally overwrites — an older file regresses newer valuations (`valuationDate >= LastValuationDate` guard missing); (c) `expense` is hardcoded `0m` while `paid` mixes loss+expense, so the loss-run expense column is always zero.
-- [ ] (P1) Import hardening: cap rows/batch, batch the per-row existing-claim lookup (currently N+1), protect against client-controlled `(SourcePolicyReference, ClaimNumber)` collisions clobbering manual claims.
-- [ ] **(P1) Frontend — entirely missing**: no claims api/types/pages/routes/nav. Build: claims list + detail, import page surfacing batch results, **loss-run generate/download action on insured & policy detail** (a daily MGA task), guarded by `claims.view`/`claims.manage`.
-- [ ] (P1) Loss-run export endpoint (PDF/XLSX via existing document tooling) — `GetLossRunAsync` returns a DTO only.
-- [ ] Import the launch program's current claims (Sedgwick) + first historical load.
+- [x] **(P0)** `UserAccessScope` threaded through all ClaimsService reads and writes; claims scope via linked Policy `ForAccessScope`; **unlinked claims (PolicyId null) require full business-data access (fail closed)**; loss-run requests for foreign policies/insureds return ACCESS_DENIED; `UpdatedById` stamped; imported claims' financials are feed-owned (manual edits touch descriptive fields only).
+- [x] **(P1)** Batch-keyed valuation history: `ClaimValuation` snapshot per (claim, valuation date); loss runs value each claim from the latest snapshot ≤ asOfDate; older import files upsert their snapshot but cannot regress current values; expense column mapped correctly (Paid = loss paid, Reserved = loss O/S, Expense = ALAE paid + O/S).
+- [x] **(P1)** Import hardening: 20k row cap, batched existing-claim lookup (was N+1), rows colliding with manual claims are skipped with an error-summary entry.
+- [x] **(P1)** Frontend: claims list with filters + totals, CSV import (Unified_Claims_Import layout) with batch history, sidebar/route guarded by `claims.view`/`claims.manage`; **Loss Run download buttons on Insured and Policy detail pages**.
+- [x] **(P1)** Loss-run CSV export endpoint (`GET /claims/loss-run/csv`) with summary header + claim detail.
+- [x] EF migration `AddClaimsAndValuations` (claims tables were previously entities-only — no migration existed); 9 new service tests covering scoping, valuation regression, snapshots, collisions, and the expense mapping.
+- [ ] **Operational**: import the launch program's current claims (Sedgwick) + first historical load; grant `claims.view`/`claims.manage` to the right roles in Role Permissions.
 
 ---
 

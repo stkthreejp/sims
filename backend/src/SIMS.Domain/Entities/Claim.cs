@@ -46,8 +46,10 @@ public class Claim : BaseEntity
     public Guid? ImportBatchId { get; set; }
     public bool IsManualEntry { get; set; } = true;
     public string? Notes { get; set; }
+    public Guid? UpdatedById { get; set; }
 
     // Navigation
     public Policy? Policy { get; set; }
     public ClaimImportBatch? ImportBatch { get; set; }
+    public ICollection<ClaimValuation> Valuations { get; set; } = new List<ClaimValuation>();
 }

@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { insuredsApi } from '@/api/insureds.api'
 import { submissionsApi } from '@/api/submissions.api'
 import { policiesApi } from '@/api/policies.api'
+import { downloadLossRunCsv } from '@/api/claims.api'
 import { queryClient } from '@/lib/queryClient'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
@@ -178,7 +179,7 @@ type Tab = 'overview' | 'policies' | 'submissions' | 'documents'
 export function InsuredDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { canEditInsureds, canDeleteInsureds, canCreatePolicies } = usePermissions()
+  const { canEditInsureds, canDeleteInsureds, canCreatePolicies, canViewClaims } = usePermissions()
   const [tab, setTab] = useState<Tab>('overview')
 
   const { data: insured, isLoading } = useQuery({
@@ -287,6 +288,19 @@ export function InsuredDetailPage() {
             <a href={`mailto:${insured.email}`} className="sd-btn outline sm">
               <Mail style={{ width: 13, height: 13 }} /> Email
             </a>
+          )}
+          {canViewClaims && (
+            <button
+              className="sd-btn outline sm"
+              onClick={() =>
+                downloadLossRunCsv({ insuredId: id }).catch((err) =>
+                  toast.error(err?.response?.status === 403
+                    ? 'You do not have access to this insured’s loss run'
+                    : 'Could not generate loss run'))
+              }
+            >
+              <Download style={{ width: 13, height: 13 }} /> Loss Run
+            </button>
           )}
           {canEditInsureds && (
             <Link to={`/insureds/${id}/edit`} className="sd-btn outline sm">
