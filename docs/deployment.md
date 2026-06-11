@@ -74,7 +74,7 @@ Or set up GitHub Actions / Azure DevOps pipeline for CI/CD.
 - [ ] Set up monitoring / Application Insights
 - [ ] Configure custom domain and SSL certificate
 - [ ] Remove developer IP from PostgreSQL firewall once VNet is set up
-- [ ] Rotate `GraphApi:ClientSecret` and store in Key Vault
+- [x] Rotate `GraphApi:ClientSecret` and store in Key Vault (rotated 2026-06-11; stored as `GraphApi--ClientSecret` in `simskey`)
 
 ## Environment Variables Reference
 
@@ -87,7 +87,7 @@ Or set up GitHub Actions / Azure DevOps pipeline for CI/CD.
 | `Qbo:ClientSecret` | Key Vault | QuickBooks OAuth client secret |
 | `Qbo:RefreshToken` | Key Vault | QuickBooks OAuth refresh token |
 | `Syncfusion:LicenseKey` | Key Vault | Syncfusion license |
-| `GraphApi:ClientSecret` | Key Vault (pending) | Microsoft Graph API |
+| `GraphApi:ClientSecret` | Key Vault | Microsoft Graph API |
 | `GeminiApi:ApiKey` | Key Vault (pending) | Google Gemini API |
 
 ### Frontend
