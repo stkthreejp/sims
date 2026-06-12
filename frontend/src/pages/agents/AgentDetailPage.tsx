@@ -4,12 +4,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, MapPin, Phone, Mail,
   Star, Building2, ChevronDown, ChevronUp, UserCircle, Percent, BanknoteIcon,
+  ShieldCheck, ShieldAlert, ShieldX, TrendingUp, TrendingDown, MessageSquare, CalendarDays,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { agentsApi } from '@/api/agents.api'
 import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
-import type { AgentLocation, AgentContact, AgentLocationInput, AgentContactInput } from '@/types/agent.types'
+import type {
+  AgentLocation, AgentContact, AgentLocationInput, AgentContactInput,
+  AgentComplianceDocType, AgentComplianceDocUpsert, AgentContactLogCreate,
+} from '@/types/agent.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
@@ -247,6 +251,31 @@ function ContactForm({
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
+function KpiTile({ label, value, sub, trend, warn = false }: {
+  label: string
+  value: string
+  sub?: string
+  trend?: 'up' | 'down'
+  warn?: boolean
+}) {
+  return (
+    <div style={{
+      background: warn ? 'var(--warn-bg)' : 'var(--surface)',
+      border: `1px solid ${warn ? 'var(--warn-fg)' : 'var(--border)'}`,
+      borderRadius: 8,
+      padding: '10px 14px',
+    }}>
+      <div style={{ fontSize: 11.5, color: warn ? 'var(--warn-fg)' : 'var(--ink-3)', marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+        <span style={{ fontSize: 22, fontWeight: 700, color: warn ? 'var(--warn-fg)' : 'var(--ink-1)', lineHeight: 1.2 }}>{value}</span>
+        {trend === 'up' && <TrendingUp style={{ width: 14, height: 14, color: 'var(--good-fg)' }} />}
+        {trend === 'down' && <TrendingDown style={{ width: 14, height: 14, color: 'var(--bad-fg)' }} />}
+      </div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{sub}</div>}
+    </div>
+  )
+}
+
 export function AgentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -271,6 +300,11 @@ export function AgentDetailPage() {
   const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
 
+  const [editingComplianceDoc, setEditingComplianceDoc] = useState<AgentComplianceDocType | null>(null)
+  const [complianceForm, setComplianceForm] = useState({ expirationDate: '', licenseState: '', executedDate: '', notes: '' })
+  const [showLogCreate, setShowLogCreate] = useState(false)
+  const [logForm, setLogForm] = useState({ logDate: '', logType: 'Call', contactName: '', notes: '' })
+
   const { data: agent, isLoading } = useQuery({
     queryKey: ['agents', id],
     queryFn: () => agentsApi.getById(id!),
@@ -291,6 +325,64 @@ export function AgentDetailPage() {
   const { data: programs = [] } = useQuery({
     queryKey: ['admin', 'program-configurations', 'active'],
     queryFn: () => programConfigurationsApi.getAll(false),
+  })
+
+  const { data: compliance } = useQuery({
+    queryKey: ['agents', id, 'compliance'],
+    queryFn: () => agentsApi.getCompliance(id!),
+    enabled: !!id,
+  })
+
+  const { data: contactLogs = [] } = useQuery({
+    queryKey: ['agents', id, 'contact-log'],
+    queryFn: () => agentsApi.getContactLog(id!),
+    enabled: !!id,
+  })
+
+  const { data: kpi } = useQuery({
+    queryKey: ['agents', id, 'kpi'],
+    queryFn: () => agentsApi.getKpi(id!),
+    enabled: !!id,
+  })
+
+  const upsertComplianceMutation = useMutation({
+    mutationFn: ({ docType, data }: { docType: string; data: AgentComplianceDocUpsert }) =>
+      agentsApi.upsertComplianceDoc(id!, docType, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', id, 'compliance'] })
+      setEditingComplianceDoc(null)
+      toast.success('Compliance doc updated')
+    },
+    onError: () => toast.error('Failed to update compliance doc'),
+  })
+
+  const deleteComplianceMutation = useMutation({
+    mutationFn: (docType: string) => agentsApi.deleteComplianceDoc(id!, docType),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', id, 'compliance'] })
+      toast.success('Compliance doc removed')
+    },
+    onError: () => toast.error('Failed to remove compliance doc'),
+  })
+
+  const createLogMutation = useMutation({
+    mutationFn: (data: AgentContactLogCreate) => agentsApi.createContactLog(id!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', id, 'contact-log'] })
+      setShowLogCreate(false)
+      setLogForm({ logDate: '', logType: 'Call', contactName: '', notes: '' })
+      toast.success('Interaction logged')
+    },
+    onError: () => toast.error('Failed to log interaction'),
+  })
+
+  const deleteLogMutation = useMutation({
+    mutationFn: (logId: string) => agentsApi.deleteContactLog(id!, logId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', id, 'contact-log'] })
+      toast.success('Log entry deleted')
+    },
+    onError: () => toast.error('Failed to delete log entry'),
   })
 
   const updateInfoMutation = useMutation({
@@ -619,6 +711,296 @@ export function AgentDetailPage() {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* KPI Strip */}
+      {kpi && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          <KpiTile
+            label="Bound Premium (12m)"
+            value={`$${kpi.boundPremiumLast12Months.toLocaleString()}`}
+            sub={kpi.boundPremiumPrior12Months != null ? `Prior 12m: $${kpi.boundPremiumPrior12Months.toLocaleString()}` : undefined}
+            trend={kpi.boundPremiumPrior12Months != null && kpi.boundPremiumPrior12Months > 0
+              ? kpi.boundPremiumLast12Months >= kpi.boundPremiumPrior12Months ? 'up' : 'down'
+              : undefined}
+          />
+          <KpiTile label="Quotes Issued (12m)" value={kpi.quotesIssuedLast12Months.toString()} />
+          <KpiTile label="Quotes Bound (12m)" value={kpi.quotesBoundLast12Months.toString()} />
+          <KpiTile
+            label="Hit Ratio"
+            value={kpi.hitRatio != null ? `${kpi.hitRatio}%` : '—'}
+            warn={kpi.hitRatio != null && kpi.hitRatio < 25}
+          />
+        </div>
+      )}
+
+      {/* Compliance Gate */}
+      <div className="sd-card">
+        <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3>
+              <ShieldCheck style={{ width: 13, height: 13, marginRight: 6, display: 'inline', verticalAlign: 'text-bottom' }} />
+              Compliance
+            </h3>
+            {compliance && !compliance.isQuoteReady && (
+              <span style={{ fontSize: 11.5, background: 'var(--warn-bg)', color: 'var(--warn-fg)', borderRadius: 4, padding: '2px 7px', fontWeight: 600 }}>
+                Not Quote-Ready
+              </span>
+            )}
+            {compliance?.isQuoteReady && (
+              <span style={{ fontSize: 11.5, background: 'var(--good-bg)', color: 'var(--good-fg)', borderRadius: 4, padding: '2px 7px', fontWeight: 600 }}>
+                Quote-Ready
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="sd-card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {(['EOCertificate', 'StateLicense', 'BrokerAgreement'] as AgentComplianceDocType[]).map((docType) => {
+              const doc = compliance?.docs.find((d) => d.docType === docType)
+              const status = doc?.status ?? 'Missing'
+              const isEditing = editingComplianceDoc === docType
+
+              const label = docType === 'EOCertificate' ? 'E&O Certificate'
+                : docType === 'StateLicense' ? 'State License'
+                : 'Broker Agreement'
+
+              const StatusIcon = status === 'Current' ? ShieldCheck
+                : status === 'ExpiringSoon' ? ShieldAlert
+                : ShieldX
+
+              const statusColor = status === 'Current' ? 'var(--good-fg)'
+                : status === 'ExpiringSoon' ? 'var(--warn-fg)'
+                : 'var(--bad-fg)'
+
+              return (
+                <div
+                  key={docType}
+                  style={{
+                    border: `1px solid ${status === 'Missing' || status === 'Expired' ? 'var(--bad-fg)' : status === 'ExpiringSoon' ? 'var(--warn-fg)' : 'var(--border)'}`,
+                    borderRadius: 8,
+                    padding: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <StatusIcon style={{ width: 14, height: 14, color: statusColor }} />
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>{label}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => {
+                          setEditingComplianceDoc(docType)
+                          setComplianceForm({
+                            expirationDate: doc?.expirationDate ?? '',
+                            licenseState: doc?.licenseState ?? '',
+                            executedDate: doc?.executedDate ?? '',
+                            notes: doc?.notes ?? '',
+                          })
+                        }}
+                        className="sims-icon-btn"
+                        title="Edit"
+                      >
+                        <Pencil style={{ width: 12, height: 12 }} />
+                      </button>
+                      {doc && (
+                        <button
+                          onClick={() => { if (confirm(`Remove ${label}?`)) deleteComplianceMutation.mutate(docType) }}
+                          className="sims-icon-btn"
+                          title="Remove"
+                        >
+                          <Trash2 style={{ width: 12, height: 12 }} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {!isEditing && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span className={`sd-pill ${status === 'Current' ? 'good' : status === 'ExpiringSoon' ? 'expiring' : status === 'Expired' ? 'cancelled' : 'withdrawn'}`} style={{ alignSelf: 'flex-start' }}>
+                        {status === 'Missing' ? 'Missing' : status}
+                      </span>
+                      {doc?.expirationDate && (
+                        <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                          Expires {doc.expirationDate}
+                        </p>
+                      )}
+                      {doc?.licenseState && (
+                        <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>State: {doc.licenseState}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {isEditing && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div>
+                          <label className="sims-field-label">Expiration Date</label>
+                          <input
+                            type="date"
+                            value={complianceForm.expirationDate}
+                            onChange={(e) => setComplianceForm({ ...complianceForm, expirationDate: e.target.value })}
+                            className="sims-input"
+                          />
+                        </div>
+                        {docType === 'StateLicense' && (
+                          <div>
+                            <label className="sims-field-label">State</label>
+                            <input
+                              value={complianceForm.licenseState}
+                              onChange={(e) => setComplianceForm({ ...complianceForm, licenseState: e.target.value })}
+                              className="sims-input"
+                              placeholder="e.g. TX"
+                              maxLength={2}
+                            />
+                          </div>
+                        )}
+                        {docType === 'BrokerAgreement' && (
+                          <div>
+                            <label className="sims-field-label">Executed Date</label>
+                            <input
+                              type="date"
+                              value={complianceForm.executedDate}
+                              onChange={(e) => setComplianceForm({ ...complianceForm, executedDate: e.target.value })}
+                              className="sims-input"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="sims-field-label">Notes</label>
+                        <input
+                          value={complianceForm.notes}
+                          onChange={(e) => setComplianceForm({ ...complianceForm, notes: e.target.value })}
+                          className="sims-input"
+                          placeholder="Optional notes"
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => upsertComplianceMutation.mutate({
+                            docType,
+                            data: {
+                              expirationDate: complianceForm.expirationDate || null,
+                              licenseState: complianceForm.licenseState || null,
+                              executedDate: complianceForm.executedDate || null,
+                              notes: complianceForm.notes || null,
+                            },
+                          })}
+                          disabled={upsertComplianceMutation.isPending}
+                          className="sd-btn primary sm"
+                        >
+                          <Check style={{ width: 11, height: 11 }} /> Save
+                        </button>
+                        <button onClick={() => setEditingComplianceDoc(null)} className="sd-btn outline sm">
+                          <X style={{ width: 11, height: 11 }} /> Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* CRM Contact Log */}
+      <div className="sd-card">
+        <div className="sd-card-head" style={{ justifyContent: 'space-between' }}>
+          <h3>
+            <MessageSquare style={{ width: 13, height: 13, marginRight: 6, display: 'inline', verticalAlign: 'text-bottom' }} />
+            Interaction Log
+          </h3>
+          {!showLogCreate && (
+            <button onClick={() => { setShowLogCreate(true); setLogForm({ logDate: new Date().toISOString().slice(0, 10), logType: 'Call', contactName: '', notes: '' }) }} className="sd-btn outline sm">
+              <Plus style={{ width: 12, height: 12 }} /> Log Interaction
+            </button>
+          )}
+        </div>
+        <div className="sd-card-body">
+          {showLogCreate && (
+            <div style={{ border: '1px solid var(--line)', background: 'var(--surface-2)', borderRadius: 'var(--r)', padding: 14, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="sims-fields" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                <div>
+                  <label className="sims-field-label">Date *</label>
+                  <input type="date" value={logForm.logDate} onChange={(e) => setLogForm({ ...logForm, logDate: e.target.value })} className="sims-input" />
+                </div>
+                <div>
+                  <label className="sims-field-label">Type</label>
+                  <select value={logForm.logType} onChange={(e) => setLogForm({ ...logForm, logType: e.target.value })} className="sims-select">
+                    <option value="Call">Call</option>
+                    <option value="Visit">Visit</option>
+                    <option value="Email">Email</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="sims-field-label">Contact Name</label>
+                  <input value={logForm.contactName} onChange={(e) => setLogForm({ ...logForm, contactName: e.target.value })} className="sims-input" placeholder="Who you spoke with" />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label className="sims-field-label">Notes *</label>
+                  <input value={logForm.notes} onChange={(e) => setLogForm({ ...logForm, notes: e.target.value })} className="sims-input" placeholder="What was discussed..." />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    if (!logForm.logDate) { toast.error('Date is required'); return }
+                    if (!logForm.notes.trim()) { toast.error('Notes are required'); return }
+                    createLogMutation.mutate({
+                      logDate: logForm.logDate,
+                      logType: logForm.logType as any,
+                      contactName: logForm.contactName || null,
+                      notes: logForm.notes.trim(),
+                    })
+                  }}
+                  disabled={createLogMutation.isPending}
+                  className="sd-btn primary sm"
+                >
+                  <Check style={{ width: 12, height: 12 }} /> Save
+                </button>
+                <button onClick={() => setShowLogCreate(false)} className="sd-btn outline sm">
+                  <X style={{ width: 12, height: 12 }} /> Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {contactLogs.length === 0 && !showLogCreate ? (
+            <p style={{ fontSize: 12.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>No interactions logged yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {contactLogs.map((log) => (
+                <div key={log.id} className="subs-row" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '8px 4px', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1 }}>
+                    <CalendarDays style={{ width: 13, height: 13, color: 'var(--ink-4)', marginTop: 2, flexShrink: 0 }} />
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{log.logDate}</span>
+                        <span className="sd-pill draft" style={{ fontSize: 11 }}>{log.logType}</span>
+                        {log.contactName && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>with {log.contactName}</span>}
+                      </div>
+                      <p style={{ fontSize: 13, color: 'var(--ink-2)' }}>{log.notes}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { if (confirm('Delete this log entry?')) deleteLogMutation.mutate(log.id) }}
+                    className="sims-icon-btn"
+                    title="Delete"
+                    style={{ flexShrink: 0, color: 'var(--ink-4)' }}
+                  >
+                    <Trash2 style={{ width: 12, height: 12 }} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

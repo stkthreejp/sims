@@ -11,4 +11,6 @@ public class Agent : BaseEntity
 
     public ICollection<Submission> Submissions { get; set; } = new List<Submission>();
     public ICollection<AgentLocation> Locations { get; set; } = new List<AgentLocation>();
+    public ICollection<AgentComplianceDoc> ComplianceDocs { get; set; } = new List<AgentComplianceDoc>();
+    public ICollection<AgentContactLog> ContactLogs { get; set; } = new List<AgentContactLog>();
 }

@@ -78,3 +78,71 @@ export interface AgentLocationInput {
   isPrimary: boolean
   contacts: AgentContactInput[]
 }
+
+// ─── Compliance Docs ──────────────────────────────────────────────────────────
+
+export type AgentComplianceDocType = 'EOCertificate' | 'StateLicense' | 'BrokerAgreement'
+export type AgentComplianceStatus = 'Current' | 'ExpiringSoon' | 'Expired' | 'Missing'
+
+export interface AgentComplianceDoc {
+  id: string
+  docType: AgentComplianceDocType
+  expirationDate: string | null
+  licenseState: string | null
+  executedDate: string | null
+  notes: string | null
+  status: AgentComplianceStatus
+}
+
+export interface AgentComplianceDocUpsert {
+  expirationDate?: string | null
+  licenseState?: string | null
+  executedDate?: string | null
+  notes?: string | null
+}
+
+export interface AgentComplianceStatusResult {
+  isQuoteReady: boolean
+  missingOrExpired: string[]
+  docs: AgentComplianceDoc[]
+}
+
+// ─── Contact Log ─────────────────────────────────────────────────────────────
+
+export type AgentContactLogType = 'Visit' | 'Call' | 'Email' | 'Other'
+
+export interface AgentContactLog {
+  id: string
+  logDate: string
+  logType: AgentContactLogType
+  contactName: string | null
+  notes: string
+  createdByName: string
+  createdAt: string
+}
+
+export interface AgentContactLogCreate {
+  logDate: string
+  logType: AgentContactLogType
+  contactName?: string | null
+  notes: string
+}
+
+// ─── KPIs ────────────────────────────────────────────────────────────────────
+
+export interface AgentKpi {
+  boundPremiumLast12Months: number
+  boundPremiumPrior12Months: number
+  quotesIssuedLast12Months: number
+  quotesBoundLast12Months: number
+  hitRatio: number | null
+}
+
+// ─── Summary Stats ────────────────────────────────────────────────────────────
+
+export interface AgentSummaryStats {
+  totalAgents: number
+  missingComplianceDocs: number
+  eoExpiringSoon: number
+  licensesExpiringSoon: number
+}

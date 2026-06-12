@@ -1,5 +1,75 @@
 namespace SIMS.Application.DTOs.Agents;
 
+// ─── Compliance docs ──────────────────────────────────────────────────────────
+
+public class AgentComplianceDocDto
+{
+    public Guid Id { get; set; }
+    public string DocType { get; set; } = string.Empty;
+    public DateOnly? ExpirationDate { get; set; }
+    public string? LicenseState { get; set; }
+    public DateOnly? ExecutedDate { get; set; }
+    public string? Notes { get; set; }
+    public string Status { get; set; } = string.Empty; // Current | ExpiringSoon | Expired | Missing
+}
+
+public class AgentComplianceDocUpsertDto
+{
+    public DateOnly? ExpirationDate { get; set; }
+    public string? LicenseState { get; set; }
+    public DateOnly? ExecutedDate { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class AgentComplianceStatusDto
+{
+    public bool IsQuoteReady { get; set; }
+    public List<string> MissingOrExpired { get; set; } = new();
+    public List<AgentComplianceDocDto> Docs { get; set; } = new();
+}
+
+// ─── Contact log ─────────────────────────────────────────────────────────────
+
+public class AgentContactLogDto
+{
+    public Guid Id { get; set; }
+    public DateOnly LogDate { get; set; }
+    public string LogType { get; set; } = string.Empty;
+    public string? ContactName { get; set; }
+    public string Notes { get; set; } = string.Empty;
+    public string CreatedByName { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+public class AgentContactLogCreateDto
+{
+    public DateOnly LogDate { get; set; }
+    public string LogType { get; set; } = string.Empty;
+    public string? ContactName { get; set; }
+    public string Notes { get; set; } = string.Empty;
+}
+
+// ─── KPIs ────────────────────────────────────────────────────────────────────
+
+public class AgentKpiDto
+{
+    public decimal BoundPremiumLast12Months { get; set; }
+    public decimal? BoundPremiumPrior12Months { get; set; }
+    public int QuotesIssuedLast12Months { get; set; }
+    public int QuotesBoundLast12Months { get; set; }
+    public decimal? HitRatio { get; set; } // null when no quotes issued
+}
+
+// ─── Summary stats (list page) ───────────────────────────────────────────────
+
+public class AgentSummaryStatsDto
+{
+    public int TotalAgents { get; set; }
+    public int MissingComplianceDocs { get; set; }
+    public int EOExpiringSoon { get; set; }
+    public int LicensesExpiringSoon { get; set; }
+}
+
 // ─── Response DTOs ────────────────────────────────────────────────────────────
 
 public class AgentContactDto

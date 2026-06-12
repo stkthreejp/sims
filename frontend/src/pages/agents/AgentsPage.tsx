@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Trash2, X, Check, MapPin, Users, UserCircle } from 'lucide-react'
+import { Plus, Trash2, X, Check, MapPin, Users, UserCircle, AlertTriangle, ShieldAlert, FileWarning } from 'lucide-react'
 import { toast } from 'sonner'
 import { agentsApi } from '@/api/agents.api'
 import type { AgentCreate } from '@/types/agent.types'
@@ -9,6 +9,40 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { isValidEmail, isValidPhone, formatPhoneInput } from '@/lib/validators'
+
+function MetricCard({
+  label,
+  value,
+  icon,
+  warn = false,
+}: {
+  label: string
+  value: number
+  icon?: React.ReactNode
+  warn?: boolean
+}) {
+  return (
+    <div
+      style={{
+        background: warn ? 'var(--warn-bg)' : 'var(--surface)',
+        border: `1px solid ${warn ? 'var(--warn-fg)' : 'var(--border)'}`,
+        borderRadius: 8,
+        padding: '10px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: warn ? 'var(--warn-fg)' : 'var(--ink-3)', fontSize: 11.5 }}>
+        {icon}
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: warn ? 'var(--warn-fg)' : 'var(--ink-1)', lineHeight: 1.2 }}>
+        {value}
+      </div>
+    </div>
+  )
+}
 
 type NewAgentForm = {
   name: string
@@ -29,6 +63,11 @@ export function AgentsPage() {
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ['agents'],
     queryFn: () => agentsApi.getAll(),
+  })
+
+  const { data: stats } = useQuery({
+    queryKey: ['agents', 'summary-stats'],
+    queryFn: () => agentsApi.getSummaryStats(),
   })
 
   const createMutation = useMutation({
@@ -82,6 +121,30 @@ export function AgentsPage() {
           New Agent
         </button>
       </div>
+
+      {stats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+          <MetricCard label="Total Agents" value={stats.totalAgents} />
+          <MetricCard
+            label="Missing Compliance"
+            value={stats.missingComplianceDocs}
+            icon={<ShieldAlert style={{ width: 13, height: 13 }} />}
+            warn={stats.missingComplianceDocs > 0}
+          />
+          <MetricCard
+            label="E&O Expiring (30d)"
+            value={stats.eoExpiringSoon}
+            icon={<AlertTriangle style={{ width: 13, height: 13 }} />}
+            warn={stats.eoExpiringSoon > 0}
+          />
+          <MetricCard
+            label="Licenses Expiring (30d)"
+            value={stats.licensesExpiringSoon}
+            icon={<FileWarning style={{ width: 13, height: 13 }} />}
+            warn={stats.licensesExpiringSoon > 0}
+          />
+        </div>
+      )}
 
       <div className="subs-table-card">
         {isLoading ? (

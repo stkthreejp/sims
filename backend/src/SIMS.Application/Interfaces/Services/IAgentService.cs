@@ -20,4 +20,18 @@ public interface IAgentService
     Task<Result<AgentContactDto>> AddContactAsync(Guid agentId, Guid locationId, AgentContactInputDto dto);
     Task<Result<AgentContactDto>> UpdateContactAsync(Guid agentId, Guid locationId, Guid contactId, AgentContactInputDto dto);
     Task<Result> DeleteContactAsync(Guid agentId, Guid locationId, Guid contactId);
+
+    // Compliance docs
+    Task<AgentComplianceStatusDto> GetComplianceStatusAsync(Guid agentId);
+    Task<Result<AgentComplianceDocDto>> UpsertComplianceDocAsync(Guid agentId, string docType, AgentComplianceDocUpsertDto dto);
+    Task<Result> DeleteComplianceDocAsync(Guid agentId, string docType);
+
+    // Contact log
+    Task<IEnumerable<AgentContactLogDto>> GetContactLogsAsync(Guid agentId);
+    Task<Result<AgentContactLogDto>> CreateContactLogAsync(Guid agentId, AgentContactLogCreateDto dto, Guid userId);
+    Task<Result> DeleteContactLogAsync(Guid agentId, Guid logId);
+
+    // KPIs and summary
+    Task<AgentKpiDto> GetKpiAsync(Guid agentId);
+    Task<AgentSummaryStatsDto> GetSummaryStatsAsync();
 }

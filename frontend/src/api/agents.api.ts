@@ -8,6 +8,13 @@ import type {
   AgentContact,
   AgentLocationInput,
   AgentContactInput,
+  AgentComplianceDoc,
+  AgentComplianceDocUpsert,
+  AgentComplianceStatusResult,
+  AgentContactLog,
+  AgentContactLogCreate,
+  AgentKpi,
+  AgentSummaryStats,
 } from '@/types/agent.types'
 
 export const agentsApi = {
@@ -48,4 +55,31 @@ export const agentsApi = {
 
   deleteContact: (agentId: string, locationId: string, contactId: string) =>
     apiClient.delete(`/agents/${agentId}/locations/${locationId}/contacts/${contactId}`),
+
+  // Compliance docs
+  getCompliance: (agentId: string) =>
+    apiClient.get<AgentComplianceStatusResult>(`/agents/${agentId}/compliance`).then((r) => r.data),
+
+  upsertComplianceDoc: (agentId: string, docType: string, data: AgentComplianceDocUpsert) =>
+    apiClient.put<AgentComplianceDoc>(`/agents/${agentId}/compliance/${docType}`, data).then((r) => r.data),
+
+  deleteComplianceDoc: (agentId: string, docType: string) =>
+    apiClient.delete(`/agents/${agentId}/compliance/${docType}`),
+
+  // Contact log
+  getContactLog: (agentId: string) =>
+    apiClient.get<AgentContactLog[]>(`/agents/${agentId}/contact-log`).then((r) => r.data),
+
+  createContactLog: (agentId: string, data: AgentContactLogCreate) =>
+    apiClient.post<AgentContactLog>(`/agents/${agentId}/contact-log`, data).then((r) => r.data),
+
+  deleteContactLog: (agentId: string, logId: string) =>
+    apiClient.delete(`/agents/${agentId}/contact-log/${logId}`),
+
+  // KPIs and summary
+  getKpi: (agentId: string) =>
+    apiClient.get<AgentKpi>(`/agents/${agentId}/kpi`).then((r) => r.data),
+
+  getSummaryStats: () =>
+    apiClient.get<AgentSummaryStats>('/agents/summary-stats').then((r) => r.data),
 }
