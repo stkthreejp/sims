@@ -47,6 +47,21 @@ public class CarrierListItemDto
     public int ContactCount { get; set; }
 }
 
+// ─── KPIs and summary ────────────────────────────────────────────────────────
+
+public class CarrierSummaryStatsDto
+{
+    public int TotalCarriers { get; set; }
+    public int ActiveLobCount { get; set; }
+    public int PendingGuidelineReviews { get; set; }
+}
+
+public class CarrierKpiDto
+{
+    public decimal BoundPremiumLast12Months { get; set; }
+    public int ActiveLobCount { get; set; }
+}
+
 // ─── Input DTOs ───────────────────────────────────────────────────────────────
 
 public class CarrierContactInputDto

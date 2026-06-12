@@ -15,4 +15,8 @@ public interface ICarrierService
     Task<Result<CarrierContactDto>> AddContactAsync(Guid carrierId, CarrierContactInputDto dto);
     Task<Result<CarrierContactDto>> UpdateContactAsync(Guid carrierId, Guid contactId, CarrierContactInputDto dto);
     Task<Result> DeleteContactAsync(Guid carrierId, Guid contactId);
+
+    // KPIs and summary
+    Task<CarrierSummaryStatsDto> GetSummaryStatsAsync();
+    Task<CarrierKpiDto> GetKpiAsync(Guid carrierId);
 }

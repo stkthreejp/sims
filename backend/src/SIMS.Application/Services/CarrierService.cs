@@ -2,6 +2,7 @@ using SIMS.Application.Common;
 using SIMS.Application.DTOs.Carriers;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace SIMS.Application.Services;
@@ -177,6 +178,45 @@ public class CarrierService : ICarrierService
         contact.DeletedAt = DateTime.UtcNow;
         await Db.SaveChangesAsync();
         return Result.Success();
+    }
+
+    // ─── KPIs and Summary ────────────────────────────────────────────────────
+
+    public async Task<CarrierSummaryStatsDto> GetSummaryStatsAsync()
+    {
+        var totalCarriers = await Db.Set<Carrier>().CountAsync(c => c.IsActive);
+
+        var activeLobCount = await Db.Set<CarrierLineOfBusiness>()
+            .CountAsync(l => l.Carrier.IsActive);
+
+        var pendingReviews = await Db.Set<UnderwritingGuidelineControl>()
+            .CountAsync(c => c.Status == UnderwritingControlStatus.AiSuggested
+                          || c.Status == UnderwritingControlStatus.Draft);
+
+        return new CarrierSummaryStatsDto
+        {
+            TotalCarriers = totalCarriers,
+            ActiveLobCount = activeLobCount,
+            PendingGuidelineReviews = pendingReviews,
+        };
+    }
+
+    public async Task<CarrierKpiDto> GetKpiAsync(Guid carrierId)
+    {
+        var last12Start = DateTime.UtcNow.Date.AddYears(-1);
+
+        var boundPremium = await Db.Set<Policy>()
+            .Where(p => p.CarrierId == carrierId && p.CreatedAt >= last12Start)
+            .SumAsync(p => (decimal?)p.TotalPremium) ?? 0m;
+
+        var activeLobCount = await Db.Set<CarrierLineOfBusiness>()
+            .CountAsync(l => l.CarrierId == carrierId);
+
+        return new CarrierKpiDto
+        {
+            BoundPremiumLast12Months = boundPremium,
+            ActiveLobCount = activeLobCount,
+        };
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

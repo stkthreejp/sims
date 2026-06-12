@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Carrier, CarrierListItem, CarrierCreate, CarrierUpdate, CarrierContact, CarrierContactInput } from '@/types/carrier.types'
+import type { Carrier, CarrierListItem, CarrierCreate, CarrierUpdate, CarrierContact, CarrierContactInput, CarrierSummaryStats, CarrierKpi } from '@/types/carrier.types'
 
 export const carriersApi = {
   // Core
@@ -27,4 +27,10 @@ export const carriersApi = {
 
   deleteContact: (carrierId: string, contactId: string) =>
     apiClient.delete(`/carriers/${carrierId}/contacts/${contactId}`),
+
+  getSummaryStats: () =>
+    apiClient.get<CarrierSummaryStats>('/carriers/summary-stats').then((r) => r.data),
+
+  getKpi: (carrierId: string) =>
+    apiClient.get<CarrierKpi>(`/carriers/${carrierId}/kpi`).then((r) => r.data),
 }

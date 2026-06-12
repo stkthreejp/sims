@@ -77,4 +77,14 @@ public class CarriersController : ControllerBase
         var result = await _carrierService.DeleteContactAsync(id, contactId);
         return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
+
+    // ─── KPIs and Summary ────────────────────────────────────────────────────
+
+    [HttpGet("summary-stats")]
+    public async Task<IActionResult> GetSummaryStats()
+        => Ok(await _carrierService.GetSummaryStatsAsync());
+
+    [HttpGet("{id:guid}/kpi")]
+    public async Task<IActionResult> GetKpi(Guid id)
+        => Ok(await _carrierService.GetKpiAsync(id));
 }

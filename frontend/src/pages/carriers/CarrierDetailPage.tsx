@@ -277,6 +277,12 @@ export function CarrierDetailPage() {
     enabled: !!id,
   })
 
+  const { data: kpi } = useQuery({
+    queryKey: ['carriers', id, 'kpi'],
+    queryFn: () => carriersApi.getKpi(id!),
+    enabled: !!id,
+  })
+
   const { data: additionalInterestRates = [] } = useQuery<CarrierAdditionalInterestRate[]>({
     queryKey: ['carrier-additional-interest-rates', id],
     queryFn: () => carrierAdditionalInterestRatesApi.getAll(id!),
@@ -831,6 +837,27 @@ export function CarrierDetailPage() {
           )}
         </div>
       </div>
+
+      {/* KPI Strip */}
+      {kpi && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 4 }}>Bound Premium (12m)</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-1)', lineHeight: 1.2 }}>
+              ${kpi.boundPremiumLast12Months.toLocaleString()}
+            </div>
+          </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 4 }}>Active Lines of Business</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-1)', lineHeight: 1.2 }}>{kpi.activeLobCount}</div>
+          </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 4 }}>Loss Ratio</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-4)', lineHeight: 1.2 }}>—</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>Manual entry — claims module pending</div>
+          </div>
+        </div>
+      )}
 
       {/* Documents */}
       <DocumentsSection entityType="Carrier" entityId={id!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />

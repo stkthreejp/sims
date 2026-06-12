@@ -77,3 +77,14 @@ export interface CarrierContactInput {
   phone?: string
   isPrimary: boolean
 }
+
+export interface CarrierSummaryStats {
+  totalCarriers: number
+  activeLobCount: number
+  pendingGuidelineReviews: number
+}
+
+export interface CarrierKpi {
+  boundPremiumLast12Months: number
+  activeLobCount: number
+}

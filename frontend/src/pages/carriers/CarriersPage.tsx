@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Check, X, Users, Trash2 } from 'lucide-react'
+import { Plus, Check, X, Users, Trash2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
 import { queryClient } from '@/lib/queryClient'
@@ -14,6 +14,22 @@ import type { PolicyLineOfBusiness } from '@/types/quote.types'
 import { Building2 } from 'lucide-react'
 
 const EMPTY_FORM: CarrierCreate = { name: '', naic: '', amBestRating: '', defaultCurrencyCode: 'USD', linesOfBusiness: [] }
+
+function StatCard({ label, value, icon, warn = false }: { label: string; value: number; icon?: React.ReactNode; warn?: boolean }) {
+  return (
+    <div style={{
+      background: warn ? 'var(--warn-bg)' : 'var(--surface)',
+      border: `1px solid ${warn ? 'var(--warn-fg)' : 'var(--border)'}`,
+      borderRadius: 8,
+      padding: '10px 14px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: warn ? 'var(--warn-fg)' : 'var(--ink-3)', marginBottom: 4 }}>
+        {icon}{label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: warn ? 'var(--warn-fg)' : 'var(--ink-1)', lineHeight: 1.2 }}>{value}</div>
+    </div>
+  )
+}
 
 function LobCheckboxes({ selected, onChange }: { selected: PolicyLineOfBusiness[]; onChange: (lobs: PolicyLineOfBusiness[]) => void }) {
   const toggle = (lob: PolicyLineOfBusiness) =>
@@ -38,6 +54,11 @@ export function CarriersPage() {
   const { data: carriers, isLoading } = useQuery({
     queryKey: ['carriers'],
     queryFn: () => carriersApi.getAll(false),
+  })
+
+  const { data: stats } = useQuery({
+    queryKey: ['carriers', 'summary-stats'],
+    queryFn: () => carriersApi.getSummaryStats(),
   })
 
   const createMutation = useMutation({
@@ -73,6 +94,19 @@ export function CarriersPage() {
           New Carrier
         </button>
       </div>
+
+      {stats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+          <StatCard label="Total Carriers" value={stats.totalCarriers} />
+          <StatCard label="Active Lines of Business" value={stats.activeLobCount} />
+          <StatCard
+            label="Pending Guideline Reviews"
+            value={stats.pendingGuidelineReviews}
+            icon={<AlertTriangle style={{ width: 13, height: 13 }} />}
+            warn={stats.pendingGuidelineReviews > 0}
+          />
+        </div>
+      )}
 
       <div className="subs-table-card">
         {isLoading ? (
