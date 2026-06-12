@@ -23,6 +23,15 @@ export interface InsuredListItem {
   isActive: boolean
   policyCount: number
   createdAt: string
+  nearestPolicyExpiration: string | null
+  hasCancelledPolicy: boolean
+}
+
+export interface InsuredSummaryStats {
+  totalInsureds: number
+  activePolicies: number
+  expiringPolicies90d: number
+  recentCancellations: number
 }
 
 export interface Insured {

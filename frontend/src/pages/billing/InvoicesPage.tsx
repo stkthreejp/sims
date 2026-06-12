@@ -306,9 +306,14 @@ export function InvoicesPage() {
     return <InvoiceDetailView id={selectedId} onBack={() => setSelectedId(null)} />
   }
 
-  const grossPremiumTotal = invoices.reduce((s, i) => s + i.grossPremium, 0)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const daysOld = (dateStr: string) => Math.floor((today.getTime() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000)
+
+  const posted = invoices.filter(i => i.status === 'Posted')
+  const outstanding = posted.reduce((s, i) => s + i.totalAmount, 0)
+  const pastDue = posted.filter(i => daysOld(i.invoiceDate) > 30)
+  const pastDueAmount = pastDue.reduce((s, i) => s + i.totalAmount, 0)
   const totalBilled = invoices.reduce((s, i) => s + i.totalAmount, 0)
-  const postedCount = invoices.filter(i => i.status === 'Posted').length
 
   return (
     <div className="subs-wrap">
@@ -335,19 +340,21 @@ export function InvoicesPage() {
       {!isLoading && (
         <div className="sd-metrics" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div className="sd-metric accent">
-            <div className="k">Total Invoices</div>
-            <div className="v">{invoices.length}</div>
-            <div className="s">{postedCount} posted</div>
+            <div className="k">Outstanding</div>
+            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(outstanding)}</div>
+            <div className="s">{posted.length} posted invoice{posted.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div className="sd-metric" style={pastDue.length > 0 ? { background: 'var(--bad-bg)', borderColor: 'var(--bad-fg)' } : {}}>
+            <div className="k" style={pastDue.length > 0 ? { color: 'var(--bad-fg)' } : {}}>Past Due (30d+)</div>
+            <div className="v" style={{ fontVariantNumeric: 'tabular-nums', ...(pastDue.length > 0 ? { color: 'var(--bad-fg)' } : {}) }}>
+              {pastDue.length > 0 ? fmt.format(pastDueAmount) : '—'}
+            </div>
+            <div className="s">{pastDue.length > 0 ? `${pastDue.length} invoice${pastDue.length !== 1 ? 's' : ''}` : 'None'}</div>
           </div>
           <div className="sd-metric">
-            <div className="k">Gross Premium</div>
-            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(grossPremiumTotal)}</div>
-            <div className="s">Sum of all invoices</div>
-          </div>
-          <div className="sd-metric">
-            <div className="k">Total Billed</div>
+            <div className="k">Total Billed (all time)</div>
             <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(totalBilled)}</div>
-            <div className="s">Premium + fees</div>
+            <div className="s">{invoices.length} invoice{invoices.length !== 1 ? 's' : ''}</div>
           </div>
         </div>
       )}
@@ -402,8 +409,15 @@ export function InvoicesPage() {
                   </td>
                 </tr>
               )}
-              {invoices.map(inv => (
-                <tr key={inv.id} className="subs-row" onClick={() => setSelectedId(inv.id)}>
+              {invoices.map(inv => {
+                const age = daysOld(inv.invoiceDate)
+                const rowBg = inv.status === 'Posted' && age > 30
+                  ? 'var(--bad-bg)'
+                  : inv.status === 'Posted' && age > 15
+                    ? 'var(--warn-bg)'
+                    : undefined
+                return (
+                <tr key={inv.id} className="subs-row" style={rowBg ? { background: rowBg } : undefined} onClick={() => setSelectedId(inv.id)}>
                   <td className="subs-id">{inv.invoiceNumber}</td>
                   <td>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-2)' }}>
@@ -420,7 +434,8 @@ export function InvoicesPage() {
                   <td className="subs-eff num" style={{ fontWeight: 600 }}>{fmt.format(inv.totalAmount)}</td>
                   <td><StatusBadge status={inv.status} /></td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -230,8 +230,22 @@ export function InsuredDetailPage() {
     ['documents', 'Documents', null],
   ]
 
+  const hasCancelled = policies.some((p) => p.status === 'Cancelled')
+
   return (
     <>
+      {/* Cancellation alert */}
+      {hasCancelled && (
+        <div style={{
+          marginBottom: 14, padding: '10px 16px', borderRadius: 'var(--r)',
+          background: 'var(--bad-bg)', border: '1px solid var(--bad-fg)', color: 'var(--bad-fg)',
+          fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontWeight: 700 }}>&#9888;</span>
+          This insured has one or more cancelled policies. Review before issuing new coverage.
+        </div>
+      )}
+
       {/* Back */}
       <button
         onClick={() => navigate('/insureds')}
