@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
+using SIMS.API.Filters;
 using System.Security.Claims;
 
 namespace SIMS.API.Controllers.Billing;
@@ -22,6 +23,7 @@ public class CashApplicationController : ControllerBase
 
     [HttpPost("apply")]
     [Authorize(Policy = AppPermissions.AccountingAdmin)]
+    [Idempotent]
     public async Task<IActionResult> Apply([FromBody] ApplyCashRequest req, CancellationToken ct)
     {
         var r = await _svc.ApplyAsync(req, UserId, ct);

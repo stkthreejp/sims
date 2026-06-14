@@ -182,6 +182,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<PayeeStatementLine> PayeeStatementLines => Set<PayeeStatementLine>();
     public DbSet<QboOAuthToken> QboOAuthTokens => Set<QboOAuthToken>();
     public DbSet<PendingQboSync> PendingQboSyncs => Set<PendingQboSync>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

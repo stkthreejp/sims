@@ -11,7 +11,7 @@ namespace SIMS.API.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
-[AllowAnonymous]
+[Authorize]
 public class AuthController : ControllerBase
 {
     private const string RefreshTokenCookieName = "sims-refresh";
@@ -27,6 +27,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {
@@ -36,6 +37,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("microsoft")]
+    [AllowAnonymous]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> LoginWithMicrosoft([FromBody] MicrosoftLoginRequestDto dto)
     {
@@ -45,6 +47,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [AllowAnonymous]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Refresh([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshTokenRequestDto? dto)
     {

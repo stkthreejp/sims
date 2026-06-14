@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SIMS.Application.DTOs.Accounting;
 using SIMS.Application.Interfaces.Services;
+using SIMS.API.Filters;
 using System.Security.Claims;
 
 namespace SIMS.API.Controllers.Billing;
@@ -29,6 +30,7 @@ public class ReceiptsController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = AppPermissions.AccountingAdmin)]
+    [Idempotent]
     public async Task<IActionResult> CreateReceipt([FromBody] CreateReceiptRequest req, CancellationToken ct)
     {
         var r = await _svc.CreateAsync(req, UserId, ct);
