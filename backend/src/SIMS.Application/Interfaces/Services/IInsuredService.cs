@@ -10,4 +10,5 @@ public interface IInsuredService
     Task<Result<InsuredDto>> CreateAsync(InsuredCreateDto dto, Guid createdById);
     Task<Result<InsuredDto>> UpdateAsync(Guid id, InsuredUpdateDto dto);
     Task<Result> DeleteAsync(Guid id);
+    Task<InsuredSummaryStatsDto> GetSummaryStatsAsync();
 }

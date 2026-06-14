@@ -2,6 +2,7 @@ using SIMS.Application.Common;
 using SIMS.Application.DTOs.Insureds;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
+using SIMS.Domain.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,20 +51,39 @@ public class InsuredService : IInsuredService
             .Include(i => i.Submissions.Where(s => !s.IsDeleted))
             .ToListAsync();
 
+        var insuredIds = items.Select(i => i.Id).ToList();
+        var policyData = await db.Set<Policy>()
+            .Join(db.Set<Submission>(), p => p.SubmissionId, s => s.Id, (p, s) => new { p.Status, p.ExpirationDate, s.InsuredId })
+            .Where(x => insuredIds.Contains(x.InsuredId))
+            .GroupBy(x => x.InsuredId)
+            .Select(g => new
+            {
+                InsuredId = g.Key,
+                NearestActive = g.Where(x => x.Status == PolicyStatus.Active).Min(x => (DateOnly?)x.ExpirationDate),
+                HasCancelled = g.Any(x => x.Status == PolicyStatus.Cancelled),
+            })
+            .ToDictionaryAsync(x => x.InsuredId);
+
         return new PagedResult<InsuredListItemDto>
         {
-            Items = items.Select(i => new InsuredListItemDto
+            Items = items.Select(i =>
             {
-                Id = i.Id,
-                InsuredType = i.InsuredType,
-                DisplayName = i.DisplayName,
-                Email = i.Email,
-                Phone = i.Phone,
-                City = i.City,
-                State = i.State,
-                IsActive = i.IsActive,
-                PolicyCount = i.Submissions.Count,
-                CreatedAt = i.CreatedAt
+                policyData.TryGetValue(i.Id, out var pd);
+                return new InsuredListItemDto
+                {
+                    Id = i.Id,
+                    InsuredType = i.InsuredType,
+                    DisplayName = i.DisplayName,
+                    Email = i.Email,
+                    Phone = i.Phone,
+                    City = i.City,
+                    State = i.State,
+                    IsActive = i.IsActive,
+                    PolicyCount = i.Submissions.Count,
+                    CreatedAt = i.CreatedAt,
+                    NearestPolicyExpiration = pd?.NearestActive,
+                    HasCancelledPolicy = pd?.HasCancelled ?? false,
+                };
             }),
             TotalCount = total,
             Page = query.Page,
@@ -244,5 +264,26 @@ public class InsuredService : IInsuredService
         insured.GeocodeProvider = null;
         insured.GooglePlaceId = null;
         insured.GeocodedAt = null;
+    }
+
+    public async Task<InsuredSummaryStatsDto> GetSummaryStatsAsync()
+    {
+        var db = GetDbContext();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var in90Days = today.AddDays(90);
+        var ago90Days = DateTime.UtcNow.Date.AddDays(-90);
+
+        var totalInsureds = await db.Set<Insured>().CountAsync(i => !i.IsDeleted && i.IsActive);
+        var activePolicies = await db.Set<Policy>().CountAsync(p => p.Status == PolicyStatus.Active);
+        var expiring90d = await db.Set<Policy>().CountAsync(p => p.Status == PolicyStatus.Active && p.ExpirationDate <= in90Days);
+        var recentCancellations = await db.Set<Policy>().CountAsync(p => p.Status == PolicyStatus.Cancelled && p.CancelledDate != null && p.CancelledDate >= DateOnly.FromDateTime(ago90Days));
+
+        return new InsuredSummaryStatsDto
+        {
+            TotalInsureds = totalInsureds,
+            ActivePolicies = activePolicies,
+            ExpiringPolicies90d = expiring90d,
+            RecentCancellations = recentCancellations,
+        };
     }
 }

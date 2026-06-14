@@ -66,14 +66,15 @@ Everything in Gate A, plus:
 ### WS0 — Stabilize the working tree ✅ DONE
 Tree committed, CI green (build + 453 tests + tsc + lint + build), EF drift clean as of 2026-06-10.
 
-### WS1 — Go-live hardening / config fail-closed — ✅ code-side / ❌ operational
+### WS1 — Go-live hardening / config fail-closed — ✅ code-side / ✅ operational
 
 Code complete: startup validator covers JWT/DB/Blob/QBO×4/webhook/Graph/origins/malware-provider/QBO-sandbox-in-prod; secrets out of source; design-time factory throws; zero vulnerable NuGet packages; `MigrateAsync()` on boot (fine single-instance).
 
-Remaining — **operational punch list (Jeremiah)**:
-- [ ] Rotate the LegiScan API key at the provider (source is clean; old key may live).
-- [ ] Azure app settings on `sims-api-test`: `Uploads__MalwareScanning__Provider` (`NoOp` explicit for UAT), `GraphApi__ClientSecret`, `Qbo__WebhookVerifierToken`, `AllowedOrigins__0`.
-- [ ] Entra staging redirect URIs; remove dev IP from Postgres firewall.
+Operational punch list — **all done (2026-06-11)**:
+- [x] Rotate the LegiScan API key; stored in Key Vault as `LegiScan--ApiKey`.
+- [x] Azure app settings on `sims-api-test`: `Uploads__MalwareScanning__Provider` (`NoOp`), `GraphApi__ClientSecret` (rotated), `Qbo__WebhookVerifierToken`, `AllowedOrigins__0`.
+- [x] Entra staging redirect URIs added (SPA platform, both short and long hostnames).
+- [ ] Remove dev IP from Postgres firewall (do when VNet/private endpoint is set up).
 
 ### WS2 — Authorization & data-scope — ✅ P0s closed / open P1-P2 backlog
 

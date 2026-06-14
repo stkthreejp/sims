@@ -53,4 +53,8 @@ public class InsuredsController : ControllerBase
         var result = await _insuredService.DeleteAsync(id);
         return result.IsSuccess ? NoContent() : NotFound(new { result.ErrorMessage });
     }
+
+    [HttpGet("summary-stats")]
+    public async Task<IActionResult> GetSummaryStats()
+        => Ok(await _insuredService.GetSummaryStatsAsync());
 }

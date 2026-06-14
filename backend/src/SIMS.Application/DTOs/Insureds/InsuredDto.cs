@@ -127,4 +127,14 @@ public class InsuredListItemDto
     public bool IsActive { get; set; }
     public int PolicyCount { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateOnly? NearestPolicyExpiration { get; set; }
+    public bool HasCancelledPolicy { get; set; }
+}
+
+public class InsuredSummaryStatsDto
+{
+    public int TotalInsureds { get; set; }
+    public int ActivePolicies { get; set; }
+    public int ExpiringPolicies90d { get; set; }
+    public int RecentCancellations { get; set; }
 }
