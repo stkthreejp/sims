@@ -369,3 +369,72 @@ export interface ClearanceOverrideReport {
   checkTypes: ClearanceOverrideSummary[]
   rows: ClearanceOverrideRow[]
 }
+
+// WS9 production reports
+
+export interface WrittenPremiumRow {
+  programId: string | null
+  programCode: string | null
+  programName: string
+  carrierId: string
+  carrierName: string
+  lineOfBusiness: string
+  state: string
+  policyCount: number
+  grossPremium: number
+  totalPremium: number
+}
+
+export interface WrittenPremium {
+  dateFrom: string
+  dateTo: string
+  totalPolicies: number
+  totalGrossPremium: number
+  rows: WrittenPremiumRow[]
+}
+
+export interface SubmissionPipelineAgentRow {
+  agentId: string | null
+  agentName: string
+  received: number
+  quoted: number
+  bound: number
+  declined: number
+  open: number
+  quoteRate: number
+  bindRate: number
+}
+
+export interface SubmissionPipeline {
+  dateFrom: string
+  dateTo: string
+  totalReceived: number
+  totalQuoted: number
+  totalBound: number
+  totalDeclined: number
+  totalOpen: number
+  quoteRate: number
+  bindRate: number
+  overallConversion: number
+  byAgent: SubmissionPipelineAgentRow[]
+}
+
+export interface UwWorkloadRow {
+  underwriterId: string
+  underwriterName: string
+  openSubmissions: number
+  pendingQuotes: number
+  openTasks: number
+  overdueTasks: number
+  referralsPending: number
+  authApprovalsPending: number
+  pipelinePremium: number
+}
+
+export interface UwWorkload {
+  totalOpenSubmissions: number
+  totalPendingQuotes: number
+  totalOpenTasks: number
+  totalPipelinePremium: number
+  rows: UwWorkloadRow[]
+}

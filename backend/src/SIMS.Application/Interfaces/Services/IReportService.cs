@@ -21,4 +21,7 @@ public interface IReportService
     Task<RenewalsUpcomingDto> GetRenewalsUpcomingAsync(int daysAhead = 90, CancellationToken ct = default);
     Task<BoundByPeriodDto> GetBoundByPeriodAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default);
     Task<HitRatioByCarrierDto> GetHitRatioByCarrierAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default);
+    Task<WrittenPremiumDto> GetWrittenPremiumAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default);
+    Task<SubmissionPipelineDto> GetSubmissionPipelineAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default);
+    Task<UwWorkloadDto> GetUwWorkloadAsync(CancellationToken ct = default);
 }

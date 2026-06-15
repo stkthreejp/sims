@@ -1094,6 +1094,171 @@ public class ReportService : IReportService
             rows);
     }
 
+    public async Task<WrittenPremiumDto> GetWrittenPremiumAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = dateFrom ?? new DateOnly(today.Year, 1, 1);
+        var to = dateTo ?? today;
+
+        var policies = await Db.Set<Policy>()
+            .Include(p => p.Carrier)
+            .Include(p => p.Program)
+            .Include(p => p.Submission).ThenInclude(s => s.Insured)
+            .Where(p => !p.IsDeleted && p.BoundDate >= from && p.BoundDate <= to)
+            .ToListAsync(ct);
+
+        var rows = policies
+            .GroupBy(p => new
+            {
+                p.ProgramId,
+                ProgramCode = p.Program?.Code,
+                ProgramName = p.Program?.Name ?? "Unassigned",
+                p.CarrierId,
+                CarrierName = p.Carrier?.Name ?? "Unknown",
+                p.LineOfBusiness,
+                State = p.Submission?.Insured?.State ?? "—",
+            })
+            .OrderByDescending(g => g.Sum(p => p.PremiumAmount))
+            .Select(g => new WrittenPremiumRowDto(
+                g.Key.ProgramId,
+                g.Key.ProgramCode,
+                g.Key.ProgramName,
+                g.Key.CarrierId,
+                g.Key.CarrierName,
+                g.Key.LineOfBusiness,
+                g.Key.State,
+                g.Count(),
+                g.Sum(p => p.PremiumAmount),
+                g.Sum(p => p.TotalPremium)))
+            .ToList();
+
+        return new WrittenPremiumDto(from, to, policies.Count, policies.Sum(p => p.PremiumAmount), rows);
+    }
+
+    public async Task<SubmissionPipelineDto> GetSubmissionPipelineAsync(DateOnly? dateFrom = null, DateOnly? dateTo = null, CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = dateFrom ?? new DateOnly(today.Year, 1, 1);
+        var to = dateTo ?? today;
+        var fromDt = from.ToDateTime(TimeOnly.MinValue);
+        var toDt = to.ToDateTime(TimeOnly.MaxValue);
+
+        var submissions = await Db.Set<Submission>()
+            .Include(s => s.Agent)
+            .Where(s => !s.IsDeleted && s.CreatedAt >= fromDt && s.CreatedAt <= toDt)
+            .ToListAsync(ct);
+
+        static int Pct(int num, int den) => den > 0 ? (int)Math.Round((decimal)num / den * 100) : 0;
+
+        var totalReceived = submissions.Count;
+        var totalQuoted = submissions.Count(s => s.Status is SubmissionStatus.Quoted or SubmissionStatus.Bound);
+        var totalBound = submissions.Count(s => s.Status == SubmissionStatus.Bound);
+        var totalDeclined = submissions.Count(s => s.Status == SubmissionStatus.Declined);
+        var totalOpen = submissions.Count(s => s.Status is SubmissionStatus.New or SubmissionStatus.InProgress);
+
+        var byAgent = submissions
+            .GroupBy(s => new { s.AgentId, AgentName = s.Agent?.Name ?? "Direct / Unassigned" })
+            .OrderByDescending(g => g.Count())
+            .Select(g =>
+            {
+                var received = g.Count();
+                var quoted = g.Count(s => s.Status is SubmissionStatus.Quoted or SubmissionStatus.Bound);
+                var bound = g.Count(s => s.Status == SubmissionStatus.Bound);
+                var declined = g.Count(s => s.Status == SubmissionStatus.Declined);
+                var open = g.Count(s => s.Status is SubmissionStatus.New or SubmissionStatus.InProgress);
+                return new SubmissionPipelineAgentRowDto(
+                    g.Key.AgentId,
+                    g.Key.AgentName,
+                    received, quoted, bound, declined, open,
+                    Pct(quoted, received),
+                    Pct(bound, quoted));
+            })
+            .ToList();
+
+        return new SubmissionPipelineDto(
+            from, to,
+            totalReceived, totalQuoted, totalBound, totalDeclined, totalOpen,
+            Pct(totalQuoted, totalReceived),
+            Pct(totalBound, totalQuoted),
+            Pct(totalBound, totalReceived),
+            byAgent);
+    }
+
+    public async Task<UwWorkloadDto> GetUwWorkloadAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+
+        var openSubmissions = await Db.Set<Submission>()
+            .Include(s => s.Underwriter)
+            .Where(s => !s.IsDeleted
+                && (s.Status == SubmissionStatus.New || s.Status == SubmissionStatus.InProgress || s.Status == SubmissionStatus.Quoted))
+            .GroupBy(s => new { s.UnderwriterId, FirstName = s.Underwriter.FirstName, LastName = s.Underwriter.LastName })
+            .Select(g => new { g.Key.UnderwriterId, g.Key.FirstName, g.Key.LastName, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var pendingQuotes = await Db.Set<Quote>()
+            .Include(q => q.Submission)
+            .Where(q => !q.IsDeleted
+                && (q.Status == QuoteStatus.Draft || q.Status == QuoteStatus.Submitted || q.Status == QuoteStatus.Quoted))
+            .GroupBy(q => q.Submission.UnderwriterId)
+            .Select(g => new { UnderwriterId = g.Key, Count = g.Count(), Premium = g.Sum(q => q.TotalPremium) })
+            .ToListAsync(ct);
+
+        var openTasks = await Db.Set<TaskInstance>()
+            .Where(t => t.AssignedUserId.HasValue
+                && (t.Status == TaskInstanceStatus.Open || t.Status == TaskInstanceStatus.InProgress || t.Status == TaskInstanceStatus.Blocked))
+            .GroupBy(t => t.AssignedUserId!.Value)
+            .Select(g => new { UserId = g.Key, Count = g.Count(), Overdue = g.Count(t => t.DueDate < now) })
+            .ToListAsync(ct);
+
+        var referrals = await Db.Set<UnderwritingReferral>()
+            .Include(r => r.Submission)
+            .Where(r => r.Status == UnderwritingReferralStatus.Open)
+            .GroupBy(r => r.Submission.UnderwriterId)
+            .Select(g => new { UnderwriterId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var authApprovals = await Db.Set<AuthorityApprovalRequest>()
+            .Where(a => a.Status == AuthorityApprovalStatus.Pending && a.AssignedToUserId.HasValue)
+            .GroupBy(a => a.AssignedToUserId!.Value)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var uwIds = openSubmissions.Select(s => s.UnderwriterId).ToHashSet();
+        var pqDict = pendingQuotes.ToDictionary(x => x.UnderwriterId);
+        var taskDict = openTasks.ToDictionary(x => x.UserId);
+        var refDict = referrals.ToDictionary(x => x.UnderwriterId);
+        var authDict = authApprovals.ToDictionary(x => x.UserId);
+
+        var rows = openSubmissions
+            .OrderByDescending(s => s.Count)
+            .Select(s =>
+            {
+                pqDict.TryGetValue(s.UnderwriterId, out var pq);
+                taskDict.TryGetValue(s.UnderwriterId, out var tk);
+                refDict.TryGetValue(s.UnderwriterId, out var rf);
+                authDict.TryGetValue(s.UnderwriterId, out var aa);
+                return new UwWorkloadRowDto(
+                    s.UnderwriterId,
+                    $"{s.FirstName} {s.LastName}".Trim(),
+                    s.Count,
+                    pq?.Count ?? 0,
+                    tk?.Count ?? 0,
+                    tk?.Overdue ?? 0,
+                    rf?.Count ?? 0,
+                    aa?.Count ?? 0,
+                    pq?.Premium ?? 0m);
+            })
+            .ToList();
+
+        return new UwWorkloadDto(
+            rows.Sum(r => r.OpenSubmissions),
+            rows.Sum(r => r.PendingQuotes),
+            rows.Sum(r => r.OpenTasks),
+            rows.Sum(r => r.PipelinePremium),
+            rows);
+    }
+
     private static PayableAgingDto BuildPayableAging(List<OpenPayableDto> payables)
     {
         decimal Bucket(OpenPayableDto p, int from, int to)

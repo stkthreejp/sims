@@ -19,6 +19,9 @@ import {
   getRenewalsUpcoming,
   getBoundByPeriod,
   getHitRatioByCarrier,
+  getWrittenPremium,
+  getSubmissionPipeline,
+  getUwWorkload,
 } from '@/api/reports.api'
 import type {
   TrustReconciliation,
@@ -39,6 +42,9 @@ import type {
   RenewalsUpcoming,
   BoundByPeriod,
   HitRatioByCarrier,
+  WrittenPremium,
+  SubmissionPipeline,
+  UwWorkload,
 } from '@/types/report.types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1486,6 +1492,179 @@ function HitRatioByCarrierReport() {
   )
 }
 
+// ── Report: Written Premium ───────────────────────────────────────────────────
+
+function WrittenPremiumReport() {
+  const thisYear = new Date().getFullYear()
+  const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
+  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+
+  const { data, isLoading, error } = useQuery<WrittenPremium>({
+    queryKey: ['report', 'written-premium', dateFrom, dateTo],
+    queryFn: () => getWrittenPremium(dateFrom, dateTo),
+  })
+
+  return (
+    <ReportShell title="Written Premium" isLoading={isLoading} error={error as Error}>
+      <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
+
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Policies Bound" value={data.totalPolicies.toLocaleString()} />
+            <KpiCard label="Written Premium" value={fmt(data.totalGrossPremium)} highlight="good" />
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Program', 'Carrier', 'LOB', 'State', 'Policies', 'Gross Premium', 'Total w/ Fees'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: ['Policies', 'Gross Premium', 'Total w/ Fees'].includes(h) ? 'right' : 'left' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                    <td style={tdStyle}>{r.programCode ?? r.programName}</td>
+                    <td style={tdStyle}>{r.carrierName}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{lobLabel(r.lineOfBusiness)}</td>
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{r.state}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.policyCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(r.totalPremium)}</td>
+                  </tr>
+                ))}
+                {data.rows.length === 0 && (
+                  <tr><td colSpan={7} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center', padding: '24px' }}>No policies bound in this period</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
+// ── Report: Submission Pipeline ───────────────────────────────────────────────
+
+function SubmissionPipelineReport() {
+  const thisYear = new Date().getFullYear()
+  const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
+  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+
+  const { data, isLoading, error } = useQuery<SubmissionPipeline>({
+    queryKey: ['report', 'submission-pipeline', dateFrom, dateTo],
+    queryFn: () => getSubmissionPipeline(dateFrom, dateTo),
+  })
+
+  return (
+    <ReportShell title="Submission Pipeline" isLoading={isLoading} error={error as Error}>
+      <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
+
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Received" value={data.totalReceived.toLocaleString()} />
+            <KpiCard label="Quoted" value={data.totalQuoted.toLocaleString()} sub={`${data.quoteRate}% of received`} />
+            <KpiCard label="Bound" value={data.totalBound.toLocaleString()} highlight={data.bindRate >= 40 ? 'good' : data.bindRate >= 20 ? 'warn' : 'bad'} sub={`${data.bindRate}% of quoted`} />
+            <KpiCard label="Declined" value={data.totalDeclined.toLocaleString()} />
+            <KpiCard label="Open" value={data.totalOpen.toLocaleString()} />
+            <KpiCard label="Overall Conversion" value={`${data.overallConversion}%`} highlight={data.overallConversion >= 20 ? 'good' : data.overallConversion >= 10 ? 'warn' : 'bad'} sub="Bound ÷ received" />
+          </div>
+
+          <h3 style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink-3)', margin: '0 0 12px' }}>By Agent</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Agent', 'Received', 'Quoted', 'Bound', 'Declined', 'Open', 'Quote %', 'Bind %'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: h === 'Agent' ? 'left' : 'right' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.byAgent.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                    <td style={tdStyle}>{r.agentName}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.received}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.quoted}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: 'var(--good-fg)' }}>{r.bound}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.declined}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.open}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{r.quoteRate > 0 ? `${r.quoteRate}%` : '—'}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: r.bindRate >= 40 ? 'var(--good-fg)' : r.bindRate >= 20 ? 'var(--warn-fg)' : r.bindRate > 0 ? 'var(--bad-fg)' : 'var(--ink-4)', fontWeight: 600 }}>
+                      {r.bindRate > 0 ? `${r.bindRate}%` : '—'}
+                    </td>
+                  </tr>
+                ))}
+                {data.byAgent.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center', padding: '24px' }}>No submissions in this period</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
+// ── Report: UW Workload ───────────────────────────────────────────────────────
+
+function UwWorkloadReport() {
+  const { data, isLoading, error } = useQuery<UwWorkload>({
+    queryKey: ['report', 'uw-workload'],
+    queryFn: getUwWorkload,
+  })
+
+  return (
+    <ReportShell title="UW Workload" isLoading={isLoading} error={error as Error}>
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <KpiCard label="Open Submissions" value={data.totalOpenSubmissions.toLocaleString()} />
+            <KpiCard label="Pending Quotes" value={data.totalPendingQuotes.toLocaleString()} />
+            <KpiCard label="Open Tasks" value={data.totalOpenTasks.toLocaleString()} highlight={data.totalOpenTasks > 20 ? 'warn' : undefined} />
+            <KpiCard label="Pipeline Premium" value={fmt(data.totalPipelinePremium)} highlight="good" />
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Underwriter', 'Open Subs', 'Pending Quotes', 'Open Tasks', 'Overdue', 'Referrals', 'Auth Approvals', 'Pipeline Premium'].map(h => (
+                    <th key={h} style={{ ...thStyle, textAlign: h === 'Underwriter' ? 'left' : 'right' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map(r => (
+                  <tr key={r.underwriterId} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>{r.underwriterName}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{r.openSubmissions}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{r.pendingQuotes}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: r.openTasks > 10 ? 'var(--warn-fg)' : 'inherit' }}>{r.openTasks}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: r.overdueTasks > 0 ? 'var(--bad-fg)' : 'var(--ink-4)', fontWeight: r.overdueTasks > 0 ? 600 : 400 }}>{r.overdueTasks}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: r.referralsPending > 0 ? 'var(--warn-fg)' : 'var(--ink-4)' }}>{r.referralsPending}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: r.authApprovalsPending > 0 ? 'var(--warn-fg)' : 'var(--ink-4)' }}>{r.authApprovalsPending}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(r.pipelinePremium)}</td>
+                  </tr>
+                ))}
+                {data.rows.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, color: 'var(--ink-4)', textAlign: 'center', padding: '24px' }}>No open submissions assigned to underwriters</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ReportShell>
+  )
+}
+
 // ── Sidebar config ──────────────────────────────────────────────────────────
 
 const REPORT_CATEGORIES = [
@@ -1517,6 +1696,9 @@ const REPORT_CATEGORIES = [
   {
     label: 'Production',
     reports: [
+      { id: 'written-premium', label: 'Written Premium' },
+      { id: 'submission-pipeline', label: 'Submission Pipeline' },
+      { id: 'uw-workload', label: 'UW Workload' },
       { id: 'renewals-upcoming', label: 'Renewals Upcoming' },
       { id: 'bound-by-period', label: 'Bound by Period' },
       { id: 'hit-ratio-by-carrier', label: 'Hit Ratio by Carrier' },
@@ -1553,6 +1735,9 @@ function renderReport(id: string) {
     case 'renewals-upcoming':        return <RenewalsUpcomingReport />
     case 'bound-by-period':          return <BoundByPeriodReport />
     case 'hit-ratio-by-carrier':     return <HitRatioByCarrierReport />
+    case 'written-premium':          return <WrittenPremiumReport />
+    case 'submission-pipeline':      return <SubmissionPipelineReport />
+    case 'uw-workload':              return <UwWorkloadReport />
     default:                         return null
   }
 }

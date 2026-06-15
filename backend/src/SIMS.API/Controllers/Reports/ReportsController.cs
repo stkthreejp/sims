@@ -81,4 +81,18 @@ public class ReportsController : ControllerBase
     public async Task<IActionResult> GetHitRatioByCarrier(
         [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken ct = default)
         => Ok(await _svc.GetHitRatioByCarrierAsync(dateFrom, dateTo, ct));
+
+    [HttpGet("production/written-premium")]
+    public async Task<IActionResult> GetWrittenPremium(
+        [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken ct = default)
+        => Ok(await _svc.GetWrittenPremiumAsync(dateFrom, dateTo, ct));
+
+    [HttpGet("production/submission-pipeline")]
+    public async Task<IActionResult> GetSubmissionPipeline(
+        [FromQuery] DateOnly? dateFrom, [FromQuery] DateOnly? dateTo, CancellationToken ct = default)
+        => Ok(await _svc.GetSubmissionPipelineAsync(dateFrom, dateTo, ct));
+
+    [HttpGet("production/uw-workload")]
+    public async Task<IActionResult> GetUwWorkload(CancellationToken ct)
+        => Ok(await _svc.GetUwWorkloadAsync(ct));
 }

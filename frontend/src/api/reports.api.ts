@@ -15,6 +15,9 @@ import type {
   RenewalsUpcoming,
   BoundByPeriod,
   HitRatioByCarrier,
+  WrittenPremium,
+  SubmissionPipeline,
+  UwWorkload,
 } from '@/types/report.types'
 
 const BASE = '/reports'
@@ -66,3 +69,12 @@ export const getBoundByPeriod = (dateFrom?: string, dateTo?: string): Promise<Bo
 
 export const getHitRatioByCarrier = (dateFrom?: string, dateTo?: string): Promise<HitRatioByCarrier> =>
   apiClient.get(`${BASE}/production/hit-ratio-by-carrier`, { params: { dateFrom, dateTo } }).then(r => r.data)
+
+export const getWrittenPremium = (dateFrom?: string, dateTo?: string): Promise<WrittenPremium> =>
+  apiClient.get(`${BASE}/production/written-premium`, { params: { dateFrom, dateTo } }).then(r => r.data)
+
+export const getSubmissionPipeline = (dateFrom?: string, dateTo?: string): Promise<SubmissionPipeline> =>
+  apiClient.get(`${BASE}/production/submission-pipeline`, { params: { dateFrom, dateTo } }).then(r => r.data)
+
+export const getUwWorkload = (): Promise<UwWorkload> =>
+  apiClient.get(`${BASE}/production/uw-workload`).then(r => r.data)

@@ -365,3 +365,72 @@ public record ClearanceOverrideRowDto(
     DateTime ReviewedAt,
     string ActionUrl
 );
+
+// ── WS9 Production Reports ────────────────────────────────────────────────────
+
+public record WrittenPremiumDto(
+    DateOnly DateFrom,
+    DateOnly DateTo,
+    int TotalPolicies,
+    decimal TotalGrossPremium,
+    IReadOnlyList<WrittenPremiumRowDto> Rows
+);
+
+public record WrittenPremiumRowDto(
+    Guid? ProgramId,
+    string? ProgramCode,
+    string ProgramName,
+    Guid CarrierId,
+    string CarrierName,
+    PolicyLineOfBusiness LineOfBusiness,
+    string State,
+    int PolicyCount,
+    decimal GrossPremium,
+    decimal TotalPremium
+);
+
+public record SubmissionPipelineDto(
+    DateOnly DateFrom,
+    DateOnly DateTo,
+    int TotalReceived,
+    int TotalQuoted,
+    int TotalBound,
+    int TotalDeclined,
+    int TotalOpen,
+    decimal QuoteRate,
+    decimal BindRate,
+    decimal OverallConversion,
+    IReadOnlyList<SubmissionPipelineAgentRowDto> ByAgent
+);
+
+public record SubmissionPipelineAgentRowDto(
+    Guid? AgentId,
+    string AgentName,
+    int Received,
+    int Quoted,
+    int Bound,
+    int Declined,
+    int Open,
+    decimal QuoteRate,
+    decimal BindRate
+);
+
+public record UwWorkloadDto(
+    int TotalOpenSubmissions,
+    int TotalPendingQuotes,
+    int TotalOpenTasks,
+    decimal TotalPipelinePremium,
+    IReadOnlyList<UwWorkloadRowDto> Rows
+);
+
+public record UwWorkloadRowDto(
+    Guid UnderwriterId,
+    string UnderwriterName,
+    int OpenSubmissions,
+    int PendingQuotes,
+    int OpenTasks,
+    int OverdueTasks,
+    int ReferralsPending,
+    int AuthApprovalsPending,
+    decimal PipelinePremium
+);
