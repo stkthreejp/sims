@@ -21,10 +21,16 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Backend build
+        run: dotnet build backend/SIMS.sln --no-incremental -v q
+
       - name: Backend tests
         run: |
-          dotnet test backend/tests/SIMS.Application.Tests/SIMS.Application.Tests.csproj --verbosity minimal
-          dotnet test backend/tests/SIMS.Application.Rating.Tests/SIMS.Application.Rating.Tests.csproj --verbosity minimal
+          dotnet test backend/tests/SIMS.Application.Tests/SIMS.Application.Tests.csproj --no-build --verbosity minimal
+          dotnet test backend/tests/SIMS.Application.Rating.Tests/SIMS.Application.Rating.Tests.csproj --no-build --verbosity minimal
+
+      - name: Backend vulnerability audit
+        run: dotnet list backend/SIMS.sln package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt; grep -q "has the following vulnerable packages" /tmp/vuln.txt && exit 1 || true
 
       - name: Frontend install
         run: npm install
@@ -105,3 +111,28 @@ jobs:
         with:
           app-name: sims-frontend-test
           images: ${{ env.ACR_LOGIN_SERVER }}/sims-frontend:${{ github.sha }}
+
+      - name: Smoke test — API health
+        run: |
+          echo "Waiting for API to become healthy..."
+          for i in $(seq 1 18); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" https://sims-api-test.azurewebsites.net/health/ready || echo "000")
+            echo "Attempt $i: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "API is healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: API did not become healthy after 3 minutes."
+          exit 1
+
+      - name: Smoke test — Frontend reachable
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" https://sims-frontend-test.azurewebsites.net/ || echo "000")
+          echo "Frontend HTTP $status"
+          if [ "$status" != "200" ] && [ "$status" != "304" ]; then
+            echo "ERROR: Frontend returned $status"
+            exit 1
+          fi
+          echo "Frontend is reachable."

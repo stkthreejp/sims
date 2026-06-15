@@ -22,6 +22,7 @@ Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
 
 // Infrastructure (EF Core, Identity, services)
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddSimsHealthChecks();
 builder.Services.AddScoped<IOpenLawsClient, OpenLawsClient>();
 builder.Services.AddHttpClient("openlaws", c => c.Timeout = TimeSpan.FromSeconds(
