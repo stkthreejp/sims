@@ -180,8 +180,8 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<DisbursementLine> DisbursementLines => Set<DisbursementLine>();
     public DbSet<PayeeStatement> PayeeStatements => Set<PayeeStatement>();
     public DbSet<PayeeStatementLine> PayeeStatementLines => Set<PayeeStatementLine>();
-    public DbSet<QboOAuthToken> QboOAuthTokens => Set<QboOAuthToken>();
-    public DbSet<PendingQboSync> PendingQboSyncs => Set<PendingQboSync>();
+    public DbSet<XeroOAuthToken> XeroOAuthTokens => Set<XeroOAuthToken>();
+    public DbSet<PendingJournalSync> PendingJournalSyncs => Set<PendingJournalSync>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)

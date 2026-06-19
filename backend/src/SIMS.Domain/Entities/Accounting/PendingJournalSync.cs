@@ -1,6 +1,10 @@
 namespace SIMS.Domain.Entities.Accounting;
 
-public class PendingQboSync
+/// <summary>
+/// A failed journal-entry export queued for retry. Driver-agnostic: the retry worker
+/// re-runs the rollup via its stored <see cref="JournalEntryRollup.DriverType"/>.
+/// </summary>
+public class PendingJournalSync
 {
     public long Id { get; set; }
     public int TenantId { get; set; } = 1;

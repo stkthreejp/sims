@@ -12,7 +12,7 @@ export interface RollupSummary {
   completedAt: string | null
 }
 
-export interface PendingQboSync {
+export interface PendingJournalSync {
   id: number
   rollupId: number
   period: string
@@ -23,9 +23,9 @@ export interface PendingQboSync {
   createdAt: string
 }
 
-export interface QboStatus {
+export interface SyncStatus {
   connected: boolean
-  pending: PendingQboSync[]
+  pending: PendingJournalSync[]
 }
 
 export interface Rollup extends RollupSummary {

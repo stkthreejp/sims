@@ -8,10 +8,10 @@ using SIMS.Infrastructure.Data;
 namespace SIMS.Infrastructure.Workers;
 
 /// <summary>
-/// Polls for PendingQboSync rows due for retry and attempts to re-export the rollup via QBO.
+/// Polls for PendingJournalSync rows due for retry and re-exports the rollup via its driver.
 /// Backoff schedule: 30s, 2m, 8m, 30m, 2h, 8h (max 6 attempts).
 /// </summary>
-public class QboSyncRetryWorker : BackgroundService
+public class JournalSyncRetryWorker : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ProcessingTimeout = TimeSpan.FromMinutes(15);
@@ -28,9 +28,9 @@ public class QboSyncRetryWorker : BackgroundService
     private const int MaxAttempts = 6;
 
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<QboSyncRetryWorker> _logger;
+    private readonly ILogger<JournalSyncRetryWorker> _logger;
 
-    public QboSyncRetryWorker(IServiceScopeFactory scopeFactory, ILogger<QboSyncRetryWorker> logger)
+    public JournalSyncRetryWorker(IServiceScopeFactory scopeFactory, ILogger<JournalSyncRetryWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -38,7 +38,7 @@ public class QboSyncRetryWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("QBO sync retry worker started.");
+        _logger.LogInformation("Journal sync retry worker started.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -49,7 +49,7 @@ public class QboSyncRetryWorker : BackgroundService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Unhandled error in QBO sync retry worker.");
+                _logger.LogError(ex, "Unhandled error in journal sync retry worker.");
             }
 
             await Task.Delay(PollInterval, stoppingToken);
@@ -62,7 +62,7 @@ public class QboSyncRetryWorker : BackgroundService
         var now = DateTime.UtcNow;
         var processingCutoff = now.Subtract(ProcessingTimeout);
 
-        var pendingIds = await db.PendingQboSyncs
+        var pendingIds = await db.PendingJournalSyncs
             .Where(p => p.TenantId == 1
                 && (((p.Status == "Pending" || p.Status == "Retrying")
                         && (p.NextRetryAt == null || p.NextRetryAt <= now))
@@ -83,7 +83,7 @@ public class QboSyncRetryWorker : BackgroundService
             if (!claimed)
                 continue;
 
-            var sync = await db.PendingQboSyncs
+            var sync = await db.PendingJournalSyncs
                 .Include(p => p.Rollup)
                 .SingleAsync(p => p.Id == syncId, ct);
 
@@ -91,15 +91,15 @@ public class QboSyncRetryWorker : BackgroundService
             {
                 var rollup = await rollupService.ResyncAsync(sync.RollupId, Guid.Empty, ct);
                 if (string.Equals(rollup.Status, "Failed", StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException(rollup.ErrorMessage ?? "QBO sync failed.");
+                    throw new InvalidOperationException(rollup.ErrorMessage ?? "Journal sync failed.");
                 if (!string.Equals(rollup.Status, "Exported", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(rollup.Status, "Posted", StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException($"QBO sync did not complete. Rollup status: {rollup.Status}.");
+                    throw new InvalidOperationException($"Journal sync did not complete. Rollup status: {rollup.Status}.");
 
                 sync.Status = "Done";
                 sync.LastError = null;
                 sync.NextRetryAt = null;
-                _logger.LogInformation("QBO sync succeeded for rollup {RollupId} on attempt {Attempt}",
+                _logger.LogInformation("Journal sync succeeded for rollup {RollupId} on attempt {Attempt}",
                     sync.RollupId, sync.AttemptCount);
             }
             catch (Exception ex)
@@ -109,7 +109,7 @@ public class QboSyncRetryWorker : BackgroundService
                 if (sync.AttemptCount >= MaxAttempts)
                 {
                     sync.Status = "Failed";
-                    _logger.LogError(ex, "QBO sync permanently failed for rollup {RollupId} after {MaxAttempts} attempts",
+                    _logger.LogError(ex, "Journal sync permanently failed for rollup {RollupId} after {MaxAttempts} attempts",
                         sync.RollupId, MaxAttempts);
                 }
                 else
@@ -117,7 +117,7 @@ public class QboSyncRetryWorker : BackgroundService
                     sync.Status = "Retrying";
                     var backoff = BackoffSchedule[Math.Min(sync.AttemptCount - 1, BackoffSchedule.Length - 1)];
                     sync.NextRetryAt = DateTime.UtcNow.Add(backoff);
-                    _logger.LogWarning(ex, "QBO sync attempt {Attempt} failed for rollup {RollupId}. Next retry at {NextRetry}",
+                    _logger.LogWarning(ex, "Journal sync attempt {Attempt} failed for rollup {RollupId}. Next retry at {NextRetry}",
                         sync.AttemptCount, sync.RollupId, sync.NextRetryAt);
                 }
             }
@@ -129,7 +129,7 @@ public class QboSyncRetryWorker : BackgroundService
 
     private static async Task<bool> TryClaimAsync(ApplicationDbContext db, long syncId, DateTime now, DateTime processingCutoff, CancellationToken ct)
     {
-        var claimed = await db.PendingQboSyncs
+        var claimed = await db.PendingJournalSyncs
             .Where(p => p.Id == syncId
                 && p.TenantId == 1
                 && (((p.Status == "Pending" || p.Status == "Retrying")

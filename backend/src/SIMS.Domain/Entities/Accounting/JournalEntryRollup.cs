@@ -6,9 +6,9 @@ public class JournalEntryRollup
     public int TenantId { get; set; } = 1;
     public int PeriodYear { get; set; }
     public int PeriodMonth { get; set; }
-    public string DriverType { get; set; } = "CSV";   // 'CSV'|'QBO'
+    public string DriverType { get; set; } = "CSV";   // 'CSV'|'Xero'
     public string Status { get; set; } = "Pending";   // 'Pending'|'Exported'|'Posted'|'Failed'
-    public string? ExternalId { get; set; }            // QBO JE ID once posted
+    public string? ExternalId { get; set; }            // Xero ManualJournalID(s) once posted
     public string? BlobUri { get; set; }               // Azure Blob URI for CSV export
     public string? ErrorMessage { get; set; }
     public Guid CreatedBy { get; set; }

@@ -118,11 +118,11 @@ var app = builder.Build();
 // Seed database
 await InfrastructureServiceExtensions.SeedDatabaseAsync(app.Services);
 
-// Bootstrap QBO token from config (no-op if already seeded or no credentials configured)
+// Warm the Xero token from config (no-op if no credentials configured)
 using (var scope = app.Services.CreateScope())
 {
-    var qboTokenSvc = scope.ServiceProvider.GetRequiredService<IQboTokenService>();
-    await qboTokenSvc.BootstrapFromConfigAsync();
+    var xeroTokenSvc = scope.ServiceProvider.GetRequiredService<IXeroTokenService>();
+    await xeroTokenSvc.BootstrapFromConfigAsync();
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();

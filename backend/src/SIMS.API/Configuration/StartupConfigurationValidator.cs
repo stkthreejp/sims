@@ -18,18 +18,15 @@ public static class StartupConfigurationValidator
         ValidateNotPlaceholder(configuration, "Storage:AzureBlobConnectionString",
             "Storage:AzureBlobConnectionString must be set in staging/production.");
 
-        ValidateNotPlaceholder(configuration, "Qbo:ClientId",
-            "Qbo:ClientId must be configured in staging/production.");
-        ValidateNotPlaceholder(configuration, "Qbo:ClientSecret",
-            "Qbo:ClientSecret must be configured in staging/production.");
-        ValidateNotPlaceholder(configuration, "Qbo:RefreshToken",
-            "Qbo:RefreshToken must be configured in staging/production.");
-        ValidateNotPlaceholder(configuration, "Qbo:RealmId",
-            "Qbo:RealmId must be configured in staging/production.");
-
-        var webhookToken = configuration["Qbo:WebhookVerifierToken"];
-        if (string.IsNullOrWhiteSpace(webhookToken) || webhookToken.Equals("PLACEHOLDER", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Qbo:WebhookVerifierToken must be set to a real secret in staging/production.");
+        // Xero secrets live in Key Vault under flat names (XeroClientID, XeroClientSecret,
+        // XeroTenantId) because ':' is not allowed in secret names; the "Xero:*" section is the
+        // dev/appsettings fallback. Accept either.
+        ValidateNotPlaceholderAny(configuration, ["XeroClientId", "Xero:ClientId"],
+            "XeroClientID (or Xero:ClientId) must be configured in staging/production.");
+        ValidateNotPlaceholderAny(configuration, ["XeroClientSecret", "Xero:ClientSecret"],
+            "XeroClientSecret (or Xero:ClientSecret) must be configured in staging/production.");
+        ValidateNotPlaceholderAny(configuration, ["XeroTenantId", "Xero:TenantId"],
+            "XeroTenantId (the Xero organisation id) must be configured in staging/production.");
 
         ValidateNotPlaceholder(configuration, "GraphApi:ClientSecret",
             "GraphApi:ClientSecret must be configured in staging/production.");
@@ -44,14 +41,6 @@ public static class StartupConfigurationValidator
             throw new InvalidOperationException(
                 "Uploads:MalwareScanning:Provider must be explicitly set in staging/production. " +
                 "Use 'ClamAV' to enable scanning, or 'NoOp' to acknowledge that uploads are not scanned.");
-
-        if (environment.IsProduction())
-        {
-            var qboEnv = configuration["Qbo:Environment"];
-            if (string.IsNullOrWhiteSpace(qboEnv) || qboEnv.Equals("sandbox", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(
-                    "Qbo:Environment must be set to 'production' — the sandbox value cannot be used in production.");
-        }
     }
 
     private static void ValidateJwt(IConfiguration configuration, IHostEnvironment environment)
@@ -96,13 +85,20 @@ public static class StartupConfigurationValidator
 
     private static void ValidateNotPlaceholder(IConfiguration configuration, string key, string errorMessage)
     {
-        var value = configuration[key];
-        if (string.IsNullOrWhiteSpace(value) ||
-            value.StartsWith("SET_VIA", StringComparison.OrdinalIgnoreCase) ||
-            value.StartsWith("SET VIA", StringComparison.OrdinalIgnoreCase) ||
-            value.Equals("PLACEHOLDER", StringComparison.OrdinalIgnoreCase))
-        {
+        if (IsPlaceholder(configuration[key]))
             throw new InvalidOperationException(errorMessage);
-        }
     }
+
+    /// <summary>Passes if at least one of the candidate keys holds a real (non-placeholder) value.</summary>
+    private static void ValidateNotPlaceholderAny(IConfiguration configuration, string[] keys, string errorMessage)
+    {
+        if (keys.All(k => IsPlaceholder(configuration[k])))
+            throw new InvalidOperationException(errorMessage);
+    }
+
+    private static bool IsPlaceholder(string? value) =>
+        string.IsNullOrWhiteSpace(value) ||
+        value.StartsWith("SET_VIA", StringComparison.OrdinalIgnoreCase) ||
+        value.StartsWith("SET VIA", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("PLACEHOLDER", StringComparison.OrdinalIgnoreCase);
 }

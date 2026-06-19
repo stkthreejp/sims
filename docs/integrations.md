@@ -16,17 +16,20 @@
 - **Auth:** `ClientSecretCredential` using the Azure AD app registration
 - **Config keys:** `GraphApi:ClientSecret`, `GraphApi:MailboxAddress`
 
-## QuickBooks Online (Accounting Sync)
+## Xero (Accounting Sync)
 
-- **Purpose:** Syncs journal entries from SIMS accounting to QBO
-- **Environment:** Sandbox (switch to production when live)
-- **Auth:** OAuth 2.0 with stored refresh token (`QboOAuthToken` entity)
+- **Purpose:** Syncs journal entries from SIMS accounting to Xero as Manual Journals. This is the sole accounting integration — QBO was removed pre-launch.
+- **Connection type:** Xero **Custom connection** (one-to-one, single organisation), using the OAuth2 **client-credentials** grant. There is no interactive authorization-code flow and **no refresh token** — the backend mints a short-lived (~30 min) access token directly from the client id/secret and re-mints on expiry.
+- **Auth:** `XeroTokenService` (token cached in `XeroOAuthToken` / `xero_oauth_tokens`). Every API call sends `Authorization: Bearer` plus the `xero-tenant-id` header.
+- **Secrets:** stored in Key Vault under **flat** names (`XeroClientID`, `XeroClientSecret`, `XeroTenantId`) because `:` is not allowed in Key Vault secret names. The DI binding applies these flat keys over the `Xero:*` section (the section is the dev/appsettings fallback). Config lookups are case-insensitive.
+- **Account mapping:** Manual Journals reference accounts by **account code**. Configure `GlAccountMap` rows with `ExternalSystem = "Xero"` whose `ExternalId` holds the Xero account code.
 - **Sync flow:**
-  1. Accounting events generate `JournalEntryRollup` records
-  2. `QboJournalDriver` converts rollups to QBO journal entries
-  3. Failed syncs queue in `PendingQboSync` and are retried by `QboSyncRetryWorker`
-- **Webhook:** `POST /api/webhooks/qbo` receives real-time change notifications
-- **Config keys:** `Qbo:ClientId`, `Qbo:ClientSecret`, `Qbo:RefreshToken`, `Qbo:RealmId`, `Qbo:Environment`
+  1. Accounting events generate `JournalEntryRollup` records (`DriverType = "Xero"`)
+  2. `XeroJournalDriver` converts each transaction group into a Manual Journal (one signed `LineAmount` per line: positive = debit, negative = credit; `Status = POSTED`)
+  3. Failed syncs queue in `PendingJournalSync` (`pending_journal_syncs`) and are retried by `JournalSyncRetryWorker` (queue + worker are driver-agnostic and re-run via `RollupService.ResyncAsync`, which respects each rollup's stored `DriverType`)
+- **Config keys:** `Xero:ClientId`, `Xero:ClientSecret`, `Xero:TenantId`, `Xero:Scopes` (+ flat Key Vault names above)
+- **Known capability gap:** Xero webhooks do **not** support Manual Journal events (only Contacts / Invoices / Subscriptions), so there is no "Divergent" detection that flags a rollup when the ledger is edited on the accounting side. This existed for QBO and was intentionally not reimplemented.
+- **Migration to apply:** the schema change (drop `qbo_oauth_tokens`, rename `pending_qbo_syncs` → `pending_journal_syncs`, add `xero_oauth_tokens`) is generated with `dotnet ef migrations add SwitchAccountingToXero` then `database update`.
 
 ## Azure Blob Storage (Documents)
 
@@ -53,14 +56,14 @@
 
 ## CSV Journal Export
 
-- **Purpose:** Alternative to QBO — export journal entries as CSV
+- **Purpose:** Alternative to the live Xero sync — export journal entries as CSV
 - **Service:** `CsvJournalDriver` implements `IJournalDriver` interface
-- **Use case:** Clients not on QBO, or for period-end batch export
+- **Use case:** Offline/manual import, or for period-end batch export
 
 ## Journal Driver Architecture
 
 The accounting sync uses a plugin-style `IJournalDriver` interface, allowing multiple export targets:
-- `QboJournalDriver` — Live sync to QuickBooks Online
+- `XeroJournalDriver` — Live sync to Xero (Manual Journals) — **active default**
 - `CsvJournalDriver` — CSV file export
 
 New drivers can be added by implementing `IJournalDriver` without changing core accounting logic.

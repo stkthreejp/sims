@@ -4,7 +4,7 @@ namespace SIMS.Application.Interfaces.Services;
 
 /// <summary>
 /// Abstraction over how a finalized JournalEntryRollup is exported/posted externally.
-/// Implementations: CsvJournalDriver (blob download), QboJournalDriver (QBO API).
+/// Implementations: CsvJournalDriver (blob download), XeroJournalDriver (Xero Manual Journals).
 /// </summary>
 public interface IJournalDriver
 {

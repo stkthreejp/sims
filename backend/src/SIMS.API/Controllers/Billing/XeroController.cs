@@ -7,30 +7,30 @@ using SIMS.Infrastructure.Data;
 namespace SIMS.API.Controllers.Billing;
 
 [ApiController]
-[Route("api/v1/billing/qbo")]
+[Route("api/v1/billing/xero")]
 [Authorize(Policy = AppPermissions.AccountingManage)]
-public class QboController : ControllerBase
+public class XeroController : ControllerBase
 {
-    private readonly IQboTokenService _tokens;
-    private readonly IQboApiClient _api;
+    private readonly IXeroTokenService _tokens;
+    private readonly IXeroApiClient _api;
     private readonly ApplicationDbContext _db;
 
-    public QboController(IQboTokenService tokens, IQboApiClient api, ApplicationDbContext db)
+    public XeroController(IXeroTokenService tokens, IXeroApiClient api, ApplicationDbContext db)
     {
         _tokens = tokens;
         _api = api;
         _db = db;
     }
 
-    /// <summary>Returns QBO connection status and pending retry queue.</summary>
+    /// <summary>Returns Xero connection status and the pending sync retry queue.</summary>
     [HttpGet("status")]
     public async Task<IActionResult> GetStatus(CancellationToken ct)
     {
         var connected = await _tokens.IsConnectedAsync(ct);
 
-        var pending = await _db.PendingQboSyncs
+        var pending = await _db.PendingJournalSyncs
             .Include(p => p.Rollup)
-            .Where(p => p.TenantId == 1 && p.Status != "Done")
+            .Where(p => p.TenantId == 1 && p.Status != "Done" && p.Rollup!.DriverType == "Xero")
             .OrderByDescending(p => p.CreatedAt)
             .Select(p => new
             {
@@ -48,13 +48,13 @@ public class QboController : ControllerBase
         return Ok(new { connected, pending });
     }
 
-    /// <summary>Returns QBO chart of accounts for GL mapping setup.</summary>
+    /// <summary>Returns the Xero chart of accounts for GL mapping setup.</summary>
     [HttpGet("accounts")]
     [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> GetAccounts(CancellationToken ct)
     {
         if (!await _tokens.IsConnectedAsync(ct))
-            return BadRequest(new { ErrorCode = "QBO_NOT_CONNECTED", ErrorMessage = "QBO is not connected." });
+            return BadRequest(new { ErrorCode = "XERO_NOT_CONNECTED", ErrorMessage = "Xero is not connected." });
 
         try
         {
@@ -63,7 +63,7 @@ public class QboController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { ErrorCode = "QBO_ERROR", ErrorMessage = ex.Message });
+            return BadRequest(new { ErrorCode = "XERO_ERROR", ErrorMessage = ex.Message });
         }
     }
 }

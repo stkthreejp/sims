@@ -5,11 +5,11 @@ import {
   Wifi, WifiOff, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getRollups, triggerRollup, resyncRollup, getRollupDownloadUrl, getQboStatus } from '@/api/rollup.api'
+import { getRollups, triggerRollup, resyncRollup, getRollupDownloadUrl, getXeroStatus } from '@/api/rollup.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
-import type { RollupSummary, PendingQboSync } from '@/types/rollup.types'
+import type { RollupSummary, PendingJournalSync } from '@/types/rollup.types'
 import { useAuthStore } from '@/store/authStore'
 
 const MONTH_NAMES = [
@@ -36,20 +36,23 @@ function StatusBadge({ status }: { status: RollupSummary['status'] }) {
   )
 }
 
+const DRIVER_LABELS: Record<string, string> = { Xero: 'Xero', CSV: 'CSV' }
+
 function DriverBadge({ type }: { type: string }) {
+  const accent = type === 'Xero'
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-      style={type === 'QBO' ? { background: 'var(--surface-2)', color: 'var(--accent-ink)' } : { background: 'var(--surface-2)', color: 'var(--ink-3)' }}
+      style={accent ? { background: 'var(--surface-2)', color: 'var(--accent-ink)' } : { background: 'var(--surface-2)', color: 'var(--ink-3)' }}
     >
-      {type === 'QBO' ? 'QuickBooks' : 'CSV'}
+      {DRIVER_LABELS[type] ?? type}
     </span>
   )
 }
 
-// ---------- QBO Status Card ----------
+// ---------- Provider Status Card ----------
 
-function QboStatusCard({ connected, pending }: { connected: boolean; pending: PendingQboSync[] }) {
+function ProviderStatusCard({ providerName, connected, pending }: { providerName: string; connected: boolean; pending: PendingJournalSync[] }) {
   const activePending = pending.filter(p => p.status !== 'Done')
   const failedCount = pending.filter(p => p.status === 'Failed').length
   const retryingCount = pending.filter(p => p.status === 'Retrying' || p.status === 'Pending').length
@@ -69,7 +72,7 @@ function QboStatusCard({ connected, pending }: { connected: boolean; pending: Pe
           {connected
             ? <Wifi className="h-4 w-4" style={{ color: 'var(--good-fg)' }} />
             : <WifiOff className="h-4 w-4" style={{ color: 'var(--ink-4)' }} />}
-          <span className="text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>QuickBooks Online</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--ink-2)' }}>{providerName}</span>
         </div>
         <span
           className="text-xs font-medium px-2 py-0.5 rounded-full"
@@ -120,7 +123,7 @@ function QboStatusCard({ connected, pending }: { connected: boolean; pending: Pe
 
       {!connected && (
         <p className="text-xs mt-1" style={{ color: 'var(--ink-3)' }}>
-          Configure OAuth credentials in <code className="px-1 rounded" style={{ background: 'var(--surface-2)' }}>appsettings.json</code> to enable QBO sync.
+          Configure OAuth credentials in <code className="px-1 rounded" style={{ background: 'var(--surface-2)' }}>appsettings.json</code> to enable {providerName} sync.
         </p>
       )}
     </div>
@@ -131,22 +134,23 @@ function QboStatusCard({ connected, pending }: { connected: boolean; pending: Pe
 
 interface TriggerModalProps {
   onClose: () => void
-  qboConnected: boolean
+  xeroConnected: boolean
 }
 
-function TriggerModal({ onClose, qboConnected }: TriggerModalProps) {
+function TriggerModal({ onClose, xeroConnected }: TriggerModalProps) {
   const qc = useQueryClient()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth() + 1)
-  const [driver, setDriver] = useState('CSV')
+  // Default to Xero (the active accounting system); fall back to CSV if not yet connected.
+  const [driver, setDriver] = useState(xeroConnected ? 'Xero' : 'CSV')
 
   const mutation = useMutation({
     mutationFn: () => triggerRollup(year, month, driver),
     onSuccess: (r) => {
       toast.success(`Rollup created: ${r.transactionCount} transaction(s), ${r.lineCount} lines`)
       qc.invalidateQueries({ queryKey: ['rollups'] })
-      qc.invalidateQueries({ queryKey: ['qbo-status'] })
+      qc.invalidateQueries({ queryKey: ['xero-status'] })
       onClose()
     },
     onError: (e: Error) => toast.error(e.message),
@@ -190,8 +194,8 @@ function TriggerModal({ onClose, qboConnected }: TriggerModalProps) {
             <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-3)' }}>Driver</label>
             <div className="flex gap-2">
               {[
+                { key: 'Xero', label: xeroConnected ? 'Xero' : 'Xero (not connected)', disabled: !xeroConnected },
                 { key: 'CSV', label: 'CSV Download', disabled: false },
-                { key: 'QBO', label: qboConnected ? 'QuickBooks' : 'QuickBooks (not connected)', disabled: !qboConnected },
               ].map(({ key, label, disabled }) => (
                 <button
                   key={key}
@@ -202,7 +206,7 @@ function TriggerModal({ onClose, qboConnected }: TriggerModalProps) {
                     : { borderColor: 'var(--line)', color: 'var(--ink-3)' }
                   }
                   disabled={disabled}
-                  title={disabled ? 'QBO not connected — configure OAuth credentials first' : undefined}
+                  title={disabled ? `${label} not connected — configure OAuth credentials first` : undefined}
                 >
                   {label}
                 </button>
@@ -212,7 +216,7 @@ function TriggerModal({ onClose, qboConnected }: TriggerModalProps) {
           <p className="text-xs" style={{ color: 'var(--ink-4)' }}>
             {driver === 'CSV'
               ? 'All unrolled posted transactions in this period will be grouped into a balanced CSV and uploaded to Azure Blob.'
-              : 'Each transaction group will be posted directly to QuickBooks Online as a JournalEntry.'}
+              : 'Each transaction group will be posted directly to Xero as a Manual Journal.'}
           </p>
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 border-t rounded-b-lg" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
@@ -244,7 +248,7 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
     onSuccess: () => {
       toast.success('Resync complete')
       qc.invalidateQueries({ queryKey: ['rollups'] })
-      qc.invalidateQueries({ queryKey: ['qbo-status'] })
+      qc.invalidateQueries({ queryKey: ['xero-status'] })
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -288,12 +292,12 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
           </div>
         )}
         {rollup.externalId && (
-          <span className="text-xs font-mono" style={{ color: 'var(--ink-3)' }}>QBO: {rollup.externalId.split(',')[0]}{rollup.externalId.includes(',') ? '…' : ''}</span>
+          <span className="text-xs font-mono" style={{ color: 'var(--ink-3)' }}>{rollup.driverType}: {rollup.externalId.split(',')[0]}{rollup.externalId.includes(',') ? '…' : ''}</span>
         )}
         {rollup.status === 'Divergent' && (
           <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--warn-fg)' }}>
             <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-            QBO divergence detected
+            {rollup.driverType} divergence detected
           </div>
         )}
       </td>
@@ -340,9 +344,9 @@ export function SyncHealthPage() {
     queryFn: getRollups,
   })
 
-  const { data: qboStatus } = useQuery({
-    queryKey: ['qbo-status'],
-    queryFn: getQboStatus,
+  const { data: xeroStatus } = useQuery({
+    queryKey: ['xero-status'],
+    queryFn: getXeroStatus,
     staleTime: 30_000,
   })
 
@@ -355,7 +359,7 @@ export function SyncHealthPage() {
     <div className="p-6">
       <PageHeader
         title="Sync Health"
-        subtitle="Journal entry rollups and QB export status"
+        subtitle="Journal entry rollups and Xero export status"
         action={
           <div className="flex items-center gap-3">
             <CashBalanceBadge />
@@ -396,10 +400,10 @@ export function SyncHealthPage() {
         </div>
       </div>
 
-      {/* QBO connection status */}
-      {qboStatus && (
+      {/* Accounting provider connection status */}
+      {xeroStatus && (
         <div className="mb-6">
-          <QboStatusCard connected={qboStatus.connected} pending={qboStatus.pending} />
+          <ProviderStatusCard providerName="Xero" connected={xeroStatus.connected} pending={xeroStatus.pending} />
         </div>
       )}
 
@@ -437,7 +441,7 @@ export function SyncHealthPage() {
       {showTrigger && (
         <TriggerModal
           onClose={() => setShowTrigger(false)}
-          qboConnected={qboStatus?.connected ?? false}
+          xeroConnected={xeroStatus?.connected ?? false}
         />
       )}
     </div>

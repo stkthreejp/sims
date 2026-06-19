@@ -4,11 +4,11 @@ using SIMS.Domain.Entities.Accounting;
 
 namespace SIMS.Infrastructure.Data.Configurations.Accounting;
 
-public class PendingQboSyncConfiguration : IEntityTypeConfiguration<PendingQboSync>
+public class PendingJournalSyncConfiguration : IEntityTypeConfiguration<PendingJournalSync>
 {
-    public void Configure(EntityTypeBuilder<PendingQboSync> b)
+    public void Configure(EntityTypeBuilder<PendingJournalSync> b)
     {
-        b.ToTable("pending_qbo_syncs");
+        b.ToTable("pending_journal_syncs");
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).ValueGeneratedOnAdd();
         b.Property(x => x.Status).IsRequired().HasMaxLength(20);
@@ -17,7 +17,7 @@ public class PendingQboSyncConfiguration : IEntityTypeConfiguration<PendingQboSy
             .WithMany()
             .HasForeignKey(x => x.RollupId)
             .OnDelete(DeleteBehavior.Cascade);
-        b.HasIndex(x => x.Status).HasDatabaseName("ix_pending_qbo_syncs_status");
-        b.HasIndex(x => x.NextRetryAt).HasDatabaseName("ix_pending_qbo_syncs_next_retry");
+        b.HasIndex(x => x.Status).HasDatabaseName("ix_pending_journal_syncs_status");
+        b.HasIndex(x => x.NextRetryAt).HasDatabaseName("ix_pending_journal_syncs_next_retry");
     }
 }

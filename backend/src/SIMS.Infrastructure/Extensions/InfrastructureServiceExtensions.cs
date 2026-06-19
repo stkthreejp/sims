@@ -136,14 +136,24 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICashApplicationService, CashApplicationService>();
         services.AddScoped<ICashDistributionService, CashDistributionService>();
         services.AddScoped<IDisbursementService, DisbursementService>();
-        // QBO
-        services.Configure<QboSettings>(configuration.GetSection("Qbo"));
+        // Xero (accounting sync).
+        // Key Vault secret names can't contain ':', and these are stored flat (XeroClientID,
+        // XeroClientSecret, XeroTenantId), so bind the "Xero" section first (dev / appsettings)
+        // and then apply the flat Key Vault keys as overrides. Config lookups are case-insensitive.
+        services.Configure<XeroSettings>(opts =>
+        {
+            configuration.GetSection("Xero").Bind(opts);
+            opts.ClientId = configuration["XeroClientId"] ?? opts.ClientId;
+            opts.ClientSecret = configuration["XeroClientSecret"] ?? opts.ClientSecret;
+            opts.TenantId = configuration["XeroTenantId"] ?? opts.TenantId;
+            opts.WebhookKey = configuration["XeroWebhookKey"] ?? opts.WebhookKey;
+        });
         services.Configure<FmcsaSocrataSettings>(configuration.GetSection("Fmcsa:Socrata"));
         services.Configure<FmcsaJobSettings>(configuration.GetSection("Fmcsa:Jobs"));
-        services.AddScoped<IQboTokenService, QboTokenService>();
-        services.AddScoped<IQboApiClient, QboApiClient>();
+        services.AddScoped<IXeroTokenService, XeroTokenService>();
+        services.AddScoped<IXeroApiClient, XeroApiClient>();
         services.AddScoped<IJournalDriver, CsvJournalDriver>();
-        services.AddScoped<IJournalDriver, QboJournalDriver>();
+        services.AddScoped<IJournalDriver, XeroJournalDriver>();
         services.AddScoped<IRollupService, RollupService>();
         services.AddScoped<IPeriodCloseService, PeriodCloseService>();
         services.AddScoped<IVoidService, VoidService>();
@@ -170,10 +180,10 @@ public static class InfrastructureServiceExtensions
             c.Timeout = TimeSpan.FromSeconds(
                 int.TryParse(configuration["HttpClients:AnthropicTimeoutSeconds"], out var anthropicTimeout) ? anthropicTimeout : 90);
         });
-        services.AddHttpClient("qbo_oauth", c => c.Timeout = TimeSpan.FromSeconds(
-            int.TryParse(configuration["HttpClients:QboOAuthTimeoutSeconds"], out var qboOAuthTimeout) ? qboOAuthTimeout : 30));
-        services.AddHttpClient("qbo_api", c => c.Timeout = TimeSpan.FromSeconds(
-            int.TryParse(configuration["HttpClients:QboApiTimeoutSeconds"], out var qboApiTimeout) ? qboApiTimeout : 30));
+        services.AddHttpClient("xero_oauth", c => c.Timeout = TimeSpan.FromSeconds(
+            int.TryParse(configuration["HttpClients:XeroOAuthTimeoutSeconds"], out var xeroOAuthTimeout) ? xeroOAuthTimeout : 30));
+        services.AddHttpClient("xero_api", c => c.Timeout = TimeSpan.FromSeconds(
+            int.TryParse(configuration["HttpClients:XeroApiTimeoutSeconds"], out var xeroApiTimeout) ? xeroApiTimeout : 30));
         services.AddHttpClient("fmcsa_socrata", c =>
         {
             c.BaseAddress = new Uri(configuration["Fmcsa:Socrata:BaseUrl"] ?? "https://data.transportation.gov");
@@ -206,7 +216,7 @@ public static class InfrastructureServiceExtensions
         services.AddHostedService<EmailIngestionWorker>();
         services.AddHostedService<TaskNotificationWorker>();
         services.AddHostedService<TaskEscalationWorker>();
-        services.AddHostedService<QboSyncRetryWorker>();
+        services.AddHostedService<JournalSyncRetryWorker>();
         services.AddHostedService<ShadowRateDailyReportWorker>();
         services.AddHostedService<FmcsaScheduledJobsWorker>();
 

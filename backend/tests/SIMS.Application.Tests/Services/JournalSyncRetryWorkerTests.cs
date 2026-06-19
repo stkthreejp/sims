@@ -12,24 +12,24 @@ using Xunit;
 
 namespace SIMS.Application.Tests.Services;
 
-public class QboSyncRetryWorkerTests
+public class JournalSyncRetryWorkerTests
 {
     [Fact]
     public async Task RunAsync_DoesNotMarkSyncDoneWhenResyncReturnsFailedRollup()
     {
-        await using var fixture = await QboRetryFixture.CreateAsync(new FailedRollupService("QBO rejected journal"));
-        await SeedPendingQboSyncAsync(fixture.Db);
+        await using var fixture = await JournalRetryFixture.CreateAsync(new FailedRollupService("Xero rejected journal"));
+        await SeedPendingJournalSyncAsync(fixture.Db);
         var worker = CreateWorker(fixture.Services);
 
         using var scope = fixture.Services.CreateScope();
         await RunWorkerOnceAsync(worker, scope.ServiceProvider);
 
         fixture.Db.ChangeTracker.Clear();
-        var sync = await fixture.Db.PendingQboSyncs.SingleAsync();
+        var sync = await fixture.Db.PendingJournalSyncs.SingleAsync();
         Assert.NotEqual("Done", sync.Status);
         Assert.Equal("Retrying", sync.Status);
         Assert.Equal(1, sync.AttemptCount);
-        Assert.Contains("QBO rejected journal", sync.LastError);
+        Assert.Contains("Xero rejected journal", sync.LastError);
         Assert.NotNull(sync.NextRetryAt);
     }
 
@@ -37,8 +37,8 @@ public class QboSyncRetryWorkerTests
     public async Task RunAsync_DoesNotProcessSyncAlreadyClaimedByAnotherWorker()
     {
         var rollupService = new BlockingRollupService();
-        await using var fixture = await QboRetryFixture.CreateAsync(rollupService);
-        await SeedPendingQboSyncAsync(fixture.Db);
+        await using var fixture = await JournalRetryFixture.CreateAsync(rollupService);
+        await SeedPendingJournalSyncAsync(fixture.Db);
         var worker = CreateWorker(fixture.Services);
 
         using var firstScope = fixture.Services.CreateScope();
@@ -59,26 +59,26 @@ public class QboSyncRetryWorkerTests
     public async Task RunAsync_ReclaimsStaleProcessingSync()
     {
         var rollupService = new SuccessfulRollupService();
-        await using var fixture = await QboRetryFixture.CreateAsync(rollupService);
-        await SeedPendingQboSyncAsync(fixture.Db, status: "Processing", attemptCount: 1, updatedAt: DateTime.UtcNow.AddMinutes(-20));
+        await using var fixture = await JournalRetryFixture.CreateAsync(rollupService);
+        await SeedPendingJournalSyncAsync(fixture.Db, status: "Processing", attemptCount: 1, updatedAt: DateTime.UtcNow.AddMinutes(-20));
         var worker = CreateWorker(fixture.Services);
 
         using var scope = fixture.Services.CreateScope();
         await RunWorkerOnceAsync(worker, scope.ServiceProvider);
 
         fixture.Db.ChangeTracker.Clear();
-        var sync = await fixture.Db.PendingQboSyncs.SingleAsync();
+        var sync = await fixture.Db.PendingJournalSyncs.SingleAsync();
         Assert.Equal("Done", sync.Status);
         Assert.Equal(2, sync.AttemptCount);
         Assert.Equal(1, rollupService.CallCount);
     }
 
-    private static QboSyncRetryWorker CreateWorker(IServiceProvider services)
+    private static JournalSyncRetryWorker CreateWorker(IServiceProvider services)
         => new(
             services.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<QboSyncRetryWorker>.Instance);
+            NullLogger<JournalSyncRetryWorker>.Instance);
 
-    private static async Task SeedPendingQboSyncAsync(
+    private static async Task SeedPendingJournalSyncAsync(
         ApplicationDbContext db,
         string status = "Pending",
         int attemptCount = 0,
@@ -88,11 +88,11 @@ public class QboSyncRetryWorkerTests
         {
             PeriodYear = 2026,
             PeriodMonth = 5,
-            DriverType = "QBO",
+            DriverType = "Xero",
             Status = "Failed",
             CreatedBy = Guid.NewGuid(),
         };
-        db.Add(new PendingQboSync
+        db.Add(new PendingJournalSync
         {
             Rollup = rollup,
             Status = status,
@@ -103,10 +103,10 @@ public class QboSyncRetryWorkerTests
         await db.SaveChangesAsync();
     }
 
-    private static Task RunWorkerOnceAsync(QboSyncRetryWorker worker, IServiceProvider services)
+    private static Task RunWorkerOnceAsync(JournalSyncRetryWorker worker, IServiceProvider services)
     {
-        var method = typeof(QboSyncRetryWorker).GetMethod("RunAsync", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new MissingMethodException(nameof(QboSyncRetryWorker), "RunAsync");
+        var method = typeof(JournalSyncRetryWorker).GetMethod("RunAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(nameof(JournalSyncRetryWorker), "RunAsync");
         return (Task)method.Invoke(worker, [services, CancellationToken.None])!;
     }
 
@@ -117,7 +117,7 @@ public class QboSyncRetryWorkerTests
                 rollupId,
                 2026,
                 5,
-                "QBO",
+                "Xero",
                 "Failed",
                 0,
                 0,
@@ -159,11 +159,11 @@ public class QboSyncRetryWorkerTests
                 rollupId,
                 2026,
                 5,
-                "QBO",
+                "Xero",
                 "Exported",
                 0,
                 0,
-                "qbo-1",
+                "xero-1",
                 null,
                 null,
                 DateTime.UtcNow,
@@ -204,11 +204,11 @@ public class QboSyncRetryWorkerTests
                 rollupId,
                 2026,
                 5,
-                "QBO",
+                "Xero",
                 "Exported",
                 0,
                 0,
-                "qbo-1",
+                "xero-1",
                 null,
                 null,
                 DateTime.UtcNow,
@@ -228,11 +228,11 @@ public class QboSyncRetryWorkerTests
             => throw new NotSupportedException();
     }
 
-    private sealed class QboRetryFixture : IAsyncDisposable
+    private sealed class JournalRetryFixture : IAsyncDisposable
     {
         private readonly SqliteConnection _anchorConnection;
 
-        private QboRetryFixture(SqliteConnection anchorConnection, ServiceProvider services, ApplicationDbContext db)
+        private JournalRetryFixture(SqliteConnection anchorConnection, ServiceProvider services, ApplicationDbContext db)
         {
             _anchorConnection = anchorConnection;
             Services = services;
@@ -242,7 +242,7 @@ public class QboSyncRetryWorkerTests
         public ServiceProvider Services { get; }
         public ApplicationDbContext Db { get; }
 
-        public static async Task<QboRetryFixture> CreateAsync(IRollupService rollupService)
+        public static async Task<JournalRetryFixture> CreateAsync(IRollupService rollupService)
         {
             var connectionString = $"Data Source={Guid.NewGuid():N};Mode=Memory;Cache=Shared";
             var anchorConnection = new SqliteConnection(connectionString);
@@ -255,7 +255,7 @@ public class QboSyncRetryWorkerTests
                 .BuildServiceProvider();
 
             var db = services.GetRequiredService<ApplicationDbContext>();
-            return new QboRetryFixture(anchorConnection, services, db);
+            return new JournalRetryFixture(anchorConnection, services, db);
         }
 
         private static async Task CreateSchemaAsync(SqliteConnection connection)
@@ -278,7 +278,7 @@ public class QboSyncRetryWorkerTests
                     CompletedAt TEXT NULL
                 );
 
-                CREATE TABLE pending_qbo_syncs (
+                CREATE TABLE pending_journal_syncs (
                     Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                     TenantId INTEGER NOT NULL,
                     RollupId INTEGER NOT NULL,
@@ -288,12 +288,12 @@ public class QboSyncRetryWorkerTests
                     LastError TEXT NULL,
                     CreatedAt TEXT NOT NULL,
                     UpdatedAt TEXT NOT NULL,
-                    CONSTRAINT FK_pending_qbo_syncs_journal_entry_rollups_RollupId
+                    CONSTRAINT FK_pending_journal_syncs_journal_entry_rollups_RollupId
                         FOREIGN KEY (RollupId) REFERENCES journal_entry_rollups (Id) ON DELETE CASCADE
                 );
 
-                CREATE INDEX ix_pending_qbo_syncs_status ON pending_qbo_syncs (Status);
-                CREATE INDEX ix_pending_qbo_syncs_next_retry ON pending_qbo_syncs (NextRetryAt);
+                CREATE INDEX ix_pending_journal_syncs_status ON pending_journal_syncs (Status);
+                CREATE INDEX ix_pending_journal_syncs_next_retry ON pending_journal_syncs (NextRetryAt);
                 """;
             await command.ExecuteNonQueryAsync();
         }

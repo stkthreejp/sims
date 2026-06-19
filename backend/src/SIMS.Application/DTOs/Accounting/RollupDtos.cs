@@ -32,5 +32,5 @@ public record RollupDto(
 public record TriggerRollupRequest(
     int PeriodYear,
     int PeriodMonth,
-    string DriverType   // 'CSV'|'QBO'
+    string DriverType   // 'CSV'|'Xero'
 );
