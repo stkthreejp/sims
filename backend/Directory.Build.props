@@ -4,7 +4,7 @@
     Transitive-dependency security pins.
 
     These packages arrive transitively (not referenced directly by any project) and
-    were flagged High by `dotnet list ... --vulnerable`. Pinning them here forces the
+    were flagged High by the `dotnet list package` vulnerability audit. Pinning them here forces the
     patched version across every project in backend/ (direct references win over
     transitive resolution).
 
