@@ -56,7 +56,7 @@ export function ComplianceDocumentationPage() {
     onError: () => toast.error('Could not create compliance document'),
   })
 
-  const documents = documentsQuery.data ?? []
+  const documents = useMemo(() => documentsQuery.data ?? [], [documentsQuery.data])
   const categories = useMemo(() => Array.from(new Set([...CATEGORIES, ...documents.map((d) => d.category)])), [documents])
   const filteredDocuments = useMemo(() => {
     if (metricFilter === 'Active') return documents.filter((document) => document.status === DOCUMENT_STATUS.ACTIVE)

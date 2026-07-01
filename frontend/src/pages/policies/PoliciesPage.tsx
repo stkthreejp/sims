@@ -71,7 +71,7 @@ export function PoliciesPage() {
     queryFn:  () => policiesApi.getAll({ pageSize: 500, sortBy: 'expirationDate', sortDir: 'asc' }),
   })
 
-  const list = data?.items ?? []
+  const list = useMemo(() => data?.items ?? [], [data])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: list.length }

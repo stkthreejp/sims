@@ -574,6 +574,9 @@ function InteractiveRadiusMap({ summary }: { summary: AutoSafetyRadiusSummary })
     return () => {
       cancelled = true
     }
+    // radiusMiles is read only to size the circle at creation; the effect below
+    // syncs subsequent changes, so re-running here (and recreating the map) is intentional to avoid.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summary.baseLatitude, summary.baseLongitude, usablePoints])
 
   useEffect(() => {

@@ -72,6 +72,15 @@ export function AddressAutocomplete({
     () => !!(window as any).google?.maps?.places
   )
 
+  // Keep the latest callbacks in refs so the place_changed listener (set up once)
+  // always invokes the current handlers without needing to re-subscribe.
+  const onChangeRef = useRef(onChange)
+  const onSelectRef = useRef(onSelect)
+  useEffect(() => {
+    onChangeRef.current = onChange
+    onSelectRef.current = onSelect
+  })
+
   useEffect(() => {
     if (ready) return
     loadMapsScript()
@@ -117,8 +126,8 @@ export function AddressAutocomplete({
       const longitude = location ? location.lng() : undefined
       const precision = Array.isArray(place.types) && place.types.length > 0 ? place.types[0] : undefined
 
-      onChange(addressLine1)
-      onSelect({
+      onChangeRef.current(addressLine1)
+      onSelectRef.current({
         addressLine1,
         city,
         state,

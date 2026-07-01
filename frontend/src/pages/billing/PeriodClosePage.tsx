@@ -280,7 +280,9 @@ export function PeriodClosePage() {
   useEffect(() => {
     if (periodsData) {
       setPeriods(periodsData)
-      if (periodsData.length > 0 && selectedId === null) setSelectedId(periodsData[0].id)
+      if (periodsData.length > 0) {
+        setSelectedId((current) => (current === null ? periodsData[0].id : current))
+      }
     }
   }, [periodsData])
 

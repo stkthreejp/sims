@@ -75,7 +75,7 @@ export function LegalRequirementsPage() {
     }),
   })
 
-  const sections = sectionsQuery.data ?? []
+  const sections = useMemo(() => sectionsQuery.data ?? [], [sectionsQuery.data])
   const summary = summaryQuery.data
   const noticeCount = useMemo(() => sections.filter((s) => s.category === 'NOTICE REQUIREMENTS').length, [sections])
   const reasonCount = useMemo(() => sections.filter((s) => s.category === 'REASONS').length, [sections])

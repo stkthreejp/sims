@@ -30,7 +30,7 @@ export function ComplianceEvidenceReportPage() {
   })
 
   const document = documentQuery.data
-  const campaigns = attestationQuery.data ?? []
+  const campaigns = useMemo(() => attestationQuery.data ?? [], [attestationQuery.data])
   const auditLogs = auditLogQuery.data ?? []
 
   const reportStats = useMemo(() => {

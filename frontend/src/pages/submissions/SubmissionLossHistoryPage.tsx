@@ -125,7 +125,7 @@ export function SubmissionLossHistoryPage() {
     },
   })
 
-  const years = summary?.years ?? []
+  const years = useMemo(() => summary?.years ?? [], [summary])
   const claims = useMemo(() => years.flatMap((y) => y.claims.map((c) => ({ ...c, year: y.policyYear, lob: y.lineOfBusiness }))), [years])
 
   if (submissionLoading || summaryLoading) return <LoadingSpinner />

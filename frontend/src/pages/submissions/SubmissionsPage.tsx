@@ -94,7 +94,7 @@ export function SubmissionsPage() {
     queryFn:  () => submissionsApi.getAll({ pageSize: 500, sortBy: 'createdAt', sortDir: 'desc' }),
   })
 
-  const list = data?.items ?? []
+  const list = useMemo(() => data?.items ?? [], [data])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: list.length }

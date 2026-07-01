@@ -248,7 +248,7 @@ export function PolicyFormsAdminPage() {
 
   const selectedPackage = packages.find((p) => p.id === selectedPackageId) ?? null
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null
-  const policyOptions = policyPage?.items ?? []
+  const policyOptions = useMemo(() => policyPage?.items ?? [], [policyPage])
 
   const packageTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates])
   const activeProposalTemplates = useMemo(() => proposalTemplates.filter((template) => template.kind !== 'Email'), [proposalTemplates])

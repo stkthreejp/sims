@@ -69,7 +69,10 @@ export function PolicyNumbersAdminPage() {
         .map((lob) => lob.lineOfBusiness)
     : ACTIVE_LOBS
   const selectedProgramLob = selectedProgramCarrier?.linesOfBusiness.find((lob) => lob.lineOfBusiness === assignmentForm.lineOfBusiness && lob.isActive)
-  const assignmentStateOptions = selectedProgramLob?.states.filter((state) => state.isActive).map((state) => state.stateCode) ?? []
+  const assignmentStateOptions = useMemo(
+    () => selectedProgramLob?.states.filter((state) => state.isActive).map((state) => state.stateCode) ?? [],
+    [selectedProgramLob],
+  )
 
   const previewCarrierName = useMemo(
     () => carriers.find((c) => c.id === assignmentForm.carrierId)?.name,

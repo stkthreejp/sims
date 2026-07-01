@@ -179,7 +179,7 @@ public class CashDistributionService : ICashDistributionService
         }
 
         await db.SaveChangesAsync(ct);
-        return Result<BatchDetailDto>.Success(await LoadBatchDetailAsync(batch.Id, db, ct));
+        return Result<BatchDetailDto>.Success((await LoadBatchDetailAsync(batch.Id, db, ct))!);
     }
 
     public async Task<IReadOnlyList<BatchSummaryDto>> GetBatchesAsync(CancellationToken ct = default)
@@ -240,7 +240,7 @@ public class CashDistributionService : ICashDistributionService
         batch.BankReference = req.BankReference;
 
         await db.SaveChangesAsync(ct);
-        return Result<BatchDetailDto>.Success(await LoadBatchDetailAsync(batchId, db, ct));
+        return Result<BatchDetailDto>.Success((await LoadBatchDetailAsync(batchId, db, ct))!);
     }
 
     public async Task<Result<string>> GetBatchPdfDownloadUrlAsync(long batchId, CancellationToken ct = default)

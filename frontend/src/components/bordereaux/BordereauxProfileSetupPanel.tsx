@@ -76,7 +76,7 @@ export function BordereauxProfileSetupPanel({
     const staticValues = parseBordereauxStringRecord(profile.staticValuesJson)
     setStaticForm(Object.fromEntries(profile.setupStatus.staticValues.map((item) => [item.key, staticValues[item.key] ?? ''])))
     setIsEditing(false)
-  }, [profile.id, profile.requiredTabsJson, profile.staticValuesJson, profile.setupStatus.staticValues])
+  }, [profile.id, profile.lineOfBusiness, profile.requiredTabsJson, profile.staticValuesJson, profile.setupStatus.staticValues])
 
   function toggleTab(tab: string) {
     const key = tab.toLowerCase()
