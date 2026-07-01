@@ -119,13 +119,13 @@ jobs:
 
       - name: Smoke test — API health
         run: |
-          echo "Waiting for API container to start and become healthy..."
-          # App Service cold-starts the container (ACR image pull + .NET init + first
-          # DB connection) only after webapps-deploy returns, which can take several
-          # minutes. Poll generously so a slow-but-healthy start is not a false failure.
-          attempts=40
+          # Azure assigns a regional default hostname (<app>-<hash>.<region>-01.azurewebsites.net),
+          # NOT the classic <app>.azurewebsites.net — look it up instead of assuming.
+          API_HOST=$(az webapp list --query "[?name=='sims-api-test'].defaultHostName | [0]" -o tsv)
+          echo "Polling https://$API_HOST/health/ready"
+          attempts=20
           for i in $(seq 1 $attempts); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://sims-api-test.azurewebsites.net/health/ready || echo "000")
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://$API_HOST/health/ready" || echo "000")
             echo "Attempt $i/$attempts: HTTP $status"
             if [ "$status" = "200" ]; then
               echo "API is healthy."
@@ -133,15 +133,16 @@ jobs:
             fi
             sleep 15
           done
-          echo "ERROR: API did not become healthy after ~10 minutes."
+          echo "ERROR: API did not become healthy after ~5 minutes."
           exit 1
 
       - name: Smoke test — Frontend reachable
         run: |
-          echo "Waiting for frontend container to become reachable..."
-          attempts=20
+          FE_HOST=$(az webapp list --query "[?name=='sims-frontend-test'].defaultHostName | [0]" -o tsv)
+          echo "Polling https://$FE_HOST/"
+          attempts=16
           for i in $(seq 1 $attempts); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://sims-frontend-test.azurewebsites.net/ || echo "000")
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://$FE_HOST/" || echo "000")
             echo "Attempt $i/$attempts: HTTP $status"
             if [ "$status" = "200" ] || [ "$status" = "304" ]; then
               echo "Frontend is reachable."
@@ -149,5 +150,5 @@ jobs:
             fi
             sleep 15
           done
-          echo "ERROR: Frontend did not become reachable after ~5 minutes."
+          echo "ERROR: Frontend did not become reachable after ~4 minutes."
           exit 1
