@@ -263,7 +263,7 @@ export function InsuredDetailPage() {
           <div style={{
             width: 52, height: 52, borderRadius: 12, background: 'var(--accent-soft)', color: 'var(--accent-ink)',
             display: 'grid', placeItems: 'center', fontSize: 18, fontWeight: 700, letterSpacing: '-.02em',
-            flexShrink: 0, border: '1px solid #cfe0ef',
+            flexShrink: 0, border: '1px solid var(--accent-border)',
           }}>
             {mark}
           </div>

@@ -139,7 +139,7 @@ function ReportShell({ title, children, isLoading, error }: {
     <div style={{ padding: '24px 28px', maxWidth: 1100 }}>
       <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: '0 0 20px' }}>{title}</h2>
       {isLoading && <div style={{ color: 'var(--ink-4)', fontSize: 13 }}>Loading…</div>}
-      {error && <div style={{ color: 'var(--red, #dc2626)', fontSize: 13 }}>Error: {error.message}</div>}
+      {error && <div style={{ color: 'var(--bad-fg)', fontSize: 13 }}>Error: {error.message}</div>}
       {!isLoading && !error && children}
     </div>
   )
@@ -828,7 +828,7 @@ function DeclineReasonReportView() {
                     </td>
                     <td style={tdStyle}>{row.state ?? '-'}</td>
                     <td style={tdStyle}>{fmtDateTime(row.declinedAt)}</td>
-                    <td style={{ ...tdStyle, minWidth: 260, color: row.reason === 'Unspecified' ? 'var(--red, #b91c1c)' : 'var(--ink-3)' }}>{row.reason}</td>
+                    <td style={{ ...tdStyle, minWidth: 260, color: row.reason === 'Unspecified' ? 'var(--danger)' : 'var(--ink-3)' }}>{row.reason}</td>
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
@@ -1214,7 +1214,7 @@ const filterStyle: React.CSSProperties = {
 function SlaBadge({ status }: { status: string }) {
   const label = status === 'DueToday' ? 'Due today' : status === 'DueSoon' ? 'Due soon' : status === 'OnTrack' ? 'On track' : status
   const bg = status === 'Overdue' ? 'var(--red-soft, #fef2f2)' : status === 'DueToday' || status === 'DueSoon' ? 'var(--yellow-soft, #fefce8)' : 'var(--green-soft, #f0fdf4)'
-  const color = status === 'Overdue' ? 'var(--red, #b91c1c)' : status === 'DueToday' || status === 'DueSoon' ? '#8a5a00' : '#166534'
+  const color = status === 'Overdue' ? 'var(--danger)' : status === 'DueToday' || status === 'DueSoon' ? '#8a5a00' : 'var(--good-fg)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--r-sm)', padding: '3px 7px', fontSize: 11, fontWeight: 700, background: bg, color }}>
       {label}
@@ -1225,7 +1225,7 @@ function SlaBadge({ status }: { status: string }) {
 function WorkTypeBadge({ type }: { type: string }) {
   const label = type === 'AuthorityApproval' ? 'Authority' : type === 'PostBind' ? 'Post-bind' : type
   const bg = type === 'AuthorityApproval' ? 'var(--yellow-soft, #fefce8)' : type === 'Referral' ? 'var(--red-soft, #fef2f2)' : 'var(--green-soft, #f0fdf4)'
-  const color = type === 'AuthorityApproval' ? '#8a5a00' : type === 'Referral' ? 'var(--red, #b91c1c)' : '#166534'
+  const color = type === 'AuthorityApproval' ? '#8a5a00' : type === 'Referral' ? 'var(--danger)' : 'var(--good-fg)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--r-sm)', padding: '3px 7px', fontSize: 11, fontWeight: 700, background: bg, color }}>
       {label}
@@ -1235,7 +1235,7 @@ function WorkTypeBadge({ type }: { type: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const bg = status === 'Pending' ? 'var(--yellow-soft, #fefce8)' : status === 'Declined' || status === 'Cancelled' ? 'var(--red-soft, #fef2f2)' : 'var(--green-soft, #f0fdf4)'
-  const color = status === 'Pending' ? '#8a5a00' : status === 'Declined' || status === 'Cancelled' ? 'var(--red, #b91c1c)' : '#166534'
+  const color = status === 'Pending' ? '#8a5a00' : status === 'Declined' || status === 'Cancelled' ? 'var(--danger)' : 'var(--good-fg)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--r-sm)', padding: '3px 7px', fontSize: 11, fontWeight: 700, background: bg, color }}>
       {status}

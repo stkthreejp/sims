@@ -436,4 +436,4 @@ function cleanAssignment(assignment: PolicyNumberAssignmentUpsert): PolicyNumber
   }
 }
 
-const policyNumberStyle = { fontFamily: 'var(--font-policy-number)' }
+const policyNumberStyle = { fontFamily: 'var(--font-mono)' }

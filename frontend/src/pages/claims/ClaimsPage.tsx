@@ -105,9 +105,9 @@ function rowsFromCsv(text: string): UnifiedClaimImportRow[] {
 
 function StatusPill({ status }: { status: ClaimStatus }) {
   const color =
-    status === 'Open' || status === 'Reopened' ? 'var(--warn, #b45309)'
+    status === 'Open' || status === 'Reopened' ? 'var(--warn-fg)'
     : status === 'Closed' ? 'var(--ink-3)'
-    : 'var(--danger, #b91c1c)'
+    : 'var(--danger)'
   return (
     <span style={{
       fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999,
@@ -352,7 +352,7 @@ export function ClaimsPage() {
                     <td style={{ textAlign: 'right' }}>{b.createdCount}</td>
                     <td style={{ textAlign: 'right' }}>{b.updatedCount}</td>
                     <td style={{ textAlign: 'right' }}>{b.skippedCount}</td>
-                    <td style={{ textAlign: 'right', color: b.errorCount > 0 ? 'var(--danger, #b91c1c)' : undefined }}>{b.errorCount}</td>
+                    <td style={{ textAlign: 'right', color: b.errorCount > 0 ? 'var(--danger)' : undefined }}>{b.errorCount}</td>
                     <td>{b.status}</td>
                     <td>{b.importedByName || '—'}</td>
                     <td>{new Date(b.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>

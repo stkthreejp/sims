@@ -34,7 +34,7 @@ export function DatabaseStatusPage() {
       />
 
       {error && (
-        <div className="flex gap-3 rounded-lg p-4 text-sm" style={{ border: '1px solid #e7baad', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>
+        <div className="flex gap-3 rounded-lg p-4 text-sm" style={{ border: '1px solid var(--bad-border)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
           <div>
             <div className="font-semibold">Could not load database status.</div>
@@ -104,7 +104,7 @@ export function DatabaseStatusPage() {
           </div>
 
           {data.pendingMigrations.length > 0 && (
-            <div className="rounded-lg p-4 text-sm" style={{ border: '1px solid #f3d69a', background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
+            <div className="rounded-lg p-4 text-sm" style={{ border: '1px solid var(--warn-border)', background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
               <div className="font-semibold mb-2">Pending migrations</div>
               <ul className="space-y-1">
                 {data.pendingMigrations.map((migration) => (
@@ -114,7 +114,7 @@ export function DatabaseStatusPage() {
             </div>
           )}
 
-          <div className="rounded-lg p-4 text-sm" style={healthy ? { border: '1px solid #b9dcc3', background: 'var(--good-bg)', color: 'var(--good-fg)' } : { border: '1px solid var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}>
+          <div className="rounded-lg p-4 text-sm" style={healthy ? { border: '1px solid var(--good-border)', background: 'var(--good-bg)', color: 'var(--good-fg)' } : { border: '1px solid var(--line-2)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}>
             {healthy ? 'Database looks current for the loss history release.' : 'Database status loaded. Review the connection, pending migrations, and expected table results above.'}
           </div>
         </>

@@ -172,9 +172,9 @@ function Btn({ children, onClick, variant = 'ghost', disabled, className = '', t
 
 function WriteupStatusPill({ status }: { status?: string }) {
   const pillStyle: React.CSSProperties = status === 'Approved'
-    ? { borderColor: '#6ee7b7', background: 'var(--good-bg)', color: 'var(--good-fg)' }
+    ? { borderColor: 'var(--good-border)', background: 'var(--good-bg)', color: 'var(--good-fg)' }
     : status === 'Submitted'
-      ? { borderColor: '#7dd3fc', background: '#f0f9ff', color: '#0369a1' }
+      ? { borderColor: '#7dd3fc', background: '#f0f9ff', color: 'var(--accent-deep)' }
       : status === 'Declined'
         ? { borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }
         : { borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-3)' }
@@ -403,7 +403,7 @@ function QuotePolicyFormsCard({ quoteId, canManage }: { quoteId: string; canMana
         )}
       />
       <div className="px-5 py-4">
-        <div className="mb-3 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: readyForWorkflow ? '#bbf7d0' : '#f5d7a3', background: readyForWorkflow ? '#f0fdf4' : 'var(--warn-bg)', color: readyForWorkflow ? '#166534' : 'var(--warn-fg)' }}>
+        <div className="mb-3 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: readyForWorkflow ? 'var(--good-border)' : 'var(--warn-border)', background: readyForWorkflow ? 'var(--good-bg)' : 'var(--warn-bg)', color: readyForWorkflow ? 'var(--good-fg)' : 'var(--warn-fg)' }}>
           {readyForWorkflow
             ? 'These forms will drive the proposal form list and the issued policy packet.'
             : 'Select the policy forms before sending a proposal or binding this quote.'}
@@ -580,8 +580,8 @@ function ChecklistCard({ quoteId }: { quoteId: string }) {
                 onClick={() => toggleMutation.mutate({ itemId: item.id, isCompleted: !item.isCompleted })}
                 className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded transition-colors disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
                 style={{
-                  border: `1px solid ${item.isCompleted ? '#1b8754' : 'var(--line)'}`,
-                  background: item.isCompleted ? '#1b8754' : 'var(--surface)',
+                  border: `1px solid ${item.isCompleted ? 'var(--success-bg)' : 'var(--line)'}`,
+                  background: item.isCompleted ? 'var(--success-bg)' : 'var(--surface)',
                   color: item.isCompleted ? '#fff' : 'var(--ink-3)',
                 }}
               >
@@ -1393,7 +1393,7 @@ export function QuoteDetailPage() {
                   type="button"
                   onClick={() => setOverrideMode('dollar')}
                   className="px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
-                  style={overrideMode === 'dollar' ? { background: '#0369a1', color: '#fff' } : { color: 'var(--ink-3)' }}
+                  style={overrideMode === 'dollar' ? { background: 'var(--accent-deep)', color: '#fff' } : { color: 'var(--ink-3)' }}
                 >
                   $ Give-back
                 </button>
@@ -1401,7 +1401,7 @@ export function QuoteDetailPage() {
                   type="button"
                   onClick={() => setOverrideMode('rate')}
                   className="px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
-                  style={overrideMode === 'rate' ? { background: '#0369a1', color: '#fff', borderLeft: '1px solid var(--line)' } : { color: 'var(--ink-3)', borderLeft: '1px solid var(--line)' }}
+                  style={overrideMode === 'rate' ? { background: 'var(--accent-deep)', color: '#fff', borderLeft: '1px solid var(--line)' } : { color: 'var(--ink-3)', borderLeft: '1px solid var(--line)' }}
                 >
                   % New rate
                 </button>

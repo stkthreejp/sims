@@ -422,8 +422,8 @@ export function PolicyDetailPage() {
               className="flex items-center justify-center gap-2 border-r px-3 py-2 text-xs font-semibold last:border-r-0"
               style={{
                 borderColor: 'var(--line)',
-                background: done ? '#e8f2e9' : active ? 'var(--accent-soft)' : 'var(--surface)',
-                color: done ? '#1b6238' : active ? 'var(--accent-ink)' : 'var(--ink-3)',
+                background: done ? 'var(--good-bg)' : active ? 'var(--accent-soft)' : 'var(--surface)',
+                color: done ? 'var(--good-fg)' : active ? 'var(--accent-ink)' : 'var(--ink-3)',
               }}
             >
               {done && <Check className="h-3.5 w-3.5" />}
@@ -783,7 +783,7 @@ export function PolicyDetailPage() {
 
 function PolicyMetric({ label, value, helper, hero = false }: { label: string; value: string; helper: string; hero?: boolean }) {
   return (
-    <div className="sd-card p-4" style={{ background: hero ? 'var(--accent-soft)' : 'var(--surface)', borderColor: hero ? '#cfe0ef' : 'var(--line)' }}>
+    <div className="sd-card p-4" style={{ background: hero ? 'var(--accent-soft)' : 'var(--surface)', borderColor: hero ? 'var(--accent-border)' : 'var(--line)' }}>
       <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.04em]" style={{ color: 'var(--ink-3)' }}>{label}</p>
       <p className="m-0 mt-1 truncate text-xl font-semibold tracking-[-0.01em]" style={{ color: hero ? 'var(--accent-ink)' : 'var(--ink)' }}>{value}</p>
       <p className="m-0 mt-1 truncate text-xs" style={{ color: 'var(--ink-3)' }}>{helper}</p>
@@ -950,13 +950,13 @@ function PolicyIssuancePanel({
         {!packet ? (
           <div className="flex h-16 items-center justify-center"><LoadingSpinner /></div>
         ) : includedForms.length === 0 ? (
-          <div className="rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
+          <div className="rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: 'var(--warn-border)', color: 'var(--warn-fg)' }}>
             Review the quote policy forms first. Once forms are included on the bound quote, they will appear here for issuance.
           </div>
         ) : (
           <>
             {hasOpenRequiredReferrals && (
-              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
+              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: 'var(--warn-border)', color: 'var(--warn-fg)' }}>
                 <div className="font-semibold">{openRequiredReferrals.length} required underwriting referral{openRequiredReferrals.length === 1 ? '' : 's'} open</div>
                 <div className="mt-1">Resolve submission referrals before previewing or issuing this policy.</div>
                 <Link to={`/submissions/${submissionId}`} className="mt-2 inline-flex font-semibold underline underline-offset-2">
@@ -965,12 +965,12 @@ function PolicyIssuancePanel({
               </div>
             )}
             {!hasOpenRequiredReferrals && !packet.isReady && packet.readinessMessages.length > 0 && (
-              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: '#f5d7a3', color: 'var(--warn-fg)' }}>
+              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--warn-bg)', borderColor: 'var(--warn-border)', color: 'var(--warn-fg)' }}>
                 {packet.readinessMessages[0]}
               </div>
             )}
             {ready && !issued && !hasOpenRequiredReferrals && (
-              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
+              <div className="mb-3 rounded border px-3 py-3 text-sm" style={{ background: 'var(--good-bg)', borderColor: 'var(--good-border)', color: 'var(--good-fg)' }}>
                 Preview creates a draft PDF for review. Issue policy creates and files the final issued packet.
               </div>
             )}

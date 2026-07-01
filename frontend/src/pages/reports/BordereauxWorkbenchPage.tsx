@@ -120,9 +120,9 @@ function ValidationPanel({ run }: { run: BordereauxRun }) {
   const errorItems = (summary.items ?? []).filter(item => ERROR_CODES.has(item.code ?? ''))
   const warningItems = (summary.items ?? []).filter(item => !ERROR_CODES.has(item.code ?? ''))
 
-  const borderColor = hasErrors ? '#fca5a5' : hasIssues ? '#f59e0b' : '#bbf7d0'
-  const bgColor = hasErrors ? '#fef2f2' : hasIssues ? '#fffbeb' : '#f0fdf4'
-  const textColor = hasErrors ? '#991b1b' : hasIssues ? '#92400e' : '#166534'
+  const borderColor = hasErrors ? 'var(--danger-border)' : hasIssues ? '#f59e0b' : 'var(--good-border)'
+  const bgColor = hasErrors ? 'var(--bad-bg)' : hasIssues ? 'var(--warn-bg)' : 'var(--good-bg)'
+  const textColor = hasErrors ? '#991b1b' : hasIssues ? '#92400e' : 'var(--good-fg)'
 
   return (
     <div style={{ border: `1px solid ${borderColor}`, borderRadius: 8, background: bgColor, padding: 12, marginBottom: 12 }}>
@@ -175,7 +175,7 @@ function StatusPill({ status }: { status: string }) {
   const matched = status === 'Matched'
   const mismatch = status === 'Mismatch'
   const bg = matched ? 'var(--green-soft, #f0fdf4)' : mismatch ? 'var(--red-soft, #fef2f2)' : 'var(--surface-2)'
-  const color = matched ? '#166534' : mismatch ? 'var(--red, #b91c1c)' : 'var(--ink-3)'
+  const color = matched ? 'var(--good-fg)' : mismatch ? 'var(--danger)' : 'var(--ink-3)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 6, padding: '3px 7px', background: bg, color, fontSize: 11, fontWeight: 700 }}>
       {matched ? <CheckCircle2 size={12} /> : mismatch ? <AlertTriangle size={12} /> : null}

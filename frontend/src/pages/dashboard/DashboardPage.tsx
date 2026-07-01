@@ -313,7 +313,7 @@ export function DashboardPage() {
         {/* Hero — bound premium */}
         <div style={{
           background: 'linear-gradient(180deg,var(--accent-soft) 0%,var(--surface) 70%)',
-          border: '1px solid #cfe0ef', borderRadius: 'var(--r-lg)', padding: '14px 16px',
+          border: '1px solid var(--accent-border)', borderRadius: 'var(--r-lg)', padding: '14px 16px',
           boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 6,
         }}>
           <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
@@ -362,8 +362,8 @@ export function DashboardPage() {
 
         {/* Eff. date soon — alert card */}
         <div style={{
-          background: effSoon.length > 0 ? '#fff8f5' : 'var(--surface)',
-          border: `1px solid ${effSoon.length > 0 ? '#f5d2c9' : 'var(--line)'}`,
+          background: effSoon.length > 0 ? 'var(--bad-bg)' : 'var(--surface)',
+          border: `1px solid ${effSoon.length > 0 ? 'var(--danger-border)' : 'var(--line)'}`,
           borderRadius: 'var(--r-lg)', padding: '14px 16px', boxShadow: 'var(--shadow-sm)',
           display: 'flex', flexDirection: 'column', gap: 6,
         }}>
@@ -532,7 +532,7 @@ export function DashboardPage() {
                     <strong>{myTasks.length}</strong> open
                   </span>
                   {myTasks.filter((t) => t.isOverdue).length > 0 && (
-                    <span style={{ color: 'var(--danger, #b91c1c)' }}>
+                    <span style={{ color: 'var(--danger)' }}>
                       <strong>{myTasks.filter((t) => t.isOverdue).length}</strong> overdue
                     </span>
                   )}
@@ -549,7 +549,7 @@ export function DashboardPage() {
                       <span style={{ color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {t.taskTypeName}
                       </span>
-                      <span style={{ color: t.isOverdue ? 'var(--danger, #b91c1c)' : 'var(--ink-4)', flexShrink: 0 }}>
+                      <span style={{ color: t.isOverdue ? 'var(--danger)' : 'var(--ink-4)', flexShrink: 0 }}>
                         {new Date(`${t.dueDate.slice(0, 10)}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                     </div>

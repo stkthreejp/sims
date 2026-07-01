@@ -1371,7 +1371,7 @@ export function SubmissionDetailPage() {
       {/* Page header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, marginBottom: 0 }}>
         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', minWidth: 0 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', flexShrink: 0, border: '1px solid #cfe0ef' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', flexShrink: 0, border: '1px solid var(--accent-border)' }}>
             <FileText size={16} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
@@ -1562,14 +1562,14 @@ export function SubmissionDetailPage() {
         </div>
         <div className="sd-metric">
           <div className="k">Days to effective</div>
-          <div className="v" style={{ color: daysToEff != null && daysToEff < 14 ? '#b33a2a' : 'inherit' }}>
+          <div className="v" style={{ color: daysToEff != null && daysToEff < 14 ? 'var(--error-border)' : 'inherit' }}>
             {daysToEff != null ? `${daysToEff}d` : '—'}
           </div>
           <div className="s">{submission.effectiveDate ? new Date(submission.effectiveDate).toLocaleDateString() : '—'}</div>
         </div>
         <div className="sd-metric">
           <div className="k">Loss ratio</div>
-          <div className="v" style={{ color: lossSummary?.lossRatio != null && lossSummary.lossRatio > 0.65 ? '#b33a2a' : 'inherit' }}>
+          <div className="v" style={{ color: lossSummary?.lossRatio != null && lossSummary.lossRatio > 0.65 ? 'var(--error-border)' : 'inherit' }}>
             {fmtPct(lossSummary?.lossRatio)}
           </div>
           <div className="s">

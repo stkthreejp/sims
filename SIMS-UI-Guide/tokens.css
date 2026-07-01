@@ -54,6 +54,32 @@
   /* ---------- ELEVATION ---------- */
   --shadow-sm: 0 1px 2px rgba(16,24,40,.04), 0 1px 1px rgba(16,24,40,.02);
 
+  /* ---------- FOCUS ---------- */
+  --focus-ring: 0 0 0 3px rgba(27, 117, 186, 0.18);
+
+  /* ---------- DANGER BUTTON BORDER ---------- */
+  --danger-border: #f3c6be;  /* rest-state border for .danger buttons */
+  --danger:        var(--bad-fg);  /* alias for component compatibility */
+
+  /* ---------- STATUS ALERT BORDERS ---------- */
+  --bad-border:  #e7baad;  /* border for error/bad alert cards */
+  --warn-border: #f3d69a;  /* border for warning alert cards */
+  --good-border: #b9dcc3;  /* border for success/good alert cards */
+
+  /* ---------- ACCENT BORDER ---------- */
+  --accent-border: #cfe0ef;  /* border for accent-soft background elements (LOB chips, accent btns) */
+
+  /* ---------- SUCCESS ACTION ---------- */
+  --success-bg:    #1b8754;
+  --success-hover: #15643f;
+
+  /* ---------- ERROR / OVERDUE INDICATOR ---------- */
+  --error-border: #b33a2a;  /* left-rule on error cards; overdue date text */
+
+  /* ---------- UW AVATAR COLOR GROUPS ---------- */
+  --uw-g2-bg: #f4ebe0;  --uw-g2-fg: #7a5a15;
+  --uw-g3-bg: #e8eefc;  --uw-g3-fg: #1c4faa;
+
   /* ---------- TYPOGRAPHY ---------- */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'Reddit Mono', ui-monospace, monospace;

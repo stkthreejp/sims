@@ -69,10 +69,10 @@ const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 function DeltaBadge({ pct, isOutlier }: { pct: number; isOutlier: boolean }) {
   const color = isOutlier
     ? pct > 0
-      ? { bg: '#fef2f2', text: '#dc2626' }
+      ? { bg: 'var(--bad-bg)', text: 'var(--bad-fg)' }
       : { bg: '#fff7ed', text: '#c2410c' }
     : Math.abs(pct) < 0.01
-    ? { bg: '#f0fdf4', text: '#16a34a' }
+    ? { bg: 'var(--good-bg)', text: 'var(--good-fg)' }
     : { bg: '#fafafa', text: '#525252' }
 
   return (
@@ -126,8 +126,8 @@ export default function AdminShadowRatingPage() {
                 borderRadius: 9999,
                 fontSize: 12,
                 fontWeight: 600,
-                background: anyOn ? '#f0fdf4' : '#fef2f2',
-                color: anyOn ? '#16a34a' : '#dc2626',
+                background: anyOn ? 'var(--good-bg)' : 'var(--bad-bg)',
+                color: anyOn ? 'var(--good-fg)' : 'var(--bad-fg)',
               }}>
                 {anyOn ? `Shadow ON: ${onLobs}` : 'Shadow Mode OFF'}
               </span>
@@ -191,7 +191,7 @@ export default function AdminShadowRatingPage() {
       )}
 
       {error && (
-        <p style={{ color: '#dc2626', fontSize: 13 }}>Failed to load shadow results.</p>
+        <p style={{ color: 'var(--bad-fg)', fontSize: 13 }}>Failed to load shadow results.</p>
       )}
 
       {data && data.results.length === 0 && !isLoading && (
@@ -226,7 +226,7 @@ export default function AdminShadowRatingPage() {
                   key={r.id}
                   style={{
                     borderBottom: i < data.results.length - 1 ? '1px solid var(--line)' : 'none',
-                    background: r.isOutlier ? '#fffbeb' : 'transparent',
+                    background: r.isOutlier ? 'var(--warn-bg)' : 'transparent',
                   }}
                 >
                   <td style={{ padding: '8px 12px' }}>
@@ -280,12 +280,12 @@ function SummaryCard({ label, value, highlight }: { label: string; value: string
   return (
     <div style={{
       padding: '16px 20px',
-      border: `1px solid ${highlight ? '#fca5a5' : 'var(--line)'}`,
+      border: `1px solid ${highlight ? 'var(--danger-border)' : 'var(--line)'}`,
       borderRadius: 'var(--r)',
-      background: highlight ? '#fff5f5' : 'var(--surface)',
+      background: highlight ? 'var(--bad-bg)' : 'var(--surface)',
     }}>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, color: highlight ? '#dc2626' : 'var(--ink)', marginTop: 6 }}>{value}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color: highlight ? 'var(--bad-fg)' : 'var(--ink)', marginTop: 6 }}>{value}</div>
     </div>
   )
 }
