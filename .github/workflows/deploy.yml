@@ -30,7 +30,12 @@ jobs:
           dotnet test backend/tests/SIMS.Application.Rating.Tests/SIMS.Application.Rating.Tests.csproj --no-build --verbosity minimal
 
       - name: Backend vulnerability audit
-        run: dotnet list backend/SIMS.sln package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt; grep -q "has the following vulnerable packages" /tmp/vuln.txt && exit 1 || true
+        # Scoped to the deployable API project (which transitively covers Application,
+        # Infrastructure, and Domain) rather than the whole solution, so test-only
+        # advisories with no available fix — e.g. CVE-2025-6965 on the SQLite native
+        # lib pulled by the test project's EFCore.Sqlite — do not block production
+        # deploys. All shipped code is still audited.
+        run: dotnet list backend/src/SIMS.API/SIMS.API.csproj package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt; grep -q "has the following vulnerable packages" /tmp/vuln.txt && exit 1 || true
 
       - name: Frontend install
         run: npm install

@@ -1,0 +1,27 @@
+<Project>
+
+  <!--
+    Transitive-dependency security pins.
+
+    These packages arrive transitively (not referenced directly by any project) and
+    were flagged High by `dotnet list ... --vulnerable`. Pinning them here forces the
+    patched version across every project in backend/ (direct references win over
+    transitive resolution).
+
+      Microsoft.Bcl.Memory        CVE-2026-26127  GHSA-73j8-2gch-69rq  fixed in 9.0.14
+                                  (arrives via the identity / System.Text.Json chain)
+      Microsoft.Kiota.Abstractions CVE-2026-44503 GHSA-7j59-v9qr-6fq9  fixed in 1.22.x
+                                  (arrives via Microsoft.Graph 5.79.0)
+
+    Note: the SQLite advisory (CVE-2025-6965 / GHSA-2m69-gcr7-jv3q) on
+    SQLitePCLRaw.lib.e_sqlite3 has no fixed release yet and only enters through the
+    test project's Microsoft.EntityFrameworkCore.Sqlite, so it never ships. The CI
+    vulnerability gate is scoped to the deployable API project instead of the whole
+    solution (see .github/workflows/deploy.yml).
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Bcl.Memory" Version="9.0.14" />
+    <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.22.2" />
+  </ItemGroup>
+
+</Project>
