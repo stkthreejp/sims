@@ -24,6 +24,7 @@ public class SubmissionGLCoveragesConfiguration : IEntityTypeConfiguration<Submi
         builder.Property(g => g.WosBlanket).HasColumnName("wos_blanket").HasDefaultValue(false);
         builder.Property(g => g.PrimaryNonContributory).HasColumnName("primary_non_contributory").HasDefaultValue(false);
         builder.Property(g => g.IncludeTria).HasColumnName("include_tria").HasDefaultValue(false);
+        builder.Property(g => g.LoggingLumberingLimit).HasColumnName("logging_lumbering_limit").HasPrecision(18, 2);
 
         builder.HasOne(g => g.Submission).WithOne(s => s.GLCoverages)
             .HasForeignKey<SubmissionGLCoverages>(g => g.SubmissionId).OnDelete(DeleteBehavior.Cascade);

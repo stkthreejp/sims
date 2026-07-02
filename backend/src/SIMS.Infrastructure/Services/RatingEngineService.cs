@@ -74,6 +74,11 @@ public class RatingEngineService : IRatingEngineService
             var err = TryRateGl(quote, modifier, out output);
             if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
         }
+        else if (formulaKey == "GL_v2")
+        {
+            var err = TryRateGlV2(quote, version, modifier, out output);
+            if (err != null) return Result<RatingResultDto>.Failure(err.Value.code, err.Value.msg);
+        }
         else if (formulaKey == "APD_v1")
         {
             var err = TryRateApd(quote, version, modifier, out output);
@@ -271,6 +276,175 @@ public class RatingEngineService : IRatingEngineService
 
         output = new FormulaOutput(result.ManualPremium, result.GrandTotal, lines);
         return null;
+    }
+
+    // ── GL_v2 (data-driven, state-aware) ─────────────────────────────────────
+
+    private static (string code, string msg)? TryRateGlV2(
+        Domain.Entities.Quote quote, RatingPlanVersion version, decimal modifier, out FormulaOutput output)
+    {
+        output = default;
+
+        var cov = quote.Submission.GLCoverages;
+        if (cov is null)
+            return ("NO_GL_COVERAGES", "GL coverages have not been set up for this submission.");
+        if (cov.EachOccurrence is null or 0)
+            return ("MISSING_FIELD", "Each Occurrence limit is required for GL rating.");
+
+        var occLimit = (int)cov.EachOccurrence.Value;
+        var pcoAgg = cov.ProductsCompletedOps is > 0 ? (int)cov.ProductsCompletedOps.Value : occLimit * 2;
+
+        var state = quote.Submission.Insured?.State?.Trim();
+        if (string.IsNullOrWhiteSpace(state))
+            return ("MISSING_FIELD", "Insured state is required for GL rating (it drives the loss costs).");
+
+        var classifications = quote.Submission.GLClassifications
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.LocationNumber)
+            .ToList();
+        if (classifications.Count == 0)
+            return ("NO_CLASSIFICATIONS", "No GL classifications found on this submission.");
+
+        GlV2Formula.RateData rateData;
+        try { rateData = BuildGlV2RateData(version); }
+        catch (InvalidOperationException ex) { return ("MISSING_FACTORS", ex.Message); }
+
+        foreach (var c in classifications)
+        {
+            if (string.IsNullOrWhiteSpace(c.ClassCode))
+                return ("MISSING_FIELD", $"Classification #{c.LocationNumber} has no class code.");
+            if (!rateData.Classes.ContainsKey(c.ClassCode))
+                return ("INELIGIBLE", $"Class code {c.ClassCode} is not eligible under this rating plan.");
+            if (c.Exposure is null or 0)
+                return ("MISSING_FIELD", $"Classification #{c.LocationNumber} ({c.ClassCode}) has no exposure.");
+        }
+
+        var inputs = classifications
+            .Select(c => new GlV2Formula.ClassInput(c.ClassCode!, c.Exposure!.Value))
+            .ToList();
+
+        GlV2Formula.RatingResult result;
+        try
+        {
+            result = GlV2Formula.Rate(
+                rateData, state!, inputs, occLimit, pcoAgg, modifier,
+                cov.IncludeTria, cov.LoggingLumberingLimit);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ("LOOKUP_FAIL", ex.Message);
+        }
+
+        var lines = classifications.Zip(result.Lines, (c, line) =>
+        {
+            var factors = new
+            {
+                state,
+                co_rate_334 = line.CoRate334,
+                co_rate_336 = line.CoRate336,
+                ilf_po = line.IlfPo,
+                ilf_pco = line.IlfPco,
+            };
+            var inputs2 = new
+            {
+                class_code = c.ClassCode,
+                description = line.Description,
+                premium_basis = line.PremiumBasis,
+                exposure = c.Exposure,
+                base_po = line.BasePo,
+                base_pco = line.BasePco,
+            };
+            return new QuoteRatingLine
+            {
+                Id = Guid.NewGuid(),
+                ExposureRef = $"GL-{c.LocationNumber:D3}-{c.ClassCode}",
+                Inputs = JsonSerializer.Serialize(inputs2),
+                FactorsApplied = JsonSerializer.Serialize(factors),
+                LinePremium = line.LineTotal,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            };
+        }).ToList();
+
+        if (result.TriaPremium > 0)
+            lines.Add(new QuoteRatingLine
+            {
+                Id = Guid.NewGuid(),
+                ExposureRef = "GL-TRIA",
+                Inputs = JsonSerializer.Serialize(new { tria_rate = rateData.TriaRate, modified_premium = result.ModifiedPremium }),
+                FactorsApplied = "{}",
+                LinePremium = result.TriaPremium,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            });
+
+        foreach (var e in result.Endorsements)
+            lines.Add(new QuoteRatingLine
+            {
+                Id = Guid.NewGuid(),
+                ExposureRef = $"GL-END-{e.Code}",
+                Inputs = JsonSerializer.Serialize(new { type = e.Label }),
+                FactorsApplied = "{}",
+                LinePremium = e.Premium,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            });
+
+        output = new FormulaOutput(result.ManualPremium, result.GrandTotal, lines);
+        return null;
+    }
+
+    private static GlV2Formula.RateData BuildGlV2RateData(RatingPlanVersion version)
+    {
+        FactorTable? T(string code) => version.FactorTables.FirstOrDefault(t => t.Code == code);
+        var classT = T("GL_CLASS");
+        var lc334T = T("GL_LOSS_COST_334");
+        var lc336T = T("GL_LOSS_COST_336");
+        var ilfT = T("GL_ILF");
+        var parT = T("GL_PARAMS");
+        var llT = T("GL_LL_ENDORSEMENT");
+
+        if (classT is null || lc334T is null || ilfT is null || parT is null)
+            throw new InvalidOperationException("GL_v2 rating plan is missing one or more required factor tables.");
+
+        var classes = new Dictionary<string, GlV2Formula.ClassConfig>();
+        foreach (var r in classT.Rows)
+        {
+            var d = r.DimensionValues;
+            var code = d["class_code"];
+            classes[code] = new GlV2Formula.ClassConfig(
+                code,
+                d.GetValueOrDefault("description", ""),
+                d.GetValueOrDefault("premium_basis", ""),
+                d.GetValueOrDefault("has_pco", "false") == "true",
+                d.GetValueOrDefault("po_tier", ""),
+                d.GetValueOrDefault("pco_tier", ""),
+                int.Parse(d.GetValueOrDefault("divisor", "1000")));
+        }
+
+        var lc334 = lc334T.Rows.ToDictionary(
+            r => (r.DimensionValues["class_code"], r.DimensionValues["state"]), r => r.Factor);
+        var lc336 = (lc336T?.Rows ?? new List<FactorRow>()).ToDictionary(
+            r => (r.DimensionValues["class_code"], r.DimensionValues["state"]), r => r.Factor);
+        var ilf = ilfT.Rows.ToDictionary(
+            r => (int.Parse(r.DimensionValues["limit"]), r.DimensionValues["tier"]), r => r.Factor);
+
+        var pars = parT.Rows.ToDictionary(r => r.DimensionValues["key"], r => r.Factor);
+        var lcm = pars.GetValueOrDefault("LCM", 1.65m);
+        var triaRate = pars.GetValueOrDefault("TRIA_RATE", 0.025m);
+
+        var ll = new Dictionary<int, (decimal Min, decimal Pct)>();
+        if (llT is not null)
+        {
+            foreach (var g in llT.Rows.GroupBy(r => int.Parse(r.DimensionValues["limit"])))
+            {
+                var min = g.FirstOrDefault(x => x.DimensionValues.GetValueOrDefault("kind") == "min")?.Factor ?? 0m;
+                var pct = g.FirstOrDefault(x => x.DimensionValues.GetValueOrDefault("kind") == "pct")?.Factor ?? 0m;
+                ll[g.Key] = (min, pct);
+            }
+        }
+
+        return new GlV2Formula.RateData(lcm, triaRate, classes, lc334, lc336, ilf, ll);
     }
 
     // ── IM_v1 ────────────────────────────────────────────────────────────────
@@ -484,7 +658,13 @@ public class RatingEngineService : IRatingEngineService
         var blanket = quote.Submission.AdditionalInterestBlankets
             .FirstOrDefault(b => !b.IsDeleted && b.LineOfBusiness == quote.LineOfBusiness);
 
-        if (interests.Count == 0 && blanket == null)
+        // Quote-time individual counts (GL): AI/WOS can be priced from a count before the
+        // detailed named records exist; the records supersede the count once entered.
+        var glCov = quote.LineOfBusiness == PolicyLineOfBusiness.GeneralLiability ? quote.Submission.GLCoverages : null;
+        var quotedAiCount = glCov?.AiIndividualCount ?? 0;
+        var quotedWosCount = glCov?.WosIndividualCount ?? 0;
+
+        if (interests.Count == 0 && blanket == null && quotedAiCount == 0 && quotedWosCount == 0)
             return [];
 
         var policyState = quote.Submission.Insured?.State?.Trim().ToUpperInvariant();
@@ -511,20 +691,31 @@ public class RatingEngineService : IRatingEngineService
                 .ToList();
             var blanketRequested = RequestsBlanketCoverage(blanket, coverageType);
 
-            if (matchingInterests.Count == 0 && !blanketRequested)
+            // Fall back to the quoted count only when no detailed records are entered.
+            var quotedCount = coverageType switch
+            {
+                AdditionalInterestCoverageType.AdditionalInsured => quotedAiCount,
+                AdditionalInterestCoverageType.WaiverOfSubrogation => quotedWosCount,
+                _ => 0,
+            };
+            var individualCount = matchingInterests.Count > 0 ? matchingInterests.Count : quotedCount;
+
+            if (individualCount == 0 && !blanketRequested)
                 continue;
 
             var rule = candidateRules
                 .Where(r => r.CoverageType == coverageType)
                 .OrderByDescending(RuleSpecificity)
-                .ThenByDescending(r => blanketRequested && r.ChargeMethod != AdditionalInterestChargeMethod.PerInterest)
+                .ThenByDescending(r => blanketRequested
+                    ? r.ChargeMethod != AdditionalInterestChargeMethod.PerInterest
+                    : r.ChargeMethod == AdditionalInterestChargeMethod.PerInterest)
                 .ThenByDescending(r => r.EffectiveDate ?? DateOnly.MinValue)
                 .FirstOrDefault();
 
             if (rule is null)
                 continue;
 
-            var chargeCount = blanketRequested ? 1 : matchingInterests.Count;
+            var chargeCount = blanketRequested ? 1 : individualCount;
             var amount = CalculateAdditionalInterestCharge(rule, chargeCount);
             var coverageLabel = AdditionalInterestLabel(coverageType);
 

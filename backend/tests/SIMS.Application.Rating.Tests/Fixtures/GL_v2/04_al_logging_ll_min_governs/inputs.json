@@ -1,0 +1,14 @@
+{
+ "state": "AL",
+ "occLimit": 300000,
+ "pcoAggregate": 1000000,
+ "scheduleModifier": 1.0,
+ "includeTria": false,
+ "loggingLumberingLimit": 100000,
+ "lines": [
+  {
+   "classCode": "97111",
+   "exposure": 50000
+  }
+ ]
+}

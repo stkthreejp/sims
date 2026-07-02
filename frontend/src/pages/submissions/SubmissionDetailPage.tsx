@@ -19,7 +19,7 @@ import { insuredsApi } from '@/api/insureds.api'
 import { outboundCommunicationsApi } from '@/api/outboundCommunications.api'
 import { VEHICLE_CLASS_LABELS, OPERATING_RADIUS_LABELS, IM_DEDUCTIBLE_TIERS, SETTLEMENT_BASIS_LABELS, APD_VEHICLE_CLASS_OPTIONS, APD_ROAD_TYPE_OPTIONS, APD_OPERATION_CODE_OPTIONS, APD_DRIVER_AGE_CODE_OPTIONS, APD_DRIVER_POINTS_CODE_OPTIONS, APD_DRIVER_EXP_MOD_OPTIONS, APD_COMP_DEDUCTIBLE_OPTIONS, APD_COLL_DEDUCTIBLE_OPTIONS, APD_SUPPORTED_STATES, ADDITIONAL_INTEREST_APPLIES_TO_LABELS, GL_CLASS_CODE_OPTIONS } from '@/types/submissionLob.types'
 import type { SubmissionDriver, SubmissionDriverCreate, SubmissionVehicle, SubmissionVehicleCreate, SubmissionLocation, SubmissionLocationCreate, SubmissionPriorCarrier, SubmissionPriorCarrierCreate, SubmissionAdditionalInterestCreate, SubmissionAdditionalInterestBlanketUpsert, SubmissionSupplemental, SubmissionSupplementalUpsert, SubmissionGLCoveragesUpsert, SubmissionGLClassificationCreate, VehicleClass, OperatingRadius, SubmissionEquipment, SubmissionEquipmentCreate, SettlementBasis, AdditionalInterestAppliesToType } from '@/types/submissionLob.types'
-import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS } from '@/types/submissionLob.types'
+import { GL_OCC_LIMIT_OPTIONS, GL_PCO_LIMIT_OPTIONS, GL_MED_LIMIT_OPTIONS, GL_LL_LIMIT_OPTIONS } from '@/types/submissionLob.types'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate, type Submission, type UnderwritingClearanceEvaluation, type UnderwritingClearanceStatus, type UnderwritingClearanceCheckType, type UnderwritingReferralSummary, type UnderwritingReferralStatus } from '@/types/submission.types'
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -525,6 +525,7 @@ export function SubmissionDetailPage() {
         wosBlanket: glCoverages.wosBlanket ?? false,
         primaryNonContributory: glCoverages.primaryNonContributory ?? false,
         includeTria: glCoverages.includeTria ?? false,
+        loggingLumberingLimit: glCoverages.loggingLumberingLimit ?? undefined,
       })
     }
   }, [glCoverages])
@@ -2115,6 +2116,16 @@ export function SubmissionDetailPage() {
                   <div><label style={labelStyle}>Damage to Rented Premises</label><input type="number" value={glCovForm.damageToRentedPremises ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, damageToRentedPremises: parseFloat(e.target.value) || undefined })); setGlCovDirty(true) }} style={inputStyle} placeholder="e.g. 100000" /></div>
                   <div><label style={labelStyle}>Total Subcontractor Cost</label><input type="number" value={glCovForm.totalSubcontractorCost ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, totalSubcontractorCost: parseFloat(e.target.value) || undefined })); setGlCovDirty(true) }} style={inputStyle} placeholder="For class 91581" /></div>
                 </div>
+              </div>
+              {/* Endorsements */}
+              <div style={{ paddingTop: 12, borderTop: '1px solid var(--line-2)', marginBottom: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Endorsements</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  <div><label style={labelStyle}># Additional Insureds (indiv.)</label><input type="number" min={0} value={glCovForm.aiIndividualCount || ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, aiIndividualCount: parseInt(e.target.value) || 0 })); setGlCovDirty(true) }} style={inputStyle} placeholder="0" /></div>
+                  <div><label style={labelStyle}># Waivers of Subrog. (indiv.)</label><input type="number" min={0} value={glCovForm.wosIndividualCount || ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, wosIndividualCount: parseInt(e.target.value) || 0 })); setGlCovDirty(true) }} style={inputStyle} placeholder="0" /></div>
+                  <div><label style={labelStyle}>Logging &amp; Lumbering (97111)</label><select value={glCovForm.loggingLumberingLimit ?? ''} onChange={(e) => { setGlCovForm((f) => ({ ...f, loggingLumberingLimit: e.target.value ? parseInt(e.target.value) : undefined })); setGlCovDirty(true) }} style={inputStyle}><option value="">— None —</option>{GL_LL_LIMIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>Enter counts to quote; add named additional-interest records before issuance. Blanket AI/WOS &amp; PNC are set in the Additional Interests section.</div>
               </div>
               {/* TRIA */}
               <div style={{ paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>

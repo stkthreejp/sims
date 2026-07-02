@@ -1,0 +1,22 @@
+{
+ "state": "MS",
+ "occLimit": 500000,
+ "pcoAggregate": 1000000,
+ "scheduleModifier": 0.9,
+ "includeTria": false,
+ "loggingLumberingLimit": null,
+ "lines": [
+  {
+   "classCode": "97111",
+   "exposure": 300000
+  },
+  {
+   "classCode": "94007",
+   "exposure": 150000
+  },
+  {
+   "classCode": "58873",
+   "exposure": 1000000
+  }
+ ]
+}

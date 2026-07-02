@@ -1,0 +1,14 @@
+{
+ "state": "GA",
+ "occLimit": 1000000,
+ "pcoAggregate": 2000000,
+ "scheduleModifier": 1.0,
+ "includeTria": false,
+ "loggingLumberingLimit": 1000000,
+ "lines": [
+  {
+   "classCode": "97111",
+   "exposure": 500000
+  }
+ ]
+}

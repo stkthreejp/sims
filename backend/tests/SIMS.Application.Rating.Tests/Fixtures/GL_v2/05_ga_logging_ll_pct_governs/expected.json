@@ -1,0 +1,13 @@
+{
+ "manualPremium": 7806.32,
+ "modifiedPremium": 7806,
+ "endorsementTotal": 780.63,
+ "triaPremium": 0,
+ "grandTotal": 8586.63,
+ "lines": [
+  {
+   "classCode": "97111",
+   "linePremium": 7806.32
+  }
+ ]
+}

@@ -20,6 +20,7 @@ public class SubmissionGLCoveragesDto
     public bool WosBlanket { get; set; }
     public bool PrimaryNonContributory { get; set; }
     public bool IncludeTria { get; set; }
+    public decimal? LoggingLumberingLimit { get; set; }
 }
 
 public class SubmissionGLCoveragesUpsertDto
@@ -39,6 +40,7 @@ public class SubmissionGLCoveragesUpsertDto
     public bool WosBlanket { get; set; }
     public bool PrimaryNonContributory { get; set; }
     public bool IncludeTria { get; set; }
+    public decimal? LoggingLumberingLimit { get; set; }
 }
 
 public class SubmissionGLClassificationDto

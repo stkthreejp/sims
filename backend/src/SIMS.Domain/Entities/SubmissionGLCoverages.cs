@@ -18,6 +18,7 @@ public class SubmissionGLCoverages : BaseEntity
     public bool WosBlanket { get; set; }              // blanket WOS endorsement — $250 flat
     public bool PrimaryNonContributory { get; set; }  // PNC endorsement — $250 flat
     public bool IncludeTria { get; set; }             // TRIA surcharge — 2.5% of GL premium
+    public decimal? LoggingLumberingLimit { get; set; } // Logging & Lumbering endorsement limit (class 97111 only); null/0 = not selected
 
     public Submission Submission { get; set; } = null!;
 }

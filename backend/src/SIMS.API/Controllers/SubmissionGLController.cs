@@ -49,6 +49,7 @@ public class SubmissionGLController : ControllerBase
         gl.WosBlanket = dto.WosBlanket;
         gl.PrimaryNonContributory = dto.PrimaryNonContributory;
         gl.IncludeTria = dto.IncludeTria;
+        gl.LoggingLumberingLimit = dto.LoggingLumberingLimit;
         await _db.SaveChangesAsync();
         return Ok(MapCoveragesToDto(gl));
     }
@@ -119,6 +120,7 @@ public class SubmissionGLController : ControllerBase
         WosBlanket = g.WosBlanket,
         PrimaryNonContributory = g.PrimaryNonContributory,
         IncludeTria = g.IncludeTria,
+        LoggingLumberingLimit = g.LoggingLumberingLimit,
     };
 
     private static SubmissionGLClassificationDto MapClassificationToDto(SubmissionGLClassification c) => new()

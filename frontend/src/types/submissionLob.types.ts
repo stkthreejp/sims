@@ -331,6 +331,15 @@ export const GL_MED_LIMIT_OPTIONS = [
   { value: 25_000, label: '$25,000' },
 ] as const
 
+// Logging & Lumbering endorsement (class 97111 only) — greater of a flat minimum
+// or a % of the 97111 premium, keyed by the selected limit.
+export const GL_LL_LIMIT_OPTIONS = [
+  { value: 100_000,   label: '$100,000' },
+  { value: 250_000,   label: '$250,000' },
+  { value: 500_000,   label: '$500,000' },
+  { value: 1_000_000, label: '$1,000,000' },
+] as const
+
 export const GL_CLASS_CODE_OPTIONS = [
   { value: '97111', label: '97111 – Logging and Lumbering' },
   { value: '99793', label: '99793 – Truckers – Common/Contract' },
@@ -344,6 +353,8 @@ export const GL_CLASS_CODE_OPTIONS = [
   { value: '95410', label: '95410 – Grading of Land' },
   { value: '58873', label: '58873 – Saw Mills or Planing Mills' },
   { value: '59738', label: '59738 – Tie, Post or Pole Yard' },
+  { value: '45819', label: '45819 – Lumberyards' },
+  { value: '61212', label: '61212 – Buildings/Premises – Bank/Office (LRO)' },
 ] as const
 
 export interface SubmissionGLCoverages {
@@ -365,6 +376,7 @@ export interface SubmissionGLCoverages {
   wosBlanket: boolean
   primaryNonContributory: boolean
   includeTria: boolean
+  loggingLumberingLimit: number | null
 }
 
 export interface SubmissionGLCoveragesUpsert {
@@ -382,6 +394,7 @@ export interface SubmissionGLCoveragesUpsert {
   wosBlanket: boolean
   primaryNonContributory: boolean
   includeTria: boolean
+  loggingLumberingLimit?: number
 }
 
 export interface SubmissionGLClassification {
