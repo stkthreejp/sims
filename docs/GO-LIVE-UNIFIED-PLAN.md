@@ -115,6 +115,7 @@ Machinery done (hierarchy, AL block, orphan audit). **Data missing: no carriers/
 - [ ] **Shadow-rate cutover**: accumulate shadow-vs-actual deltas on real-shaped UAT quotes; flip per-LOB toggles to authoritative when deltas are explained. (The comparison data + admin UI exist.)
 - [ ] Confirm renewal rate-version + endorsement rating policy defaults.
 - [ ] Second LOB rater — blocked on actuarial workbook handoff (post-UAT unless APD enters scope).
+- [ ] **Rate workbench (post-UAT, decided 2026-07-02)**: versioned factor-table editing in SIMS — clone Active→Draft, grid/CSV edit, diff + shadow vs current, promote effective-dated (`RatingPlanVersion` schema already supports it). Interim: rate changes via the `backend/seed/rating/gl_v2` runbook (edit JSON → new seed migration); Excel retired as the rate source of truth. Never mutate a version with rated/bound quotes.
 
 ### WS7 — Bordereaux — ✅ pipeline done / ❌ reporting-integrity gaps (P0 for Gate B)
 
