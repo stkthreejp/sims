@@ -104,7 +104,7 @@ Closeout verified: links fixed, guards aligned, 404 real, Login redesigned, no p
 
 Machinery done (hierarchy, AL block, orphan audit). **Data missing: no carriers/programs are seeded** — Lloyd's IM (Beazley AFB 623/2623) and Lloyd's GL (DALE 1729) per the launch decision, with eligible states, limits, territories, rating assignments, fees, SL setup, policy-number sequences, form packages, commissions, QBO/GL mappings.
 
-- [ ] Configure both launch programs end-to-end (state lists/limits per the SMM Underwriter context).
+- [ ] Configure both launch programs end-to-end (state lists/limits per the SMM Underwriter context). **Staged (decided 2026-07-02): GL (DALE 1729/Brace) first, per `docs/WS5-COMPANY-SETUP-TEST-CHECKLIST.md` Part A — fix what it surfaces before touching the second program; IM (Beazley) is the deferred Part B pass. Gate-A item 5 needs only one bindable program, so GL alone flips the blocker.**
 - [ ] Run the orphan audit; resolve every finding.
 - [ ] **(new, from §8.2) Per launch state, an SL "tax assertion" check**: a test bind in each filing state must produce SL tax + stamping lines and include the state's mandatory SL disclosure form. This is the WS12 fail-closed behavior exercised as a setup-verification step.
 - [ ] **(new, §5.4) Per launch state, diligent-effort research**: determine which launch states mandate pre-bind diligent effort/affidavits vs filing-time, and set `DiligentSearchRequired`/`AffidavitRequired` accordingly — feeds the WS12 bind blocker.

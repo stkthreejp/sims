@@ -1,12 +1,34 @@
-# WS5 — One-Company Complete Setup & Test Checklist
+# WS5 — Launch Program Setup & Test Checklist
 
-Goal: configure one carrier/program end-to-end (Gate A: "one full program configured
-end-to-end and bindable") and verify every subsystem it touches. Written 2026-07-02,
-after GL_v2 went live. Test on the Azure test env (`sims-frontend-test` regional URL).
+Goal: clear WS5 (the open Gate-A blocker) by configuring the launch programs
+end-to-end and verifying every subsystem they touch. Written 2026-07-02, after
+GL_v2 went live. Test on the Azure test env (`sims-frontend-test` regional URL).
 
-**How to use:** work Phases 0–9 (setup) top to bottom, then run lifecycle tests T1–T18,
-then the per-state matrix. Anything in §Known-gaps is *expected* to fail — record it,
-don't chase it.
+**How to use (staged — decided 2026-07-02):** do **Part A only** for now (Lloyd's
+GL — DALE 1729/Brace): Phases 0–9 top to bottom, then lifecycle tests T1–T18, then
+the per-state matrix. Fix what Part A surfaces before configuring anything else —
+most defects will be in shared machinery (rating, SL, numbering, forms, BDX,
+accounting), so setting up a second program against a dirty pipeline just doubles
+the rework. **Part B (Lloyd's IM — Beazley AFB 623/2623) is deferred** until Part A
+is clean. Anything in §Known-gaps is *expected* to fail — record it, don't chase it.
+
+## What "WS5 cleared" means (plan §WS5 → this checklist)
+
+| Plan item | Covered by |
+|---|---|
+| Configure both launch programs end-to-end | Part A (GL) **now**; Part B (IM) deferred until Part A is clean |
+| Orphan audit clean | Phase 1 (re-run after Part B) |
+| Per launch state: SL "tax assertion" check | T7 + per-state matrix |
+| Per launch state: diligent-effort research → flags | Phase 4 + per-state matrix |
+| Historical-versioning gap | Already deferred/documented — nothing to do |
+
+**Gate-A item 5 reads "one full program configured end-to-end and bindable" — so
+finishing Part A alone flips the Gate-A blocker.** WS5 as a workstream fully closes
+after the deferred Part B pass (§Sign-off below).
+
+---
+
+# Part A — Lloyd's GL (DALE 1729 / Brace)
 
 ---
 
@@ -158,6 +180,44 @@ Quote on the configured program/carrier, rate, and compare **quote grand total**
 | AL | ☐ | ☐ | ☐ | ☐ |
 | GA | ☐ | ☐ | ☐ | ☐ |
 | … | ☐ | ☐ | ☐ | ☐ |
+
+# Part B — Lloyd's IM (Beazley AFB 623/2623) — **DEFERRED** until Part A is clean
+
+**Do not start this until Part A findings are fixed and its golden values pass.**
+Kept here (not deleted) because a few code paths are IM-only and will never be
+exercised by GL testing — the equipment schedule, the IM endorsement charges
+(including the discrepancy flagged below), the deductible-eligibility guard, and
+the IM Unit Info BDX tab.
+
+The IM rater (`IM_v1`, data-driven) has been seeded since May — equipment types,
+territories, base-rate/deductible factor tables, eligibility rules, and a Beazley
+carrier assignment (pattern-matched). Part B is mostly *verification* plus the
+program-hierarchy/financial/forms setup that no migration covers.
+
+## Setup deltas (repeat Phases 1–9 for Beazley/IM)
+
+- [ ] Phase 1: Program hierarchy — Beazley carrier, **IM LOB** active + launch states; London fields for the IM binder (its own UMR/section/class of business).
+- [ ] Phase 2: Carrier rating assignment **IM → IM_v1 v1** exists (seeded — verify in AdminRatingPage/carrier detail rather than create).
+- [ ] Phase 2b: Equipment types (12) and territories (7, with state→territory map) present.
+- [ ] Phases 3–8: commissions, SL setup + fees per state, policy-number sequence + assignment for IM, form package + proposal template, BDX profile (IM Unit Info tab matters), accounting mapping — same drill as Part A.
+- [ ] Re-run the **orphan audit** after Part B setup; resolve findings.
+
+## IM lifecycle tests
+
+- [ ] **IM golden value** (from `backend/seed/rating/README.md`, verified vs the IM workbook): MS insured, schedule mod **0.70** (w/ reason), deductible $2,500 on all items, **Debris Removal only** (uncheck Rental/Towing/Newly), 7 items: Fellerbuncher '07 $35K · Skidder '07 $35K · Dozer '06 $30K · Loader '14 $100K · Fellerbuncher '15 $80K · Loader '14 $65K · Skidder '19 $100K (ages vs a 2026 effective date: 19/19/20/12/11/12/7) → IM premium **$8,630**, + $250 debris = **$8,880**.
+- [ ] ⚠️ **Endorsement-charge discrepancy to adjudicate**: the engine charges Rental Reimbursement **$500**, Towing/Storage/Recovery **$175**, Newly Acquired **$0**; the IM workbook/seed README says **$250 / $250 / $500**. Verify against the current IM rater and correct whichever is wrong before UAT sign-off.
+- [ ] Ineligible deductible guard: Chipper or Tub Grinder with $2,500 deductible must refuse to rate (factor 0.00 = unavailable).
+- [ ] TRIA (1% of subtotal for IM) calculates when selected.
+- [ ] AI charges on an IM quote: named AI/loss-payee records charge per the global engine (count-at-quote fields are GL-only — IM uses named records/blanket).
+- [ ] Repeat T6–T9 (proposal → bind incl. SL tax/stamping lines → issue → accounting) on the IM program.
+- [ ] BDX: IM policy's equipment schedule appears on the **IM Unit Info** tab of the London export (serials, values).
+
+## Sign-off
+
+- [ ] **Part A done** (all boxes ticked; findings recorded against §Known-gaps or filed and fixed): flip §2 **Gate-A item 5 to ✅** in `GO-LIVE-UNIFIED-PLAN.md` and annotate §WS5 "GL configured end-to-end; IM deferred" with the date. **The Gate-A blocker is cleared at this point.**
+- [ ] **Part B done** (run after Part A is clean): tick the remaining §WS5 checkboxes — WS5 fully closed.
+
+---
 
 ## Known gaps — expected findings, don't chase
 
