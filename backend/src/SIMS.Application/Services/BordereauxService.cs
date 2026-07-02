@@ -465,10 +465,12 @@ public class BordereauxService : IBordereauxService
         if (!carrierExists)
             return ("CARRIER_NOT_FOUND", "Carrier not found or inactive.");
 
-        var jsonValidation = ValidateJsonArray(request.RequiredTabsJson, "REQUIRED_TABS");
+        // Tabs/columns may be empty at create — they're picked in the post-create setup
+        // panel, and the setup-status machinery flags the gaps until Ready for Export.
+        var jsonValidation = ValidateJsonArrayAllowEmpty(request.RequiredTabsJson, "REQUIRED_TABS");
         if (jsonValidation is not null)
             return jsonValidation;
-        jsonValidation = ValidateJsonArray(request.RequiredColumnsJson, "REQUIRED_COLUMNS");
+        jsonValidation = ValidateJsonArrayAllowEmpty(request.RequiredColumnsJson, "REQUIRED_COLUMNS");
         if (jsonValidation is not null)
             return jsonValidation;
         jsonValidation = ValidateJsonObject(request.MappingRulesJson, "MAPPING_RULES");
@@ -1403,6 +1405,16 @@ public class BordereauxService : IBordereauxService
             return error.Value;
         if (document!.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
             return ($"{label}_REQUIRED", $"{LabelToText(label)} must be a non-empty JSON array.");
+        return null;
+    }
+
+    private static (string Code, string Message)? ValidateJsonArrayAllowEmpty(string json, string label)
+    {
+        using var document = TryParse(json, label, out var error);
+        if (error is not null)
+            return error.Value;
+        if (document!.RootElement.ValueKind != JsonValueKind.Array)
+            return ($"{label}_INVALID", $"{LabelToText(label)} must be a JSON array.");
         return null;
     }
 

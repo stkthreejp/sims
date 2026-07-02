@@ -88,6 +88,26 @@ inception 2026-08-01) could never pass — backwards logic.
 August); disjoint ranges still reject. Regression tests added for both directions
 (`CarrierRatingAssignmentProgramScopeTests`).
 
+## F4 — BLOCKER: BDX profile creation always fails ("Required tabs must be a non-empty JSON array")
+
+**Status: FIXED — shipped immediately (blocker)**
+
+Found during Phase 7. Both create surfaces (Admin → Bordereaux profiles and the
+carrier-page dialog) send `requiredTabsJson: '[]'` with no tab input at create time —
+the tab picker lives in the *post-create* setup panel — while the backend rejected
+empty arrays. Chicken-and-egg: no profile could ever be created from the UI.
+
+**Fix:**
+- Backend: `RequiredTabsJson`/`RequiredColumnsJson` now accept an empty (but valid)
+  JSON array at create/update — completeness stays policed by the setup-status panel
+  (`IsReadyForExport` + "Missing" items), which is the designed progressive flow.
+  Malformed/non-array input still rejects.
+- `IncludedTransactionTypesJson` stays strict (empty would filter every premium
+  preview to zero rows); the carrier-page dialog now defaults to the same full
+  transaction-type set the admin page already used (shared `DEFAULT_BDX_TXN_TYPES`).
+- Regression tests: create with empty tabs/columns succeeds + flags Missing; create
+  with empty transaction types still rejects.
+
 ---
 
 *(next finding goes here)*

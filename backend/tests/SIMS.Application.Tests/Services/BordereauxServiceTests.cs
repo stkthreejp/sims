@@ -67,6 +67,44 @@ public class BordereauxServiceTests
     }
 
     [Fact]
+    public async Task CreateProfileAsync_AllowsEmptyTabsAndColumnsForProgressiveSetup()
+    {
+        // The create dialogs send empty tabs/columns; the post-create setup panel is
+        // where they get picked. Create must succeed and setup status must flag the gaps.
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            RequiredTabsJson = "[]",
+            RequiredColumnsJson = "[]",
+        });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.False(result.Value!.SetupStatus.IsReadyForExport);
+        Assert.Contains(result.Value.SetupStatus.RequiredTabs, item => item.Status == "Missing");
+        Assert.Contains(result.Value.SetupStatus.RequiredColumns, item => item.Status == "Missing");
+    }
+
+    [Fact]
+    public async Task CreateProfileAsync_RejectsEmptyIncludedTransactionTypes()
+    {
+        // Empty included-types would filter every premium preview to zero rows.
+        await using var db = CreateDb();
+        var (program, carrier) = await SeedProgramCarrierAsync(db);
+        var service = new BordereauxService(db);
+
+        var result = await service.CreateProfileAsync(ValidRequest(program.Id, carrier.Id) with
+        {
+            IncludedTransactionTypesJson = "[]",
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INCLUDED_TRANSACTION_TYPES_REQUIRED", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task CreateProfileAsync_RejectsDuplicateActiveScope()
     {
         await using var db = CreateDb();

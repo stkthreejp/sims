@@ -1,3 +1,7 @@
+// Default transaction types for new BDX profiles — the backend rejects an empty
+// list (it would filter every premium preview to zero rows).
+export const DEFAULT_BDX_TXN_TYPES = '["NewBusiness","Endorsement","Renewal","Cancellation","Reinstatement","Rewrite","NonRenewal"]'
+
 export interface BordereauxProfile {
   id: string
   name: string

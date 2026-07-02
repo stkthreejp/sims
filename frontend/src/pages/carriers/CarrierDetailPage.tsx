@@ -30,7 +30,7 @@ import {
   updateBordereauxProfile,
 } from '@/api/bordereaux.api'
 import type { CarrierCommission } from '@/types/carrierCommission.types'
-import type { BordereauxProfile } from '@/types/bordereaux.types'
+import { DEFAULT_BDX_TXN_TYPES, type BordereauxProfile } from '@/types/bordereaux.types'
 import {
   BordereauxProfileSetupPanel,
   bordereauxProfileToRequest,
@@ -394,7 +394,7 @@ export function CarrierDetailPage() {
       mappingRulesJson: '{}',
       staticValuesJson: '{}',
       validationRulesJson: '{}',
-      includedTransactionTypesJson: '[]',
+      includedTransactionTypesJson: DEFAULT_BDX_TXN_TYPES,
       notes: null,
     }),
     onSuccess: (created) => {

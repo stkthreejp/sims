@@ -14,7 +14,7 @@ import {
   bordereauxProfileToRequest,
 } from '@/components/bordereaux/BordereauxProfileSetupPanel'
 import { LOB_LABELS } from '@/types/quote.types'
-import type { BordereauxProfile, UpsertBordereauxProfileRequest } from '@/types/bordereaux.types'
+import { DEFAULT_BDX_TXN_TYPES, type BordereauxProfile, type UpsertBordereauxProfileRequest } from '@/types/bordereaux.types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -22,8 +22,6 @@ const REPORT_TYPES = ['Premium', 'TaxFee', 'Commission'] as const
 const FREQUENCIES  = ['Monthly', 'Quarterly', 'Annual'] as const
 const OUTPUT_FMTS  = ['LondonBordereaux', 'XLSX', 'CSV'] as const
 const DATE_BASES   = ['EffectiveOrBoundDateGreater', 'EffectiveDate', 'BoundDate'] as const
-
-const DEFAULT_TXN_TYPES = '["NewBusiness","Endorsement","Renewal","Cancellation","Reinstatement","Rewrite","NonRenewal"]'
 
 function blankRequest(): UpsertBordereauxProfileRequest {
   return {
@@ -43,7 +41,7 @@ function blankRequest(): UpsertBordereauxProfileRequest {
     mappingRulesJson: '{}',
     staticValuesJson: '{}',
     validationRulesJson: '{}',
-    includedTransactionTypesJson: DEFAULT_TXN_TYPES,
+    includedTransactionTypesJson: DEFAULT_BDX_TXN_TYPES,
     notes: null,
   }
 }
