@@ -344,14 +344,17 @@ public class BordereauxServiceTests
         var savedProfile = await db.Set<SIMS.Domain.Entities.Bordereaux.BordereauxProfile>().SingleAsync();
         savedProfile.StaticValuesJson = """{"umr":"CHANGED"}""";
         var savedInvoice = await db.Set<Invoice>().SingleAsync();
-        savedInvoice.GrossPremium = 999m;
+        // Sentinel for the post-snapshot change. Must contain a '.' so it can never
+        // false-match a hex substring of a random GUID in the snapshot JSON (a bare
+        // "999" did, which made this assertion flaky).
+        savedInvoice.GrossPremium = 987654.32m;
         await db.SaveChangesAsync();
 
         var savedRun = await db.Set<SIMS.Domain.Entities.Bordereaux.BordereauxRun>().SingleAsync();
         Assert.Contains("BRACE-SMM-2025-LOGGING", savedRun.ProfileSnapshotJson);
         Assert.DoesNotContain("CHANGED", savedRun.ProfileSnapshotJson);
         Assert.Contains("1451", savedRun.SourceRowsSnapshotJson);
-        Assert.DoesNotContain("999", savedRun.SourceRowsSnapshotJson);
+        Assert.DoesNotContain("987654.32", savedRun.SourceRowsSnapshotJson);
     }
 
     [Fact]
@@ -537,13 +540,14 @@ public class BordereauxServiceTests
         await SeedPolicyTransactionWithInvoiceAsync(db, program, carrier, TransactionType.NewBusiness, new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 8), "LL-GL-000145-00", "MS", 1451m, 362.75m);
         var run = await service.CreatePremiumRunSnapshotAsync(profile.Value!.Id, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30), generatedById: null);
         var invoice = await db.Set<Invoice>().SingleAsync();
-        invoice.GrossPremium = 999m;
+        // Sentinel with a '.' so it can't false-match a GUID/structural substring in the export XML.
+        invoice.GrossPremium = 987654.32m;
         await db.SaveChangesAsync();
 
         await service.GeneratePremiumExportPackageAsync(run.Value!.Id, generatedById: null);
 
         Assert.Contains("1451", blob.Uploads[0].Text);
-        Assert.DoesNotContain("999", blob.Uploads[0].Text);
+        Assert.DoesNotContain("987654.32", blob.Uploads[0].Text);
     }
 
     [Fact]
