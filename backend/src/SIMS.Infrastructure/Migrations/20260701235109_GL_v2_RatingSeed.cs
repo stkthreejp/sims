@@ -386,8 +386,8 @@ BEGIN
     UPDATE rating_plans SET status = 3, updated_at = v_now WHERE line_of_business = 1 AND formula_key = 'GL_v1';
 
     -- Global GL additional-interest rates (carrier_id NULL = all GL carriers).
-    IF NOT EXISTS (SELECT 1 FROM carrier_additional_interest_rates WHERE carrier_id IS NULL AND line_of_business = 1 AND is_deleted = false) THEN
-        INSERT INTO carrier_additional_interest_rates (id, carrier_id, line_of_business, coverage_type, charge_method, per_interest_amount, blanket_amount, minimum_charge, maximum_charge, state, effective_date, expiration_date, is_active, created_at, updated_at, is_deleted)
+    IF NOT EXISTS (SELECT 1 FROM carrier_additional_interest_rates WHERE ""CarrierId"" IS NULL AND ""LineOfBusiness"" = 1 AND ""IsDeleted"" = false) THEN
+        INSERT INTO carrier_additional_interest_rates (""Id"", ""CarrierId"", ""LineOfBusiness"", ""CoverageType"", ""ChargeMethod"", ""PerInterestAmount"", ""BlanketAmount"", ""MinimumCharge"", ""MaximumCharge"", ""State"", ""EffectiveDate"", ""ExpirationDate"", ""IsActive"", ""CreatedAt"", ""UpdatedAt"", ""IsDeleted"")
         VALUES
           (gen_random_uuid(), NULL, 1, 0, 2, 50, NULL, NULL, NULL, NULL, NULL, NULL, true, v_now, v_now, false),
           (gen_random_uuid(), NULL, 1, 0, 3, NULL, 250, NULL, NULL, NULL, NULL, NULL, true, v_now, v_now, false),
@@ -424,7 +424,7 @@ BEGIN
         DELETE FROM rating_plan_versions WHERE rating_plan_id = v_plan_id;
         DELETE FROM rating_plans WHERE id = v_plan_id;
     END IF;
-    DELETE FROM carrier_additional_interest_rates WHERE carrier_id IS NULL AND line_of_business = 1;
+    DELETE FROM carrier_additional_interest_rates WHERE ""CarrierId"" IS NULL AND ""LineOfBusiness"" = 1;
 END $$;
 ");
         }
