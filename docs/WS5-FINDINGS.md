@@ -108,6 +108,26 @@ empty arrays. Chicken-and-egg: no profile could ever be created from the UI.
 - Regression tests: create with empty tabs/columns succeeds + flags Missing; create
   with empty transaction types still rejects.
 
+## F5 — BLOCKER: rating assignment still fails after F3 ("failed to assign rating plan", 500)
+
+**Status: FIXED — shipped immediately (blocker; F3 follow-through)**
+
+Same action as F3, new failure mode: generic toast (no backend message) because the
+API 500'd. Container logs showed `DbUpdateException → Npgsql P0001` from the
+**database trigger** `validate_carrier_rating_assignment_program_scope` — a second
+enforcement layer (migration `AddCarrierRatingAssignmentProgramScopeRefs`) still
+enforcing the old point-in-time rule ("path active as of the version's effective
+date"). F3 fixed the C# resolver only, so the service approved and the DB vetoed.
+
+**Fix:** migration `FixRatingAssignmentTriggerVersionOverlap` replaces the trigger
+function with the same range-overlap semantics as the service; Down restores the
+original. Reviewed the sibling program-scope triggers (commissions, fees, forms,
+numbering, proposals, brokerage, SL): they validate against their row's own
+user-chosen effective date, not a global version date, so they don't share this trap.
+
+**Lesson recorded:** the "program SOT" constraints are enforced twice — service layer
+AND plpgsql trigger. Any semantic change to one must change both.
+
 ---
 
 *(next finding goes here)*
