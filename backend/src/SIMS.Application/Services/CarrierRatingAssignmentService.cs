@@ -90,6 +90,7 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
                 dto.CarrierId,
                 dto.LineOfBusiness,
                 version.EffectiveDate,
+                version.ExpirationDate,
                 ct);
             if (!programCarrierLineOfBusinessId.HasValue)
                 return Result<CarrierRatingAssignmentDto>.Failure("INVALID_PROGRAM_SETUP_PATH",
@@ -225,11 +226,16 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
         }).ToList();
     }
 
+    // The rating version's effective range and the program path's effective range
+    // must OVERLAP — a version live since January is valid for a program line that
+    // starts in August. (Point-in-time at the version's effective date wrongly
+    // rejected any program set up after the rates' inception.)
     private async Task<Guid?> ResolveProgramCarrierLobPathAsync(
         Guid programConfigurationId,
         Guid carrierId,
         PolicyLineOfBusiness lineOfBusiness,
-        DateOnly effectiveDate,
+        DateOnly versionEffectiveDate,
+        DateOnly? versionExpirationDate,
         CancellationToken ct)
     {
         return await Db.Set<ProgramCarrierLineOfBusiness>()
@@ -237,14 +243,14 @@ public class CarrierRatingAssignmentService : ICarrierRatingAssignmentService
                 l.LineOfBusiness == lineOfBusiness &&
                 l.IsActive &&
                 !l.IsDeleted &&
-                l.EffectiveDate <= effectiveDate &&
-                (l.ExpirationDate == null || l.ExpirationDate >= effectiveDate) &&
+                (versionExpirationDate == null || l.EffectiveDate <= versionExpirationDate) &&
+                (l.ExpirationDate == null || l.ExpirationDate >= versionEffectiveDate) &&
                 l.ProgramCarrier.IsActive &&
                 !l.ProgramCarrier.IsDeleted &&
                 l.ProgramCarrier.CarrierId == carrierId &&
                 l.ProgramCarrier.ProgramConfigurationId == programConfigurationId &&
-                l.ProgramCarrier.EffectiveDate <= effectiveDate &&
-                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= effectiveDate))
+                (versionExpirationDate == null || l.ProgramCarrier.EffectiveDate <= versionExpirationDate) &&
+                (l.ProgramCarrier.ExpirationDate == null || l.ProgramCarrier.ExpirationDate >= versionEffectiveDate))
             .Select(l => (Guid?)l.Id)
             .FirstOrDefaultAsync(ct);
     }

@@ -138,6 +138,85 @@ public class CarrierRatingAssignmentProgramScopeTests
         Assert.Equal(programLob.Id, result.Value.ProgramCarrierLineOfBusinessId);
     }
 
+    [Fact]
+    public async Task CreateAsync_AllowsAssignmentWhenProgramPathStartsAfterVersionEffectiveDate()
+    {
+        // Real-world WS5 blocker: rate version effective 2026-01-01, program line
+        // (binder) starts 2026-08-01. Ranges overlap, so the assignment must succeed.
+        await using var db = CreateDb();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Lloyds of London - Dale", IsActive = true };
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var version = CreateVersion("Longleaf GL", PolicyLineOfBusiness.GeneralLiability);
+        var programLob = new ProgramCarrierLineOfBusiness
+        {
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 8, 1),
+        };
+        var programCarrier = new ProgramCarrier
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 8, 1),
+            LinesOfBusiness = { programLob },
+        };
+
+        db.AddRange(carrier, program, version.RatingPlan, version, programCarrier);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreateAsync(new()
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            RatingPlanVersionId = version.Id,
+        });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.Equal(programLob.Id, result.Value!.ProgramCarrierLineOfBusinessId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsAssignmentWhenProgramPathExpiredBeforeVersionEffectiveDate()
+    {
+        // Disjoint ranges: program line ended 2025-06-30, rates start 2026-01-01 —
+        // the guard must still reject.
+        await using var db = CreateDb();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Lloyds of London - Dale", IsActive = true };
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var version = CreateVersion("Longleaf GL", PolicyLineOfBusiness.GeneralLiability);
+        var programLob = new ProgramCarrierLineOfBusiness
+        {
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2024, 1, 1),
+            ExpirationDate = new DateOnly(2025, 6, 30),
+        };
+        var programCarrier = new ProgramCarrier
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2024, 1, 1),
+            LinesOfBusiness = { programLob },
+        };
+
+        db.AddRange(carrier, program, version.RatingPlan, version, programCarrier);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreateAsync(new()
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.GeneralLiability,
+            RatingPlanVersionId = version.Id,
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_PROGRAM_SETUP_PATH", result.ErrorCode);
+    }
+
     private static RatingPlanVersion CreateVersion(string planName, PolicyLineOfBusiness lob = PolicyLineOfBusiness.InlandMarine)
     {
         var plan = new RatingPlan
