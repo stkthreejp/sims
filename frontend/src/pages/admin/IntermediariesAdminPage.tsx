@@ -355,8 +355,8 @@ export function IntermediariesAdminPage() {
         }
       />
 
-      <div className="grid grid-cols-[320px_1fr] gap-5">
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="flex flex-col gap-5">
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
           <div className="px-4 py-3 border-b bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             Brokers
           </div>

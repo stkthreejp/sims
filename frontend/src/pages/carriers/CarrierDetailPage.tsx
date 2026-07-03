@@ -1374,22 +1374,30 @@ export function CarrierDetailPage() {
                   <label className="sims-field-label">State</label>
                   <input value={additionalInterestRateForm.state} maxLength={2} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))} placeholder="Optional" className="sims-input" />
                 </div>
-                <div>
-                  <label className="sims-field-label">Per Interest Amount</label>
-                  <input type="number" value={additionalInterestRateForm.perInterestAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, perInterestAmount: e.target.value }))} className="sims-input" />
-                </div>
-                <div>
-                  <label className="sims-field-label">Blanket Amount</label>
-                  <input type="number" value={additionalInterestRateForm.blanketAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, blanketAmount: e.target.value }))} className="sims-input" />
-                </div>
-                <div>
-                  <label className="sims-field-label">Minimum</label>
-                  <input type="number" value={additionalInterestRateForm.minimumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, minimumCharge: e.target.value }))} className="sims-input" />
-                </div>
-                <div>
-                  <label className="sims-field-label">Maximum</label>
-                  <input type="number" value={additionalInterestRateForm.maximumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, maximumCharge: e.target.value }))} className="sims-input" />
-                </div>
+                {additionalInterestRateForm.chargeMethod === 'PerInterest' && (
+                  <div>
+                    <label className="sims-field-label">Per Interest Amount</label>
+                    <input type="number" value={additionalInterestRateForm.perInterestAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, perInterestAmount: e.target.value }))} className="sims-input" />
+                  </div>
+                )}
+                {additionalInterestRateForm.chargeMethod === 'BlanketFlat' && (
+                  <div>
+                    <label className="sims-field-label">Blanket Amount</label>
+                    <input type="number" value={additionalInterestRateForm.blanketAmount} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, blanketAmount: e.target.value }))} className="sims-input" />
+                  </div>
+                )}
+                {(additionalInterestRateForm.chargeMethod === 'PerInterest' || additionalInterestRateForm.chargeMethod === 'BlanketFlat') && (
+                  <>
+                    <div>
+                      <label className="sims-field-label">Minimum</label>
+                      <input type="number" value={additionalInterestRateForm.minimumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, minimumCharge: e.target.value }))} className="sims-input" />
+                    </div>
+                    <div>
+                      <label className="sims-field-label">Maximum</label>
+                      <input type="number" value={additionalInterestRateForm.maximumCharge} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, maximumCharge: e.target.value }))} className="sims-input" />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="sims-field-label">Effective Date</label>
                   <input type="date" value={additionalInterestRateForm.effectiveDate} onChange={(e) => setAdditionalInterestRateForm((f) => ({ ...f, effectiveDate: e.target.value }))} className="sims-input" />

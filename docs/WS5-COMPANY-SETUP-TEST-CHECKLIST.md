@@ -77,7 +77,7 @@ after the deferred Part B pass (§Sign-off below).
 ## Phase 7 — Bordereaux profile
 
 - [ ] Admin → Bordereaux profiles: Premium/monthly/XLSX profile for the program/carrier (GL or all-LOB per how you'll report), `RequiresAccountCurrent` on.
-- [ ] Static values set: **UMR**, **coverholder PIN**, **year of account** → Setup status = **Ready for Export** (0 missing items).
+- [ ] Static values set: **UMR** (+ coverholder PIN/name default) → Setup status = **Ready for Export** (0 missing items). *(Post-batch F2/F7: Year of Account is now auto-derived from each transaction's effective year; required-columns/mapping no longer gate readiness — readiness = required tabs + UMR.)*
 
 ## Phase 8 — Accounting
 
@@ -155,7 +155,7 @@ Quote on the configured program/carrier, rate, and compare **quote grand total**
 - [ ] Workbench: premium preview shows the bound transaction in its **invoice-date** month with correct gross/commission/net-due-carrier.
 - [ ] Create run snapshot → run #1; validation summary **clear** (no missing London-LOB or SL-setup warnings if Phases 1/4 done).
 - [ ] Generate export package → London BDX + Account Current XLSX download; UMR/PIN/statics present; commission from invoice stamp.
-- [ ] Reconcile with matching totals → **Matched**; with off-by-$1 → **Mismatch**.
+- [ ] *(Optional — F8)* Reconcile is **not required** for the London flow (BDX + Account Current derive from the same snapshot; London bills from what's sent). Exercise only if checking against external/actual-cash figures: matching totals → **Matched**; off-by-$1 → **Mismatch**.
 - [ ] Second run creates run #2 without touching run #1 (frozen snapshots).
 
 ### T15 — Reports

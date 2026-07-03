@@ -113,7 +113,7 @@ public class ProgramConfigurationServiceTests
     {
         await using var db = CreateDb();
         var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
-        var carrier = new Carrier { Name = "Falls Lake", IsActive = true };
+        var carrier = new Carrier { Name = "Falls Lake", IsActive = true, LinesOfBusiness = { new() { LineOfBusiness = PolicyLineOfBusiness.InlandMarine } } };
         db.AddRange(program, carrier);
         await db.SaveChangesAsync();
 
@@ -144,7 +144,7 @@ public class ProgramConfigurationServiceTests
     {
         await using var db = CreateDb();
         var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
-        var carrier = new Carrier { Name = "Falls Lake", IsActive = true };
+        var carrier = new Carrier { Name = "Falls Lake", IsActive = true, LinesOfBusiness = { new() { LineOfBusiness = PolicyLineOfBusiness.InlandMarine } } };
         var formTemplate = new PolicyFormTemplate
         {
             FormNumber = "NC-IM-001",
@@ -240,7 +240,7 @@ public class ProgramConfigurationServiceTests
     {
         await using var db = CreateDb();
         var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
-        var carrier = new Carrier { Name = "Falls Lake", IsActive = true };
+        var carrier = new Carrier { Name = "Falls Lake", IsActive = true, LinesOfBusiness = { new() { LineOfBusiness = PolicyLineOfBusiness.InlandMarine } } };
         db.AddRange(program, carrier);
         await db.SaveChangesAsync();
 
@@ -262,11 +262,31 @@ public class ProgramConfigurationServiceTests
     }
 
     [Fact]
+    public async Task AddLineOfBusinessAsync_RejectsLineOfBusinessTheCarrierDoesNotWrite()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        // Carrier declares only GL; the program cannot deploy IM under it.
+        var carrier = new Carrier { Name = "BRACE", IsActive = true, LinesOfBusiness = { new() { LineOfBusiness = PolicyLineOfBusiness.GeneralLiability } } };
+        db.AddRange(program, carrier);
+        await db.SaveChangesAsync();
+
+        var service = new ProgramConfigurationService(db);
+        var programCarrier = await service.AddCarrierAsync(program.Id, new UpsertProgramCarrierRequest(carrier.Id, true, new DateOnly(2026, 1, 1), null, null));
+
+        var result = await service.AddLineOfBusinessAsync(program.Id, programCarrier.Value!.Id, new UpsertProgramCarrierLineOfBusinessRequest(
+            PolicyLineOfBusiness.InlandMarine, true, new DateOnly(2026, 1, 1), null, "IM setup"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("CARRIER_LOB_NOT_SUPPORTED", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task AddLineOfBusinessAsync_SavesLondonReportingValues()
     {
         await using var db = CreateDb();
         var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
-        var carrier = new Carrier { Name = "BRACE", IsActive = true };
+        var carrier = new Carrier { Name = "BRACE", IsActive = true, LinesOfBusiness = { new() { LineOfBusiness = PolicyLineOfBusiness.GeneralLiability } } };
         db.AddRange(program, carrier);
         await db.SaveChangesAsync();
 

@@ -166,6 +166,10 @@ public class ProgramConfigurationService : IProgramConfigurationService
         if (programCarrier is null)
             return Result<ProgramCarrierLineOfBusinessDto>.Failure("PROGRAM_CARRIER_NOT_FOUND", "Program carrier setup was not found.");
 
+        if (!await CarrierWritesLineOfBusinessAsync(programCarrier.CarrierId, request.LineOfBusiness, ct))
+            return Result<ProgramCarrierLineOfBusinessDto>.Failure("CARRIER_LOB_NOT_SUPPORTED",
+                "This carrier does not write the selected line of business. Add it to the carrier record first.");
+
         var duplicate = await _db.Set<ProgramCarrierLineOfBusiness>()
             .AnyAsync(l => l.ProgramCarrierId == programCarrierId && l.LineOfBusiness == request.LineOfBusiness, ct);
         if (duplicate)
@@ -217,6 +221,10 @@ public class ProgramConfigurationService : IProgramConfigurationService
             .AnyAsync(l => l.ProgramCarrierId == programCarrierId && l.LineOfBusiness == request.LineOfBusiness && l.Id != programCarrierLobId, ct);
         if (duplicate)
             return Result<ProgramCarrierLineOfBusinessDto>.Failure("PROGRAM_CARRIER_LOB_DUPLICATE", "Line of business is already configured for this program carrier.");
+
+        if (!await CarrierWritesLineOfBusinessAsync(lob.ProgramCarrier.CarrierId, request.LineOfBusiness, ct))
+            return Result<ProgramCarrierLineOfBusinessDto>.Failure("CARRIER_LOB_NOT_SUPPORTED",
+                "This carrier does not write the selected line of business. Add it to the carrier record first.");
 
         lob.LineOfBusiness = request.LineOfBusiness;
         lob.IsActive = request.IsActive;
@@ -550,6 +558,12 @@ public class ProgramConfigurationService : IProgramConfigurationService
         paymentTermsDays is < 0 or > 365
             ? ("INVALID_PAYMENT_TERMS", "Payment terms must be between 0 and 365 days.")
             : null;
+
+    // A program can only deploy a line of business the carrier actually writes
+    // (declared on the carrier record's CarrierLineOfBusiness capability list).
+    private async Task<bool> CarrierWritesLineOfBusinessAsync(Guid carrierId, PolicyLineOfBusiness lineOfBusiness, CancellationToken ct) =>
+        await _db.Set<CarrierLineOfBusiness>()
+            .AnyAsync(cl => cl.CarrierId == carrierId && cl.LineOfBusiness == lineOfBusiness, ct);
 
     private static Result<string> NormalizeStateCode(string stateCode)
     {

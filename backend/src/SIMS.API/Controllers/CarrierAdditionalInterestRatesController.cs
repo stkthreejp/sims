@@ -100,10 +100,14 @@ public class CarrierAdditionalInterestRatesController : ControllerBase
         row.LineOfBusiness = dto.LineOfBusiness;
         row.CoverageType = dto.CoverageType;
         row.ChargeMethod = dto.ChargeMethod;
-        row.PerInterestAmount = dto.PerInterestAmount;
-        row.BlanketAmount = dto.BlanketAmount;
-        row.MinimumCharge = dto.MinimumCharge;
-        row.MaximumCharge = dto.MaximumCharge;
+        // Keep only the amount(s) that apply to the chosen charge method so a rule can't
+        // carry a contradictory value (e.g. a per-interest rule with a stray blanket amount).
+        var isPerInterest = dto.ChargeMethod == Domain.Enums.AdditionalInterestChargeMethod.PerInterest;
+        var isBlanket = dto.ChargeMethod == Domain.Enums.AdditionalInterestChargeMethod.BlanketFlat;
+        row.PerInterestAmount = isPerInterest ? dto.PerInterestAmount : null;
+        row.BlanketAmount = isBlanket ? dto.BlanketAmount : null;
+        row.MinimumCharge = (isPerInterest || isBlanket) ? dto.MinimumCharge : null;
+        row.MaximumCharge = (isPerInterest || isBlanket) ? dto.MaximumCharge : null;
         row.State = dto.State?.Trim().ToUpperInvariant();
         row.EffectiveDate = dto.EffectiveDate;
         row.ExpirationDate = dto.ExpirationDate;

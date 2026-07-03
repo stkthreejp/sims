@@ -25,22 +25,11 @@ public class BordereauxService : IBordereauxService
     {
         Converters = { new JsonStringEnumConverter() },
     };
-    private static readonly SetupExpectation[] PremiumRequiredColumnExpectations =
-    [
-        new("Certificate Ref", "Certificate Ref"),
-        new("Gross premium paid this time", "Gross premium paid this time"),
-        new("Net Premium to London in original currency", "Net Premium to London in original currency"),
-    ];
     private static readonly SetupExpectation[] PremiumStaticValueExpectations =
     [
         new("umr", "Unique Market Reference (UMR)"),
-        new("yearOfAccount", "Year of Account"),
         new("coverholderName", "Coverholder Name", "Specialty Market Managers, LLC"),
         new("coverholderPin", "Coverholder PIN", "USA00060"),
-    ];
-    private static readonly SetupExpectation[] PremiumMappingRuleExpectations =
-    [
-        new("commissionBasis", "Commission Basis"),
     ];
     private sealed record ResolvedBordereauxProgramScope(
         Guid? ProgramCarrierId,
@@ -636,20 +625,20 @@ public class BordereauxService : IBordereauxService
                 []);
         }
 
+        // Readiness = required tabs (LOB-driven) + static values (UMR / coverholder).
+        // Required columns and the commission-basis mapping are structural export
+        // constants (always written, no user input), so they don't gate readiness.
         var tabItems = BuildArraySetupItems(RequiredTabsFor(profile), profile.RequiredTabsJson).ToList();
-        var columnItems = BuildArraySetupItems(PremiumRequiredColumnExpectations, profile.RequiredColumnsJson).ToList();
         var staticItems = BuildObjectSetupItems(PremiumStaticValueExpectations, profile.StaticValuesJson).ToList();
-        var mappingItems = BuildObjectSetupItems(PremiumMappingRuleExpectations, profile.MappingRulesJson).ToList();
-        var missingItems = tabItems.Concat(columnItems).Concat(staticItems).Concat(mappingItems)
-            .Count(item => item.Status == SetupMissing);
+        var missingItems = tabItems.Concat(staticItems).Count(item => item.Status == SetupMissing);
 
         return new BordereauxProfileSetupStatusDto(
             missingItems == 0,
             missingItems,
             tabItems,
-            columnItems,
+            [],
             staticItems,
-            mappingItems);
+            []);
     }
 
     private static IReadOnlyList<SetupExpectation> RequiredTabsFor(BordereauxProfile profile)
@@ -788,7 +777,6 @@ public class BordereauxService : IBordereauxService
         var coverholderName = GetStaticValue(staticValues, "coverholderName") ?? "Specialty Market Managers, LLC";
         var coverholderPin = GetStaticValue(staticValues, "coverholderPin") ?? "USA00060";
         var profileUmr = GetStaticValue(staticValues, "umr") ?? string.Empty;
-        var yearOfAccount = GetStaticValue(staticValues, "yearOfAccount") ?? string.Empty;
         var currencyCode = string.IsNullOrWhiteSpace(run.Profile.Carrier.DefaultCurrencyCode)
             ? "USD"
             : run.Profile.Carrier.DefaultCurrencyCode.Trim().ToUpperInvariant();
@@ -843,7 +831,9 @@ public class BordereauxService : IBordereauxService
                 setup?.LondonClassOfBusiness ?? string.Empty,
                 setup?.LondonRiskCode ?? string.Empty,
                 setup?.LondonInsuranceType ?? "DIRECT",
-                yearOfAccount,
+                // Year of Account derived from the transaction's effective year (interim,
+                // until the Binder entity resolves it from the binder period). F2.
+                row.TransactionEffectiveDate.Year.ToString(),
                 currencyCode,
                 commissionRate,
                 commissionAmount,

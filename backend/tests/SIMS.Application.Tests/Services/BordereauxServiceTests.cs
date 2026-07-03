@@ -84,7 +84,6 @@ public class BordereauxServiceTests
         Assert.True(result.IsSuccess, result.ErrorMessage);
         Assert.False(result.Value!.SetupStatus.IsReadyForExport);
         Assert.Contains(result.Value.SetupStatus.RequiredTabs, item => item.Status == "Missing");
-        Assert.Contains(result.Value.SetupStatus.RequiredColumns, item => item.Status == "Missing");
     }
 
     [Fact]
@@ -267,8 +266,6 @@ public class BordereauxServiceTests
         Assert.True(result.IsSuccess);
         Assert.False(result.Value!.SetupStatus.IsReadyForExport);
         Assert.Contains(result.Value.SetupStatus.RequiredTabs, item => item.Key == "Acct Current" && item.Status == "Missing");
-        Assert.Contains(result.Value.SetupStatus.RequiredColumns, item => item.Key == "Gross premium paid this time" && item.Status == "Missing");
-        Assert.Contains(result.Value.SetupStatus.MappingRules, item => item.Key == "commissionBasis" && item.Status == "Missing");
         Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "umr" && item.Status == "Missing");
         Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "coverholderName" && item.Status == "Default");
     }
@@ -288,7 +285,6 @@ public class BordereauxServiceTests
         Assert.True(result.IsSuccess);
         Assert.True(result.Value!.SetupStatus.IsReadyForExport);
         Assert.Equal(0, result.Value.SetupStatus.MissingItems);
-        Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "yearOfAccount" && item.Status == "Configured" && item.Value == "2025");
         Assert.Contains(result.Value.SetupStatus.StaticValues, item => item.Key == "coverholderName" && item.Status == "Default");
     }
 
