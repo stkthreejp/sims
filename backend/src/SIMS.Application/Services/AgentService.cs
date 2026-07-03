@@ -247,32 +247,40 @@ public class AgentService : IAgentService
             .Where(d => d.AgentId == agentId)
             .ToListAsync();
 
-        var docDtos = Enum.GetValues<AgentComplianceDocType>()
-            .Select(type =>
-            {
-                var doc = docs.FirstOrDefault(d => d.DocType == type);
-                return doc == null
-                    ? new AgentComplianceDocDto { DocType = type.ToString(), Status = "Missing" }
-                    : MapComplianceDocToDto(doc);
-            }).ToList();
-
-        var missingOrExpired = docDtos
-            .Where(d => d.Status is "Missing" or "Expired")
-            .Select(d => d.DocType)
+        var eo = docs.FirstOrDefault(d => d.DocType == AgentComplianceDocType.EOCertificate);
+        var broker = docs.FirstOrDefault(d => d.DocType == AgentComplianceDocType.BrokerAgreement);
+        var licenses = docs
+            .Where(d => d.DocType == AgentComplianceDocType.StateLicense)
+            .OrderBy(d => d.LicenseState)
+            .Select(MapComplianceDocToDto)
             .ToList();
+
+        var missingOrExpired = new List<string>();
+        if (eo == null || ComputeComplianceStatus(eo.ExpirationDate) == "Expired")
+            missingOrExpired.Add(nameof(AgentComplianceDocType.EOCertificate));
+        if (broker == null)
+            missingOrExpired.Add(nameof(AgentComplianceDocType.BrokerAgreement));
+        if (licenses.Count == 0 || licenses.Any(l => l.Status == "Expired"))
+            missingOrExpired.Add(nameof(AgentComplianceDocType.StateLicense));
 
         return new AgentComplianceStatusDto
         {
             IsQuoteReady = missingOrExpired.Count == 0,
             MissingOrExpired = missingOrExpired,
-            Docs = docDtos,
+            EoCertificate = eo == null ? null : MapComplianceDocToDto(eo),
+            BrokerAgreement = broker == null ? null : MapComplianceDocToDto(broker),
+            StateLicenses = licenses,
         };
     }
 
+    // EOCertificate & BrokerAgreement singletons.
     public async Task<Result<AgentComplianceDocDto>> UpsertComplianceDocAsync(Guid agentId, string docType, AgentComplianceDocUpsertDto dto)
     {
         if (!Enum.TryParse<AgentComplianceDocType>(docType, true, out var docTypeEnum))
             return Result<AgentComplianceDocDto>.Failure("INVALID_DOC_TYPE", $"Unknown doc type: {docType}");
+
+        if (docTypeEnum == AgentComplianceDocType.StateLicense)
+            return Result<AgentComplianceDocDto>.Failure("USE_LICENSE_ENDPOINT", "State licenses are managed as a collection; use the licenses endpoints.");
 
         var existing = await Db.Set<AgentComplianceDoc>()
             .IgnoreQueryFilters()
@@ -289,10 +297,7 @@ public class AgentService : IAgentService
             existing.DeletedAt = null;
         }
 
-        existing.ExpirationDate = dto.ExpirationDate;
-        existing.LicenseState = dto.LicenseState?.Trim();
-        existing.ExecutedDate = dto.ExecutedDate;
-        existing.Notes = dto.Notes?.Trim();
+        ApplyUpsert(existing, dto);
         existing.UpdatedAt = DateTime.UtcNow;
 
         await Db.SaveChangesAsync();
@@ -304,6 +309,9 @@ public class AgentService : IAgentService
         if (!Enum.TryParse<AgentComplianceDocType>(docType, true, out var docTypeEnum))
             return Result.Failure("INVALID_DOC_TYPE", $"Unknown doc type: {docType}");
 
+        if (docTypeEnum == AgentComplianceDocType.StateLicense)
+            return Result.Failure("USE_LICENSE_ENDPOINT", "State licenses are managed as a collection; use the licenses endpoints.");
+
         var doc = await Db.Set<AgentComplianceDoc>()
             .FirstOrDefaultAsync(d => d.AgentId == agentId && d.DocType == docTypeEnum);
 
@@ -313,6 +321,77 @@ public class AgentService : IAgentService
         doc.DeletedAt = DateTime.UtcNow;
         await Db.SaveChangesAsync();
         return Result.Success();
+    }
+
+    // StateLicense collection.
+    public async Task<Result<AgentComplianceDocDto>> AddStateLicenseAsync(Guid agentId, AgentComplianceDocUpsertDto dto)
+    {
+        if (!await Db.Set<Agent>().AnyAsync(a => a.Id == agentId))
+            return Result<AgentComplianceDocDto>.Failure("NOT_FOUND", "Agent not found.");
+
+        var state = dto.LicenseState?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(state))
+            return Result<AgentComplianceDocDto>.Failure("STATE_REQUIRED", "A state is required for a state license.");
+
+        var duplicate = await Db.Set<AgentComplianceDoc>()
+            .AnyAsync(d => d.AgentId == agentId && d.DocType == AgentComplianceDocType.StateLicense && d.LicenseState == state);
+        if (duplicate)
+            return Result<AgentComplianceDocDto>.Failure("DUPLICATE_STATE", $"A license for {state} already exists.");
+
+        var license = new AgentComplianceDoc { AgentId = agentId, DocType = AgentComplianceDocType.StateLicense };
+        ApplyUpsert(license, dto);
+        license.LicenseState = state;
+        Db.Set<AgentComplianceDoc>().Add(license);
+
+        await Db.SaveChangesAsync();
+        return Result<AgentComplianceDocDto>.Success(MapComplianceDocToDto(license));
+    }
+
+    public async Task<Result<AgentComplianceDocDto>> UpdateStateLicenseAsync(Guid agentId, Guid licenseId, AgentComplianceDocUpsertDto dto)
+    {
+        var license = await Db.Set<AgentComplianceDoc>()
+            .FirstOrDefaultAsync(d => d.Id == licenseId && d.AgentId == agentId && d.DocType == AgentComplianceDocType.StateLicense);
+        if (license == null) return Result<AgentComplianceDocDto>.Failure("NOT_FOUND", "State license not found.");
+
+        var state = dto.LicenseState?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(state))
+            return Result<AgentComplianceDocDto>.Failure("STATE_REQUIRED", "A state is required for a state license.");
+
+        var duplicate = await Db.Set<AgentComplianceDoc>()
+            .AnyAsync(d => d.AgentId == agentId && d.Id != licenseId
+                && d.DocType == AgentComplianceDocType.StateLicense && d.LicenseState == state);
+        if (duplicate)
+            return Result<AgentComplianceDocDto>.Failure("DUPLICATE_STATE", $"A license for {state} already exists.");
+
+        ApplyUpsert(license, dto);
+        license.LicenseState = state;
+        license.UpdatedAt = DateTime.UtcNow;
+
+        await Db.SaveChangesAsync();
+        return Result<AgentComplianceDocDto>.Success(MapComplianceDocToDto(license));
+    }
+
+    public async Task<Result> DeleteStateLicenseAsync(Guid agentId, Guid licenseId)
+    {
+        var license = await Db.Set<AgentComplianceDoc>()
+            .FirstOrDefaultAsync(d => d.Id == licenseId && d.AgentId == agentId && d.DocType == AgentComplianceDocType.StateLicense);
+        if (license == null) return Result.Failure("NOT_FOUND", "State license not found.");
+
+        license.IsDeleted = true;
+        license.DeletedAt = DateTime.UtcNow;
+        await Db.SaveChangesAsync();
+        return Result.Success();
+    }
+
+    private static void ApplyUpsert(AgentComplianceDoc doc, AgentComplianceDocUpsertDto dto)
+    {
+        doc.ExpirationDate = dto.ExpirationDate;
+        doc.EoLimit = dto.EoLimit;
+        doc.EoCarrierName = dto.EoCarrierName?.Trim();
+        doc.LicenseState = dto.LicenseState?.Trim();
+        doc.ExecutedDate = dto.ExecutedDate;
+        doc.IsContinuous = dto.IsContinuous;
+        doc.Notes = dto.Notes?.Trim();
     }
 
     // ─── Contact Log ─────────────────────────────────────────────────────────
@@ -426,19 +505,19 @@ public class AgentService : IAgentService
             .GroupBy(d => d.AgentId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var allTypes = Enum.GetValues<AgentComplianceDocType>();
         int missingCompliance = 0, eoExpiring = 0, licensesExpiring = 0;
 
         foreach (var agentId in activeAgentIds)
         {
             var agentDocs = docsByAgent.TryGetValue(agentId, out var docs) ? docs : new();
 
-            bool isReady = allTypes.All(type =>
-            {
-                var doc = agentDocs.FirstOrDefault(d => d.DocType == type);
-                return doc != null && (doc.ExpirationDate == null || doc.ExpirationDate >= today);
-            });
-            if (!isReady) missingCompliance++;
+            bool eoReady = agentDocs.Any(d => d.DocType == AgentComplianceDocType.EOCertificate
+                && (d.ExpirationDate == null || d.ExpirationDate >= today));
+            bool brokerReady = agentDocs.Any(d => d.DocType == AgentComplianceDocType.BrokerAgreement);
+            var stateLicenses = agentDocs.Where(d => d.DocType == AgentComplianceDocType.StateLicense).ToList();
+            bool licensesReady = stateLicenses.Count > 0
+                && stateLicenses.All(d => d.ExpirationDate == null || d.ExpirationDate >= today);
+            if (!(eoReady && brokerReady && licensesReady)) missingCompliance++;
 
             var eo = agentDocs.FirstOrDefault(d => d.DocType == AgentComplianceDocType.EOCertificate);
             if (eo?.ExpirationDate is { } eoDue && eoDue >= today && eoDue <= in30Days)
@@ -525,8 +604,11 @@ public class AgentService : IAgentService
         Id = d.Id,
         DocType = d.DocType.ToString(),
         ExpirationDate = d.ExpirationDate,
+        EoLimit = d.EoLimit,
+        EoCarrierName = d.EoCarrierName,
         LicenseState = d.LicenseState,
         ExecutedDate = d.ExecutedDate,
+        IsContinuous = d.IsContinuous,
         Notes = d.Notes,
         Status = ComputeComplianceStatus(d.ExpirationDate),
     };

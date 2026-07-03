@@ -129,6 +129,32 @@ public class AgentsController : ControllerBase
         return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
+    // State licenses — collection (multiple states per agent, keyed by row id).
+
+    [HttpPost("{id:guid}/compliance/licenses")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
+    public async Task<IActionResult> AddStateLicense(Guid id, [FromBody] AgentComplianceDocUpsertDto dto)
+    {
+        var result = await _agentService.AddStateLicenseAsync(id, dto);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpPut("{id:guid}/compliance/licenses/{licenseId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
+    public async Task<IActionResult> UpdateStateLicense(Guid id, Guid licenseId, [FromBody] AgentComplianceDocUpsertDto dto)
+    {
+        var result = await _agentService.UpdateStateLicenseAsync(id, licenseId, dto);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
+    [HttpDelete("{id:guid}/compliance/licenses/{licenseId:guid}")]
+    [Authorize(Policy = AppPermissions.AdminSystemManage)]
+    public async Task<IActionResult> DeleteStateLicense(Guid id, Guid licenseId)
+    {
+        var result = await _agentService.DeleteStateLicenseAsync(id, licenseId);
+        return result.IsSuccess ? NoContent() : BadRequest(new { result.ErrorCode, result.ErrorMessage });
+    }
+
     // ─── Contact Log ─────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/contact-log")]

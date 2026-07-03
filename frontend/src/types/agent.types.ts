@@ -88,23 +88,31 @@ export interface AgentComplianceDoc {
   id: string
   docType: AgentComplianceDocType
   expirationDate: string | null
+  eoLimit: number | null
+  eoCarrierName: string | null
   licenseState: string | null
   executedDate: string | null
+  isContinuous: boolean
   notes: string | null
   status: AgentComplianceStatus
 }
 
 export interface AgentComplianceDocUpsert {
   expirationDate?: string | null
+  eoLimit?: number | null
+  eoCarrierName?: string | null
   licenseState?: string | null
   executedDate?: string | null
+  isContinuous?: boolean
   notes?: string | null
 }
 
 export interface AgentComplianceStatusResult {
   isQuoteReady: boolean
   missingOrExpired: string[]
-  docs: AgentComplianceDoc[]
+  eoCertificate: AgentComplianceDoc | null
+  brokerAgreement: AgentComplianceDoc | null
+  stateLicenses: AgentComplianceDoc[]
 }
 
 // ─── Contact Log ─────────────────────────────────────────────────────────────

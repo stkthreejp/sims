@@ -12,7 +12,7 @@ import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import type {
   AgentLocation, AgentContact, AgentLocationInput, AgentContactInput,
-  AgentComplianceDocType, AgentComplianceDocUpsert, AgentContactLogCreate,
+  AgentComplianceDoc, AgentComplianceDocUpsert, AgentContactLogCreate,
 } from '@/types/agent.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -300,8 +300,10 @@ export function AgentDetailPage() {
   const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
 
-  const [editingComplianceDoc, setEditingComplianceDoc] = useState<AgentComplianceDocType | null>(null)
-  const [complianceForm, setComplianceForm] = useState({ expirationDate: '', licenseState: '', executedDate: '', notes: '' })
+  // Compliance editing key: 'EOCertificate' | 'BrokerAgreement' | 'license-new' | `license-<id>`
+  const [editingCompliance, setEditingCompliance] = useState<string | null>(null)
+  const emptyComplianceForm = { expirationDate: '', eoLimit: '', eoCarrierName: '', licenseState: '', executedDate: '', isContinuous: false, notes: '' }
+  const [complianceForm, setComplianceForm] = useState(emptyComplianceForm)
   const [showLogCreate, setShowLogCreate] = useState(false)
   const [logForm, setLogForm] = useState({ logDate: '', logType: 'Call', contactName: '', notes: '' })
 
@@ -345,24 +347,58 @@ export function AgentDetailPage() {
     enabled: !!id,
   })
 
+  const invalidateCompliance = () => qc.invalidateQueries({ queryKey: ['agents', id, 'compliance'] })
+  const complianceError = (e: unknown) =>
+    toast.error((e as { response?: { data?: { errorMessage?: string } } })?.response?.data?.errorMessage ?? 'Failed to update compliance doc')
+
   const upsertComplianceMutation = useMutation({
     mutationFn: ({ docType, data }: { docType: string; data: AgentComplianceDocUpsert }) =>
       agentsApi.upsertComplianceDoc(id!, docType, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['agents', id, 'compliance'] })
-      setEditingComplianceDoc(null)
+      invalidateCompliance()
+      setEditingCompliance(null)
       toast.success('Compliance doc updated')
     },
-    onError: () => toast.error('Failed to update compliance doc'),
+    onError: complianceError,
   })
 
   const deleteComplianceMutation = useMutation({
     mutationFn: (docType: string) => agentsApi.deleteComplianceDoc(id!, docType),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['agents', id, 'compliance'] })
+      invalidateCompliance()
       toast.success('Compliance doc removed')
     },
-    onError: () => toast.error('Failed to remove compliance doc'),
+    onError: complianceError,
+  })
+
+  const addLicenseMutation = useMutation({
+    mutationFn: (data: AgentComplianceDocUpsert) => agentsApi.addStateLicense(id!, data),
+    onSuccess: () => {
+      invalidateCompliance()
+      setEditingCompliance(null)
+      toast.success('State license added')
+    },
+    onError: complianceError,
+  })
+
+  const updateLicenseMutation = useMutation({
+    mutationFn: ({ licenseId, data }: { licenseId: string; data: AgentComplianceDocUpsert }) =>
+      agentsApi.updateStateLicense(id!, licenseId, data),
+    onSuccess: () => {
+      invalidateCompliance()
+      setEditingCompliance(null)
+      toast.success('State license updated')
+    },
+    onError: complianceError,
+  })
+
+  const deleteLicenseMutation = useMutation({
+    mutationFn: (licenseId: string) => agentsApi.deleteStateLicense(id!, licenseId),
+    onSuccess: () => {
+      invalidateCompliance()
+      toast.success('State license removed')
+    },
+    onError: complianceError,
   })
 
   const createLogMutation = useMutation({
@@ -758,156 +794,291 @@ export function AgentDetailPage() {
           </div>
         </div>
         <div className="sd-card-body">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {(['EOCertificate', 'StateLicense', 'BrokerAgreement'] as AgentComplianceDocType[]).map((docType) => {
-              const doc = compliance?.docs.find((d) => d.docType === docType)
-              const status = doc?.status ?? 'Missing'
-              const isEditing = editingComplianceDoc === docType
+          {(() => {
+            const statusMeta = (status: string) => ({
+              Icon: status === 'Current' ? ShieldCheck : status === 'ExpiringSoon' ? ShieldAlert : ShieldX,
+              color: status === 'Current' ? 'var(--good-fg)' : status === 'ExpiringSoon' ? 'var(--warn-fg)' : 'var(--bad-fg)',
+              border: status === 'Missing' || status === 'Expired' ? 'var(--bad-fg)' : status === 'ExpiringSoon' ? 'var(--warn-fg)' : 'var(--border)',
+              pill: status === 'Current' ? 'good' : status === 'ExpiringSoon' ? 'expiring' : status === 'Expired' ? 'cancelled' : 'withdrawn',
+            })
+            const openEdit = (key: string, doc: AgentComplianceDoc | null) => {
+              setEditingCompliance(key)
+              setComplianceForm({
+                expirationDate: doc?.expirationDate ?? '',
+                eoLimit: doc?.eoLimit != null ? String(doc.eoLimit) : '',
+                eoCarrierName: doc?.eoCarrierName ?? '',
+                licenseState: doc?.licenseState ?? '',
+                executedDate: doc?.executedDate ?? '',
+                isContinuous: doc?.isContinuous ?? false,
+                notes: doc?.notes ?? '',
+              })
+            }
+            const NotesField = (
+              <div>
+                <label className="sims-field-label">Notes</label>
+                <input
+                  value={complianceForm.notes}
+                  onChange={(e) => setComplianceForm({ ...complianceForm, notes: e.target.value })}
+                  className="sims-input"
+                  placeholder="Optional notes"
+                />
+              </div>
+            )
+            const eo = compliance?.eoCertificate ?? null
+            const broker = compliance?.brokerAgreement ?? null
+            const licenses = compliance?.stateLicenses ?? []
 
-              const label = docType === 'EOCertificate' ? 'E&O Certificate'
-                : docType === 'StateLicense' ? 'State License'
-                : 'Broker Agreement'
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Singletons: E&O Certificate + Broker Agreement */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {/* E&O Certificate */}
+                  {(() => {
+                    const status = eo?.status ?? 'Missing'
+                    const m = statusMeta(status)
+                    const isEditing = editingCompliance === 'EOCertificate'
+                    return (
+                      <div style={{ border: `1px solid ${m.border}`, borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <m.Icon style={{ width: 14, height: 14, color: m.color }} />
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>E&amp;O Certificate</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => openEdit('EOCertificate', eo)} className="sims-icon-btn" title="Edit">
+                              <Pencil style={{ width: 12, height: 12 }} />
+                            </button>
+                            {eo && (
+                              <button onClick={() => { if (confirm('Remove E&O Certificate?')) deleteComplianceMutation.mutate('EOCertificate') }} className="sims-icon-btn" title="Remove">
+                                <Trash2 style={{ width: 12, height: 12 }} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {!isEditing && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span className={`sd-pill ${m.pill}`} style={{ alignSelf: 'flex-start' }}>{status}</span>
+                            {eo?.expirationDate && <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Expires {eo.expirationDate}</p>}
+                            {eo?.eoLimit != null && <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>Limit ${eo.eoLimit.toLocaleString()}</p>}
+                            {eo?.eoCarrierName && <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>Carrier: {eo.eoCarrierName}</p>}
+                          </div>
+                        )}
+                        {isEditing && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                              <div>
+                                <label className="sims-field-label">Expiration Date</label>
+                                <input type="date" value={complianceForm.expirationDate} onChange={(e) => setComplianceForm({ ...complianceForm, expirationDate: e.target.value })} className="sims-input" />
+                              </div>
+                              <div>
+                                <label className="sims-field-label">Limit ($)</label>
+                                <input type="number" min={0} step={1000} value={complianceForm.eoLimit} onChange={(e) => setComplianceForm({ ...complianceForm, eoLimit: e.target.value })} className="sims-input" placeholder="e.g. 1000000" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="sims-field-label">Insurance Company</label>
+                              <input value={complianceForm.eoCarrierName} onChange={(e) => setComplianceForm({ ...complianceForm, eoCarrierName: e.target.value })} className="sims-input" placeholder="E&O carrier name" />
+                            </div>
+                            {NotesField}
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                onClick={() => upsertComplianceMutation.mutate({ docType: 'EOCertificate', data: {
+                                  expirationDate: complianceForm.expirationDate || null,
+                                  eoLimit: complianceForm.eoLimit ? Number(complianceForm.eoLimit) : null,
+                                  eoCarrierName: complianceForm.eoCarrierName || null,
+                                  notes: complianceForm.notes || null,
+                                } })}
+                                disabled={upsertComplianceMutation.isPending}
+                                className="sd-btn primary sm"
+                              >
+                                <Check style={{ width: 11, height: 11 }} /> Save
+                              </button>
+                              <button onClick={() => setEditingCompliance(null)} className="sd-btn outline sm">
+                                <X style={{ width: 11, height: 11 }} /> Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
 
-              const StatusIcon = status === 'Current' ? ShieldCheck
-                : status === 'ExpiringSoon' ? ShieldAlert
-                : ShieldX
+                  {/* Broker Agreement */}
+                  {(() => {
+                    const status = broker?.status ?? 'Missing'
+                    const m = statusMeta(status)
+                    const isEditing = editingCompliance === 'BrokerAgreement'
+                    return (
+                      <div style={{ border: `1px solid ${m.border}`, borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <m.Icon style={{ width: 14, height: 14, color: m.color }} />
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>Broker Agreement</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => openEdit('BrokerAgreement', broker)} className="sims-icon-btn" title="Edit">
+                              <Pencil style={{ width: 12, height: 12 }} />
+                            </button>
+                            {broker && (
+                              <button onClick={() => { if (confirm('Remove Broker Agreement?')) deleteComplianceMutation.mutate('BrokerAgreement') }} className="sims-icon-btn" title="Remove">
+                                <Trash2 style={{ width: 12, height: 12 }} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {!isEditing && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span className={`sd-pill ${m.pill}`} style={{ alignSelf: 'flex-start' }}>{status}</span>
+                            {broker?.isContinuous && <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Continuous (evergreen)</p>}
+                            {!broker?.isContinuous && broker?.executedDate && <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Executed {broker.executedDate}</p>}
+                          </div>
+                        )}
+                        {isEditing && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-2)' }}>
+                              <input type="checkbox" checked={complianceForm.isContinuous} onChange={(e) => setComplianceForm({ ...complianceForm, isContinuous: e.target.checked })} />
+                              Continuous (evergreen — no renewal date)
+                            </label>
+                            {!complianceForm.isContinuous && (
+                              <div>
+                                <label className="sims-field-label">Executed Date</label>
+                                <input type="date" value={complianceForm.executedDate} onChange={(e) => setComplianceForm({ ...complianceForm, executedDate: e.target.value })} className="sims-input" />
+                              </div>
+                            )}
+                            {NotesField}
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                onClick={() => upsertComplianceMutation.mutate({ docType: 'BrokerAgreement', data: {
+                                  executedDate: complianceForm.isContinuous ? null : (complianceForm.executedDate || null),
+                                  isContinuous: complianceForm.isContinuous,
+                                  notes: complianceForm.notes || null,
+                                } })}
+                                disabled={upsertComplianceMutation.isPending}
+                                className="sd-btn primary sm"
+                              >
+                                <Check style={{ width: 11, height: 11 }} /> Save
+                              </button>
+                              <button onClick={() => setEditingCompliance(null)} className="sd-btn outline sm">
+                                <X style={{ width: 11, height: 11 }} /> Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
 
-              const statusColor = status === 'Current' ? 'var(--good-fg)'
-                : status === 'ExpiringSoon' ? 'var(--warn-fg)'
-                : 'var(--bad-fg)'
-
-              return (
-                <div
-                  key={docType}
-                  style={{
-                    border: `1px solid ${status === 'Missing' || status === 'Expired' ? 'var(--bad-fg)' : status === 'ExpiringSoon' ? 'var(--warn-fg)' : 'var(--border)'}`,
-                    borderRadius: 8,
-                    padding: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
+                {/* State Licenses (collection) */}
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <StatusIcon style={{ width: 14, height: 14, color: statusColor }} />
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>{label}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        onClick={() => {
-                          setEditingComplianceDoc(docType)
-                          setComplianceForm({
-                            expirationDate: doc?.expirationDate ?? '',
-                            licenseState: doc?.licenseState ?? '',
-                            executedDate: doc?.executedDate ?? '',
-                            notes: doc?.notes ?? '',
-                          })
-                        }}
-                        className="sims-icon-btn"
-                        title="Edit"
-                      >
-                        <Pencil style={{ width: 12, height: 12 }} />
-                      </button>
-                      {doc && (
-                        <button
-                          onClick={() => { if (confirm(`Remove ${label}?`)) deleteComplianceMutation.mutate(docType) }}
-                          className="sims-icon-btn"
-                          title="Remove"
-                        >
-                          <Trash2 style={{ width: 12, height: 12 }} />
-                        </button>
-                      )}
-                    </div>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>
+                      State Licenses {licenses.length > 0 && <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>({licenses.length})</span>}
+                    </span>
+                    <button
+                      onClick={() => openEdit('license-new', null)}
+                      className="sd-btn outline sm"
+                      disabled={editingCompliance === 'license-new'}
+                    >
+                      <Plus style={{ width: 11, height: 11 }} /> Add License
+                    </button>
                   </div>
 
-                  {!isEditing && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <span className={`sd-pill ${status === 'Current' ? 'good' : status === 'ExpiringSoon' ? 'expiring' : status === 'Expired' ? 'cancelled' : 'withdrawn'}`} style={{ alignSelf: 'flex-start' }}>
-                        {status === 'Missing' ? 'Missing' : status}
-                      </span>
-                      {doc?.expirationDate && (
-                        <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-                          Expires {doc.expirationDate}
-                        </p>
-                      )}
-                      {doc?.licenseState && (
-                        <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>State: {doc.licenseState}</p>
-                      )}
-                    </div>
+                  {licenses.length === 0 && editingCompliance !== 'license-new' && (
+                    <p style={{ fontSize: 12, color: 'var(--bad-fg)' }}>No state licenses on file — agent is not quote-ready.</p>
                   )}
 
-                  {isEditing && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {licenses.map((lic) => {
+                    const m = statusMeta(lic.status)
+                    const isEditing = editingCompliance === `license-${lic.id}`
+                    if (isEditing) {
+                      return (
+                        <div key={lic.id} style={{ border: `1px solid ${m.border}`, borderRadius: 6, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 8 }}>
+                            <div>
+                              <label className="sims-field-label">State</label>
+                              <input value={complianceForm.licenseState} onChange={(e) => setComplianceForm({ ...complianceForm, licenseState: e.target.value.toUpperCase() })} className="sims-input" placeholder="TX" maxLength={2} />
+                            </div>
+                            <div>
+                              <label className="sims-field-label">Expiration Date</label>
+                              <input type="date" value={complianceForm.expirationDate} onChange={(e) => setComplianceForm({ ...complianceForm, expirationDate: e.target.value })} className="sims-input" />
+                            </div>
+                          </div>
+                          {NotesField}
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              onClick={() => updateLicenseMutation.mutate({ licenseId: lic.id, data: {
+                                licenseState: complianceForm.licenseState || null,
+                                expirationDate: complianceForm.expirationDate || null,
+                                notes: complianceForm.notes || null,
+                              } })}
+                              disabled={updateLicenseMutation.isPending || !complianceForm.licenseState}
+                              className="sd-btn primary sm"
+                            >
+                              <Check style={{ width: 11, height: 11 }} /> Save
+                            </button>
+                            <button onClick={() => setEditingCompliance(null)} className="sd-btn outline sm">
+                              <X style={{ width: 11, height: 11 }} /> Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div key={lic.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${m.border}`, borderRadius: 6, padding: '8px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <m.Icon style={{ width: 13, height: 13, color: m.color }} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>{lic.licenseState}</span>
+                          <span className={`sd-pill ${m.pill}`}>{lic.status}</span>
+                          {lic.expirationDate && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Expires {lic.expirationDate}</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => openEdit(`license-${lic.id}`, lic)} className="sims-icon-btn" title="Edit">
+                            <Pencil style={{ width: 12, height: 12 }} />
+                          </button>
+                          <button onClick={() => { if (confirm(`Remove ${lic.licenseState} license?`)) deleteLicenseMutation.mutate(lic.id) }} className="sims-icon-btn" title="Remove">
+                            <Trash2 style={{ width: 12, height: 12 }} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {editingCompliance === 'license-new' && (
+                    <div style={{ border: '1px dashed var(--border)', borderRadius: 6, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 8 }}>
+                        <div>
+                          <label className="sims-field-label">State</label>
+                          <input value={complianceForm.licenseState} onChange={(e) => setComplianceForm({ ...complianceForm, licenseState: e.target.value.toUpperCase() })} className="sims-input" placeholder="TX" maxLength={2} autoFocus />
+                        </div>
                         <div>
                           <label className="sims-field-label">Expiration Date</label>
-                          <input
-                            type="date"
-                            value={complianceForm.expirationDate}
-                            onChange={(e) => setComplianceForm({ ...complianceForm, expirationDate: e.target.value })}
-                            className="sims-input"
-                          />
+                          <input type="date" value={complianceForm.expirationDate} onChange={(e) => setComplianceForm({ ...complianceForm, expirationDate: e.target.value })} className="sims-input" />
                         </div>
-                        {docType === 'StateLicense' && (
-                          <div>
-                            <label className="sims-field-label">State</label>
-                            <input
-                              value={complianceForm.licenseState}
-                              onChange={(e) => setComplianceForm({ ...complianceForm, licenseState: e.target.value })}
-                              className="sims-input"
-                              placeholder="e.g. TX"
-                              maxLength={2}
-                            />
-                          </div>
-                        )}
-                        {docType === 'BrokerAgreement' && (
-                          <div>
-                            <label className="sims-field-label">Executed Date</label>
-                            <input
-                              type="date"
-                              value={complianceForm.executedDate}
-                              onChange={(e) => setComplianceForm({ ...complianceForm, executedDate: e.target.value })}
-                              className="sims-input"
-                            />
-                          </div>
-                        )}
                       </div>
-                      <div>
-                        <label className="sims-field-label">Notes</label>
-                        <input
-                          value={complianceForm.notes}
-                          onChange={(e) => setComplianceForm({ ...complianceForm, notes: e.target.value })}
-                          className="sims-input"
-                          placeholder="Optional notes"
-                        />
-                      </div>
+                      {NotesField}
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button
-                          onClick={() => upsertComplianceMutation.mutate({
-                            docType,
-                            data: {
-                              expirationDate: complianceForm.expirationDate || null,
-                              licenseState: complianceForm.licenseState || null,
-                              executedDate: complianceForm.executedDate || null,
-                              notes: complianceForm.notes || null,
-                            },
+                          onClick={() => addLicenseMutation.mutate({
+                            licenseState: complianceForm.licenseState || null,
+                            expirationDate: complianceForm.expirationDate || null,
+                            notes: complianceForm.notes || null,
                           })}
-                          disabled={upsertComplianceMutation.isPending}
+                          disabled={addLicenseMutation.isPending || !complianceForm.licenseState}
                           className="sd-btn primary sm"
                         >
-                          <Check style={{ width: 11, height: 11 }} /> Save
+                          <Check style={{ width: 11, height: 11 }} /> Add
                         </button>
-                        <button onClick={() => setEditingComplianceDoc(null)} className="sd-btn outline sm">
+                        <button onClick={() => setEditingCompliance(null)} className="sd-btn outline sm">
                           <X style={{ width: 11, height: 11 }} /> Cancel
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
 

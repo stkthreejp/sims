@@ -66,6 +66,16 @@ export const agentsApi = {
   deleteComplianceDoc: (agentId: string, docType: string) =>
     apiClient.delete(`/agents/${agentId}/compliance/${docType}`),
 
+  // State licenses (collection)
+  addStateLicense: (agentId: string, data: AgentComplianceDocUpsert) =>
+    apiClient.post<AgentComplianceDoc>(`/agents/${agentId}/compliance/licenses`, data).then((r) => r.data),
+
+  updateStateLicense: (agentId: string, licenseId: string, data: AgentComplianceDocUpsert) =>
+    apiClient.put<AgentComplianceDoc>(`/agents/${agentId}/compliance/licenses/${licenseId}`, data).then((r) => r.data),
+
+  deleteStateLicense: (agentId: string, licenseId: string) =>
+    apiClient.delete(`/agents/${agentId}/compliance/licenses/${licenseId}`),
+
   // Contact log
   getContactLog: (agentId: string) =>
     apiClient.get<AgentContactLog[]>(`/agents/${agentId}/contact-log`).then((r) => r.data),

@@ -15,11 +15,16 @@ public class AgentComplianceDoc : BaseEntity
     // EOCertificate / StateLicense
     public DateOnly? ExpirationDate { get; set; }
 
+    // EOCertificate only
+    public decimal? EoLimit { get; set; }
+    public string? EoCarrierName { get; set; }
+
     // StateLicense only
     public string? LicenseState { get; set; }
 
     // BrokerAgreement only
     public DateOnly? ExecutedDate { get; set; }
+    public bool IsContinuous { get; set; }
 
     public string? Notes { get; set; }
 

@@ -22,7 +22,12 @@ Statuses: `LOGGED` → `DECIDED` (disposition agreed) → `IN BATCH` → `DEPLOY
   sends `{}`). Reconcile stays optional. Checklist T14 marked optional.
 - **F11 DEPLOYED** — Intermediaries admin stacked top/bottom (list capped-scroll on top).
 
-Deferred: full Binder (F2 end-state), F9a (agent compliance — Wave 2), F9b, F10.
+Deferred: full Binder (F2 end-state), F9b (agent doc attachments), F10 (CreatePayable → WS11).
+
+## Batch 2 (shipped 2026-07-03)
+
+- **F9a DEPLOYED** — agent compliance rework: E&O limit + insurance-company fields, Broker
+  Agreement continuous flag, and **multiple state licenses** (collection). See F9 below.
 
 ---
 
@@ -237,10 +242,19 @@ in the backend. So the step is already skippable — no code change needed to pr
 
 ## F9 — Agent compliance docs: missing fields, single-per-type, and no attachments
 
-**Status: DECIDED (2026-07-02) — F9a fields+multiple-licenses in batch; F9b attachments post-UAT.**
-- **F9a (batch):** E&O limit + insurance-company name (+ require them); State License reworked
-  to **multiple** (collection, not singleton-per-type); Broker Agreement **Continuous** flag
-  that grays out the expiration date. Validation for the new required fields.
+**Status: F9a DEPLOYED (Wave 2, 2026-07-03) — F9b attachments post-UAT.**
+- **F9a (DEPLOYED):** E&O certificate gained **limit** + **insurance-company name** fields;
+  **State License reworked to a collection** — `AgentComplianceDoc` StateLicense rows are now
+  multiple (one per state, keyed by row id) via `POST/PUT/DELETE /agents/{id}/compliance/licenses`,
+  with duplicate-state and required-state guards; EOCertificate & BrokerAgreement stay singletons
+  on the existing `PUT/DELETE /compliance/{docType}` (which now reject StateLicense). Broker
+  Agreement gained a **Continuous** (evergreen) flag that hides the executed date when set.
+  Quote-readiness = EO present & not-expired + Broker present + ≥1 license & none expired.
+  Migration `AddAgentComplianceEoAndContinuousFields` adds `eo_limit`, `eo_carrier_name`,
+  `is_continuous`. Detail-page compliance card reworked into EO + Broker cards + a multi-row
+  State Licenses section. (Note: the new E&O limit/carrier fields are captured but **not**
+  gated as required — kept informational to avoid blocking quote-readiness; revisit if UAT wants
+  them hard-required.)
 - **F9b (post-UAT):** required document uploads (dec page / license copy / signed agreement)
   auto-filed to the agent Documents section.
 

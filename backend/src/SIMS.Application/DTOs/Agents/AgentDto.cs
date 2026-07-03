@@ -7,8 +7,11 @@ public class AgentComplianceDocDto
     public Guid Id { get; set; }
     public string DocType { get; set; } = string.Empty;
     public DateOnly? ExpirationDate { get; set; }
+    public decimal? EoLimit { get; set; }
+    public string? EoCarrierName { get; set; }
     public string? LicenseState { get; set; }
     public DateOnly? ExecutedDate { get; set; }
+    public bool IsContinuous { get; set; }
     public string? Notes { get; set; }
     public string Status { get; set; } = string.Empty; // Current | ExpiringSoon | Expired | Missing
 }
@@ -16,8 +19,11 @@ public class AgentComplianceDocDto
 public class AgentComplianceDocUpsertDto
 {
     public DateOnly? ExpirationDate { get; set; }
+    public decimal? EoLimit { get; set; }
+    public string? EoCarrierName { get; set; }
     public string? LicenseState { get; set; }
     public DateOnly? ExecutedDate { get; set; }
+    public bool IsContinuous { get; set; }
     public string? Notes { get; set; }
 }
 
@@ -25,7 +31,9 @@ public class AgentComplianceStatusDto
 {
     public bool IsQuoteReady { get; set; }
     public List<string> MissingOrExpired { get; set; } = new();
-    public List<AgentComplianceDocDto> Docs { get; set; } = new();
+    public AgentComplianceDocDto? EoCertificate { get; set; }
+    public AgentComplianceDocDto? BrokerAgreement { get; set; }
+    public List<AgentComplianceDocDto> StateLicenses { get; set; } = new();
 }
 
 // ─── Contact log ─────────────────────────────────────────────────────────────

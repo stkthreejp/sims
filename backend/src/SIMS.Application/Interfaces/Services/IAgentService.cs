@@ -21,10 +21,14 @@ public interface IAgentService
     Task<Result<AgentContactDto>> UpdateContactAsync(Guid agentId, Guid locationId, Guid contactId, AgentContactInputDto dto);
     Task<Result> DeleteContactAsync(Guid agentId, Guid locationId, Guid contactId);
 
-    // Compliance docs
+    // Compliance docs — EOCertificate & BrokerAgreement are singletons (keyed by doc type);
+    // StateLicense is a collection (multiple states per agent, keyed by row id).
     Task<AgentComplianceStatusDto> GetComplianceStatusAsync(Guid agentId);
     Task<Result<AgentComplianceDocDto>> UpsertComplianceDocAsync(Guid agentId, string docType, AgentComplianceDocUpsertDto dto);
     Task<Result> DeleteComplianceDocAsync(Guid agentId, string docType);
+    Task<Result<AgentComplianceDocDto>> AddStateLicenseAsync(Guid agentId, AgentComplianceDocUpsertDto dto);
+    Task<Result<AgentComplianceDocDto>> UpdateStateLicenseAsync(Guid agentId, Guid licenseId, AgentComplianceDocUpsertDto dto);
+    Task<Result> DeleteStateLicenseAsync(Guid agentId, Guid licenseId);
 
     // Contact log
     Task<IEnumerable<AgentContactLogDto>> GetContactLogsAsync(Guid agentId);
