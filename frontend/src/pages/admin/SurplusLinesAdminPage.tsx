@@ -87,7 +87,7 @@ export function SurplusLinesAdminPage() {
   })
   const { data: payees = [] } = useQuery({
     queryKey: ['admin', 'fees', 'payees'],
-    queryFn: feesApi.getPayees,
+    queryFn: () => feesApi.getPayees(),
   })
 
   const selectedSetup = useMemo(
@@ -126,6 +126,18 @@ export function SurplusLinesAdminPage() {
   )
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin', 'surplus-lines', 'setups'] })
+
+  const [newPayeeName, setNewPayeeName] = useState('')
+  const [newPayeeType, setNewPayeeType] = useState('TaxFilingService')
+  const createPayee = useMutation({
+    mutationFn: () => feesApi.createPayee({ name: newPayeeName.trim(), payeeType: newPayeeType }),
+    onSuccess: (payee) => {
+      toast.success(`Payee '${payee.name}' added`)
+      setNewPayeeName('')
+      qc.invalidateQueries({ queryKey: ['admin', 'fees', 'payees'] })
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Payee could not be added')),
+  })
 
   const saveSetup = useMutation({
     mutationFn: () => editingId
@@ -392,6 +404,29 @@ export function SurplusLinesAdminPage() {
 
           <div className="border-t pt-5">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Filing handling</div>
+            <div className="mb-3 grid items-end gap-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 md:grid-cols-[1fr_220px_auto]">
+              <TextInput
+                label="New payee name"
+                value={newPayeeName}
+                onChange={setNewPayeeName}
+              />
+              <SelectField label="Payee type" value={newPayeeType} onChange={setNewPayeeType}>
+                <option value="TaxFilingService">Tax filing service</option>
+                <option value="Carrier">Carrier</option>
+                <option value="PremiumFinance">Premium finance</option>
+                <option value="Broker">Broker</option>
+                <option value="Other">Other</option>
+              </SelectField>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                disabled={!newPayeeName.trim() || createPayee.isPending}
+                onClick={() => createPayee.mutate()}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {createPayee.isPending ? 'Adding…' : 'Add payee'}
+              </button>
+            </div>
             <div className="grid gap-3 md:grid-cols-4">
               <CheckInput
                 label="Filed by vendor"

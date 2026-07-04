@@ -287,8 +287,8 @@ export function SubmissionDetailPage() {
   })
 
   const { data: programs = [] } = useQuery({
-    queryKey: ['admin', 'program-configurations', 'active'],
-    queryFn: () => programConfigurationsApi.getAll(false),
+    queryKey: ['program-configurations', 'options', 'active'],
+    queryFn: () => programConfigurationsApi.getOptions(false),
   })
 
   const { data: usersData } = useQuery({

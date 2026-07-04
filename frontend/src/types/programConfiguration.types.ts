@@ -89,3 +89,13 @@ export interface ProgramCarrierLobStateUpsert {
   expirationDate?: string | null
   notes?: string | null
 }
+
+export interface ProgramOrphanIssue {
+  severity: string // 'error' | 'warning'
+  path: string
+  issue: string
+}
+
+export interface ProgramOrphanAudit {
+  issues: ProgramOrphanIssue[]
+}

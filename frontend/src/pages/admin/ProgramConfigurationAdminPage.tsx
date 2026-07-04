@@ -16,6 +16,7 @@ import type {
   ProgramCarrierUpsert,
   ProgramConfiguration,
   ProgramConfigurationUpsert,
+  ProgramOrphanIssue,
 } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 
@@ -100,6 +101,16 @@ export function ProgramConfigurationAdminPage() {
   }, [programs, selectedProgramId])
 
   const refreshPrograms = () => qc.invalidateQueries({ queryKey: ['admin', 'program-configurations'] })
+
+  const [orphanIssues, setOrphanIssues] = useState<ProgramOrphanIssue[] | null>(null)
+  const orphanAudit = useMutation({
+    mutationFn: () => programConfigurationsApi.getOrphanAudit(),
+    onSuccess: (audit) => {
+      setOrphanIssues(audit.issues)
+      if (audit.issues.length === 0) toast.success('Orphan audit clean — no findings')
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Orphan audit failed')),
+  })
 
   const saveProgram = useMutation({
     mutationFn: () => {
@@ -242,6 +253,43 @@ export function ProgramConfigurationAdminPage() {
         title="Program Configuration"
         subtitle="Set up the Program > Carrier > LOB > State foundation for quotes, policies, fees, documents, and reporting"
       />
+
+      <div className="rounded-lg border bg-white">
+        <div className="flex items-center justify-between gap-3 px-5 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800">Orphan audit</h2>
+            <p className="text-xs text-slate-500">Checks every program for missing carriers, lines of business, and states.</p>
+          </div>
+          <button
+            type="button"
+            className={miniBtn}
+            onClick={() => orphanAudit.mutate()}
+            disabled={orphanAudit.isPending}
+          >
+            <Layers3 className="h-3.5 w-3.5" />
+            {orphanAudit.isPending ? 'Running…' : 'Run orphan audit'}
+          </button>
+        </div>
+        {orphanIssues !== null && (
+          <div className="border-t px-5 py-3">
+            {orphanIssues.length === 0 ? (
+              <p className="text-sm text-emerald-700">No findings — every program path has carriers, lines of business, and states.</p>
+            ) : (
+              <ul className="space-y-1">
+                {orphanIssues.map((issue, i) => (
+                  <li key={i} className="text-sm">
+                    <span className={issue.severity === 'error' ? 'font-semibold text-red-700' : 'font-semibold text-amber-700'}>
+                      {issue.severity === 'error' ? 'Error' : 'Warning'}
+                    </span>
+                    <span className="text-slate-500"> · {issue.path} — </span>
+                    <span className="text-slate-800">{issue.issue}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
         <section className="rounded-lg border bg-white">

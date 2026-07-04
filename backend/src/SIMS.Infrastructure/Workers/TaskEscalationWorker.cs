@@ -59,6 +59,7 @@ public class TaskEscalationWorker : BackgroundService
         var clientSecret = config["GraphApi:ClientSecret"]   ?? throw new InvalidOperationException("GraphApi:ClientSecret not configured.");
         var mailbox      = config["GraphApi:MailboxAddress"] ?? throw new InvalidOperationException("GraphApi:MailboxAddress not configured.");
         var frontendBase = config["AppSettings:FrontendBaseUrl"] ?? "http://localhost:5173";
+        var redirectTo   = config["Email:RedirectAllTo"];
 
         var graph = new GraphServiceClient(new ClientSecretCredential(tenantId, clientId, clientSecret));
 
@@ -148,7 +149,10 @@ public class TaskEscalationWorker : BackgroundService
                 foreach (var user in notifyUsers)
                 {
                     if (string.IsNullOrEmpty(user.Email)) continue;
-                    await TrySendEmailAsync(graph, mailbox, user.Email, user.FullName, subject, emailBody, ct);
+                    if (!string.IsNullOrWhiteSpace(redirectTo))
+                        await TrySendEmailAsync(graph, mailbox, redirectTo, user.FullName, $"[TEST → {user.Email}] {subject}", emailBody, ct);
+                    else
+                        await TrySendEmailAsync(graph, mailbox, user.Email, user.FullName, subject, emailBody, ct);
                 }
             }
         }

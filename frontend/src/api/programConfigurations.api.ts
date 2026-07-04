@@ -8,11 +8,20 @@ import type {
   ProgramCarrierUpsert,
   ProgramConfiguration,
   ProgramConfigurationUpsert,
+  ProgramOrphanAudit,
 } from '@/types/programConfiguration.types'
 
 export const programConfigurationsApi = {
   getAll: (includeInactive = false) =>
     apiClient.get<ProgramConfiguration[]>('/admin/program-configurations', { params: { includeInactive } }).then((r) => r.data),
+
+  // Read-only lookup for pickers — reachable by any authenticated user, unlike
+  // the admin-gated getAll (which silently 403s for underwriters).
+  getOptions: (includeInactive = false) =>
+    apiClient.get<ProgramConfiguration[]>('/program-configurations/options', { params: { includeInactive } }).then((r) => r.data),
+
+  getOrphanAudit: () =>
+    apiClient.get<ProgramOrphanAudit>('/admin/program-configurations/orphan-audit').then((r) => r.data),
 
   create: (data: ProgramConfigurationUpsert) =>
     apiClient.post<ProgramConfiguration>('/admin/program-configurations', data).then((r) => r.data),

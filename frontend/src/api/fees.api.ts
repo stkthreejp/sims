@@ -5,8 +5,14 @@ export const feesApi = {
   getLedgerAccounts: () =>
     apiClient.get<LedgerAccountOption[]>('/admin/fees/ledger-accounts').then((r) => r.data),
 
-  getPayees: () =>
-    apiClient.get<PayeeOption[]>('/admin/fees/payees').then((r) => r.data),
+  getPayees: (includeInactive = false) =>
+    apiClient.get<PayeeOption[]>('/admin/fees/payees', { params: { includeInactive } }).then((r) => r.data),
+
+  createPayee: (data: { name: string; payeeType: string; externalReference?: string | null; isActive?: boolean }) =>
+    apiClient.post<PayeeOption>('/admin/fees/payees', data).then((r) => r.data),
+
+  updatePayee: (id: number, data: { name: string; payeeType: string; externalReference?: string | null; isActive?: boolean }) =>
+    apiClient.put<PayeeOption>(`/admin/fees/payees/${id}`, data).then((r) => r.data),
 
   // Definitions
   getDefinitions: () =>

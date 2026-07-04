@@ -37,16 +37,72 @@ public class FeesController : ControllerBase
         return Ok(accounts);
     }
 
+    private static readonly string[] PayeeTypes = ["Carrier", "TaxFilingService", "PremiumFinance", "Broker", "Other"];
+
     [HttpGet("payees")]
-    public async Task<IActionResult> GetPayees(CancellationToken ct)
+    public async Task<IActionResult> GetPayees([FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
         var payees = await _db.Set<Payee>()
-            .Where(p => p.TenantId == 1 && p.IsActive)
+            .Where(p => p.TenantId == 1 && (includeInactive || p.IsActive))
             .OrderBy(p => p.Name)
-            .Select(p => new PayeeOptionDto(p.Id, p.Name, p.PayeeType))
+            .Select(p => new PayeeOptionDto(p.Id, p.Name, p.PayeeType, p.IsActive))
             .ToListAsync(ct);
 
         return Ok(payees);
+    }
+
+    [HttpPost("payees")]
+    public async Task<IActionResult> CreatePayee([FromBody] UpsertPayeeRequest req, CancellationToken ct)
+    {
+        var name = req.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest(new { ErrorCode = "VALIDATION", ErrorMessage = "Payee name is required." });
+        if (!PayeeTypes.Contains(req.PayeeType))
+            return BadRequest(new { ErrorCode = "VALIDATION", ErrorMessage = $"Payee type must be one of: {string.Join(", ", PayeeTypes)}." });
+
+        var duplicate = await _db.Set<Payee>()
+            .AnyAsync(p => p.TenantId == 1 && p.Name.ToLower() == name.ToLower(), ct);
+        if (duplicate)
+            return BadRequest(new { ErrorCode = "DUPLICATE_NAME", ErrorMessage = $"A payee named '{name}' already exists." });
+
+        var payee = new Payee
+        {
+            Name = name,
+            PayeeType = req.PayeeType,
+            ExternalReference = string.IsNullOrWhiteSpace(req.ExternalReference) ? null : req.ExternalReference.Trim(),
+            IsActive = req.IsActive,
+        };
+        _db.Set<Payee>().Add(payee);
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new PayeeOptionDto(payee.Id, payee.Name, payee.PayeeType, payee.IsActive));
+    }
+
+    [HttpPut("payees/{id:long}")]
+    public async Task<IActionResult> UpdatePayee(long id, [FromBody] UpsertPayeeRequest req, CancellationToken ct)
+    {
+        var payee = await _db.Set<Payee>().FirstOrDefaultAsync(p => p.Id == id && p.TenantId == 1, ct);
+        if (payee is null)
+            return NotFound(new { ErrorCode = "NOT_FOUND", ErrorMessage = "Payee not found." });
+
+        var name = req.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest(new { ErrorCode = "VALIDATION", ErrorMessage = "Payee name is required." });
+        if (!PayeeTypes.Contains(req.PayeeType))
+            return BadRequest(new { ErrorCode = "VALIDATION", ErrorMessage = $"Payee type must be one of: {string.Join(", ", PayeeTypes)}." });
+
+        var duplicate = await _db.Set<Payee>()
+            .AnyAsync(p => p.TenantId == 1 && p.Id != id && p.Name.ToLower() == name.ToLower(), ct);
+        if (duplicate)
+            return BadRequest(new { ErrorCode = "DUPLICATE_NAME", ErrorMessage = $"A payee named '{name}' already exists." });
+
+        payee.Name = name;
+        payee.PayeeType = req.PayeeType;
+        payee.ExternalReference = string.IsNullOrWhiteSpace(req.ExternalReference) ? null : req.ExternalReference.Trim();
+        payee.IsActive = req.IsActive;
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new PayeeOptionDto(payee.Id, payee.Name, payee.PayeeType, payee.IsActive));
     }
 
     [HttpGet("definitions")]

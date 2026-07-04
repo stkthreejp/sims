@@ -34,13 +34,32 @@ public class GraphOutboundEmailSenderService : IOutboundEmailSenderService
         try
         {
             var (graphClient, mailboxAddress) = CreateGraphClient();
+
+            // Non-production sink: when Email:RedirectAllTo is set, every send goes to
+            // that address instead of the real recipients, with the original recipient
+            // preserved in the subject.
+            var redirectAllTo = _config["Email:RedirectAllTo"];
+            var subject = communication.Subject;
+            var toAddress = communication.ToAddress;
+            var toName = communication.ToName;
+            var ccAddresses = communication.CcAddresses;
+            var bccAddresses = communication.BccAddresses;
+            if (!string.IsNullOrWhiteSpace(redirectAllTo))
+            {
+                subject = $"[TEST → {communication.ToAddress}] {subject}";
+                toAddress = redirectAllTo;
+                toName = null;
+                ccAddresses = null;
+                bccAddresses = null;
+            }
+
             var message = new Message
             {
-                Subject = communication.Subject,
+                Subject = subject,
                 Body = new ItemBody { ContentType = BodyType.Html, Content = communication.BodyHtml },
-                ToRecipients = BuildRecipients(communication.ToAddress, communication.ToName),
-                CcRecipients = BuildRecipients(communication.CcAddresses, null),
-                BccRecipients = BuildRecipients(communication.BccAddresses, null),
+                ToRecipients = BuildRecipients(toAddress, toName),
+                CcRecipients = BuildRecipients(ccAddresses, null),
+                BccRecipients = BuildRecipients(bccAddresses, null),
                 ReplyTo = BuildRecipients(communication.FromAddress, communication.FromName),
                 Attachments = await BuildAttachmentsAsync(communication, cancellationToken),
             };

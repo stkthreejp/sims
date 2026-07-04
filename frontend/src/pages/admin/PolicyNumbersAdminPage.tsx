@@ -53,8 +53,8 @@ export function PolicyNumbersAdminPage() {
   })
 
   const { data: programs = [] } = useQuery({
-    queryKey: ['admin', 'program-configurations'],
-    queryFn: () => programConfigurationsApi.getAll(true),
+    queryKey: ['program-configurations', 'options', 'all'],
+    queryFn: () => programConfigurationsApi.getOptions(true),
   })
 
   const selectedAssignmentProgram = programs.find((program) => program.id === assignmentForm.programConfigurationId)

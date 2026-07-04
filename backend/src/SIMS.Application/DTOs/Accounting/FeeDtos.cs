@@ -20,7 +20,15 @@ public record LedgerAccountOptionDto(
 public record PayeeOptionDto(
     long Id,
     string Name,
-    string PayeeType
+    string PayeeType,
+    bool IsActive = true
+);
+
+public record UpsertPayeeRequest(
+    string Name,
+    string PayeeType,
+    string? ExternalReference,
+    bool IsActive = true
 );
 
 public record FeeRuleVersionDto(

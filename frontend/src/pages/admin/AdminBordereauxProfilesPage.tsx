@@ -13,14 +13,28 @@ import {
   BordereauxProfileSetupPanel,
   bordereauxProfileToRequest,
 } from '@/components/bordereaux/BordereauxProfileSetupPanel'
+import axios from 'axios'
 import { LOB_LABELS } from '@/types/quote.types'
 import { DEFAULT_BDX_TXN_TYPES, type BordereauxProfile, type UpsertBordereauxProfileRequest } from '@/types/bordereaux.types'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+function getApiErrorMessage(e: unknown, fallback: string) {
+  if (axios.isAxiosError(e)) {
+    const data = e.response?.data
+    if (typeof data === 'string') return data
+    return data?.errorMessage ?? data?.detail ?? data?.title ?? data?.message ?? fallback
+  }
+  if (e instanceof Error) return e.message
+  return fallback
+}
 
-const REPORT_TYPES = ['Premium', 'TaxFee', 'Commission'] as const
-const FREQUENCIES  = ['Monthly', 'Quarterly', 'Annual'] as const
-const OUTPUT_FMTS  = ['LondonBordereaux', 'XLSX', 'CSV'] as const
+// ── Constants ─────────────────────────────────────────────────────────────────
+// Values must match the backend enums exactly (BordereauxReportType /
+// BordereauxFrequency / BordereauxOutputFormat) — extend the backend first
+// before offering new options here.
+
+const REPORT_TYPES = ['Premium'] as const
+const FREQUENCIES  = ['Monthly'] as const
+const OUTPUT_FMTS  = ['Xlsx'] as const
 const DATE_BASES   = ['EffectiveOrBoundDateGreater', 'EffectiveDate', 'BoundDate'] as const
 
 function blankRequest(): UpsertBordereauxProfileRequest {
@@ -32,7 +46,7 @@ function blankRequest(): UpsertBordereauxProfileRequest {
     stateCode: null,
     reportType: 'Premium',
     frequency: 'Monthly',
-    outputFormat: 'LondonBordereaux',
+    outputFormat: 'Xlsx',
     dateBasis: 'EffectiveOrBoundDateGreater',
     requiresAccountCurrent: true,
     isActive: true,
@@ -93,7 +107,7 @@ function ProfileForm({
     setForm(prev => ({ ...prev, [k]: v }))
 
   const { data: programs = [] } = useQuery({
-    queryKey: ['programs', 'all'],
+    queryKey: ['admin', 'program-configurations', 'active'],
     queryFn: () => programConfigurationsApi.getAll(false),
   })
   const { data: carriers = [] } = useQuery({
@@ -229,7 +243,7 @@ export default function AdminBordereauxProfilesPage() {
       setShowCreate(false)
       setSelectedId(profile.id)
     },
-    onError: () => toast.error('Failed to create profile'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to create profile')),
   })
 
   const update = useMutation({
@@ -240,7 +254,7 @@ export default function AdminBordereauxProfilesPage() {
       qc.invalidateQueries({ queryKey: ['bordereaux', 'profiles'] })
       qc.setQueryData(['bordereaux', 'profile', profile.id], profile)
     },
-    onError: () => toast.error('Failed to save profile'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save profile')),
   })
 
   function handleSetupSave(patch: BordereauxProfile) {

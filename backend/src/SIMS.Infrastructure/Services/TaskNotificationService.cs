@@ -20,6 +20,7 @@ public class TaskNotificationService : ITaskNotificationService
     private readonly GraphServiceClient _graphClient;
     private readonly string _mailboxAddress;
     private readonly string _frontendBaseUrl;
+    private readonly string? _redirectAllTo;
 
     private static readonly TimeSpan WorkerInterval = TimeSpan.FromMinutes(15);
 
@@ -36,6 +37,7 @@ public class TaskNotificationService : ITaskNotificationService
         var clientSecret = config["GraphApi:ClientSecret"]      ?? throw new InvalidOperationException("GraphApi:ClientSecret not configured.");
         _mailboxAddress  = config["GraphApi:MailboxAddress"]    ?? throw new InvalidOperationException("GraphApi:MailboxAddress not configured.");
         _frontendBaseUrl = config["AppSettings:FrontendBaseUrl"] ?? "http://localhost:5173";
+        _redirectAllTo   = config["Email:RedirectAllTo"];
 
         _graphClient = new GraphServiceClient(
             new ClientSecretCredential(tenantId, clientId, clientSecret));
@@ -330,6 +332,12 @@ public class TaskNotificationService : ITaskNotificationService
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(_redirectAllTo))
+            {
+                subject = $"[TEST → {toEmail}] {subject}";
+                toEmail = _redirectAllTo;
+            }
+
             var request = new SendMailPostRequestBody
             {
                 Message = new Message

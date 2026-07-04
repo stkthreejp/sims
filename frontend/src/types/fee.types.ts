@@ -24,6 +24,7 @@ export interface PayeeOption {
   id: number
   name: string
   payeeType: string
+  isActive?: boolean
 }
 
 export interface FeePremiumBracket {

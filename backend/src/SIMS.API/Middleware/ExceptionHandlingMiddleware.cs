@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace SIMS.API.Middleware;
 
@@ -22,10 +24,20 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
+            if (FindPostgresException(ex) is not null)
+                _logger.LogWarning(ex, "Database constraint rejected the request: {Message}", ex.Message);
+            else
+                _logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
             await HandleExceptionAsync(context, ex);
         }
     }
+
+    private static PostgresException? FindPostgresException(Exception exception) => exception switch
+    {
+        PostgresException pg => pg,
+        DbUpdateException { InnerException: not null } db => FindPostgresException(db.InnerException!),
+        _ => null,
+    };
 
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
@@ -37,6 +49,12 @@ public class ExceptionHandlingMiddleware
             ArgumentException ex => (HttpStatusCode.BadRequest, "Bad Request", ex.ParamName != null
                 ? $"Invalid value for parameter '{ex.ParamName}'."
                 : "Invalid argument."),
+            _ when FindPostgresException(exception) is { SqlState: "P0001" } pg =>
+                (HttpStatusCode.Conflict, "Configuration rule violation", pg.MessageText),
+            _ when FindPostgresException(exception) is { SqlState: "23505" } =>
+                (HttpStatusCode.Conflict, "Duplicate record", "A record with the same unique value already exists (it may be a previously deleted record)."),
+            _ when FindPostgresException(exception) is { SqlState: "23503" } =>
+                (HttpStatusCode.Conflict, "Invalid reference", "A referenced record does not exist, or this record is still referenced by other records."),
             _ => (HttpStatusCode.InternalServerError, "Internal Server Error", "An unexpected error occurred.")
         };
 
