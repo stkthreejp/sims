@@ -81,7 +81,7 @@ after the deferred Part B pass (§Sign-off below).
 
 ## Phase 8 — Accounting
 
-- [ ] Chart of accounts / journal mapping present. Xero optional now: unbound config just leaves `pending_journal_syncs` rows in Pending (worker retries; not an error).
+- [ ] Chart of accounts / journal mapping present. Xero optional now — but note (audit 2026-07-04): with Xero unbound, a rollup export marks the rollup **Failed** ("Xero is not configured"); **no `pending_journal_syncs` rows appear** (the retry queue is dead code — nothing enqueues; WS8 item). Expected: leave rollups un-triggered or accept the Failed status and resync after binding config.
 
 ## Phase 9 — Access
 
@@ -137,7 +137,7 @@ Quote on the configured program/carrier, rate, and compare **quote grand total**
 - [ ] Preview → draft PDF; Issue → final packet filed with the selected forms incl. the state SL disclosure form; dec page fields correct.
 
 ### T9 — Accounting artifacts
-- [ ] Ledger transaction balanced; carrier payable, agent commission, receivable rows as expected; Xero sync row Pending/Synced (per config).
+- [ ] Ledger transaction balanced; carrier payable, agent commission, receivable rows as expected; Xero rollup **Failed (unbound — expected)** or Synced (bound). *(No Pending sync rows exist today — the retry queue is dead code; WS8.)*
 
 ### T10 — Endorsement (positive)
 - [ ] Midterm endorsement with premium increase: rates, invoices, completes; shows on policy transaction artifacts.
@@ -197,7 +197,7 @@ program-hierarchy/financial/forms setup that no migration covers.
 ## Setup deltas (repeat Phases 1–9 for Beazley/IM)
 
 - [ ] Phase 1: Program hierarchy — Beazley carrier, **IM LOB** active + launch states; London fields for the IM binder (its own UMR/section/class of business).
-- [ ] Phase 2: Carrier rating assignment **IM → IM_v1 v1** exists (seeded — verify in AdminRatingPage/carrier detail rather than create).
+- [ ] Phase 2: Carrier rating assignment **IM → IM_v1 v1** exists — **create it if absent** (audit 2026-07-04: the May-4 seed only fired if a carrier named *beazley* existed when that migration ran; on a fresh/rebuilt DB it created nothing).
 - [ ] Phase 2b: Equipment types (12) and territories (7, with state→territory map) present.
 - [ ] Phases 3–8: commissions, SL setup + fees per state, policy-number sequence + assignment for IM, form package + proposal template, BDX profile (IM Unit Info tab matters), accounting mapping — same drill as Part A.
 - [ ] Re-run the **orphan audit** after Part B setup; resolve findings.
