@@ -482,7 +482,7 @@ export function FeesAdminPage() {
             ['applyToChildLines', 'Apply to Child Lines'],
             ['applyOnlyOnce', 'Apply Only Once'],
             ['onlyAppliesToIssuanceState', 'Only applies to state of issuance'],
-            ['appliesToFlatCancellations', 'Applies to Flat Cancellations'],
+            ['appliesToFlatCancellations', 'Only applies to flat cancellations'],
             ['mandatoryCharge', 'Mandatory Charge'],
           ] as [keyof VersionForm, string][]).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -674,7 +674,9 @@ export function FeesAdminPage() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => { setNonTaxableEdit(versions[0]?.nonTaxableStates ?? []); setShowTaxability(true) }}
-                    className="sd-btn outline px-3 py-1.5 text-xs rounded">Taxable States</button>
+                    disabled={loadingVersions || versions.length === 0}
+                    title={loadingVersions ? 'Loading versions…' : versions.length === 0 ? 'Add a rule version before editing taxability' : undefined}
+                    className="sd-btn outline px-3 py-1.5 text-xs rounded disabled:opacity-40 disabled:cursor-not-allowed">Taxable States</button>
                   <button onClick={() => openNewVersion()}
                     className="sd-btn primary flex items-center gap-1 px-3 py-1.5 text-xs rounded">
                     <Plus className="h-3 w-3" /> New Version
@@ -924,9 +926,22 @@ export function FeesAdminPage() {
                 ))}
               </div>
             </div>
-            <div className="px-6 py-4 border-t flex justify-end gap-2 flex-shrink-0" style={{ borderColor: 'var(--line)' }}>
-              <button onClick={() => setShowTaxability(false)} className="sd-btn outline px-4 py-2 text-sm">Cancel</button>
-              <button onClick={() => saveTaxability()} className="sd-btn primary px-4 py-2 text-sm">Save</button>
+            <div className="px-6 py-4 border-t flex items-center justify-between gap-2 flex-shrink-0" style={{ borderColor: 'var(--line)' }}>
+              <span className="text-xs" style={{ color: 'var(--ink-3)' }}>
+                {nonTaxableEdit.length === 0
+                  ? 'All states taxable'
+                  : `${nonTaxableEdit.length} state${nonTaxableEdit.length === 1 ? '' : 's'} non-taxable: ${[...nonTaxableEdit].sort().join(', ')}`}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => setShowTaxability(false)} className="sd-btn outline px-4 py-2 text-sm">Cancel</button>
+                <button
+                  onClick={() => {
+                    if (nonTaxableEdit.length === 0 &&
+                        !confirm('This will mark EVERY state taxable for this fee (no non-taxable states). Continue?')) return
+                    saveTaxability()
+                  }}
+                  className="sd-btn primary px-4 py-2 text-sm">Save</button>
+              </div>
             </div>
           </div>
         </div>

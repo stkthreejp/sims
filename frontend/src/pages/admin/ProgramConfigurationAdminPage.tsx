@@ -101,6 +101,19 @@ export function ProgramConfigurationAdminPage() {
     if (!selectedProgramId && programs.length > 0) setSelectedProgramId(programs[0].id)
   }, [programs, selectedProgramId])
 
+  // Reset all child-edit state when the selected program changes, so a Save started
+  // under program A can never target program B's spine (audit A1 — wrong-target saves).
+  useEffect(() => {
+    setCarrierForm(emptyCarrier())
+    setEditingCarrierId(null)
+    setLobParentCarrierId(null)
+    setLobForm(emptyLob())
+    setEditingLobId(null)
+    setStateParent(null)
+    setStateForm(emptyState())
+    setEditingStateId(null)
+  }, [selectedProgram?.id])
+
   const refreshPrograms = () => qc.invalidateQueries({ queryKey: ['admin', 'program-configurations'] })
 
   const [orphanIssues, setOrphanIssues] = useState<ProgramOrphanIssue[] | null>(null)

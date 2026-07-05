@@ -323,7 +323,13 @@ export function PolicyNumbersAdminPage() {
                 ))}
               </div>
             </div>
-            <button onClick={() => saveSequence.mutate()} disabled={saveSequence.isPending || !sequenceForm.name || !sequenceForm.format} className="sd-btn primary">
+            <button onClick={() => {
+              // Warn if lowering NextNumber on an existing sequence — reissuing already-minted numbers (audit A5).
+              const stored = editingSequenceId ? sequences.find((s) => s.id === editingSequenceId) : undefined
+              if (stored && Number(sequenceForm.nextNumber) < stored.nextNumber &&
+                  !confirm(`Next number ${sequenceForm.nextNumber} is lower than the current ${stored.nextNumber}. This can mint DUPLICATE policy numbers. Continue?`)) return
+              saveSequence.mutate()
+            }} disabled={saveSequence.isPending || !sequenceForm.name || !sequenceForm.format} className="sd-btn primary">
               <Save className="h-4 w-4" /> Save sequence
             </button>
           </div>
@@ -397,7 +403,10 @@ export function PolicyNumbersAdminPage() {
                         <button onClick={() => editAssignment(assignment)} className="sims-icon-btn" title="Edit assignment">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => deleteAssignment.mutate(assignment.id)} className="sims-icon-btn hover:text-red-600" title="Remove assignment">
+                        <button onClick={() => {
+                          const scope = [LOB_LABELS[assignment.lineOfBusiness], assignment.state ?? 'All states'].filter(Boolean).join(' · ')
+                          if (confirm(`Delete this policy-number assignment (${scope} → ${assignment.sequenceName})?\n\nBinds matching this scope will fall back to legacy numbering. This cannot be undone.`)) deleteAssignment.mutate(assignment.id)
+                        }} className="sims-icon-btn hover:text-red-600" title="Remove assignment">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -455,7 +464,13 @@ export function PolicyNumbersAdminPage() {
                       <button onClick={() => editSequence(sequence)} className="sims-icon-btn" title="Edit sequence">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button onClick={() => deleteSequence.mutate(sequence.id)} className="sims-icon-btn hover:text-red-600" title="Remove sequence">
+                      <button onClick={() => {
+                        const refs = assignments.filter((a) => a.policyNumberSequenceId === sequence.id).length
+                        const warn = refs > 0
+                          ? `\n\n${refs} assignment${refs === 1 ? '' : 's'} reference this sequence and will stop generating numbers.`
+                          : ''
+                        if (confirm(`Delete policy-number sequence "${sequence.name}"?${warn}\n\nThis cannot be undone.`)) deleteSequence.mutate(sequence.id)
+                      }} className="sims-icon-btn hover:text-red-600" title="Remove sequence">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
