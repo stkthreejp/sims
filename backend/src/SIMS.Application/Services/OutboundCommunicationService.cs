@@ -286,6 +286,7 @@ public class OutboundCommunicationService : IOutboundCommunicationService
             .Include(q => q.Submission).ThenInclude(s => s.Underwriter)
             .Include(q => q.Submission).ThenInclude(s => s.Equipment).ThenInclude(e => e.EquipmentType)
             .Include(q => q.Submission).ThenInclude(s => s.AdditionalInterests)
+            .Include(q => q.Submission).ThenInclude(s => s.Vehicles)
             .FirstOrDefaultAsync(q => q.Id == quoteId)
             ?? throw new InvalidOperationException("Quote not found.");
 
@@ -325,6 +326,7 @@ public class OutboundCommunicationService : IOutboundCommunicationService
             .Include(p => p.Submission).ThenInclude(s => s.Underwriter)
             .Include(p => p.Submission).ThenInclude(s => s.Equipment).ThenInclude(e => e.EquipmentType)
             .Include(p => p.Submission).ThenInclude(s => s.AdditionalInterests)
+            .Include(p => p.Submission).ThenInclude(s => s.Vehicles)
             .FirstOrDefaultAsync(p => p.Id == policyId)
             ?? throw new InvalidOperationException("Policy not found.");
 
@@ -366,6 +368,7 @@ public class OutboundCommunicationService : IOutboundCommunicationService
             .Include(s => s.Underwriter)
             .Include(s => s.Equipment).ThenInclude(e => e.EquipmentType)
             .Include(s => s.AdditionalInterests)
+            .Include(s => s.Vehicles)
             .FirstOrDefaultAsync(s => s.Id == submissionId)
             ?? throw new InvalidOperationException("Submission not found.");
 
@@ -439,6 +442,22 @@ public class OutboundCommunicationService : IOutboundCommunicationService
                 ["Address"] = FormatAddress(i.AddressLine1, i.AddressLine2, i.City, i.State, i.ZipCode),
                 ["Types"] = FormatAdditionalInterestTypes(i),
                 ["LoanNumber"] = i.ScheduledItemNumbers,
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
+
+        data.RepeatingValues["Vehicles"] = submission.Vehicles
+            .Where(v => !v.IsDeleted)
+            .OrderBy(v => v.UnitNumber)
+            .Select(v => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["UnitNumber"] = v.UnitNumber,
+                ["Year"] = v.Year,
+                ["Make"] = v.Make,
+                ["Model"] = v.Model,
+                ["Vin"] = v.Vin,
+                ["StatedValue"] = v.ApdStatedValue,
+                ["CompDeductible"] = v.ApdCompDeductible,
+                ["CollDeductible"] = v.ApdCollDeductible,
             } as IReadOnlyDictionary<string, object?>)
             .ToList();
     }

@@ -554,6 +554,15 @@ public class PolicyFormService : IPolicyFormService
         Tag("Types", "Interest types", "Additional Interests", repeatBlock: "AdditionalInterests"),
         Tag("LoanNumber", "Loan or contract number", "Additional Interests", repeatBlock: "AdditionalInterests"),
 
+        Tag("UnitNumber", "Unit number", "Vehicles", "Number", "number", "Vehicles"),
+        Tag("Year", "Year", "Vehicles", "Number", "number", "Vehicles"),
+        Tag("Make", "Make", "Vehicles", repeatBlock: "Vehicles"),
+        Tag("Model", "Model", "Vehicles", repeatBlock: "Vehicles"),
+        Tag("Vin", "VIN", "Vehicles", repeatBlock: "Vehicles"),
+        Tag("StatedValue", "Stated value", "Vehicles", "Currency", "currency", "Vehicles"),
+        Tag("CompDeductible", "Comprehensive deductible", "Vehicles", "Currency", "currency", "Vehicles"),
+        Tag("CollDeductible", "Collision deductible", "Vehicles", "Currency", "currency", "Vehicles"),
+
         Tag("FormNumber", "Form number", "Forms", repeatBlock: "PolicyForms"),
         Tag("FormName", "Form name", "Forms", repeatBlock: "PolicyForms"),
         Tag("EditionDate", "Edition date", "Forms", repeatBlock: "PolicyForms"),

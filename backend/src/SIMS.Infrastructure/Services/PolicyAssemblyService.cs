@@ -153,6 +153,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             .Include(p => p.Submission).ThenInclude(s => s.Locations)
             .Include(p => p.Submission).ThenInclude(s => s.Equipment)
             .Include(p => p.Submission).ThenInclude(s => s.AdditionalInterests)
+            .Include(p => p.Submission).ThenInclude(s => s.Vehicles)
             .Include(p => p.BoundQuote)
             .FirstOrDefaultAsync(p => p.Id == policyId);
 
@@ -387,8 +388,26 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             } as IReadOnlyDictionary<string, object?>)
             .ToList();
 
+        data.RepeatingValues["Vehicles"] = BuildVehicleRows(policy.Submission.Vehicles);
+
         return data;
     }
+
+    private static List<IReadOnlyDictionary<string, object?>> BuildVehicleRows(IEnumerable<SubmissionVehicle> vehicles) =>
+        vehicles
+            .OrderBy(v => v.UnitNumber)
+            .Select(v => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["UnitNumber"] = v.UnitNumber,
+                ["Year"] = v.Year,
+                ["Make"] = v.Make,
+                ["Model"] = v.Model,
+                ["Vin"] = v.Vin,
+                ["StatedValue"] = v.ApdStatedValue,
+                ["CompDeductible"] = v.ApdCompDeductible,
+                ["CollDeductible"] = v.ApdCollDeductible,
+            } as IReadOnlyDictionary<string, object?>)
+            .ToList();
 
     private static string FormatAdditionalInterestTypes(SubmissionAdditionalInterest interest)
     {

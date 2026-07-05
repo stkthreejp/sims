@@ -192,6 +192,19 @@ public class PolicyFormServiceTests
         Assert.Contains("Program not found.", result.ErrorMessage);
     }
 
+    [Fact]
+    public async Task GetDocumentTagsAsync_IncludesVehiclesRepeatBlockWithVin()
+    {
+        await using var db = CreateDb();
+
+        var tags = await CreateService(db).GetDocumentTagsAsync();
+
+        Assert.Contains(tags, t => t.RepeatBlock == "Vehicles" && t.Tag == "Vin" && t.IsRepeatable);
+        Assert.Contains(tags, t => t.RepeatBlock == "Vehicles" && t.Tag == "Year");
+        Assert.Contains(tags, t => t.RepeatBlock == "Vehicles" && t.Tag == "Make");
+        Assert.Contains(tags, t => t.RepeatBlock == "Vehicles" && t.Tag == "Model");
+    }
+
     private static PolicyFormService CreateService(ApplicationDbContext db)
     {
         var provider = new ServiceCollection()

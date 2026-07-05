@@ -308,4 +308,71 @@ row or a slim table) — confirm during implementation. No API/schema change.
 
 ---
 
+## F12 — Company license module (store SMM/Jeremiah SL licenses once, pick in SL setup)
+
+**Status: LOGGED — feature; recommend post-Gate-A (reduces re-entry, not a launch blocker)**
+
+Today `SurplusLinesStateSetup` re-captures the filing broker/license per state
+(`FilingBrokerName`, `LicenseNumber`, `LicenseState`, broker address) — the same SMM /
+Jeremiah license details are re-entered for every state. Proposal: a **CompanyLicense**
+entity (holder name, license #, state, type, effective/expiration dates) + admin CRUD;
+SL setup references a `CompanyLicenseId` and the broker/license fields populate from it.
+Pairs with the SL-setup cleanup in F15.
+
+---
+
+## F13 — Policy-number format: add a token picker (don't make users memorize tags)
+
+**Status: DECIDED — queued for batch (frontend-only)**
+
+`PolicyNumbersAdminPage` Format / Term-suffix are bare text inputs (line ~240/249) with a
+live preview but no list of available tokens. Add clickable token chips
+(`{CARRIER} {LOB} {YY} {YYYY} {STATE} {COMPANY} {SEQ:000}`; `{TERM:00}` for the suffix)
+that insert at the cursor. No API/schema change.
+
+---
+
+## F14 — Template builder: add a Vehicles repeat block for Auto PD schedules
+
+**Status: DECIDED — queued for batch (small backend + data wiring)**
+
+Repeat blocks already exist (`{{#Block}}…{{/Block}}` in `DocumentMergeService`; picker in
+`TemplateEditor`) with Equipment / AdditionalInterests / PolicyForms blocks. Auto PD needs a
+**Vehicles** block (Year / Make / Model / VIN / …) sourced from the submission's vehicles —
+not currently a registered repeat block (Equipment exposes SerialNumber, not VIN). Add a
+`Vehicles` repeat block to the `PolicyFormService` tag registry + `PolicyAssemblyService`
+data builder. Confirm the `Vehicle` entity fields during implementation.
+
+---
+
+## F15 — Surplus Lines setup has a second, vestigial payee (fee engine is the payee SOT)
+
+**Status: DECIDED (fee setup = SOT, per Jeremiah) — treatment TBD, queued**
+
+The **fee engine is the source of truth** for both the SL tax amount and the payee:
+`FeeCalculationService` computes the tax (a `FeeDefinition` with `FeeCategory="Tax"` +
+`FeeRuleVersion`), and `InvoicingService` creates the `Payable` from the fee line's
+`PayableRouting` + `PayablePayeeId`. `SurplusLinesStateSetup.StatePayeeId` / `FilingPayeeId` /
+`CreateFilingPayable` ("Filed by vendor") are **compliance metadata that drive no payable
+today** — a dual-payee trap (WS5-R "no dead knobs"). Recommendation: keep SL setup for
+filing-workflow/compliance fields (license, broker, diligent search, filing
+method/frequency/portal) but stop it collecting its own payee — either remove the payee
+selectors or make them a read-only reflection of the linked SL-tax fee's payee. (Payees are
+created via Fees admin → `POST /admin/fees/payees`, also inline on both admin pages.)
+Related: WS12 W17 (`FilingRequired`→`quote.IsFilingState`) and W19 (fee-link category check).
+
+---
+
+## Questions answered this round (no code change required)
+
+- **SL tax: charge/fee vs SL setup — the fee/charge setup wins.** SL tax is computed only by
+  the fee engine; `SurplusLinesStateSetup.SurplusLinesTaxFeeDefinitionId` is a reference link
+  for filing/UI, not a calculator. Set SL tax up as a **Tax-category fee**.
+- **Doc Library vs Policy Forms — complementary, not competing.** Doc Library authors HTML
+  templates (proposals / letters / notices). Policy Forms maps which form/doc applies per
+  program/LOB/state and holds binary carrier PDFs + field mappings. (Authoring simple policy
+  forms as HTML in the Library is a possible post-launch convergence, not a defect.)
+
+---
+
 *(next finding goes here)*

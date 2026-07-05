@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Hash, Link2, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -30,9 +30,41 @@ const emptyAssignment: PolicyNumberAssignmentUpsert = {
   isActive: true,
 }
 
+// Tokens the policy-number generator understands (see PolicyNumberService.BuildBaseNumber).
+const FORMAT_TOKENS: { token: string; hint: string }[] = [
+  { token: '{CARRIER}', hint: 'Carrier short name' },
+  { token: '{LOB}', hint: 'Line-of-business code (GL/IM/APD)' },
+  { token: '{STATE}', hint: 'Risk state (2 letters)' },
+  { token: '{COMPANY}', hint: 'Writing company' },
+  { token: '{YY}', hint: '2-digit year' },
+  { token: '{YYYY}', hint: '4-digit year' },
+  { token: '{SEQ:00000}', hint: 'Zero-padded sequence' },
+]
+const TERM_TOKENS: { token: string; hint: string }[] = [
+  { token: '{TERM:00}', hint: 'Zero-padded term number' },
+  { token: '{TERM}', hint: 'Term number' },
+]
+
 export function PolicyNumbersAdminPage() {
   const qc = useQueryClient()
   const [sequenceForm, setSequenceForm] = useState<PolicyNumberSequenceUpsert>(emptySequence)
+  const formatInputRef = useRef<HTMLInputElement>(null)
+  const termInputRef = useRef<HTMLInputElement>(null)
+
+  // Insert a format token at the caret (or append) so users don't memorize the tag list (F13).
+  const insertToken = (field: 'format' | 'termSuffixFormat', token: string, el: HTMLInputElement | null) => {
+    const current = sequenceForm[field]
+    const start = el?.selectionStart ?? current.length
+    const end = el?.selectionEnd ?? current.length
+    const next = current.slice(0, start) + token + current.slice(end)
+    setSequenceForm((f) => ({ ...f, [field]: next }))
+    requestAnimationFrame(() => {
+      if (!el) return
+      el.focus()
+      const caret = start + token.length
+      el.setSelectionRange(caret, caret)
+    })
+  }
   const [editingSequenceId, setEditingSequenceId] = useState<string | null>(null)
   const [assignmentForm, setAssignmentForm] = useState<PolicyNumberAssignmentUpsert>(emptyAssignment)
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
@@ -237,8 +269,16 @@ export function PolicyNumbersAdminPage() {
             </label>
             <label className="block">
               <span className="sims-field-label">Format</span>
-              <input value={sequenceForm.format} onChange={(e) => setSequenceForm((f) => ({ ...f, format: e.target.value }))} className="sims-input" style={policyNumberStyle} />
+              <input ref={formatInputRef} value={sequenceForm.format} onChange={(e) => setSequenceForm((f) => ({ ...f, format: e.target.value }))} className="sims-input" style={policyNumberStyle} />
             </label>
+            <div className="flex flex-wrap gap-1.5">
+              {FORMAT_TOKENS.map((t) => (
+                <button key={t.token} type="button" title={t.hint} onClick={() => insertToken('format', t.token, formatInputRef.current)}
+                  className="rounded border px-1.5 py-0.5 text-[11px]" style={{ borderColor: 'var(--line)', color: 'var(--ink-2)', background: 'var(--surface-2)', ...policyNumberStyle }}>
+                  {t.token}
+                </button>
+              ))}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="sims-field-label">Next number</span>
@@ -246,7 +286,15 @@ export function PolicyNumbersAdminPage() {
               </label>
               <label className="block">
                 <span className="sims-field-label">Term suffix</span>
-                <input value={sequenceForm.termSuffixFormat} onChange={(e) => setSequenceForm((f) => ({ ...f, termSuffixFormat: e.target.value }))} className="sims-input" style={policyNumberStyle} />
+                <input ref={termInputRef} value={sequenceForm.termSuffixFormat} onChange={(e) => setSequenceForm((f) => ({ ...f, termSuffixFormat: e.target.value }))} className="sims-input" style={policyNumberStyle} />
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {TERM_TOKENS.map((t) => (
+                    <button key={t.token} type="button" title={t.hint} onClick={() => insertToken('termSuffixFormat', t.token, termInputRef.current)}
+                      className="rounded border px-1.5 py-0.5 text-[11px]" style={{ borderColor: 'var(--line)', color: 'var(--ink-2)', background: 'var(--surface-2)', ...policyNumberStyle }}>
+                      {t.token}
+                    </button>
+                  ))}
+                </div>
               </label>
             </div>
             <div className="grid grid-cols-2 gap-3 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
