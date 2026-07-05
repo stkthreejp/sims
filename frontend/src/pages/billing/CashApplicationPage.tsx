@@ -191,9 +191,12 @@ export function CashApplicationPage() {
 
   const receiptRemaining = selectedReceipt ? selectedReceipt.amount - selectedReceipt.appliedAmount : 0
   const variance = selectedReceipt ? receiptRemaining - totals.gross : 0
-  const isBalanced = Math.abs(variance) < 0.005
   const hasOverApply = gridRows.some(r => r.grossApplied > r.invoice.openBalance + 0.005)
-  const canPost = selectedReceiptId !== null && gridRows.length > 0 && isBalanced && !hasOverApply
+  // Applying MORE than the receipt holds is invalid; applying LESS is a partial
+  // application — allowed, with the remainder left on the receipt (audit B1).
+  const isOverReceipt = variance < -0.005
+  const isUnderApplied = variance > 0.005
+  const canPost = selectedReceiptId !== null && gridRows.length > 0 && !hasOverApply && !isOverReceipt
 
   const handlePost = () => {
     if (!selectedReceiptId) return
@@ -321,9 +324,14 @@ export function CashApplicationPage() {
                   <button className="sd-btn primary" onClick={handlePost} disabled={!canPost || isPending}>
                     {isPending ? 'Posting…' : 'Post Application'}
                   </button>
-                  {!isBalanced && gridRows.length > 0 && (
+                  {isOverReceipt && gridRows.length > 0 && (
+                    <p style={{ fontSize: 12, color: 'var(--bad-fg)' }}>
+                      Applied ({fmt.format(totals.gross)}) exceeds receipt remaining ({fmt.format(receiptRemaining)}). Reduce before posting.
+                    </p>
+                  )}
+                  {isUnderApplied && gridRows.length > 0 && !isOverReceipt && (
                     <p style={{ fontSize: 12, color: 'var(--warn-fg)' }}>
-                      Gross applied must equal receipt remaining ({fmt.format(receiptRemaining)}) before posting.
+                      Partial application — {fmt.format(variance)} will remain on the receipt as unapplied.
                     </p>
                   )}
                 </div>

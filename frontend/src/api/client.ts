@@ -11,6 +11,15 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken
   if (token) config.headers.Authorization = `Bearer ${token}`
+
+  // Stamp a stable Idempotency-Key on mutating requests so the backend can
+  // dedupe a replay (e.g. the 401-refresh retry below re-sends this same config
+  // object) instead of double-posting money (audit B4). Only set it once — the
+  // interceptor runs again on replay, and we must keep the original key.
+  const method = config.method?.toUpperCase()
+  if (method && method !== 'GET' && method !== 'HEAD' && !config.headers['Idempotency-Key']) {
+    config.headers['Idempotency-Key'] = crypto.randomUUID()
+  }
   return config
 })
 

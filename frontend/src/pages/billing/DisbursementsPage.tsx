@@ -383,6 +383,17 @@ function DisbursementsTab() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const voidMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => voidDisbursement(id, reason),
+    onSuccess: (d) => {
+      toast.success(`${d.disbursementNumber} voided`)
+      qc.invalidateQueries({ queryKey: ['disbursements'] })
+      qc.invalidateQueries({ queryKey: ['disbursement-detail', d.id] })
+      qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   if (isLoading) return <LoadingSpinner />
 
   if (disbursements.length === 0) {
@@ -420,17 +431,35 @@ function DisbursementsTab() {
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmt.format(d.totalAmount)}</td>
                   <td><StatusBadge status={DISB_PILL[d.status] ?? 'draft'} label={DISB_LABEL[d.status] ?? d.status} /></td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    {d.status === 'Draft' && (
-                      <button
-                        className="sd-btn sm"
-                        disabled={postMutation.isPending}
-                        onClick={() => postMutation.mutate(d.id)}
-                        style={{ color: 'var(--pill-bound-fg)' }}
-                      >
-                        <CheckCircle2 style={{ width: 12, height: 12 }} />
-                        Post
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {d.status === 'Draft' && (
+                        <button
+                          className="sd-btn sm"
+                          disabled={postMutation.isPending}
+                          onClick={() => {
+                            if (confirm(`Post ${d.disbursementNumber} — pay ${d.payeeName} ${fmt.format(d.totalAmount)}?\n\nThis posts the payment journal entry and cannot be edited afterward.`)) postMutation.mutate(d.id)
+                          }}
+                          style={{ color: 'var(--pill-bound-fg)' }}
+                        >
+                          <CheckCircle2 style={{ width: 12, height: 12 }} />
+                          Post
+                        </button>
+                      )}
+                      {(d.status === 'Draft' || d.status === 'Posted') && (
+                        <button
+                          className="sd-btn sm"
+                          disabled={voidMutation.isPending}
+                          onClick={() => {
+                            const reason = prompt(`Void ${d.disbursementNumber} (${d.payeeName}, ${fmt.format(d.totalAmount)})?\n\nEnter a reason:`)
+                            if (reason && reason.trim()) voidMutation.mutate({ id: d.id, reason: reason.trim() })
+                          }}
+                          style={{ color: 'var(--bad-fg)' }}
+                        >
+                          <X style={{ width: 12, height: 12 }} />
+                          Void
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
