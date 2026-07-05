@@ -6,6 +6,7 @@ import { submissionsApi } from '@/api/submissions.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { tasksApi } from '@/api/tasks.api'
 import { useAuthStore } from '@/store/authStore'
+import { parseDateOnly } from '@/lib/utils'
 import type { SubmissionListItem } from '@/types/submission.types'
 import type { QuoteListItem } from '@/types/quote.types'
 
@@ -30,7 +31,7 @@ function greeting(): string {
 function daysUntil(dateStr: string | null): number {
   if (!dateStr) return Infinity
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const target = new Date(dateStr); target.setHours(0, 0, 0, 0)
+  const target = parseDateOnly(dateStr); target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - today.getTime()) / 86400000)
 }
 
@@ -479,7 +480,7 @@ export function DashboardPage() {
                         </td>
                         <td className="dp-mini-td">
                           <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)', marginRight: 8 }}>
-                            {new Date(q.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {parseDateOnly(q.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                           <span style={{
                             display: 'inline-block', fontSize: 10.5, fontWeight: 600, padding: '2px 6px',

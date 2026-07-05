@@ -5,7 +5,7 @@ import { Search, FileText } from 'lucide-react'
 import { policiesApi } from '@/api/policies.api'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, type PolicyStatus, type PolicyListItem } from '@/types/policy.types'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, parseDateOnly } from '@/lib/utils'
 import { EmptyState } from '@/components/common/EmptyState'
 
 type SortKey = 'policyNumber' | 'insuredName' | 'expirationDate' | 'totalPremium'
@@ -30,7 +30,7 @@ const RENEWAL_LABELS: Record<string, string> = {
 }
 
 function daysToExp(iso: string): number {
-  const exp = new Date(iso)
+  const exp = parseDateOnly(iso)
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   exp.setHours(0, 0, 0, 0)
@@ -38,7 +38,7 @@ function daysToExp(iso: string): number {
 }
 
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return parseDateOnly(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function tabKey(p: PolicyListItem): TabKey {

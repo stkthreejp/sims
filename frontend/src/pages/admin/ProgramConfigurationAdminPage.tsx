@@ -7,6 +7,7 @@ import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { todayLocal } from '@/lib/utils'
 import type {
   ProgramCarrier,
   ProgramCarrierLineOfBusiness,
@@ -29,7 +30,7 @@ const emptyProgram: ProgramConfigurationUpsert = {
   notes: '',
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => todayLocal()
 
 const emptyCarrier = (): ProgramCarrierUpsert => ({
   carrierId: '',

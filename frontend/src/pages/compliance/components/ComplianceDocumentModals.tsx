@@ -9,6 +9,10 @@ import { ATTESTATION_STATUS, REVIEW_STATUS } from '@/constants/compliance'
 import { formatBytes } from '@/lib/formatBytes'
 import type { ComplianceAttestationCampaign, ComplianceAttestationRecipient, ComplianceEvidence } from '@/types/compliance.types'
 
+/** Format a Date as 'yyyy-MM-dd' in the user's local timezone (never UTC). */
+const toLocalDateString = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
 // Shared primitives
 
 export function SimpleModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -140,7 +144,7 @@ export function AttestationModal({
   const [dueDate, setDueDate] = useState(() => {
     const date = new Date()
     date.setDate(date.getDate() + 14)
-    return date.toISOString().slice(0, 10)
+    return toLocalDateString(date)
   })
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
 
@@ -247,7 +251,7 @@ export function ReviewModal({
     else if (cadence === 'semiannual' || cadence === 'semi-annual') date.setMonth(date.getMonth() + 6)
     else if (cadence === 'biennial') date.setFullYear(date.getFullYear() + 2)
     else date.setFullYear(date.getFullYear() + 1)
-    return date.toISOString().slice(0, 10)
+    return toLocalDateString(date)
   })
 
   const reviewMutation = useMutation({

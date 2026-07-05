@@ -7,10 +7,11 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
+import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { CreateReceiptRequest, ReceiptDetail } from '@/types/receipt.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const fmtDate = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const RECEIPT_PILL: Record<string, string> = {
   Open: 'quoted',
@@ -23,7 +24,7 @@ const RECEIPT_LABEL: Record<string, string> = { PartiallyApplied: 'Partial' }
 // ---------- New Receipt Modal ----------
 
 const EMPTY_FORM: CreateReceiptRequest = {
-  receivedDate: new Date().toISOString().slice(0, 10),
+  receivedDate: todayLocal(),
   amount: 0,
   payerName: '',
 }

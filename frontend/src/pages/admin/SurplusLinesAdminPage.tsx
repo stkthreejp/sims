@@ -9,6 +9,7 @@ import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { surplusLinesApi } from '@/api/surplusLines.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { todayLocal } from '@/lib/utils'
 import type { FeeDefinition, PayeeOption } from '@/types/fee.types'
 import type { ProgramConfiguration } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
@@ -16,7 +17,7 @@ import type { SurplusLinesStateSetup, SurplusLinesStateSetupUpsert } from '@/typ
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WV','WI','WY','DC']
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => todayLocal()
 
 const emptySetup = (): SurplusLinesStateSetupUpsert => ({
   stateCode: 'TX',

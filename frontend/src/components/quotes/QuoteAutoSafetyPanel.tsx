@@ -5,6 +5,7 @@ import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock3, FileText, Map
 import { toast } from 'sonner'
 import { quotesApi } from '@/api/quotes.api'
 import { getGoogleMapsApiKey } from '@/lib/clientConfig'
+import { parseDateOnly } from '@/lib/utils'
 import type { AutoSafetyBasic, AutoSafetyDetail, AutoSafetyIss, AutoSafetyRadiusSummary, AutoSafetyRiskLevel, AutoSafetySnapshotHistory, AutoSafetyTrendBucket } from '@/types/quote.types'
 
 type Props = {
@@ -311,7 +312,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
             <div>
               {data.recentSevereEvents.map((event, idx) => (
                 <div key={`${event.date}-${idx}`} className="grid grid-cols-[120px_160px_1fr_80px] gap-3 px-4 py-2" style={{ borderBottom: '1px solid var(--line-2)', fontSize: 'var(--fs-body)' }}>
-                  <span style={{ color: 'var(--ink-3)' }}>{new Date(event.date).toLocaleDateString()}</span>
+                  <span style={{ color: 'var(--ink-3)' }}>{parseDateOnly(event.date).toLocaleDateString()}</span>
                   <span style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{event.eventType}</span>
                   <span className="truncate" style={{ color: 'var(--ink-2)' }}>{event.description}</span>
                   <span className="text-right" style={{ color: 'var(--ink-3)' }}>{event.state ?? '-'}</span>

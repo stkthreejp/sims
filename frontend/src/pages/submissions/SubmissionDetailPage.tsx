@@ -24,7 +24,7 @@ import { SUBMISSION_STATUS_LABELS, type SubmissionStatus, type SubmissionUpdate,
 import { LOB_LABELS, ACTIVE_LOBS, QUOTE_STATUS_LABELS, type PolicyLineOfBusiness, type QuoteStatus, type QuoteCreate } from '@/types/quote.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, parseDateOnly } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -136,7 +136,7 @@ function fmtPct(n: number | null | undefined) {
 
 function daysUntil(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null
-  const diff = new Date(dateStr).getTime() - Date.now()
+  const diff = parseDateOnly(dateStr).getTime() - Date.now()
   return Math.ceil(diff / 86400000)
 }
 
@@ -1252,7 +1252,7 @@ export function SubmissionDetailPage() {
                   <div className="meta">
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>{q.quoteNumber}</span>
                     <span className="sep">·</span>
-                    <span>{new Date(q.effectiveDate).toLocaleDateString()} → {new Date(q.expirationDate).toLocaleDateString()}</span>
+                    <span>{parseDateOnly(q.effectiveDate).toLocaleDateString()} → {parseDateOnly(q.expirationDate).toLocaleDateString()}</span>
                     {q.hasCommissionOverride && <><span className="sep">·</span><span style={{ color: 'var(--warn-fg)' }}>commission override</span></>}
                   </div>
                 </div>
@@ -1530,7 +1530,7 @@ export function SubmissionDetailPage() {
         <div>
           <div className="k">Effective</div>
           <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {submission.effectiveDate ? new Date(submission.effectiveDate).toLocaleDateString() : '—'}
+            {submission.effectiveDate ? parseDateOnly(submission.effectiveDate).toLocaleDateString() : '—'}
           </div>
         </div>
         <div>
@@ -1566,7 +1566,7 @@ export function SubmissionDetailPage() {
           <div className="v" style={{ color: daysToEff != null && daysToEff < 14 ? 'var(--error-border)' : 'inherit' }}>
             {daysToEff != null ? `${daysToEff}d` : '—'}
           </div>
-          <div className="s">{submission.effectiveDate ? new Date(submission.effectiveDate).toLocaleDateString() : '—'}</div>
+          <div className="s">{submission.effectiveDate ? parseDateOnly(submission.effectiveDate).toLocaleDateString() : '—'}</div>
         </div>
         <div className="sd-metric">
           <div className="k">Loss ratio</div>
@@ -1593,9 +1593,9 @@ export function SubmissionDetailPage() {
               <div className="sd-field">
                 <span className="lbl">Term</span>
                 <span className="val" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {submission.effectiveDate ? new Date(submission.effectiveDate).toLocaleDateString() : '—'}
+                  {submission.effectiveDate ? parseDateOnly(submission.effectiveDate).toLocaleDateString() : '—'}
                   {' → '}
-                  {submission.expirationDate ? new Date(submission.expirationDate).toLocaleDateString() : '—'}
+                  {submission.expirationDate ? parseDateOnly(submission.expirationDate).toLocaleDateString() : '—'}
                 </span>
               </div>
               <div className="sd-field">

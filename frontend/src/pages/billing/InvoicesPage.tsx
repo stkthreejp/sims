@@ -7,12 +7,13 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { StatusBadge } from '@/components/common/StatusBadge'
+import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { CreateInvoiceRequest, InvoiceDetail } from '@/types/invoice.types'
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']
 
 const EMPTY_FORM: CreateInvoiceRequest = {
-  effectiveDate: new Date().toISOString().slice(0, 10),
+  effectiveDate: todayLocal(),
   grossPremium: 0,
   stateCode: 'TX',
   isEndorsement: false,
@@ -31,7 +32,7 @@ const CATEGORY_PILL: Record<string, string> = {
 }
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const fmtDate = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 // ---------- New Invoice Modal ----------
 
@@ -307,7 +308,7 @@ export function InvoicesPage() {
   }
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const daysOld = (dateStr: string) => Math.floor((today.getTime() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000)
+  const daysOld = (dateStr: string) => Math.floor((today.getTime() - parseDateOnly(dateStr).getTime()) / 86400000)
 
   const posted = invoices.filter(i => i.status === 'Posted')
   const outstanding = posted.reduce((s, i) => s + i.totalAmount, 0)

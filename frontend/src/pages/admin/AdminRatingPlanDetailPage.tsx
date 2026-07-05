@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useAuthStore } from '@/store/authStore'
+import { todayLocal } from '@/lib/utils'
 import type { RatingPlanVersionSummary, PlanStatus } from '@/types/rating.types'
 
 function StatusBadge({ status }: { status: PlanStatus }) {
@@ -36,9 +37,7 @@ function CreateDraftModal({
   onClose: () => void
 }) {
   const qc = useQueryClient()
-  const [effectiveDate, setEffectiveDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  )
+  const [effectiveDate, setEffectiveDate] = useState(todayLocal())
   const [cloneFrom, setCloneFrom] = useState<string>('none')
   const [notes, setNotes] = useState('')
 

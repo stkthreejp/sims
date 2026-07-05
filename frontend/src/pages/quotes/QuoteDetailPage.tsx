@@ -24,7 +24,7 @@ import { uwWriteupApi } from '@/api/uwWriteup.api'
 import type { IMWriteupPayload, WriteupCondition } from '@/types/uwWriteup.types'
 import type { UnderwritingReferralSummary } from '@/types/submission.types'
 import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
-import { formatCurrency, formatDate, formatPercent } from '@/lib/utils'
+import { formatCurrency, formatDate, formatPercent, todayLocal } from '@/lib/utils'
 import { usePermissions } from '@/hooks/usePermissions'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -619,7 +619,7 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [form, setForm] = useState({
-    boundDate: new Date().toISOString().slice(0, 10),
+    boundDate: todayLocal(),
     effectiveDate: effectiveDate.slice(0, 10),
     expirationDate: expirationDate.slice(0, 10),
   })

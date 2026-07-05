@@ -8,6 +8,7 @@ import {
 import { submissionsApi } from '@/api/submissions.api'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus } from '@/types/submission.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { parseDateOnly } from '@/lib/utils'
 
 type SortKey = 'submissionNumber' | 'insuredName' | 'status' | 'effectiveDate' | 'createdAt'
 type SortDir = 'asc' | 'desc'
@@ -59,13 +60,13 @@ function uwAvatarClass(name: string): string {
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
-  const d = new Date(iso)
+  const d = parseDateOnly(iso)
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function daysToEff(iso: string | null | undefined): number | null {
   if (!iso) return null
-  const eff = new Date(iso)
+  const eff = parseDateOnly(iso)
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   eff.setHours(0, 0, 0, 0)

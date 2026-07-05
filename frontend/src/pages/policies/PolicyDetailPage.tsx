@@ -17,7 +17,7 @@ import { POLICY_STATUS_LABELS, POLICY_TRANSACTION_STATUS_LABELS, POLICY_TRANSACT
 import type { CancellationComplianceChecklistItem, CancellationReason, IssueCancellationNotice, LegalComplianceGuidance, LegalComplianceRequirement, LegalRequirementSnapshot, MarkNonRenewal, NonRenewPolicy, Policy, PolicyIssuancePacket, PolicyTransaction, ReinstatePolicy, StartRewritePolicy } from '@/types/policy.types'
 import { DOCUMENT_TYPE_LABELS } from '@/types/attachment.types'
 import type { Attachment, DocumentType } from '@/types/attachment.types'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, parseDateOnly, todayLocal } from '@/lib/utils'
 import type { Note } from '@/types/quote.types'
 import type { DocumentTemplateListItem } from '@/types/documentTemplate.types'
 import type { UnderwritingReferralSummary } from '@/types/submission.types'
@@ -210,7 +210,7 @@ export function PolicyDetailPage() {
   })
 
   const issuePolicyMutation = useMutation({
-    mutationFn: () => policiesApi.issue(id!, { issuedDate: new Date().toISOString().slice(0, 10) }),
+    mutationFn: () => policiesApi.issue(id!, { issuedDate: todayLocal() }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', id] })
       qc.invalidateQueries({ queryKey: ['policies', id, 'issuance-packet'] })
@@ -283,7 +283,7 @@ export function PolicyDetailPage() {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
-  const daysRemaining = Math.ceil((new Date(policy.expirationDate).getTime() - Date.now()) / 86400000)
+  const daysRemaining = Math.ceil((parseDateOnly(policy.expirationDate).getTime() - Date.now()) / 86400000)
   const activeStage = policy.status === 'Cancelled' || policy.status === 'NonRenewed' || policy.status === 'Expired'
     ? 3
     : daysRemaining <= 45 ? 2 : 1
@@ -516,11 +516,11 @@ export function PolicyDetailPage() {
         </div>
         <div>
           <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Effective Date</p>
-          <p className="font-medium">{new Date(policy.effectiveDate).toLocaleDateString()}</p>
+          <p className="font-medium">{parseDateOnly(policy.effectiveDate).toLocaleDateString()}</p>
         </div>
         <div>
           <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Expiration Date</p>
-          <p className="font-medium">{new Date(policy.expirationDate).toLocaleDateString()}</p>
+          <p className="font-medium">{parseDateOnly(policy.expirationDate).toLocaleDateString()}</p>
         </div>
         <div>
           <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Premium</p>
@@ -548,24 +548,24 @@ export function PolicyDetailPage() {
         </div>
         <div>
           <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Bound Date</p>
-          <p className="font-medium">{new Date(policy.boundDate).toLocaleDateString()}</p>
+          <p className="font-medium">{parseDateOnly(policy.boundDate).toLocaleDateString()}</p>
         </div>
         {policy.issuedDate && (
           <div>
             <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Issued Date</p>
-            <p className="font-medium">{new Date(policy.issuedDate).toLocaleDateString()}</p>
+            <p className="font-medium">{parseDateOnly(policy.issuedDate).toLocaleDateString()}</p>
           </div>
         )}
         {policy.nonRenewedDate && (
           <div>
             <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Non-Renewed Date</p>
-            <p className="font-medium">{new Date(policy.nonRenewedDate).toLocaleDateString()}</p>
+            <p className="font-medium">{parseDateOnly(policy.nonRenewedDate).toLocaleDateString()}</p>
           </div>
         )}
         {policy.cancelledDate && (
           <div>
             <p className="text-xs mb-0.5" style={{ color: 'var(--ink-3)' }}>Cancelled Date</p>
-            <p className="font-medium">{new Date(policy.cancelledDate).toLocaleDateString()}</p>
+            <p className="font-medium">{parseDateOnly(policy.cancelledDate).toLocaleDateString()}</p>
           </div>
         )}
         {policy.limit != null && (
@@ -793,7 +793,7 @@ function PolicyMetric({ label, value, helper, hero = false }: { label: string; v
 
 function formatDate(value: string | null) {
   if (!value) return '-'
-  return new Date(value).toLocaleDateString()
+  return parseDateOnly(value).toLocaleDateString()
 }
 
 function formatRequiredChecklistBlockers(items: QuoteChecklistItem[], stageLabel: string) {
@@ -911,7 +911,7 @@ function PolicyIssuancePanel({
           <h3>Policy issuance packet</h3>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-3)' }}>
             {issued
-              ? `Issued ${packet?.issuedDate ? new Date(packet.issuedDate).toLocaleDateString() : ''}`
+              ? `Issued ${packet?.issuedDate ? parseDateOnly(packet.issuedDate).toLocaleDateString() : ''}`
                 : ready && !hasOpenRequiredReferrals
                 ? issueChecklistBlockedReason ?? `${includedForms.length} form${includedForms.length === 1 ? '' : 's'} ready. Preview, then issue.`
                 : hasOpenRequiredReferrals
@@ -1065,7 +1065,7 @@ function TransactionRows({
     t.status === 'NoticePending'
   const completeCancellation = useMutation({
     mutationFn: () => policiesApi.completeCancellation(t.policyId, t.id, {
-      completedDate: new Date().toISOString().slice(0, 10),
+      completedDate: todayLocal(),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
@@ -1076,7 +1076,7 @@ function TransactionRows({
   })
   const completeNonRenewal = useMutation({
     mutationFn: () => policiesApi.completeNonRenewal(t.policyId, t.id, {
-      completedDate: new Date().toISOString().slice(0, 10),
+      completedDate: todayLocal(),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
@@ -1191,7 +1191,7 @@ function TransactionArtifactDetails({
   })
   const completeRewrite = useMutation({
     mutationFn: () => policiesApi.completeRewrite(artifacts.transaction.policyId, artifacts.transaction.id, {
-      completedDate: new Date().toISOString().slice(0, 10),
+      completedDate: todayLocal(),
       notes: 'Replacement policy bound.',
     }),
     onSuccess: () => {

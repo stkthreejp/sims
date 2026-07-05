@@ -16,7 +16,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, todayLocal } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
@@ -240,7 +240,7 @@ export function CarrierDetailPage() {
   const [editContactForm, setEditContactForm] = useState<ContactFormData>(emptyContactForm())
 
   const [showAddCommission, setShowAddCommission] = useState(false)
-  const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', lineOfBusiness: '' as string, commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+  const [commissionForm, setCommissionForm] = useState({ programConfigurationId: '', lineOfBusiness: '' as string, commissionRate: '', smmRetentionRate: '', effectiveDate: todayLocal() })
   const [expandedLobs, setExpandedLobs] = useState<Set<string>>(new Set())
   const [showAdditionalInterestRateForm, setShowAdditionalInterestRateForm] = useState(false)
   const [editingAdditionalInterestRateId, setEditingAdditionalInterestRateId] = useState<string | null>(null)
@@ -310,7 +310,7 @@ export function CarrierDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['carrier-commissions', id] })
       setShowAddCommission(false)
-      setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', commissionRate: '', smmRetentionRate: '', effectiveDate: new Date().toISOString().slice(0, 10) })
+      setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', commissionRate: '', smmRetentionRate: '', effectiveDate: todayLocal() })
       toast.success('Commission rate added')
     },
     onError: (err: Error) => toast.error(err.message),

@@ -9,6 +9,7 @@ import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { EmptyState } from '@/components/common/EmptyState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { todayLocal } from '@/lib/utils'
 import type { Intermediary, IntermediaryBrokerageSetup, IntermediaryBrokerageSetupUpsert, IntermediaryUpsert } from '@/types/intermediary.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 
@@ -71,7 +72,7 @@ const emptySetupForm = (): SetupForm => ({
   programConfigurationId: '',
   carrierId: '',
   lineOfBusiness: '',
-  effectiveDate: new Date().toISOString().slice(0, 10),
+  effectiveDate: todayLocal(),
   expirationDate: '',
   brokerageRate: '',
   createPayable: false,

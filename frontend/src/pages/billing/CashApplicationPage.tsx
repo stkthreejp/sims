@@ -5,10 +5,11 @@ import { toast } from 'sonner'
 import { getReceipts, getOpenInvoices, applyCash } from '@/api/receipts.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { parseDateOnly } from '@/lib/utils'
 import type { OpenInvoice, ApplicationLineRequest } from '@/types/receipt.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const fmtDate = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 // ---------- Row state ----------
 

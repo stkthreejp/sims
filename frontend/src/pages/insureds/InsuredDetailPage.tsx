@@ -15,6 +15,7 @@ import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, type PolicyListItem } from '@/types/policy.types'
 import { usePermissions } from '@/hooks/usePermissions'
 import { getGoogleMapsApiKey } from '@/lib/clientConfig'
+import { parseDateOnly } from '@/lib/utils'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function initials(name: string): string {
 
 function daysUntil(dateStr: string): number {
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const target = new Date(dateStr); target.setHours(0, 0, 0, 0)
+  const target = parseDateOnly(dateStr); target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - today.getTime()) / 86400000)
 }
 
@@ -119,8 +120,8 @@ function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
               <td style={{ color: 'var(--ink-2)' }}>{p.carrierName}</td>
               <td>
                 <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12.5 }}>
-                  {new Date(p.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} →{' '}
-                  {new Date(p.expirationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {parseDateOnly(p.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} →{' '}
+                  {parseDateOnly(p.expirationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
                 {days >= 0 && days <= 60 && (
                   <div style={{ fontSize: 11, color: 'var(--warn-fg)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{days}d to renewal</div>
@@ -158,7 +159,7 @@ function SubmissionTable({ subs, onOpen }: { subs: useSubmissions; onOpen: (id: 
             <td style={{ color: 'var(--ink-3)' }}>—</td>
             <td><span className={`sd-pill ${SUB_PILL[s.status]}`}>{SUBMISSION_STATUS_LABELS[s.status]}</span></td>
             <td style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12.5 }}>
-              {s.effectiveDate ? new Date(s.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+              {s.effectiveDate ? parseDateOnly(s.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
             </td>
             <td style={{ color: 'var(--ink-2)' }}>{s.underwriterName}</td>
             <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{s.quoteCount}</td>

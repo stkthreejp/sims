@@ -2,6 +2,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { usePermissions } from '@/hooks/usePermissions'
+import { todayLocal } from '@/lib/utils'
 import {
   getTrustReconciliation,
   getCarrierPayableAging,
@@ -1354,7 +1355,7 @@ function RenewalsUpcomingReport() {
 function BoundByPeriodReport() {
   const thisYear = new Date().getFullYear()
   const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+  const [dateTo, setDateTo] = useState(todayLocal())
 
   const { data, isLoading, error } = useQuery<BoundByPeriod>({
     queryKey: ['report', 'bound-by-period', dateFrom, dateTo],
@@ -1436,7 +1437,7 @@ function BoundByPeriodReport() {
 function HitRatioByCarrierReport() {
   const thisYear = new Date().getFullYear()
   const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+  const [dateTo, setDateTo] = useState(todayLocal())
 
   const { data, isLoading, error } = useQuery<HitRatioByCarrier>({
     queryKey: ['report', 'hit-ratio-by-carrier', dateFrom, dateTo],
@@ -1497,7 +1498,7 @@ function HitRatioByCarrierReport() {
 function WrittenPremiumReport() {
   const thisYear = new Date().getFullYear()
   const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+  const [dateTo, setDateTo] = useState(todayLocal())
 
   const { data, isLoading, error } = useQuery<WrittenPremium>({
     queryKey: ['report', 'written-premium', dateFrom, dateTo],
@@ -1553,7 +1554,7 @@ function WrittenPremiumReport() {
 function SubmissionPipelineReport() {
   const thisYear = new Date().getFullYear()
   const [dateFrom, setDateFrom] = useState(`${thisYear}-01-01`)
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+  const [dateTo, setDateTo] = useState(todayLocal())
 
   const { data, isLoading, error } = useQuery<SubmissionPipeline>({
     queryKey: ['report', 'submission-pipeline', dateFrom, dateTo],

@@ -18,6 +18,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/validators'
+import { todayLocal } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
 import { getAgentCommissions, createAgentCommission, disableAgentCommission } from '@/api/agentCommissions.api'
@@ -1083,7 +1084,7 @@ export function AgentDetailPage() {
             Interaction Log
           </h3>
           {!showLogCreate && (
-            <button onClick={() => { setShowLogCreate(true); setLogForm({ logDate: new Date().toISOString().slice(0, 10), logType: 'Call', contactName: '', notes: '' }) }} className="sd-btn outline sm">
+            <button onClick={() => { setShowLogCreate(true); setLogForm({ logDate: todayLocal(), logType: 'Call', contactName: '', notes: '' }) }} className="sd-btn outline sm">
               <Plus style={{ width: 12, height: 12 }} /> Log Interaction
             </button>
           )}

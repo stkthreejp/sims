@@ -14,11 +14,12 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
+import { parseDateOnly } from '@/lib/utils'
 import type { NettedPayee, BatchSummary } from '@/types/cashDistribution.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) =>
-  new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const BATCH_PILL: Record<string, string> = {
   Open: 'submitted',

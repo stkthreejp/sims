@@ -14,11 +14,12 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
+import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { OpenPayable, AgingRow } from '@/types/disbursement.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) =>
-  new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 const payeeSubledgerKey = (payee: { payeeId: number | null; payeeName: string }) =>
   payee.payeeId ? `payee:${payee.payeeId}` : `name:${payee.payeeName}`
 
@@ -55,7 +56,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
   const [amounts, setAmounts] = useState<Record<number, string>>(
     Object.fromEntries(payables.map((p) => [p.id, (p.amount - p.paidAmount).toFixed(2)]))
   )
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [paymentDate, setPaymentDate] = useState(todayLocal())
   const [paymentMethod, setPaymentMethod] = useState('Check')
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')

@@ -8,6 +8,7 @@ import { premiumChargesApi } from '@/api/premiumCharges.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { FeeDefinition, FeeRuleVersion } from '@/types/fee.types'
 import type { ProgramConfiguration } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
@@ -165,7 +166,7 @@ export function FeesAdminPage() {
   })
 
   const { mutate: disableVersion } = useMutation({
-    mutationFn: () => feesApi.disableVersion(editingVersion!.id, new Date().toISOString().slice(0, 10)),
+    mutationFn: () => feesApi.disableVersion(editingVersion!.id, todayLocal()),
     onSuccess: () => { toast.success('Version disabled'); qc.invalidateQueries({ queryKey: ['admin', 'fees', 'versions', selectedDef?.id] }); setView('versions') },
     onError: () => toast.error('Failed'),
   })
@@ -293,7 +294,7 @@ export function FeesAdminPage() {
     setShowPremiumChargeForm(true)
   }
 
-  const isSuperseded = (v: FeeRuleVersion) => v.disabledDate !== null && new Date(v.disabledDate) <= new Date()
+  const isSuperseded = (v: FeeRuleVersion) => v.disabledDate !== null && parseDateOnly(v.disabledDate) <= new Date()
 
   if (isLoading) return <LoadingSpinner />
 
