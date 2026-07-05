@@ -46,6 +46,21 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         var sequence = await _db.Set<PolicyNumberSequence>().FirstOrDefaultAsync(s => s.Id == id);
         if (sequence == null) return Result<PolicyNumberSequenceDto>.Failure("NOT_FOUND", "Policy number sequence not found.");
 
+        // Prevent rewinding NextNumber below already-issued values (WS5-R Batch 1, A1.2), which
+        // would re-issue duplicate policy numbers. For annually-resetting sequences the floor is
+        // scoped to the current year (values legitimately restart each year).
+        var usageQuery = _db.Set<PolicyNumberSequenceUsage>()
+            .Where(u => u.PolicyNumberSequenceId == id && !u.IsDeleted);
+        if (dto.ResetAnnually)
+        {
+            var currentYear = DateTime.UtcNow.Year;
+            usageQuery = usageQuery.Where(u => u.AssignedAt.Year == currentYear);
+        }
+        var maxIssued = await usageQuery.Select(u => (long?)u.SequenceValue).MaxAsync() ?? 0;
+        if (dto.NextNumber <= maxIssued)
+            return Result<PolicyNumberSequenceDto>.Failure("NEXT_NUMBER_TOO_LOW",
+                $"Next number must be greater than the highest number already issued for this sequence ({maxIssued}).");
+
         ApplySequence(sequence, dto);
         await _db.SaveChangesAsync();
         return Result<PolicyNumberSequenceDto>.Success(MapSequence(sequence));
@@ -55,6 +70,19 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
     {
         var sequence = await _db.Set<PolicyNumberSequence>().FirstOrDefaultAsync(s => s.Id == id);
         if (sequence == null) return Result.Failure("NOT_FOUND", "Policy number sequence not found.");
+
+        // Guard against orphaning assignments/issued numbers (WS5-R Batch 1, A1.2). Deleting a
+        // referenced sequence silently drops its assignments from admin GETs (filtered INNER
+        // JOINs) and pushes binds to the legacy fallback.
+        var referencedByAssignments = await _db.Set<PolicyNumberAssignment>()
+            .AnyAsync(a => a.PolicyNumberSequenceId == id && !a.IsDeleted);
+        if (referencedByAssignments)
+            return Result.Failure("SEQUENCE_IN_USE", "This sequence is referenced by one or more policy-number assignments. Remove those assignments first.");
+
+        var hasIssuedNumbers = await _db.Set<PolicyNumberSequenceUsage>()
+            .AnyAsync(u => u.PolicyNumberSequenceId == id && !u.IsDeleted);
+        if (hasIssuedNumbers)
+            return Result.Failure("SEQUENCE_IN_USE", "This sequence has already issued policy numbers and cannot be deleted.");
 
         sequence.IsDeleted = true;
         sequence.DeletedAt = DateTime.UtcNow;

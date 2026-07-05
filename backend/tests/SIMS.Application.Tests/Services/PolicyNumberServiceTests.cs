@@ -184,6 +184,25 @@ public class PolicyNumberServiceTests
     }
 
     [Fact]
+    public async Task GenerateForBindAsync_FailsClosedForProgramQuoteWithoutAssignment()
+    {
+        await using var db = CreateDb();
+        var program = new ProgramConfiguration { Id = Guid.NewGuid(), Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden Specialty" };
+        var quote = CreateQuote(carrier, "NC", PolicyLineOfBusiness.InlandMarine, new DateOnly(2026, 6, 1));
+        quote.ProgramId = program.Id;
+        quote.Program = program;
+        db.AddRange(program, carrier, quote.Submission.Insured, quote.Submission, quote);
+        await db.SaveChangesAsync();
+
+        var result = await new PolicyNumberService(db).GenerateForBindAsync(quote, Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("POLICY_NUMBER_ASSIGNMENT_MISSING", result.ErrorCode);
+        Assert.Empty(await db.Set<PolicyNumberSequenceUsage>().ToListAsync());
+    }
+
+    [Fact]
     public async Task GenerateForBindAsync_FailsWhenQuoteAlreadyHasPolicyNumber()
     {
         await using var db = CreateDb();

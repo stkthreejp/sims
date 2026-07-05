@@ -171,6 +171,84 @@ public class PolicyNumberAdminServiceTests
         Assert.Null(result.Value.ProgramCarrierLobStateId);
     }
 
+    [Fact]
+    public async Task DeleteSequenceAsync_BlockedWhenReferencedByAssignment()
+    {
+        await using var db = CreateDb();
+        var carrier = new Carrier { Id = Guid.NewGuid(), Name = "Oden", IsActive = true };
+        var sequence = CreateSequence();
+        db.AddRange(carrier, sequence, new PolicyNumberAssignment
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumberSequenceId = sequence.Id,
+            CarrierId = carrier.Id,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            IsActive = true,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await new PolicyNumberAdminService(db).DeleteSequenceAsync(sequence.Id);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("SEQUENCE_IN_USE", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task DeleteSequenceAsync_BlockedWhenSequenceHasIssuedNumbers()
+    {
+        await using var db = CreateDb();
+        var sequence = CreateSequence();
+        db.AddRange(sequence, new PolicyNumberSequenceUsage
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumberSequenceId = sequence.Id,
+            BasePolicyNumber = "X-001",
+            FullPolicyNumber = "X-001-01",
+            SequenceValue = 1,
+            TermNumber = 1,
+            AssignedById = Guid.NewGuid(),
+            AssignedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await new PolicyNumberAdminService(db).DeleteSequenceAsync(sequence.Id);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("SEQUENCE_IN_USE", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UpdateSequenceAsync_RejectsNextNumberBelowIssuedValue()
+    {
+        await using var db = CreateDb();
+        var sequence = CreateSequence();
+        db.AddRange(sequence, new PolicyNumberSequenceUsage
+        {
+            Id = Guid.NewGuid(),
+            PolicyNumberSequenceId = sequence.Id,
+            BasePolicyNumber = "X-010",
+            FullPolicyNumber = "X-010-01",
+            SequenceValue = 10,
+            TermNumber = 1,
+            AssignedById = Guid.NewGuid(),
+            AssignedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await new PolicyNumberAdminService(db).UpdateSequenceAsync(sequence.Id, new PolicyNumberSequenceUpsertDto
+        {
+            Name = sequence.Name,
+            Format = sequence.Format,
+            TermSuffixFormat = sequence.TermSuffixFormat,
+            NextNumber = 5, // below the highest issued value (10)
+            ResetAnnually = false,
+            IsActive = true,
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("NEXT_NUMBER_TOO_LOW", result.ErrorCode);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

@@ -28,7 +28,16 @@ public class PolicyNumberService : IPolicyNumberService
         var assignment = await FindAssignmentAsync(quote.ProgramId, quote.CarrierId, quote.LineOfBusiness, state);
 
         if (assignment == null)
+        {
+            // Fail closed for program-scoped binds (WS5-R Batch 1, A1.2): no silent legacy
+            // POL- number on a program policy — it would never resolve to a real sequence and
+            // could never appear on a bordereau. The legacy generator remains only for any
+            // (now unreachable) program-less quote.
+            if (quote.ProgramId != null)
+                return Result<PolicyNumberGenerationResult>.Failure("POLICY_NUMBER_ASSIGNMENT_MISSING",
+                    "No policy-number assignment is configured for this program, carrier, line of business, and state. Add an assignment before binding.");
             return await GenerateLegacyNumberAsync();
+        }
 
         var ownsTransaction = _db.Database.CurrentTransaction == null;
         IDbContextTransaction? transaction = null;
