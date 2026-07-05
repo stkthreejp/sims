@@ -891,7 +891,7 @@ export function FeesAdminPage() {
             </div>
             <div className="px-6 py-4 border-t flex justify-end gap-2" style={{ borderColor: 'var(--line)' }}>
               <button onClick={() => setShowNewDef(false)} className="sd-btn outline px-4 py-2 text-sm">Cancel</button>
-              <button onClick={() => createDef()} disabled={savingDef || !defForm.code || !defForm.displayName}
+              <button onClick={() => createDef()} disabled={savingDef || !defForm.code || !defForm.displayName || !defForm.ledgerAccountId}
                 className="sd-btn primary px-4 py-2 text-sm disabled:opacity-50">
                 {savingDef ? 'Creating…' : 'Create'}
               </button>

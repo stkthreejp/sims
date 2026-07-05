@@ -71,8 +71,9 @@ public class FeeCalculationService : IFeeCalculationService
 
         // Step 4: Load non-taxable state overrides for all resolved fee definitions
         var feeDefIds = resolved.Select(v => v.FeeDefinitionId).ToList();
+        var normalizedStateCode = ctx.StateCode?.Trim().ToUpperInvariant();
         var nonTaxableOverrides = (await db.Set<FeeStateTaxability>()
-            .Where(s => feeDefIds.Contains(s.FeeDefinitionId) && s.StateCode == ctx.StateCode && !s.IsTaxable)
+            .Where(s => feeDefIds.Contains(s.FeeDefinitionId) && s.StateCode == normalizedStateCode && !s.IsTaxable)
             .Select(s => s.FeeDefinitionId)
             .ToListAsync(ct))
             .ToHashSet();
@@ -90,15 +91,21 @@ public class FeeCalculationService : IFeeCalculationService
             var def = rule.FeeDefinition;
 
             // Taxes use taxableBase (premium + all previously-calculated taxable fees).
-            // All other fees use gross premium.
-            var calcBase = def.FeeCategory == "Tax" ? taxableBase : ctx.GrossPremium;
+            // All other fees use gross premium. Case-insensitive so a "tax"/"TAX" category
+            // can't silently escape the taxable base (WS5-R Batch 1, A1.3).
+            var calcBase = string.Equals(def.FeeCategory, "Tax", StringComparison.OrdinalIgnoreCase)
+                ? taxableBase
+                : ctx.GrossPremium;
 
+            // Fail loud on an unknown calc type rather than silently charging $0
+            // (WS5-R Batch 1, A1.3). CreateVersion whitelists CalcType, so this is a
+            // defense-in-depth guard against mis-seeded data.
             var raw = rule.CalcType switch
             {
                 "Flat" => rule.FlatAmount ?? 0m,
                 "Percent" => calcBase * (rule.PercentRate ?? 0m),
                 "Stratified" => ComputeStratified(calcBase, rule.PremiumBrackets.ToList()),
-                _ => 0m
+                _ => throw new InvalidOperationException($"Unsupported fee calc type '{rule.CalcType}' on fee definition '{def.Code}'.")
             };
 
             // Apply minimum

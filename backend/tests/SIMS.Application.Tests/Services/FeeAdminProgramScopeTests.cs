@@ -516,6 +516,72 @@ public class FeeAdminProgramScopeTests
         await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
+    [Fact]
+    public async Task CreateVersionAsync_RejectsUnknownCalcType()
+    {
+        await using var db = CreateDb();
+        var fee = BuildFee("MGA", "MGA Fee", "PolicyFee", 100);
+        db.Add(fee);
+        await db.SaveChangesAsync();
+
+        var result = await new FeeAdminService(new TestServiceProvider(db))
+            .CreateVersionAsync(Guid.NewGuid(), ValidRequest(fee.Id) with { CalcType = "NetPercent" });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("CALC_TYPE_INVALID", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateVersionAsync_RejectsPercentOfNet()
+    {
+        await using var db = CreateDb();
+        var fee = BuildFee("MGA", "MGA Fee", "PolicyFee", 100);
+        db.Add(fee);
+        await db.SaveChangesAsync();
+
+        var result = await new FeeAdminService(new TestServiceProvider(db))
+            .CreateVersionAsync(Guid.NewGuid(), ValidRequest(fee.Id) with { PercentOfNet = true });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("PERCENT_OF_NET_UNSUPPORTED", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateVersionAsync_RejectsMissingFeeDefinition()
+    {
+        await using var db = CreateDb();
+
+        var result = await new FeeAdminService(new TestServiceProvider(db))
+            .CreateVersionAsync(Guid.NewGuid(), ValidRequest(999999L));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("FEE_DEFINITION_NOT_FOUND", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateDefinitionAsync_RejectsInvalidCategory()
+    {
+        await using var db = CreateDb();
+
+        var result = await new FeeAdminService(new TestServiceProvider(db))
+            .CreateDefinitionAsync(new CreateFeeDefinitionRequest("X", "X Fee", "Bogus", true, 100, 1));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("FEE_CATEGORY_INVALID", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateDefinitionAsync_RejectsMissingLedgerAccount()
+    {
+        await using var db = CreateDb();
+
+        var result = await new FeeAdminService(new TestServiceProvider(db))
+            .CreateDefinitionAsync(new CreateFeeDefinitionRequest("X", "X Fee", "PolicyFee", true, 100, 999));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("LEDGER_ACCOUNT_NOT_FOUND", result.ErrorCode);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

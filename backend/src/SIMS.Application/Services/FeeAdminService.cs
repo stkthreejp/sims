@@ -36,8 +36,18 @@ public class FeeAdminService : IFeeAdminService
         return def is null ? Result<FeeDefinitionDto>.Failure("NOT_FOUND", "Fee definition not found") : Result<FeeDefinitionDto>.Success(MapDefinition(def));
     }
 
+    private static readonly string[] ValidFeeCategories =
+        ["Tax", "StampingFee", "PolicyFee", "BrokerFee", "Inspection", "Other"];
+
     public async Task<Result<FeeDefinitionDto>> CreateDefinitionAsync(CreateFeeDefinitionRequest req, CancellationToken ct = default)
     {
+        // Whitelist the category and validate the ledger-account FK up front (WS5-R Batch 1,
+        // A1.3) so a bad category or ledgerAccountId:0 fails cleanly instead of a 500.
+        if (!ValidFeeCategories.Contains(req.FeeCategory))
+            return Result<FeeDefinitionDto>.Failure("FEE_CATEGORY_INVALID", "Fee category must be one of Tax, StampingFee, PolicyFee, BrokerFee, Inspection, or Other.");
+        if (!await Db.Set<LedgerAccount>().AnyAsync(a => a.Id == req.LedgerAccountId, ct))
+            return Result<FeeDefinitionDto>.Failure("LEDGER_ACCOUNT_NOT_FOUND", "The selected ledger account was not found.");
+
         var def = new FeeDefinition
         {
             Code = req.Code,
@@ -300,6 +310,16 @@ public class FeeAdminService : IFeeAdminService
     private async Task<Result<ResolvedFeeProgramScope>> ValidateVersionRequestAsync(
         CreateFeeRuleVersionRequest req, CancellationToken ct)
     {
+        // Whitelist calc type, reject the dormant percent-of-net flag, and validate the
+        // fee-definition FK (WS5-R Batch 1, A1.3). An unknown calc type would otherwise be
+        // stored and later charge $0 silently; percent-of-net is stored-but-never-read.
+        if (req.CalcType is not "Flat" and not "Percent" and not "Stratified")
+            return Result<ResolvedFeeProgramScope>.Failure("CALC_TYPE_INVALID", "Calc type must be Flat, Percent, or Stratified.");
+        if (req.PercentOfNet)
+            return Result<ResolvedFeeProgramScope>.Failure("PERCENT_OF_NET_UNSUPPORTED", "Percent-of-net fees are not supported; configure a gross percent instead.");
+        if (!await Db.Set<FeeDefinition>().AnyAsync(d => d.Id == req.FeeDefinitionId, ct))
+            return Result<ResolvedFeeProgramScope>.Failure("FEE_DEFINITION_NOT_FOUND", "The selected fee definition was not found.");
+
         if (req.PayableRouting is not "NotPayable" and not "Company" and not "Entity")
             return Result<ResolvedFeeProgramScope>.Failure("PAYABLE_ROUTING_INVALID", "Payable routing must be NotPayable, Company, or Entity.");
 
