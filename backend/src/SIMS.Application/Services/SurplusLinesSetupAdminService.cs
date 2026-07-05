@@ -167,7 +167,8 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             .Include(s => s.StampingFeeDefinition)
             .Include(s => s.FilingFeeDefinition)
             .Include(s => s.StatePayee)
-            .Include(s => s.FilingPayee);
+            .Include(s => s.FilingPayee)
+            .Include(s => s.CompanyLicense);
 
     private async Task<(string Code, string Message)?> ValidateAsync(UpsertSurplusLinesStateSetupRequest request, CancellationToken ct)
     {
@@ -180,8 +181,8 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             return ("BROKER_STATE_INVALID", "Broker state must be two characters.");
         if (request.ExpirationDate.HasValue && request.ExpirationDate.Value < request.EffectiveDate)
             return ("INVALID_DATE_RANGE", "Expiration date cannot be before effective date.");
-        if (request.CreateFilingPayable && !request.FilingPayeeId.HasValue)
-            return ("FILING_PAYEE_REQUIRED", "Select a vendor payee before marking the state as filed by vendor.");
+        // F15: the payee that receives the SL tax payable is the SOT-owned by the linked fee
+        // (fee engine drives the payable), so the SL setup no longer requires its own payee.
         if (request.FilingPaymentTermsDays is < 0 or > 365)
             return ("INVALID_PAYMENT_TERMS", "Filing payment terms must be between 0 and 365 days.");
         if (request.FilingDueDayOfMonth is < 1 or > 31)
@@ -209,6 +210,14 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
                 .AnyAsync(c => c.Id == request.CarrierId.Value, ct);
             if (!carrierExists)
                 return ("CARRIER_NOT_FOUND", "Carrier was not found.");
+        }
+
+        if (request.CompanyLicenseId.HasValue)
+        {
+            var licenseExists = await _db.Set<CompanyLicense>()
+                .AnyAsync(l => l.Id == request.CompanyLicenseId.Value && l.IsActive, ct);
+            if (!licenseExists)
+                return ("COMPANY_LICENSE_NOT_FOUND", "The selected company license was not found or is inactive.");
         }
 
         if (request.ProgramConfigurationId.HasValue)
@@ -242,9 +251,6 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             if (foundFeeCount != feeIds.Count)
                 return ("FEE_DEFINITION_NOT_FOUND", "One or more linked fee definitions were not found.");
         }
-
-        if (!request.CreateFilingPayable && request.FilingRequired && !request.StatePayeeId.HasValue)
-            return ("STATE_PAYEE_REQUIRED", "Select a state payable recipient for direct surplus lines filing.");
 
         if (!request.CreateFilingPayable && request.StatePayeeId.HasValue)
         {
@@ -334,6 +340,7 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
         setup.ExpirationDate = request.ExpirationDate;
         setup.IsActive = request.IsActive;
         setup.FilingRequired = request.FilingRequired;
+        setup.CompanyLicenseId = request.CompanyLicenseId;
         setup.LicenseHolderType = TrimToEmpty(request.LicenseHolderType);
         setup.FilingBrokerName = TrimToEmpty(request.FilingBrokerName);
         setup.LicenseNumber = TrimToEmpty(request.LicenseNumber);
@@ -429,7 +436,42 @@ public class SurplusLinesSetupAdminService : ISurplusLinesSetupAdminService
             setup.AffidavitNotes,
             await GetFeeValidationMessagesAsync(setup, ct),
             setup.CreatedAt,
-            setup.UpdatedAt);
+            setup.UpdatedAt,
+            setup.CompanyLicenseId,
+            setup.CompanyLicense?.HolderName,
+            await ResolveTaxPayeeNameAsync(setup, ct));
+
+    // F15: resolve the payee that actually receives the SL tax payable from the linked SL-tax
+    // fee's active rule version (the fee engine is the payee SOT). Read-only on the SL screen.
+    private async Task<string?> ResolveTaxPayeeNameAsync(SurplusLinesStateSetup setup, CancellationToken ct)
+    {
+        if (!setup.SurplusLinesTaxFeeDefinitionId.HasValue)
+            return null;
+
+        var lob = setup.LineOfBusiness?.ToString();
+        var payeeId = await _db.Set<FeeRuleVersion>()
+            .Where(v =>
+                v.FeeDefinitionId == setup.SurplusLinesTaxFeeDefinitionId.Value &&
+                v.EffectiveDate <= setup.EffectiveDate &&
+                (!v.DisabledDate.HasValue || v.DisabledDate.Value > setup.EffectiveDate) &&
+                (v.ProgramConfigurationId == null || v.ProgramConfigurationId == setup.ProgramConfigurationId) &&
+                (v.CarrierId == null || v.CarrierId == setup.CarrierId) &&
+                (v.LineOfBusiness == null || v.LineOfBusiness == lob) &&
+                (v.StateCode == null || v.StateCode == setup.StateCode) &&
+                v.PayableRouting == "Entity" &&
+                v.PayablePayeeId != null)
+            .OrderByDescending(v => v.EffectiveDate)
+            .Select(v => v.PayablePayeeId)
+            .FirstOrDefaultAsync(ct);
+
+        if (payeeId is null)
+            return null;
+
+        return await _db.Set<Payee>()
+            .Where(p => p.Id == payeeId.Value)
+            .Select(p => p.Name)
+            .FirstOrDefaultAsync(ct);
+    }
 
     private async Task<IReadOnlyList<string>> GetFeeValidationMessagesAsync(SurplusLinesStateSetup setup, CancellationToken ct)
     {

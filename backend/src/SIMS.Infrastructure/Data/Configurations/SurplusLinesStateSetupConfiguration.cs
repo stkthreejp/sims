@@ -99,5 +99,10 @@ public class SurplusLinesStateSetupConfiguration : IEntityTypeConfiguration<Surp
             .WithMany()
             .HasForeignKey(s => s.FilingPayeeId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.CompanyLicense)
+            .WithMany()
+            .HasForeignKey(s => s.CompanyLicenseId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

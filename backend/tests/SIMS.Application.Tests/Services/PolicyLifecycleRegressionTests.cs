@@ -3222,6 +3222,9 @@ public class PolicyLifecycleRegressionTests
     {
         public List<QuoteCreateDto> CreateRequests { get; } = [];
 
+        public Task<Result<QuoteDto>> SetStatusAsync(Guid id, QuoteStatus newStatus, UserAccessScope access)
+            => throw new NotSupportedException();
+
         public async Task<Result<QuoteDto>> CreateAsync(QuoteCreateDto dto, Guid createdById, UserAccessScope? access = null)
         {
             CreateRequests.Add(dto);

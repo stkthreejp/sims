@@ -335,8 +335,10 @@ public class SurplusLinesSetupAdminServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_RejectsVendorFilingWithoutVendorPayee()
+    public async Task CreateAsync_AllowsVendorFilingWithoutVendorPayee()
     {
+        // F15: the payee that receives the SL tax payable is owned by the linked fee (fee engine
+        // is the payee SOT), so the SL setup no longer requires its own vendor payee.
         await using var db = CreateDb();
         var service = new SurplusLinesSetupAdminService(db);
 
@@ -368,9 +370,7 @@ public class SurplusLinesSetupAdminServiceTests
             null,
             CreateFilingPayable: true));
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal("FILING_PAYEE_REQUIRED", result.ErrorCode);
-        Assert.Contains("vendor", result.ErrorMessage!, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -419,8 +419,10 @@ public class SurplusLinesSetupAdminServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_RejectsDirectFilingWithoutStatePayee()
+    public async Task CreateAsync_AllowsDirectFilingWithoutStatePayee()
     {
+        // F15: direct filing no longer requires a state payee on the SL setup — the payable's
+        // payee is resolved from the linked SL-tax fee.
         await using var db = CreateDb();
         var service = new SurplusLinesSetupAdminService(db);
 
@@ -451,9 +453,7 @@ public class SurplusLinesSetupAdminServiceTests
             null,
             null));
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal("STATE_PAYEE_REQUIRED", result.ErrorCode);
-        Assert.Contains("state", result.ErrorMessage!, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]

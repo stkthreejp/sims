@@ -14,6 +14,7 @@ public class SurplusLinesStateSetup : BaseEntity
     public DateOnly? ExpirationDate { get; set; }
     public bool IsActive { get; set; } = true;
     public bool FilingRequired { get; set; }
+    public Guid? CompanyLicenseId { get; set; }
     public string LicenseHolderType { get; set; } = string.Empty;
     public string FilingBrokerName { get; set; } = string.Empty;
     public string LicenseNumber { get; set; } = string.Empty;
@@ -53,4 +54,5 @@ public class SurplusLinesStateSetup : BaseEntity
     public FeeDefinition? FilingFeeDefinition { get; set; }
     public Payee? StatePayee { get; set; }
     public Payee? FilingPayee { get; set; }
+    public CompanyLicense? CompanyLicense { get; set; }
 }

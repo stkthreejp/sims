@@ -53,7 +53,12 @@ public record SurplusLinesStateSetupDto(
     string? AffidavitNotes,
     IReadOnlyList<string> FeeValidationMessages,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    Guid? CompanyLicenseId,
+    string? CompanyLicenseHolder,
+    // F15: the payee that actually receives the SL tax payable is resolved from the linked
+    // SL-tax fee (the fee engine is the payee SOT); shown read-only on the SL setup screen.
+    string? ResolvedTaxPayeeName
 );
 
 public record UpsertSurplusLinesStateSetupRequest(
@@ -94,7 +99,8 @@ public record UpsertSurplusLinesStateSetupRequest(
     bool DiligentSearchRequired = false,
     string? DiligentSearchNotes = null,
     bool AffidavitRequired = false,
-    string? AffidavitNotes = null
+    string? AffidavitNotes = null,
+    Guid? CompanyLicenseId = null
 );
 
 public record CopySurplusLinesStateSetupRequest(string TargetStateCode);

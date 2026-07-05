@@ -4,6 +4,7 @@ import axios from 'axios'
 import { Check, Copy, Pencil, Plus, Save, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
+import { companyLicensesApi } from '@/api/companyLicenses.api'
 import { feesApi } from '@/api/fees.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { surplusLinesApi } from '@/api/surplusLines.api'
@@ -58,6 +59,7 @@ const emptySetup = (): SurplusLinesStateSetupUpsert => ({
   diligentSearchNotes: null,
   affidavitRequired: false,
   affidavitNotes: null,
+  companyLicenseId: null,
 })
 
 const inputCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
@@ -90,6 +92,35 @@ export function SurplusLinesAdminPage() {
     queryKey: ['admin', 'fees', 'payees'],
     queryFn: () => feesApi.getPayees(),
   })
+  const { data: companyLicenses = [] } = useQuery({
+    queryKey: ['company-licenses', 'active'],
+    queryFn: () => companyLicensesApi.getAll(false),
+  })
+
+  // F12: selecting a stored company license auto-fills the broker/license fields so they
+  // aren't re-keyed per state (the fields stay editable for per-state overrides).
+  const applyCompanyLicense = (licenseId: string) => {
+    if (!licenseId) {
+      setForm((f) => ({ ...f, companyLicenseId: null }))
+      return
+    }
+    const lic = companyLicenses.find((l) => l.id === licenseId)
+    if (!lic) return
+    setForm((f) => ({
+      ...f,
+      companyLicenseId: lic.id,
+      licenseHolderType: 'SMM',
+      filingBrokerName: lic.holderName,
+      licenseNumber: lic.licenseNumber,
+      licenseState: lic.licenseState,
+      brokerAddressLine1: lic.addressLine1 ?? f.brokerAddressLine1,
+      brokerAddressLine2: lic.addressLine2 ?? f.brokerAddressLine2,
+      brokerCity: lic.city ?? f.brokerCity,
+      brokerState: lic.state ?? f.brokerState,
+      brokerZipCode: lic.zipCode ?? f.brokerZipCode,
+      brokerCountry: lic.country || f.brokerCountry,
+    }))
+  }
 
   const selectedSetup = useMemo(
     () => setups.find((setup) => setup.id === selectedId) ?? setups[0] ?? null,
@@ -209,6 +240,7 @@ export function SurplusLinesAdminPage() {
       diligentSearchNotes: setup.diligentSearchNotes,
       affidavitRequired: setup.affidavitRequired,
       affidavitNotes: setup.affidavitNotes,
+      companyLicenseId: setup.companyLicenseId,
     })
   }
 
@@ -379,6 +411,15 @@ export function SurplusLinesAdminPage() {
 
           <div className="border-t pt-5">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Broker / license</div>
+            <div className="mb-3">
+              <SelectField label="Company license (auto-fills broker/license)" value={form.companyLicenseId ?? ''} onChange={applyCompanyLicense}>
+                <option value="">Enter manually / no stored license</option>
+                {companyLicenses.map((lic) => (
+                  <option key={lic.id} value={lic.id}>{lic.holderName} — {lic.licenseState} {lic.licenseNumber}</option>
+                ))}
+              </SelectField>
+              <p className="mt-1 text-xs text-slate-500">Manage licenses under Admin → Company Licenses. Selecting one fills the fields below (still editable).</p>
+            </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="xl:col-span-2">
                 <TextInput label="Filing broker" value={form.filingBrokerName} onChange={(value) => setForm((f) => ({ ...f, filingBrokerName: value }))} />
@@ -405,6 +446,10 @@ export function SurplusLinesAdminPage() {
 
           <div className="border-t pt-5">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Filing handling</div>
+            <div className="mb-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              The SL tax payable recipient is set on the linked SL-tax fee (Admin → Charges &amp; Fees, on the fee's
+              rule version). It's shown read-only on the saved setup below; the payee fields here are optional/legacy.
+            </div>
             <div className="mb-3 grid items-end gap-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 md:grid-cols-[1fr_220px_auto]">
               <TextInput
                 label="New payee name"
@@ -509,7 +554,7 @@ export function SurplusLinesAdminPage() {
           <button
             type="button"
             onClick={() => saveSetup.mutate()}
-            disabled={saveSetup.isPending || !form.stateCode || !programScopeAllowsCurrent || !form.licenseNumber.trim() || !form.filingBrokerName.trim() || (form.createFilingPayable ? !form.filingPayeeId : form.filingRequired && !form.statePayeeId)}
+            disabled={saveSetup.isPending || !form.stateCode || !programScopeAllowsCurrent || !form.licenseNumber.trim() || !form.filingBrokerName.trim()}
             className="inline-flex w-full items-center justify-center gap-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -526,8 +571,10 @@ export function SurplusLinesAdminPage() {
           <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
             <DetailBlock label="Filing broker" value={selectedSetup.filingBrokerName} />
             <DetailBlock label="License" value={`${selectedSetup.licenseNumber} (${selectedSetup.licenseState})`} />
+            {selectedSetup.companyLicenseHolder && <DetailBlock label="Company license" value={selectedSetup.companyLicenseHolder} />}
             <DetailBlock label="Address" value={[selectedSetup.brokerAddressLine1, selectedSetup.brokerAddressLine2, selectedSetup.brokerCity, selectedSetup.brokerState, selectedSetup.brokerZipCode, selectedSetup.brokerCountry].filter(Boolean).join(', ')} />
             <DetailBlock label="Linked fees" value={[selectedSetup.surplusLinesTaxFeeName, selectedSetup.stampingFeeName, selectedSetup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'} />
+            <DetailBlock label="SL tax payable recipient (from fee)" value={selectedSetup.resolvedTaxPayeeName ?? 'Not set on the SL-tax fee'} />
             <DetailBlock label="Filing handling" value={filingHandlingText(selectedSetup)} />
             <DetailBlock label="Vendor cadence" value={selectedSetup.createFilingPayable ? [selectedSetup.filingFrequency, selectedSetup.filingDueDayOfMonth ? `Due day ${selectedSetup.filingDueDayOfMonth}` : null, selectedSetup.filingMethod].filter(Boolean).join(' / ') || 'Not set' : 'Not vendor-filed'} />
             <DetailBlock label="Vendor portal" value={selectedSetup.createFilingPayable ? selectedSetup.filingPortalUrl || 'None' : 'Not vendor-filed'} />
@@ -632,10 +679,11 @@ function dateRange(effectiveDate: string, expirationDate: string | null) {
 }
 
 function filingHandlingText(setup: SurplusLinesStateSetup) {
-  if (!setup.createFilingPayable) return `Direct filing by SMM; payable to ${setup.statePayeeName ?? 'No state recipient selected'}`
-
-  const terms = setup.filingPaymentTermsDays != null ? ` / Net ${setup.filingPaymentTermsDays}` : ''
-  return `Filed by vendor: ${setup.filingPayeeName ?? 'No vendor payee selected'}${terms}`
+  const mode = setup.createFilingPayable
+    ? `Filed by vendor${setup.filingPaymentTermsDays != null ? ` / Net ${setup.filingPaymentTermsDays}` : ''}`
+    : 'Direct filing by SMM'
+  const payee = setup.resolvedTaxPayeeName ? ` · tax payable to ${setup.resolvedTaxPayeeName}` : ''
+  return `${mode}${payee}`
 }
 
 function cleanSetup(setup: SurplusLinesStateSetupUpsert): SurplusLinesStateSetupUpsert {

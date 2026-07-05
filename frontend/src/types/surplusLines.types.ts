@@ -52,6 +52,9 @@ export interface SurplusLinesStateSetup {
   feeValidationMessages: string[]
   createdAt: string
   updatedAt: string
+  companyLicenseId: string | null
+  companyLicenseHolder: string | null
+  resolvedTaxPayeeName: string | null
 }
 
 export interface SurplusLinesStateSetupUpsert {
@@ -93,4 +96,5 @@ export interface SurplusLinesStateSetupUpsert {
   diligentSearchNotes: string | null
   affidavitRequired: boolean
   affidavitNotes: string | null
+  companyLicenseId: string | null
 }
