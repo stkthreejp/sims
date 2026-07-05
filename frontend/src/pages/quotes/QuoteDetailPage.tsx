@@ -1040,7 +1040,7 @@ export function QuoteDetailPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { canCreatePolicies, canBindPolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
+  const { canCreatePolicies, canEditPolicies, canBindPolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
   const [showBind, setShowBind] = useState(false)
   const [showRating, setShowRating] = useState(false)
   const [showReduce, setShowReduce] = useState(false)
@@ -1123,6 +1123,16 @@ export function QuoteDetailPage() {
       toast.success('Commission give-back applied')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to apply commission override'),
+  })
+
+  const setStatusMutation = useMutation({
+    mutationFn: (status: QuoteStatus) => quotesApi.setStatus(quoteId!, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quotes', quoteId] })
+      qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', quote?.submissionId] })
+      toast.success('Quote status updated')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to update quote status'),
   })
 
   const previewInlandMarineProposalMutation = useMutation({
@@ -1341,6 +1351,31 @@ export function QuoteDetailPage() {
             {quote.boundPolicyId && (
               <Btn variant="outline" onClick={() => navigate(`/policies/${quote.boundPolicyId}`)}>
                 <ShieldCheck className="h-3.5 w-3.5" /> View policy
+              </Btn>
+            )}
+            {canEditPolicies && (quote.status === 'Draft' || quote.status === 'Submitted') && (
+              <>
+                <Btn variant="outline" disabled={setStatusMutation.isPending} onClick={() => setStatusMutation.mutate('Quoted')}>
+                  Mark Quoted
+                </Btn>
+                <Btn variant="danger" disabled={setStatusMutation.isPending} onClick={() => { if (confirm('Decline this quote?')) setStatusMutation.mutate('Declined') }}>
+                  Decline
+                </Btn>
+              </>
+            )}
+            {canEditPolicies && quote.status === 'Quoted' && (
+              <>
+                <Btn variant="danger" disabled={setStatusMutation.isPending} onClick={() => { if (confirm('Decline this quote?')) setStatusMutation.mutate('Declined') }}>
+                  Decline
+                </Btn>
+                <Btn variant="outline" disabled={setStatusMutation.isPending} onClick={() => setStatusMutation.mutate('Draft')}>
+                  Reopen
+                </Btn>
+              </>
+            )}
+            {canEditPolicies && (quote.status === 'Declined' || quote.status === 'Expired') && (
+              <Btn variant="outline" disabled={setStatusMutation.isPending} onClick={() => setStatusMutation.mutate('Draft')}>
+                Reopen
               </Btn>
             )}
             {showBindAction && (

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Quote, QuoteListItem, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, InvoicePreview, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail, QuoteChecklistItem, QuotePolicyFormSelection, QuotePolicyFormSelectionUpsert } from '@/types/quote.types'
+import type { Quote, QuoteListItem, QuoteStatus, QuoteCreate, QuoteUpdate, QuoteBind, CommissionOverrideRequest, InvoicePreview, Note, Attachment, RatingResult, RateQuoteRequest, AutoSafetySummary, AutoSafetyRefresh, AutoSafetyDetail, QuoteChecklistItem, QuotePolicyFormSelection, QuotePolicyFormSelectionUpsert } from '@/types/quote.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const quotesApi = {
@@ -17,6 +17,9 @@ export const quotesApi = {
 
   update: (id: string, data: QuoteUpdate) =>
     apiClient.put<Quote>(`/quotes/${id}`, data).then((r) => r.data),
+
+  setStatus: (id: string, status: QuoteStatus) =>
+    apiClient.post<Quote>(`/quotes/${id}/status`, { status }).then((r) => r.data),
 
   bind: (id: string, data: QuoteBind) =>
     apiClient.post<Quote>(`/quotes/${id}/bind`, data).then((r) => r.data),

@@ -111,6 +111,11 @@ public class QuoteUpdateDto : QuoteCreateDto
     public QuoteStatus Status { get; set; }
 }
 
+public class QuoteStatusUpdateDto
+{
+    public QuoteStatus Status { get; set; }
+}
+
 public class QuoteBindDto
 {
     public DateOnly BoundDate { get; set; }

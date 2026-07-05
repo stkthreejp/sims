@@ -335,6 +335,55 @@ public class QuoteService : IQuoteService
         return Result<QuoteDto>.Success(MapToDto(quote));
     }
 
+    public async Task<Result<QuoteDto>> SetStatusAsync(Guid id, QuoteStatus newStatus, UserAccessScope access)
+    {
+        var quote = await Db.Set<Quote>()
+            .Include(qt => qt.Submission).ThenInclude(s => s.Insured)
+            .Include(qt => qt.Program)
+            .Include(qt => qt.Carrier)
+            .Where(qt => qt.Id == id && !qt.IsDeleted)
+            .ForAccessScope(access)
+            .FirstOrDefaultAsync();
+        if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
+        if (quote.Status == QuoteStatus.Bound)
+            return Result<QuoteDto>.Failure("ALREADY_BOUND", "Cannot change the status of a bound quote.");
+
+        // Whitelisted transitions. Never transition TO Bound (bind endpoint only) or TO Cancelled (a policy concept).
+        var allowed = quote.Status switch
+        {
+            QuoteStatus.Draft     => newStatus is QuoteStatus.Submitted or QuoteStatus.Quoted or QuoteStatus.Declined,
+            QuoteStatus.Submitted => newStatus is QuoteStatus.Quoted or QuoteStatus.Declined or QuoteStatus.Draft,
+            QuoteStatus.Quoted    => newStatus is QuoteStatus.Declined or QuoteStatus.Draft,
+            QuoteStatus.Declined  => newStatus is QuoteStatus.Draft,
+            QuoteStatus.Expired   => newStatus is QuoteStatus.Draft,
+            _                     => false,
+        };
+        if (!allowed)
+            return Result<QuoteDto>.Failure("INVALID_TRANSITION", $"Cannot change quote status from {quote.Status} to {newStatus}.");
+
+        var previousStatus = quote.Status;
+        quote.Status = newStatus;
+        quote.UpdatedAt = DateTime.UtcNow;
+        await Db.SaveChangesAsync();
+
+        var eventName = newStatus switch
+        {
+            QuoteStatus.Submitted => "quote.status.submitted",
+            QuoteStatus.Quoted    => "quote.status.quoted",
+            QuoteStatus.Declined  => "quote.status.declined",
+            QuoteStatus.Expired   => "quote.status.expired",
+            _                     => null
+        };
+        if (eventName != null && newStatus != previousStatus)
+            await _workflowEngine.FireEventAsync(
+                eventName,
+                TaskEntityType.Policy,
+                quote.Id,
+                BuildQuoteContext(quote));
+
+        return Result<QuoteDto>.Success(await MapToDtoWithPolicyAsync(quote));
+    }
+
     public async Task<Result<QuoteDto>> BindAsync(Guid id, QuoteBindDto dto, UserAccessScope access)
     {
         var quote = await Db.Set<Quote>()

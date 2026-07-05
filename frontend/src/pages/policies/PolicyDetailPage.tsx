@@ -96,7 +96,7 @@ export function PolicyDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['policies', id, 'notes'] }),
   })
 
-  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canIssuePolicies, canEndorsePolicies, canCancelPolicies, canManageUnderwriting, canOverrideClearance, canViewClaims, isAdmin } = usePermissions()
+  const { canCreateNotes, canEditNotes, canDeleteNotes, canUploadAttachments, canDeleteAttachments, canIssuePolicies, canEndorsePolicies, canRenewPolicies, canCancelPolicies, canManageUnderwriting, canOverrideClearance, canViewClaims, isAdmin } = usePermissions()
 
   const { data: issuancePacket } = useQuery({
     queryKey: ['policies', id, 'issuance-packet'],
@@ -207,6 +207,16 @@ export function PolicyDetailPage() {
       toast.success('Rewrite transaction started')
     },
     onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Rewrite could not be started'),
+  })
+
+  const createRenewalQuoteMutation = useMutation({
+    mutationFn: () => policiesApi.createRenewalQuote(id!),
+    onSuccess: (createdQuote) => {
+      qc.invalidateQueries({ queryKey: ['policies', id] })
+      toast.success('Renewal quote started')
+      navigate(`/quotes/${createdQuote.id}`)
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Renewal could not be started'),
   })
 
   const issuePolicyMutation = useMutation({
@@ -355,6 +365,16 @@ export function PolicyDetailPage() {
                 <FileSignature className="h-3.5 w-3.5" /> Endorse
               </button>
             </>
+          )}
+          {policy.status === 'Active' && canRenewPolicies && (
+            <button
+              onClick={() => { if (confirm('Start a renewal quote for this policy?')) createRenewalQuoteMutation.mutate() }}
+              disabled={createRenewalQuoteMutation.isPending}
+              title="Start a renewal quote for this policy"
+              className="sd-btn outline"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Start renewal
+            </button>
           )}
           {policy.status === 'Active' && canCancelPolicies && (
             <>
@@ -639,6 +659,7 @@ export function PolicyDetailPage() {
                   canUploadProof={canUploadAttachments}
                   canCompleteCancellation={canCancelPolicies}
                   canCompleteRewrite={canEndorsePolicies}
+                  canIssueEndorsement={canEndorsePolicies}
                   postBindBlockedReason={postBindBlockedReason}
                   onIssueNonRenewalNotice={() => setNonRenewalNoticeTransactionId(t.id)}
                 />
@@ -1034,6 +1055,7 @@ function TransactionRows({
   canUploadProof,
   canCompleteCancellation,
   canCompleteRewrite,
+  canIssueEndorsement,
   postBindBlockedReason,
   onIssueNonRenewalNotice,
 }: {
@@ -1042,6 +1064,7 @@ function TransactionRows({
   canUploadProof: boolean
   canCompleteCancellation: boolean
   canCompleteRewrite: boolean
+  canIssueEndorsement: boolean
   postBindBlockedReason: string | null
   onIssueNonRenewalNotice: () => void
 }) {
@@ -1063,6 +1086,21 @@ function TransactionRows({
   const canIssueNonRenewalNotice = canCompleteCancellation &&
     t.transactionType === 'NonRenewal' &&
     t.status === 'NoticePending'
+  const canIssueEndorsementTransaction = canIssueEndorsement &&
+    t.transactionType === 'Endorsement' &&
+    t.status === 'Submitted'
+  const issueEndorsement = useMutation({
+    mutationFn: () => policiesApi.issueEndorsement(t.policyId, t.id, {
+      effectiveDate: t.effectiveDate,
+      premiumChange: t.premiumChange,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'] })
+      toast.success('Endorsement issued')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Endorsement could not be issued'),
+  })
   const completeCancellation = useMutation({
     mutationFn: () => policiesApi.completeCancellation(t.policyId, t.id, {
       completedDate: todayLocal(),
@@ -1121,6 +1159,22 @@ function TransactionRows({
                 }}
               >
                 <Send className="h-3.5 w-3.5" /> Issue Notice
+              </button>
+            )}
+            {canIssueEndorsementTransaction && (
+              <button
+                type="button"
+                className="sd-btn outline sm"
+                disabled={issueEndorsement.isPending || !!postBindBlockedReason}
+                title={postBindBlockedReason ?? 'Issue this endorsement'}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  if (!postBindBlockedReason && confirm('Issue this endorsement?')) {
+                    issueEndorsement.mutate()
+                  }
+                }}
+              >
+                <Send className="h-3.5 w-3.5" /> Issue
               </button>
             )}
             {canComplete && (

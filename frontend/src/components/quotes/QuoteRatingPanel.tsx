@@ -41,6 +41,10 @@ function safeParse(raw: string): Record<string, unknown> {
 export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBound }: Props) {
   const qc = useQueryClient()
 
+  // The equipment schedule only drives Inland Marine rating. GL/AL/APD rate off the
+  // submission's exposures, so equipment fetch/UI/blockers are IM-only (audit U4).
+  const isIM = lineOfBusiness === 'InlandMarine'
+
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: ['rating-snapshot', quoteId],
     queryFn: () => quotesApi.getRatingSnapshot(quoteId),
@@ -49,12 +53,14 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
   const { data: equipment = [] } = useQuery({
     queryKey: ['submission-equipment', submissionId],
     queryFn: () => submissionIMApi.getEquipment(submissionId),
+    enabled: isIM,
   })
 
   const { data: equipmentTypes = [] } = useQuery({
     queryKey: ['im-equipment-types'],
     queryFn: () => imLookupsApi.getEquipmentTypes(),
     staleTime: 5 * 60 * 1000,
+    enabled: isIM,
   })
 
   // Form state — seeded from snapshot when one exists.
@@ -150,6 +156,8 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
   const itemsMissingType = equipment.filter((e) => !e.equipmentTypeId)
   const itemsMissingValue = equipment.filter((e) => !e.value)
   const blockedByMissingFields = itemsMissingType.length > 0 || itemsMissingValue.length > 0
+  // Only IM can be blocked by the equipment schedule; other LOBs rate off exposures.
+  const equipmentBlocked = isIM && (equipment.length === 0 || blockedByMissingFields)
   const selectedEndorsementPremium = IM_OPTIONAL_ENDORSEMENTS
     .filter((e) => imEndorsements[e.key])
     .reduce((sum, e) => sum + e.premium, 0)
@@ -166,7 +174,8 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
         )}
       </div>
 
-      {/* Equipment summary */}
+      {/* Equipment summary (Inland Marine only) */}
+      {isIM && (
       <div className="sd-card">
         <div className="sd-card-head">
           <h3>Equipment <span className="cnt">{equipment.length}</span></h3>
@@ -225,6 +234,13 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
           </table>
         )}
       </div>
+      )}
+
+      {!isIM && !snapshot && !isBound && (
+        <p className="sd-card" style={{ margin: 0, padding: '12px 16px', color: 'var(--ink-3)', fontSize: 'var(--fs-body)' }}>
+          Premium for this line is calculated from the submission's exposures. Set any schedule modifier below, then Calculate.
+        </p>
+      )}
 
       {lineOfBusiness === 'InlandMarine' && (
         <div className="sd-card">
@@ -298,7 +314,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
           <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={() => rateMutation.mutate()}
-              disabled={rateMutation.isPending || shadowMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}
+              disabled={rateMutation.isPending || shadowMutation.isPending || reasonInvalid || equipmentBlocked}
               className="sd-btn primary sm"
             >
               <Calculator size={14} />
@@ -307,7 +323,7 @@ export function QuoteRatingPanel({ quoteId, submissionId, lineOfBusiness, isBoun
             {shadowStatus?.[LOB_SHADOW_KEY[lineOfBusiness]!] && (
               <button
                 onClick={() => shadowMutation.mutate()}
-                disabled={shadowMutation.isPending || rateMutation.isPending || reasonInvalid || equipment.length === 0 || blockedByMissingFields}
+                disabled={shadowMutation.isPending || rateMutation.isPending || reasonInvalid || equipmentBlocked}
                 className="sd-btn outline sm"
                 title="Run engine without changing the quote premium — compare to spreadsheet"
               >

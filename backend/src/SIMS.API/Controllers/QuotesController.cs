@@ -70,6 +70,18 @@ public class QuotesController : ControllerBase
         return result.ToHttpResult(this);
     }
 
+    [HttpPost("{id:guid}/status")]
+    [Authorize(Policy = AppPermissions.PoliciesEdit)]
+    public async Task<IActionResult> SetStatus(Guid id, [FromBody] QuoteStatusUpdateDto dto)
+    {
+        var result = await _quoteService.SetStatusAsync(id, dto.Status, CurrentAccess);
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : (result.ErrorCode == "NOT_FOUND"
+                ? NotFound(new { result.ErrorCode, result.ErrorMessage })
+                : BadRequest(new { result.ErrorCode, result.ErrorMessage }));
+    }
+
     [HttpPost("{id:guid}/rate")]
     [Authorize(Policy = AppPermissions.PoliciesEdit)]
     public async Task<IActionResult> Rate(Guid id, [FromBody] RateQuoteRequest request)

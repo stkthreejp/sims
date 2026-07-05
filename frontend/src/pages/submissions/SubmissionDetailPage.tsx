@@ -186,7 +186,7 @@ export function SubmissionDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const qc = useQueryClient()
-  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
+  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies, canDeletePolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
 
   const extractionState = location.state as { extractionStatus?: string; emailId?: string } | null
   const [showExtractionBanner, setShowExtractionBanner] = useState(
@@ -1260,7 +1260,7 @@ export function SubmissionDetailPage() {
                   {q.status === 'Bound' && q.boundPolicyId && (
                     <Link to={`/policies/${q.boundPolicyId}`} className="sd-btn sm outline" onClick={(e) => e.stopPropagation()}>View Policy</Link>
                   )}
-                  {q.status !== 'Bound' && (
+                  {canDeletePolicies && q.status === 'Draft' && (
                     <button
                       onClick={(e) => { e.stopPropagation(); if (confirm('Delete this quote?')) deleteQuoteMutation.mutate(q.id) }}
                       className="sims-icon-btn hover:text-red-500"
@@ -1313,6 +1313,11 @@ export function SubmissionDetailPage() {
               <label htmlFor="isFilingState" style={{ fontSize: 12.5, color: 'var(--ink-2)', cursor: 'pointer' }}>Filing State</label>
             </div>
           </div>
+          {quoteForm.lineOfBusiness === 'AutoLiability' && (
+            <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, fontSize: 12.5, background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
+              Auto Liability is not currently bindable — you can quote it for record-keeping, but it cannot be bound.
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button onClick={handleCreateQuote} disabled={createQuoteMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save Quote</button>
             <button onClick={() => setShowQuoteForm(false)} className="sd-btn outline sm"><X size={13} /> Cancel</button>

@@ -231,6 +231,99 @@ public class QuoteServiceAccessTests
         Assert.Empty(await db.Set<Policy>().ToListAsync());
     }
 
+    [Fact]
+    public async Task SetStatusAsync_DraftToDeclined_Succeeds()
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, carrierId, currentUserId);
+        var quote = SeedQuote(db, submission.Id, carrierId, currentUserId, QuoteStatus.Draft);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).SetStatusAsync(quote.Id, QuoteStatus.Declined, new UserAccessScope(currentUserId, true));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(QuoteStatus.Declined, result.Value!.Status);
+        var saved = await db.Set<Quote>().SingleAsync(q => q.Id == quote.Id);
+        Assert.Equal(QuoteStatus.Declined, saved.Status);
+    }
+
+    [Fact]
+    public async Task SetStatusAsync_QuotedToDraft_ReopensSuccessfully()
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, carrierId, currentUserId);
+        var quote = SeedQuote(db, submission.Id, carrierId, currentUserId, QuoteStatus.Quoted);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).SetStatusAsync(quote.Id, QuoteStatus.Draft, new UserAccessScope(currentUserId, true));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(QuoteStatus.Draft, result.Value!.Status);
+        var saved = await db.Set<Quote>().SingleAsync(q => q.Id == quote.Id);
+        Assert.Equal(QuoteStatus.Draft, saved.Status);
+    }
+
+    [Fact]
+    public async Task SetStatusAsync_BoundQuote_IsRejected()
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, carrierId, currentUserId);
+        var quote = SeedQuote(db, submission.Id, carrierId, currentUserId, QuoteStatus.Bound);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).SetStatusAsync(quote.Id, QuoteStatus.Draft, new UserAccessScope(currentUserId, true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("ALREADY_BOUND", result.ErrorCode);
+        var saved = await db.Set<Quote>().SingleAsync(q => q.Id == quote.Id);
+        Assert.Equal(QuoteStatus.Bound, saved.Status);
+    }
+
+    [Fact]
+    public async Task SetStatusAsync_QuotedToBound_IsRejectedAsInvalidTransition()
+    {
+        await using var db = CreateDb();
+        var currentUserId = Guid.NewGuid();
+        var carrierId = Guid.NewGuid();
+        var submission = SeedSubmissionWithCarrier(db, carrierId, currentUserId);
+        var quote = SeedQuote(db, submission.Id, carrierId, currentUserId, QuoteStatus.Quoted);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).SetStatusAsync(quote.Id, QuoteStatus.Bound, new UserAccessScope(currentUserId, true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_TRANSITION", result.ErrorCode);
+        var saved = await db.Set<Quote>().SingleAsync(q => q.Id == quote.Id);
+        Assert.Equal(QuoteStatus.Quoted, saved.Status);
+    }
+
+    private static Quote SeedQuote(ApplicationDbContext db, Guid submissionId, Guid carrierId, Guid userId, QuoteStatus status)
+    {
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteNumber = "QTE-2026-0001",
+            SubmissionId = submissionId,
+            CarrierId = carrierId,
+            LineOfBusiness = PolicyLineOfBusiness.InlandMarine,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            ExpirationDate = new DateOnly(2027, 1, 1),
+            PremiumAmount = 1000m,
+            TaxesAndFees = 100m,
+            TotalPremium = 1100m,
+            Status = status,
+            CreatedById = userId,
+        };
+        db.Add(quote);
+        return quote;
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
