@@ -247,6 +247,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
         builder.Entity<Attachment>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<DocumentTemplate>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyFormTemplate>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<CompanyLicense>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyFormFieldMapping>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyPackageConfiguration>().HasQueryFilter(e => !e.IsDeleted);
         builder.Entity<PolicyPackageForm>().HasQueryFilter(e => !e.IsDeleted);

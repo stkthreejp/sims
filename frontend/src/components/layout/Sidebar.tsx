@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2, Hash, Bot, Boxes, Handshake, FileBarChart2 } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Building2, ShieldCheck, UserCheck, LayoutTemplate, Inbox, CheckSquare, Calendar, GitMerge, AlertOctagon, ListChecks, Receipt, Banknote, ArrowLeftRight, Landmark, Wallet, FileInput, Activity, CalendarCheck, Wifi, BarChart2, Sliders, FlaskConical, KeyRound, Database, Settings2, BookOpenCheck, FileCheck2, Hash, Bot, Boxes, Handshake, FileBarChart2, BadgeCheck } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
@@ -94,6 +94,7 @@ export function Sidebar() {
             {perms.canManageSystem && <NavItem to="/admin/intermediaries" label="Intermediaries" icon={Handshake} />}
             {perms.canManageUnderwritingControls && <NavItem to="/admin/underwriting-controls" label="UW Controls" icon={ShieldCheck} />}
             {perms.canManageSystem && <NavItem to="/admin/surplus-lines" label="Surplus Lines" icon={FileCheck2} />}
+            {perms.canManageSystem && <NavItem to="/admin/company-licenses" label="Company Licenses" icon={BadgeCheck} />}
             {perms.canManageSystem && <NavItem to="/admin/legal-requirements" label="Legal Tracker" icon={BookOpenCheck} />}
             {perms.canViewDocumentLibrary && <NavItem to="/document-library" label="Doc Library" icon={LayoutTemplate} />}
             {perms.canManageUnderwriting && <NavItem to="/admin/policy-forms" label="Policy Forms" icon={LayoutTemplate} />}

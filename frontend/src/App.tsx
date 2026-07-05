@@ -82,6 +82,7 @@ const ProgramConfigurationAdminPage = lazy(() => import('@/pages/admin/ProgramCo
 const IntermediariesAdminPage = lazy(() => import('@/pages/admin/IntermediariesAdminPage').then((m) => ({ default: m.IntermediariesAdminPage })))
 const UnderwritingControlsAdminPage = lazy(() => import('@/pages/admin/UnderwritingControlsAdminPage').then((m) => ({ default: m.UnderwritingControlsAdminPage })))
 const SurplusLinesAdminPage = lazy(() => import('@/pages/admin/SurplusLinesAdminPage').then((m) => ({ default: m.SurplusLinesAdminPage })))
+const CompanyLicensesAdminPage = lazy(() => import('@/pages/admin/CompanyLicensesAdminPage').then((m) => ({ default: m.CompanyLicensesAdminPage })))
 const AdminBordereauxProfilesPage = lazy(() => import('@/pages/admin/AdminBordereauxProfilesPage'))
 
 // Quotes & Billing
@@ -277,6 +278,7 @@ export default function App() {
               <Route path="/admin/intermediaries" element={withPermission(Permissions.AdminSystemManage, <IntermediariesAdminPage />)} />
               <Route path="/admin/underwriting-controls" element={withPermission(Permissions.AdminUnderwritingControlsManage, <UnderwritingControlsAdminPage />)} />
               <Route path="/admin/surplus-lines" element={withPermission(Permissions.AdminSystemManage, <SurplusLinesAdminPage />)} />
+              <Route path="/admin/company-licenses" element={withPermission(Permissions.AdminSystemManage, <CompanyLicensesAdminPage />)} />
               <Route path="/admin/bordereaux-profiles" element={withAllPermissions([Permissions.NavAdminBordereaux, Permissions.AccountingAdmin], <AdminBordereauxProfilesPage />)} />
               <Route path="/quotes/:quoteId" element={withPermission(Permissions.PoliciesView, <QuoteDetailPage />)} />
               <Route path="/quotes/:quoteId/writeup" element={withPermission(Permissions.PoliciesView, <QuoteWriteupPage />)} />

@@ -370,8 +370,27 @@ Related: WS12 W17 (`FilingRequired`→`quote.IsFilingState`) and W19 (fee-link c
   for filing/UI, not a calculator. Set SL tax up as a **Tax-category fee**.
 - **Doc Library vs Policy Forms — complementary, not competing.** Doc Library authors HTML
   templates (proposals / letters / notices). Policy Forms maps which form/doc applies per
-  program/LOB/state and holds binary carrier PDFs + field mappings. (Authoring simple policy
-  forms as HTML in the Library is a possible post-launch convergence, not a defect.)
+  program/LOB/state and holds binary carrier PDFs + field mappings. (Authoring data-bearing
+  policy forms as HTML in the Library is now F16.)
+
+---
+
+## F16 — No form builder for data-bearing policy forms (dec page); converge on the Doc Library
+
+**Status: DECIDED (author in Doc Library, reference from Policy Forms; build NOW) — queued**
+
+`PolicyFormTemplate` is upload-only (`StoragePath`/`FileName`/`ContentType`/`IsFillable` +
+`FieldMappings`) — no `HtmlContent`, no in-app editor. The visual TipTap builder (drag-in
+tags + repeat blocks) exists only for Doc Library `DocumentTemplate`. Rendering already
+supports data: `PolicyAssemblyService.PrepareFormPdfAsync` branches `.pdf`→fill-fields,
+`.docx`→merge, `.html`→merge+HTML-to-PDF. So the gap is **authoring**, not rendering.
+Decision (Jeremiah): a policy-package form may **reference a Doc Library `DocumentTemplate`**
+(authored in the builder); `PolicyAssemblyService` renders that template's HtmlContent into
+the packet. Policy Forms remains the mapping layer + carrier binary PDFs. Build: add an
+optional `DocumentTemplateId` to `PolicyFormTemplate` (or the package-form), a render branch
+that resolves the linked template, and a frontend "authored template" mode that picks a
+Policy-scoped Doc Library template instead of uploading. Reuses DocumentMergeService +
+the existing tag/repeat registry (incl. the new Vehicles block from F14).
 
 ---
 
