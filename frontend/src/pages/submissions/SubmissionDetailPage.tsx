@@ -839,13 +839,13 @@ export function SubmissionDetailPage() {
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleCreateQuote = () => {
-    if (!quoteForm.carrierId || !quoteForm.lineOfBusiness || !quoteForm.effectiveDate || !quoteForm.expirationDate) {
-      toast.error('Carrier, line of business, and dates are required')
+    if (!quoteForm.programId || !quoteForm.carrierId || !quoteForm.lineOfBusiness || !quoteForm.effectiveDate || !quoteForm.expirationDate) {
+      toast.error('Program, carrier, line of business, and dates are required')
       return
     }
     createQuoteMutation.mutate({
       submissionId: id!,
-      programId: quoteForm.programId || null,
+      programId: quoteForm.programId,
       carrierId: quoteForm.carrierId,
       lineOfBusiness: quoteForm.lineOfBusiness as PolicyLineOfBusiness,
       effectiveDate: quoteForm.effectiveDate,
@@ -1285,7 +1285,7 @@ export function SubmissionDetailPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
-              { label: 'Program', node: <select value={quoteForm.programId} onChange={setQF('programId')} style={inputStyle}><option value="">No program</option>{programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select> },
+              { label: 'Program', node: <select value={quoteForm.programId} onChange={setQF('programId')} style={inputStyle}><option value="" disabled>Select a program…</option>{programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select> },
               { label: 'Carrier *', node: <select value={quoteForm.carrierId} onChange={setQF('carrierId')} style={inputStyle}><option value="">— Select carrier —</option>{quoteCarrierOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select> },
               { label: 'Line of Business *', node: <select value={quoteForm.lineOfBusiness} onChange={setQF('lineOfBusiness')} disabled={!quoteForm.carrierId} style={inputStyle}><option value="">— Select LOB —</option>{availableLobs.map((l) => <option key={l} value={l}>{getLobLabel(l)}</option>)}</select> },
               { label: 'Effective Date *', node: <input type="date" value={quoteForm.effectiveDate} onChange={setQF('effectiveDate')} style={inputStyle} /> },

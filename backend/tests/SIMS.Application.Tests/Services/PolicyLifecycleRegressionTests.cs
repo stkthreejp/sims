@@ -43,6 +43,72 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteCreate_RequiresProgram()
+    {
+        await using var db = CreateDb();
+        var fixture = CreateQuoteFixture("No Program");
+        db.AddRange(fixture.User, fixture.Carrier, fixture.Insured, fixture.Submission);
+        await db.SaveChangesAsync();
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        var result = await quoteService.CreateAsync(CreateQuoteRequest(fixture, null), fixture.UserId);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("PROGRAM_REQUIRED", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task QuoteBind_RejectsDeclinedQuote()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        fixture.Quote.Status = QuoteStatus.Declined;
+        await db.SaveChangesAsync();
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("QUOTE_NOT_BINDABLE", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task QuoteBind_RequiresRerateWhenEffectiveDateChangedAfterRating()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db); // quote effective 2026-01-01
+        db.Add(new QuoteRatingSnapshot
+        {
+            QuoteId = fixture.Quote.Id,
+            RatingPlanVersionId = Guid.NewGuid(),
+            RatedById = fixture.UserId,
+            RatedAt = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc),
+            GrandTotalPremium = 1000m,
+        });
+        await db.SaveChangesAsync();
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        // BindRequest() effective date (2026-01-05) differs from the rated 2026-01-01.
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("RERATE_REQUIRED", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task QuoteBind_FailsClosedWhenCommissionScheduleMissing()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService(), carrierCommissions: new MissingCarrierCommissionService());
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("COMMISSION_SCHEDULE_MISSING", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task QuoteBind_GeneratesPolicyNumberFromBindEffectiveDate()
     {
         await using var db = CreateDb();
@@ -312,6 +378,9 @@ public class PolicyLifecycleRegressionTests
     {
         await using var db = CreateDb();
         var fixture = await SeedBindableQuoteAsync(db);
+        // Align the quote's effective date with the bind date so the snapshot-locking assertion
+        // isn't short-circuited by the RERATE_REQUIRED guard (WS5-R Batch 1).
+        fixture.Quote.EffectiveDate = new DateOnly(2026, 1, 5);
         var olderSnapshot = new QuoteRatingSnapshot
         {
             QuoteId = fixture.Quote.Id,
@@ -2585,10 +2654,12 @@ public class PolicyLifecycleRegressionTests
         ApplicationDbContext db,
         RecordingInvoicingService invoicing,
         RecordingWorkflowEngineService? workflow = null,
-        IPolicyNumberService? policyNumbers = null)
+        IPolicyNumberService? policyNumbers = null,
+        ICarrierCommissionService? carrierCommissions = null)
     {
         workflow ??= new RecordingWorkflowEngineService();
         policyNumbers ??= new StubPolicyNumberService();
+        carrierCommissions ??= new NoOpCarrierCommissionService();
         var services = new ServiceCollection()
             .AddSingleton<DbContext>(db)
             .AddSingleton<IInvoicingService>(invoicing)
@@ -2597,7 +2668,7 @@ public class PolicyLifecycleRegressionTests
         return new QuoteService(
             services,
             workflow,
-            new NoOpCarrierCommissionService(),
+            carrierCommissions,
             new NoOpAgentCommissionService(),
             new NoOpQuoteChecklistService(),
             policyNumbers,
@@ -2667,6 +2738,11 @@ public class PolicyLifecycleRegressionTests
     private static async Task<QuoteFixture> SeedBindableQuoteAsync(ApplicationDbContext db)
     {
         var fixture = CreateQuoteFixture("Test Logistics");
+        // WS5-R Batch 1: quotes now require a program and an active program→carrier→LOB→state
+        // path to be bindable (the commission schedule is supplied by the NoOp stub below).
+        var program = new ProgramConfiguration { Name = "Longleaf", Code = "LONGLEAF", IsActive = true };
+        fixture.Quote.ProgramId = program.Id;
+        fixture.Quote.Program = program;
         var template = new PolicyFormTemplate
         {
             Id = Guid.NewGuid(),
@@ -2685,7 +2761,33 @@ public class PolicyLifecycleRegressionTests
             IsIncluded = true,
             SequenceOrder = 1,
         };
-        db.AddRange(fixture.User, fixture.Carrier, fixture.Insured, fixture.Submission, fixture.Quote, template, selection);
+        db.AddRange(fixture.User, fixture.Carrier, fixture.Insured, fixture.Submission, program, fixture.Quote, template, selection);
+        await db.SaveChangesAsync();
+        db.Add(new ProgramCarrier
+        {
+            ProgramConfigurationId = program.Id,
+            CarrierId = fixture.Carrier.Id,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            LinesOfBusiness =
+            {
+                new ProgramCarrierLineOfBusiness
+                {
+                    LineOfBusiness = fixture.Quote.LineOfBusiness,
+                    IsActive = true,
+                    EffectiveDate = new DateOnly(2026, 1, 1),
+                    States =
+                    {
+                        new ProgramCarrierLobState
+                        {
+                            StateCode = fixture.Insured.State,
+                            IsActive = true,
+                            EffectiveDate = new DateOnly(2026, 1, 1)
+                        }
+                    }
+                }
+            }
+        });
         await db.SaveChangesAsync();
         return fixture;
     }
@@ -3211,6 +3313,25 @@ public class PolicyLifecycleRegressionTests
         public Task<Result<CarrierCommissionDto>> DisableAsync(long id, DateOnly? disabledDate, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        // Represents a configured carrier commission schedule so the bind-time fail-closed
+        // guard (WS5-R Batch 1) is satisfied; these lifecycle tests don't assert on the rate.
+        public Task<CarrierCommissionRates?> GetActiveRatesAsync(Guid carrierId, string? lineOfBusiness, DateOnly asOfDate, Guid? programConfigurationId = null, CancellationToken ct = default)
+            => Task.FromResult<CarrierCommissionRates?>(new CarrierCommissionRates(0.15m, 0.05m));
+
+        public Task<IReadOnlyList<CarrierCommissionDto>> GetAllAsync(Guid carrierId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<CarrierCommissionDto>>([]);
+    }
+
+    // Represents an UNconfigured carrier commission schedule (returns null) to exercise the
+    // bind-time fail-closed guard (WS5-R Batch 1, A1.1).
+    private sealed class MissingCarrierCommissionService : ICarrierCommissionService
+    {
+        public Task<Result<CarrierCommissionDto>> CreateAsync(Guid carrierId, CreateCarrierCommissionRequest req, Guid userId, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<Result<CarrierCommissionDto>> DisableAsync(long id, DateOnly? disabledDate, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task<CarrierCommissionRates?> GetActiveRatesAsync(Guid carrierId, string? lineOfBusiness, DateOnly asOfDate, Guid? programConfigurationId = null, CancellationToken ct = default)
             => Task.FromResult<CarrierCommissionRates?>(null);
 
@@ -3234,7 +3355,7 @@ public class PolicyLifecycleRegressionTests
             Guid? carrierId = null,
             string? stateCode = null,
             CancellationToken ct = default)
-            => Task.FromResult<decimal?>(null);
+            => Task.FromResult<decimal?>(0m);
 
         public Task<IReadOnlyList<AgentCommissionDto>> GetAllAsync(Guid agentId, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AgentCommissionDto>>([]);

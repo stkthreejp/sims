@@ -25,21 +25,14 @@ import type { AgentCommission } from '@/types/agentCommission.types'
 
 // ─── Commission constants ──────────────────────────────────────────────────────
 
+// Active/rateable lines only (GL_v2, IM_v1, APD_v1). Deprecated/non-bindable lines
+// (e.g. AutoLiability) are intentionally omitted so commission schedules can't be
+// configured for a line the system can't quote or bind (WS5-R Batch 1, A1.1).
 const LOB_OPTIONS = [
   { value: '', label: 'All Lines (default fallback)' },
   { value: 'GeneralLiability', label: 'General Liability' },
   { value: 'InlandMarine', label: 'Inland Marine' },
-  { value: 'AutoLiability', label: 'Auto Liability' },
   { value: 'AutoPhysicalDamage', label: 'Auto Physical Damage' },
-  { value: 'Property', label: 'Property' },
-  { value: 'CommercialAuto', label: 'Commercial Auto' },
-  { value: 'BusinessOwners', label: 'Business Owners' },
-  { value: 'WorkersCompensation', label: 'Workers Compensation' },
-  { value: 'ProfessionalLiability', label: 'Professional Liability' },
-  { value: 'Umbrella', label: 'Umbrella' },
-  { value: 'Cyber', label: 'Cyber' },
-  { value: 'ExcessLiability', label: 'Excess Liability' },
-  { value: 'Other', label: 'Other' },
 ]
 
 // ─── Location form state ───────────────────────────────────────────────────────

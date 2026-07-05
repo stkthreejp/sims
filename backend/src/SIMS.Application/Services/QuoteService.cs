@@ -8,6 +8,7 @@ using SIMS.Domain.Entities;
 using SIMS.Domain.Entities.Rating;
 using SIMS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace SIMS.Application.Services;
 
@@ -159,16 +160,14 @@ public class QuoteService : IQuoteService
                 ? Result<QuoteDto>.Failure(BusinessDataAccess.AccessDeniedCode, BusinessDataAccess.AccessDeniedMessage)
                 : Result<QuoteDto>.Failure("INVALID_SUBMISSION", "Submission not found.");
 
-        ProgramConfiguration? program = null;
         var carrierId = dto.CarrierId;
         var lineOfBusiness = dto.LineOfBusiness;
-        if (dto.ProgramId.HasValue)
-        {
-            program = await Db.Set<ProgramConfiguration>()
-                .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
-            if (program == null)
-                return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
-        }
+        if (!dto.ProgramId.HasValue)
+            return Result<QuoteDto>.Failure("PROGRAM_REQUIRED", "A program is required to create a quote.");
+        var program = await Db.Set<ProgramConfiguration>()
+            .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
+        if (program == null)
+            return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
 
         var carrier = await Db.Set<Carrier>()
             .FirstOrDefaultAsync(c => c.Id == carrierId && !c.IsDeleted && c.IsActive);
@@ -252,16 +251,14 @@ public class QuoteService : IQuoteService
         if (validation is not null)
             return Result<QuoteDto>.Failure(validation.Value.Code, validation.Value.Message);
 
-        ProgramConfiguration? program = null;
         var carrierId = dto.CarrierId;
         var lineOfBusiness = dto.LineOfBusiness;
-        if (dto.ProgramId.HasValue)
-        {
-            program = await Db.Set<ProgramConfiguration>()
-                .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
-            if (program == null)
-                return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
-        }
+        if (!dto.ProgramId.HasValue)
+            return Result<QuoteDto>.Failure("PROGRAM_REQUIRED", "A program is required for a quote.");
+        var program = await Db.Set<ProgramConfiguration>()
+            .FirstOrDefaultAsync(p => p.Id == dto.ProgramId.Value && !p.IsDeleted && p.IsActive);
+        if (program == null)
+            return Result<QuoteDto>.Failure("INVALID_PROGRAM", "Program not found or inactive.");
 
         var carrier = await Db.Set<Carrier>()
             .FirstOrDefaultAsync(c => c.Id == carrierId && !c.IsDeleted && c.IsActive);
@@ -352,12 +349,33 @@ public class QuoteService : IQuoteService
         if (quote == null) return Result<QuoteDto>.Failure("NOT_FOUND", "Quote not found.");
         if (quote.Status == QuoteStatus.Bound)
             return Result<QuoteDto>.Failure("ALREADY_BOUND", "Quote is already bound.");
+        if (quote.Status is not (QuoteStatus.Draft or QuoteStatus.Submitted or QuoteStatus.Quoted))
+            return Result<QuoteDto>.Failure("QUOTE_NOT_BINDABLE", $"A quote with status {quote.Status} cannot be bound.");
         var amountValidation = ValidateQuoteAmounts(quote.PremiumAmount, quote.TaxesAndFees);
         if (amountValidation is not null)
             return Result<QuoteDto>.Failure(amountValidation.Value.Code, amountValidation.Value.Message);
         var dateValidation = ValidateBindDates(dto);
         if (dateValidation is not null)
             return Result<QuoteDto>.Failure(dateValidation.Value.Code, dateValidation.Value.Message);
+
+        // Fail-closed identity/path/re-rate guards (WS5-R Batch 1, A1.4/A1.5).
+        if (quote.Submission == null)
+            return Result<QuoteDto>.Failure("NOT_FOUND", "Quote submission not found.");
+        if (quote.ProgramId == null)
+            return Result<QuoteDto>.Failure("PROGRAM_REQUIRED", "A program is required to bind this quote.");
+
+        var submissionLobs = ParseLinesOfBusiness(quote.Submission.LinesOfBusiness);
+        if (submissionLobs.Count > 0 && !submissionLobs.Contains(quote.LineOfBusiness))
+            return Result<QuoteDto>.Failure("QUOTE_LOB_NOT_IN_SUBMISSION", $"{quote.LineOfBusiness} is not one of the submission's declared lines of business.");
+
+        var hasRatingSnapshot = await Db.Set<QuoteRatingSnapshot>().AnyAsync(s => s.QuoteId == quote.Id && !s.IsDeleted);
+        if (hasRatingSnapshot && dto.EffectiveDate != quote.EffectiveDate)
+            return Result<QuoteDto>.Failure("RERATE_REQUIRED", "The effective date changed since this quote was rated. Re-rate the quote at the new effective date before binding.");
+
+        var bindPathValidation = await ValidateProgramSetupPathAsync(quote.Program, quote.CarrierId, quote.LineOfBusiness, quote.Submission, dto.EffectiveDate);
+        if (bindPathValidation is not null)
+            return Result<QuoteDto>.Failure(bindPathValidation.Value.Code, bindPathValidation.Value.Message);
+
         if (!await HasIncludedPolicyFormsAsync(quote.Id))
             return Result<QuoteDto>.Failure("POLICY_FORMS_REQUIRED", "Select the policy forms for this quote before binding.");
         var clearance = await _clearance.EvaluateSubmissionAsync(quote.SubmissionId, access.UserId);
@@ -368,6 +386,26 @@ public class QuoteService : IQuoteService
         var controlSummary = await _controlEnforcement.EvaluateQuoteAsync(quote.Id, UnderwritingControlStage.Bind, access.UserId);
         if (controlSummary.HasBlockingResults)
             return Result<QuoteDto>.Failure("UNDERWRITING_CONTROL_BLOCKED", BuildControlBlockMessage("binding", controlSummary.BlockingResults));
+
+        // Commission fail-closed (WS5-R Batch 1, A1.1). Absence of a schedule blocks the bind;
+        // a deliberate 0%-rate schedule row is the supported path for concede-commission accounts.
+        // Re-resolve at the bind effective date and refresh the stored rates so the bound policy
+        // reflects current schedule values (not a possibly-stale create-time 0% default).
+        var commissionLobKey = quote.LineOfBusiness.ToString();
+        var boundCarrierRates = await _carrierCommissions.GetActiveRatesAsync(quote.CarrierId, commissionLobKey, dto.EffectiveDate, quote.ProgramId);
+        if (boundCarrierRates == null)
+            return Result<QuoteDto>.Failure("COMMISSION_SCHEDULE_MISSING", "No carrier commission schedule is configured for this carrier, line of business, and program. Add a schedule (a deliberate 0% row is allowed) before binding.");
+        decimal? boundAgentRate = null;
+        if (quote.Submission.AgentId is Guid boundAgentId)
+        {
+            boundAgentRate = await _agentCommissions.GetActiveRateAsync(boundAgentId, commissionLobKey, dto.EffectiveDate, quote.ProgramId, quote.CarrierId, quote.Submission.Insured?.State);
+            if (boundAgentRate == null)
+                return Result<QuoteDto>.Failure("COMMISSION_SCHEDULE_MISSING", "No agent commission schedule is configured for this agent, line of business, and program. Add a schedule (a deliberate 0% row is allowed) before binding.");
+        }
+        quote.CarrierCommissionRate = boundCarrierRates.CommissionRate;
+        quote.SMMRetentionRate = boundCarrierRates.SMMRetentionRate;
+        if (boundAgentRate.HasValue)
+            quote.AgentCommissionRate = boundAgentRate.Value;
 
         await using var dbTransaction = await Db.Database.BeginTransactionAsync();
 
@@ -747,6 +785,27 @@ public class QuoteService : IQuoteService
         return pathExists
             ? null
             : ("INVALID_PROGRAM_SETUP_PATH", "Selected carrier, line of business, and insured state are not active for this program.");
+    }
+
+    // Parse a submission's JSON-serialized LinesOfBusiness array into the LOB enum set.
+    // Mirrors UnderwritingClearanceService so bind-time quote-LOB checks agree with clearance.
+    private static IReadOnlySet<PolicyLineOfBusiness> ParseLinesOfBusiness(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return new HashSet<PolicyLineOfBusiness>();
+        try
+        {
+            var names = JsonSerializer.Deserialize<string[]>(value) ?? [];
+            return names
+                .Select(name => Enum.TryParse<PolicyLineOfBusiness>(name, out var lob) ? lob : (PolicyLineOfBusiness?)null)
+                .Where(lob => lob.HasValue)
+                .Select(lob => lob!.Value)
+                .ToHashSet();
+        }
+        catch
+        {
+            return new HashSet<PolicyLineOfBusiness>();
+        }
     }
 
     private static string BuildControlBlockMessage(string action, IReadOnlyList<UnderwritingControlEnforcementResultDto> blockers)
