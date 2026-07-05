@@ -104,12 +104,12 @@ Full finding detail: `docs/SETUP-AUDIT-2026-07-04.md`. Engineering rules adopted
 
 **Batch 0 — ✅ DONE 2026-07-04 (20cfba6):** payee CRUD; P0001/23505/23503→409 middleware; orphan-audit UI; BDX enum fix + query-key fix; email sink (+ app setting); program-config options endpoint.
 
-**Batch 1 — fail-open money & identity (P1, before bind tests T7–T9):**
-- [ ] Commission fail-closed (A1.1, decided Q2): validate LOB on unscoped paths; `COMMISSION_SCHEDULE_MISSING` block at bind with explicit 0%-rate rows as the rare-case path; `ACTIVE_LOBS` in the agent picker; complete label maps.
-- [ ] Policy-number fail-closed (A1.2): block program-scoped binds with no assignment; drop/validate `WritingCompanyId`; guard sequence delete; `NextNumber ≥ max(usage)+1`.
-- [ ] Fee-engine traps (A1.3): whitelist CalcType/FeeCategory (+CHECK constraints); validate FKs; hide-or-implement PercentOfNet ✓, LicenseType/City scope, OnlyAppliesToIssuanceState, AppliesToFlatCancellations (Q5 pending); normalize taxability states; fix the taxability-wipe + `ledgerAccountId:0` UI paths (UI8).
-- [ ] Bind guards (A1.4 ✓): status whitelist (Declined quotes currently bind via API); `RERATE_REQUIRED` on effective-date change; re-validate program path at bind; quote LOB ∈ submission LOBs (closes the AL non-bindable bypass); quote-validity window (Q10).
-- [ ] **Require program on quotes** (A1.5 ✓, decided Q1): ProgramId mandatory at create + bind; remove the "No program" option (null-program policies can never reach a bordereau).
+**Batch 1 — fail-open money & identity — ✅ DONE 2026-07-05 (Waves A `aa15a57` / B `3409902` / C `b3ae2fd`, all deployed green; +21 pinning tests, 488 backend tests):**
+- [x] Commission fail-closed (A1.1, Q2) — `COMMISSION_SCHEDULE_MISSING` blocks bind when the carrier (or assigned-agent) schedule is absent; resolved rates refreshed onto the quote at bind; explicit 0%-rate rows are the supported concede path; agent-commission picker trimmed to active rateable lines (GL/IM/APD).
+- [x] Policy-number fail-closed (A1.2) — program-scoped bind with no assignment → `POLICY_NUMBER_ASSIGNMENT_MISSING` (no silent legacy POL-); sequence delete guarded (`SEQUENCE_IN_USE`); `NextNumber` floor (`NEXT_NUMBER_TOO_LOW`, current-year-scoped for resetting sequences). *(Deferred: `WritingCompanyId` drop/validate — Q6; the fail-closed block now surfaces a WritingCompanyId-set assignment as missing rather than silently disabling it.)*
+- [x] Fee-engine traps (A1.3) — unknown CalcType throws (no silent $0); case-insensitive Tax category + state-taxability lookup; CreateDefinition whitelists FeeCategory + validates ledger-account FK; CreateVersion whitelists CalcType + validates fee-definition FK + rejects dormant PercentOfNet; frontend requires a ledger account (UI8). *(Deferred: DB CHECK constraints — service whitelist covers new data, a startup CHECK risks failing on pre-existing rows; `AppliesToFlatCancellations` semantics — Q5. LicenseType/City/OnlyAppliesToIssuanceState were found to be **consumed**, not dead — no change needed.)*
+- [x] Bind guards (A1.4) — status whitelist (Declined/Cancelled/Expired → `QUOTE_NOT_BINDABLE`); `RERATE_REQUIRED` on effective-date change when a rating snapshot exists; program path re-validated at the bind effective date; quote LOB ∈ submission LOBs (closes the AL non-bindable bypass). *(Deferred: quote-validity window — Q10.)*
+- [x] **Require program on quotes** (A1.5, Q1) — ProgramId mandatory at create + update + bind; quote form's "No program" replaced with a disabled "Select a program…" placeholder and gated.
 
 **Batch 2 — setup lifecycle integrity (P1):**
 - [ ] Filtered unique indexes + duplicate checks (A2.1 ✓: rating assignments, carriers, PN sequences) + per-module create-delete-recreate tests.
@@ -223,7 +223,7 @@ Resolved earlier: launch scope; BDX day one; §5.1–5.9 (earned-premium ruleset
 
 **To Gate A (internal UAT):**
 1. **WS5 Part A** (GL) per the checklist — resume from Phase 1 now that Batch 0 is deployed.
-2. **WS5-R Batch 1** (fail-closed money/identity + bind guards + require-program) **before the T7–T9 bind tests**; Batch 2 alongside; Batch 3 before T10/T13; Batch 4 A4.5 (KY) during the per-state matrix.
+2. ~~**WS5-R Batch 1** (fail-closed money/identity + bind guards + require-program) before the T7–T9 bind tests.~~ ✅ DONE 2026-07-05 (`aa15a57`/`3409902`/`b3ae2fd`). Next: Batch 2 alongside the checklist; Batch 3 before T10/T13; Batch 4 A4.5 (KY) during the per-state matrix.
 3. **WS8**: App Insights connection string; rollback rehearsal; UAT script.
 4. Burn-in with no open P0/P1.
 
