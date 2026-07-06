@@ -17,6 +17,10 @@ const USE_CASE_LABELS: Record<string, string> = {
   BatchTriage: 'Batch triage',
 }
 
+// Only DocumentExtraction is currently read by the backend AI pipeline; the
+// others are placeholders whose settings drive nothing until they're wired up.
+const CONSUMED_USE_CASES = new Set(['DocumentExtraction'])
+
 const inputCls = 'w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
 
 type Draft = {
@@ -142,8 +146,20 @@ export function AiSettingsAdminPage() {
             return (
               <div key={setting.useCase} className="grid gap-4 px-5 py-4 lg:grid-cols-[220px_1fr_220px_1fr_auto]">
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">{USE_CASE_LABELS[setting.useCase] ?? setting.useCase}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-900">{USE_CASE_LABELS[setting.useCase] ?? setting.useCase}</span>
+                    {CONSUMED_USE_CASES.has(setting.useCase) ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Active</span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">Not yet wired</span>
+                    )}
+                  </div>
                   <div className="mt-1 text-xs text-slate-500">Current: {setting.model.provider}</div>
+                  {CONSUMED_USE_CASES.has(setting.useCase) ? (
+                    <div className="mt-1 text-xs text-slate-500">This is the only use case the AI pipeline currently reads. Model is admin-locked here.</div>
+                  ) : (
+                    <div className="mt-1 text-xs text-amber-600">Editable, but not yet consumed by any backend workflow.</div>
+                  )}
                 </div>
 
                 <label>

@@ -309,7 +309,7 @@ export function UnderwritingControlsAdminPage() {
       return underwritingGuidelinesApi.retireControl(control.id, notes)
     },
     onSuccess: (_saved, vars) => {
-      toast.success(`Control ${vars.action}d`)
+      toast.success(`Control ${decisionPastTense(vars.action)}`)
       setDecisionNotes((prev) => ({ ...prev, [vars.control.id]: '' }))
       invalidateControls(activeDocumentId)
     },
@@ -373,6 +373,19 @@ export function UnderwritingControlsAdminPage() {
   function requestDeleteDocument(doc: UnderwritingGuidelineDocument) {
     if (!confirm(`Delete ${doc.title}? Draft, AI suggested, approved, and rejected controls in this guideline will be removed.`)) return
     deleteDocument.mutate(doc.id)
+  }
+
+  function requestPublishControl(control: UnderwritingGuidelineControl) {
+    const impact = control.isBlocking
+      ? `This is a ${severityLabel(control.severity).toLowerCase()} BLOCKING control — once live it can block submissions, quotes, or binds that match it.`
+      : `This is a ${severityLabel(control.severity).toLowerCase()} control — once live it will apply to matching submissions, quotes, and binds.`
+    if (!confirm(`Publish "${control.label}"?\n\n${impact}`)) return
+    decideControl.mutate({ control, action: 'publish' })
+  }
+
+  function requestRetireControl(control: UnderwritingGuidelineControl) {
+    if (!confirm(`Retire "${control.label}"?\n\nThis removes a live control — it will no longer apply to submissions, quotes, or binds.`)) return
+    decideControl.mutate({ control, action: 'retire' })
   }
 
   function submitAttachmentProposal() {
@@ -1051,11 +1064,11 @@ export function UnderwritingControlsAdminPage() {
                             <X className="h-3.5 w-3.5" />
                             Reject
                           </button>
-                          <button type="button" onClick={() => decideControl.mutate({ control, action: 'publish' })} disabled={control.status !== 'Approved'} className={iconBtnCls}>
+                          <button type="button" onClick={() => requestPublishControl(control)} disabled={control.status !== 'Approved'} className={iconBtnCls}>
                             <Rocket className="h-3.5 w-3.5" />
                             Publish
                           </button>
-                          <button type="button" onClick={() => decideControl.mutate({ control, action: 'retire' })} disabled={control.status !== 'Published'} className={iconBtnCls}>
+                          <button type="button" onClick={() => requestRetireControl(control)} disabled={control.status !== 'Published'} className={iconBtnCls}>
                             <Archive className="h-3.5 w-3.5" />
                             Retire
                           </button>
@@ -1313,6 +1326,15 @@ function severityLabel(value: UnderwritingControlSeverity) {
     ReferralRequired: 'Referral required',
     HardBlock: 'Hard block',
   }[value]
+}
+
+function decisionPastTense(action: 'approve' | 'reject' | 'publish' | 'retire') {
+  return {
+    approve: 'approved',
+    reject: 'rejected',
+    publish: 'published',
+    retire: 'retired',
+  }[action]
 }
 
 function statusLabel(value: UnderwritingControlStatus) {

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { adminEscalationRulesApi, adminTaskTypesApi } from '@/api/admin.api'
+import { rolesApi } from '@/api/roles.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -33,6 +34,11 @@ export function EscalationRulesAdminPage() {
   const { data: taskTypes = [] } = useQuery({
     queryKey: ['admin', 'task-types'],
     queryFn: () => adminTaskTypesApi.getAll(true),
+  })
+
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesApi.getAll,
   })
 
   const { mutate: save, isPending: saving } = useMutation({
@@ -103,12 +109,14 @@ export function EscalationRulesAdminPage() {
             </div>
             <div className="col-span-2">
               <label className="sims-field-label">Notify Role *</label>
-              <input
+              <select
                 value={form.notifyRoleName}
                 onChange={(e) => setForm({ ...form, notifyRoleName: e.target.value })}
-                placeholder="e.g. Manager, Admin"
-                className="sims-input"
-              />
+                className="sims-select"
+              >
+                <option value="">Select a role…</option>
+                {roles.map((role) => <option key={role.id} value={role.name}>{role.name}</option>)}
+              </select>
             </div>
             <div className="flex items-center gap-2">
               <input

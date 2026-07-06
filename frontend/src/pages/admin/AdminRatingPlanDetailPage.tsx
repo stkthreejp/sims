@@ -297,7 +297,10 @@ export function AdminRatingPlanDetailPage() {
                     {(v.status === 'Draft' || v.status === 'Active') && (
                       <button
                         onClick={() => {
-                          if (confirm(`Retire v${v.versionNumber} of ${plan.name}? This cannot be undone.`))
+                          const msg = v.status === 'Active'
+                            ? `Retire the ACTIVE version v${v.versionNumber} of ${plan.name}?\n\nThis plan will have NO active version. New quotes for ${plan.lobLabel} on the ${v.assignedCarrierCount} assigned carrier${v.assignedCarrierCount !== 1 ? 's' : ''} will STOP rating until another version is promoted. This cannot be undone.`
+                            : `Retire v${v.versionNumber} of ${plan.name}? This cannot be undone.`
+                          if (confirm(msg))
                             retireMutation.mutate(v.id)
                         }}
                         disabled={retireMutation.isPending}

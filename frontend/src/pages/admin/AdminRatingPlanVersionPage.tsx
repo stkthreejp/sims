@@ -45,7 +45,6 @@ function FactorTablePanel({
   const [pasteMode, setPasteMode] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const [parsedPaste, setParsedPaste] = useState<{ dims: Record<string, string>; factor: string }[] | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const saveMutation = useMutation({
     mutationFn: () => {
@@ -63,6 +62,17 @@ function FactorTablePanel({
     },
     onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Save failed'),
   })
+
+  // A9(a): block save when any factor cell is non-numeric/NaN.
+  function handleSave() {
+    const bad = table.rows.find((r) => !Number.isFinite(parseFloat(editedFactors[r.id] ?? String(r.factor))))
+    if (bad) {
+      const label = table.dimensionNames.map((d) => bad.dimensionValues[d] ?? '—').join(' / ')
+      toast.error(`Non-numeric factor for row "${label}". Fix all factor cells before saving.`)
+      return
+    }
+    saveMutation.mutate()
+  }
 
   const confirmPasteMutation = useMutation({
     mutationFn: () => {
@@ -87,6 +97,14 @@ function FactorTablePanel({
     const factorIdx = headers.findIndex((h) => h.toLowerCase() === 'factor')
     if (factorIdx < 0) { toast.error("Paste data must have a 'factor' column."); return }
     const dimHeaders = headers.filter((_, i) => i !== factorIdx)
+    // A9(b): reject when pasted dimension columns don't match this table's dimensions —
+    // otherwise the rows are stored with keys the rater will never match against.
+    const expected = [...table.dimensionNames].sort()
+    const got = [...dimHeaders].sort()
+    if (expected.length !== got.length || expected.some((d, i) => d !== got[i])) {
+      toast.error(`Paste columns must match this table's dimensions: ${table.dimensionNames.join(', ')} (plus factor). Got: ${dimHeaders.join(', ') || '(none)'}.`)
+      return
+    }
     const parsed = lines.slice(1).map((line) => {
       const cols = line.split(sep).map((c) => c.trim())
       const dims: Record<string, string> = {}
@@ -132,7 +150,7 @@ function FactorTablePanel({
                   <X className="h-3 w-3" /> Cancel
                 </button>
                 <button
-                  onClick={() => saveMutation.mutate()}
+                  onClick={handleSave}
                   disabled={saveMutation.isPending}
                   className="sd-btn primary flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50"
                 >
@@ -283,7 +301,6 @@ function FactorTablePanel({
           </div>
         </div>
       )}
-      <input ref={fileInputRef} type="file" accept=".csv" className="hidden" />
     </div>
   )
 }
@@ -754,7 +771,10 @@ export function AdminRatingPlanVersionPage() {
             {(isDraft || version.status === 'Active') && (
               <button
                 onClick={() => {
-                  if (confirm(`Retire v${version.versionNumber} of ${version.planName}? This cannot be undone.`))
+                  const msg = version.status === 'Active'
+                    ? `Retire the ACTIVE version v${version.versionNumber} of ${version.planName}?\n\nThis plan will have NO active version. New quotes for ${version.lobLabel} on carriers assigned to this plan will STOP rating until another version is promoted. This cannot be undone.`
+                    : `Retire v${version.versionNumber} of ${version.planName}? This cannot be undone.`
+                  if (confirm(msg))
                     retireMutation.mutate()
                 }}
                 disabled={retireMutation.isPending}

@@ -12,7 +12,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { PolicyListItem } from '@/types/policy.types'
-import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
+import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageConfigurationUpsert, PolicyPackageFormUpsert } from '@/types/policyForm.types'
 import type { ProposalDocumentConfiguration, ProposalDocumentConfigurationUpsert, ProposalDocumentRole } from '@/types/proposalDocument.types'
 
 const FORM_TYPES: PolicyFormType[] = ['Mandatory', 'Conditional', 'AdHoc']
@@ -193,6 +193,7 @@ function describeTriggerCondition(config: TriggerConfig) {
 export function PolicyFormsAdminPage() {
   const qc = useQueryClient()
   const [templateForm, setTemplateForm] = useState(emptyTemplate)
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
   const [packageForm, setPackageForm] = useState(emptyPackage)
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
   const [packageRows, setPackageRows] = useState<PolicyPackageFormUpsert[]>([])
@@ -389,21 +390,48 @@ export function PolicyFormsAdminPage() {
   }, [packageCarrierOptions, packageForm.carrierId, packageForm.lineOfBusiness, packageForm.state, selectedPackageProgram])
 
   const createTemplate = useMutation({
-    mutationFn: () => policyFormsApi.createTemplate({
-      ...templateForm,
-      editionDate: templateForm.editionDate || undefined,
-      fileName: templateForm.fileName || undefined,
-      contentType: templateForm.contentType || undefined,
-      storagePath: templateForm.storagePath || undefined,
-      notes: templateForm.notes || undefined,
-      documentTemplateId: templateForm.documentTemplateId || null,
-    }),
+    mutationFn: () => {
+      const payload = {
+        ...templateForm,
+        editionDate: templateForm.editionDate || undefined,
+        fileName: templateForm.fileName || undefined,
+        contentType: templateForm.contentType || undefined,
+        storagePath: templateForm.storagePath || undefined,
+        notes: templateForm.notes || undefined,
+        documentTemplateId: templateForm.documentTemplateId || null,
+      }
+      return editingTemplateId
+        ? policyFormsApi.updateTemplate(editingTemplateId, payload)
+        : policyFormsApi.createTemplate(payload)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
       setTemplateForm(emptyTemplate)
-      toast.success('Policy form saved')
+      setEditingTemplateId(null)
+      toast.success(editingTemplateId ? 'Policy form updated' : 'Policy form saved')
     },
     onError: (e: any) => toast.error(getApiErrorMessage(e, 'Policy form could not be saved')),
+  })
+
+  const toggleTemplateActive = useMutation({
+    mutationFn: (template: PolicyFormTemplate) => policyFormsApi.updateTemplate(template.id, {
+      formNumber: template.formNumber,
+      name: template.name,
+      editionDate: template.editionDate ?? undefined,
+      documentType: template.documentType,
+      fileName: template.fileName ?? undefined,
+      contentType: template.contentType ?? undefined,
+      storagePath: template.storagePath ?? undefined,
+      isFillable: template.isFillable,
+      isActive: !template.isActive,
+      notes: template.notes ?? undefined,
+      documentTemplateId: template.documentTemplateId,
+    }),
+    onSuccess: (saved) => {
+      qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
+      toast.success(saved.isActive ? 'Policy form activated' : 'Policy form deactivated')
+    },
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Policy form status could not be changed')),
   })
 
   const uploadTemplateFile = useMutation({
@@ -449,6 +477,24 @@ export function PolicyFormsAdminPage() {
       toast.success('Package created')
     },
     onError: (e: any) => toast.error(getApiErrorMessage(e, 'Package could not be saved')),
+  })
+
+  const updatePackage = useMutation({
+    mutationFn: ({ pkg, changes }: { pkg: PolicyPackageConfiguration; changes: Partial<PolicyPackageConfigurationUpsert> }) =>
+      policyFormsApi.updatePackage(pkg.id, {
+        programConfigurationId: pkg.programConfigurationId,
+        carrierId: pkg.carrierId,
+        lineOfBusiness: pkg.lineOfBusiness,
+        state: pkg.state,
+        name: pkg.name,
+        isActive: pkg.isActive,
+        ...changes,
+      }),
+    onSuccess: (saved) => {
+      qc.invalidateQueries({ queryKey: ['policy-form-packages'] })
+      toast.success(saved.isActive ? 'Package updated' : 'Package deactivated')
+    },
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Package could not be updated')),
   })
 
   const savePackageRows = useMutation({
@@ -512,6 +558,16 @@ export function PolicyFormsAdminPage() {
     onError: (e: any) => toast.error(getApiErrorMessage(e, 'Proposal document setup could not be removed')),
   })
 
+  const renamePackage = (pkg: PolicyPackageConfiguration) => {
+    const name = prompt('Package name', pkg.name)?.trim()
+    if (!name || name === pkg.name) return
+    updatePackage.mutate({ pkg, changes: { name } })
+  }
+
+  const togglePackageActive = (pkg: PolicyPackageConfiguration) => {
+    updatePackage.mutate({ pkg, changes: { isActive: !pkg.isActive } })
+  }
+
   const selectPackage = (pkg: PolicyPackageConfiguration) => {
     setSelectedPackageId(pkg.id)
     setPackageRows(pkg.forms.map((f) => ({
@@ -521,6 +577,28 @@ export function PolicyFormsAdminPage() {
       triggerConditionJson: f.triggerConditionJson ?? undefined,
       notes: f.notes ?? undefined,
     })))
+  }
+
+  const editTemplate = (template: PolicyFormTemplate) => {
+    setEditingTemplateId(template.id)
+    setTemplateForm({
+      formNumber: template.formNumber,
+      name: template.name,
+      editionDate: template.editionDate ?? '',
+      documentType: template.documentType as typeof emptyTemplate.documentType,
+      fileName: template.fileName ?? '',
+      contentType: template.contentType ?? '',
+      storagePath: template.storagePath ?? '',
+      isFillable: template.isFillable,
+      isActive: template.isActive,
+      notes: template.notes ?? '',
+      documentTemplateId: template.documentTemplateId ?? '',
+    })
+  }
+
+  const cancelTemplateEdit = () => {
+    setEditingTemplateId(null)
+    setTemplateForm(emptyTemplate)
   }
 
   const selectTemplateMappings = (template: PolicyFormTemplate) => {
@@ -608,6 +686,11 @@ export function PolicyFormsAdminPage() {
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <FileText className="h-4 w-4 text-slate-400" />
             <h2 className="text-sm font-semibold text-slate-800">Form Library</h2>
+            {editingTemplateId && (
+              <button type="button" onClick={cancelTemplateEdit} className="ml-auto text-xs text-slate-500 hover:text-slate-700">
+                Cancel edit
+              </button>
+            )}
           </div>
           <div className="p-4 space-y-3 border-b bg-slate-50">
             <div className="grid grid-cols-2 gap-2">
@@ -631,7 +714,7 @@ export function PolicyFormsAdminPage() {
               </>
             )}
             <button onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.formNumber || !templateForm.name} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
-              <Plus className="h-4 w-4" /> Add form
+              {editingTemplateId ? <><Check className="h-4 w-4" /> Save form</> : <><Plus className="h-4 w-4" /> Add form</>}
             </button>
             <div className="pt-2 border-t">
               <label className="block text-xs font-medium text-slate-500 mb-1">Test data policy</label>
@@ -656,6 +739,9 @@ export function PolicyFormsAdminPage() {
                 onOpen={() => openTemplateFile(template.id)}
                 onMap={() => selectTemplateMappings(template)}
                 onTest={() => testMergeTemplate.mutate(template.id)}
+                onEdit={() => editTemplate(template)}
+                onToggleActive={() => toggleTemplateActive.mutate(template)}
+                togglingActive={toggleTemplateActive.isPending}
                 canTest={Boolean(testPolicyId && (template.storagePath || template.documentTemplateId))}
                 testing={testMergeTemplate.isPending}
               />
@@ -745,10 +831,27 @@ export function PolicyFormsAdminPage() {
           </div>
           <div className="divide-y max-h-[520px] overflow-auto">
             {packages.map((pkg) => (
-              <button key={pkg.id} onClick={() => selectPackage(pkg)} className={`w-full text-left p-3 hover:bg-slate-50 ${selectedPackageId === pkg.id ? 'bg-blue-50' : ''}`}>
-                <p className="text-sm font-medium text-slate-800">{pkg.name}</p>
-                <p className="text-xs text-slate-500">{pkg.carrierName} · {LOB_LABELS[pkg.lineOfBusiness]} · {pkg.state ?? 'All States'} · {pkg.forms.length} forms</p>
-              </button>
+              <div key={pkg.id} className={`p-3 ${selectedPackageId === pkg.id ? 'bg-blue-50' : ''}`}>
+                <button onClick={() => selectPackage(pkg)} className="w-full text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-800">{pkg.name}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded shrink-0 ${pkg.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {pkg.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">{pkg.carrierName} · {LOB_LABELS[pkg.lineOfBusiness]} · {pkg.state ?? 'All States'} · {pkg.forms.length} forms</p>
+                </button>
+                <div className="flex items-center gap-2 mt-2">
+                  <button type="button" onClick={() => renamePackage(pkg)} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50">
+                    <Pencil className="h-3 w-3" />
+                    Rename
+                  </button>
+                  <button type="button" onClick={() => togglePackageActive(pkg)} disabled={updatePackage.isPending} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                    <Check className="h-3 w-3" />
+                    {pkg.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -1044,6 +1147,9 @@ function TemplateRow({
   onOpen,
   onMap,
   onTest,
+  onEdit,
+  onToggleActive,
+  togglingActive,
   canTest,
   testing,
 }: {
@@ -1053,6 +1159,9 @@ function TemplateRow({
   onOpen: () => void
   onMap: () => void
   onTest: () => void
+  onEdit: () => void
+  onToggleActive: () => void
+  togglingActive: boolean
   canTest: boolean
   testing: boolean
 }) {
@@ -1071,7 +1180,15 @@ function TemplateRow({
       {template.fileName && (
         <p className="text-xs text-slate-500 mt-1 truncate">{template.fileName}</p>
       )}
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <button type="button" onClick={onEdit} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50">
+          <Pencil className="h-3 w-3" />
+          Edit
+        </button>
+        <button type="button" onClick={onToggleActive} disabled={togglingActive} className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+          <Check className="h-3 w-3" />
+          {template.isActive ? 'Deactivate' : 'Activate'}
+        </button>
         <label className="inline-flex items-center gap-1 px-2 py-1 border rounded text-xs text-slate-600 hover:bg-slate-50 cursor-pointer">
           <Upload className="h-3 w-3" />
           {template.fileName ? 'Replace' : 'Upload'}

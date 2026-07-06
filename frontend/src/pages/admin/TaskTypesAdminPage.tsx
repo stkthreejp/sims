@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { adminTaskTypesApi } from '@/api/admin.api'
+import { rolesApi } from '@/api/roles.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -23,6 +24,11 @@ export function TaskTypesAdminPage() {
   const { data: types = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'task-types'],
     queryFn: () => adminTaskTypesApi.getAll(),
+  })
+
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesApi.getAll,
   })
 
   const { mutate: save, isPending: saving } = useMutation({
@@ -90,11 +96,18 @@ export function TaskTypesAdminPage() {
             </div>
             <div>
               <label className="sims-field-label">Assigned Role Template</label>
-              <input value={form.assignedRoleTemplate} onChange={(e) => setForm({ ...form, assignedRoleTemplate: e.target.value })} placeholder="e.g. UnderwriterId" className="sims-input" />
+              <select value={form.assignedRoleTemplate} onChange={(e) => setForm({ ...form, assignedRoleTemplate: e.target.value })} className="sims-select">
+                <option value="">(unassigned)</option>
+                {roles.map((role) => <option key={role.id} value={role.name}>{role.name}</option>)}
+                {form.assignedRoleTemplate && !roles.some((role) => role.name === form.assignedRoleTemplate) && (
+                  <option value={form.assignedRoleTemplate}>{form.assignedRoleTemplate} (unknown role)</option>
+                )}
+              </select>
             </div>
             <div className="col-span-2">
               <label className="sims-field-label">Due Date Formula</label>
               <input value={form.dueDateFormula} onChange={(e) => setForm({ ...form, dueDateFormula: e.target.value })} placeholder="e.g. EffectiveDate-30d" className="sims-input" />
+              <p className="text-xs text-slate-500 mt-1">Format: &lt;anchor&gt;±&lt;n&gt;d — e.g. <code>EffectiveDate-30d</code> (30 days before effective date) or <code>CreatedDate+7d</code>. Validated server-side.</p>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="active" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />

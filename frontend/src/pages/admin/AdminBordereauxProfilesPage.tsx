@@ -27,6 +27,7 @@ const REPORT_TYPES = ['Premium'] as const
 const FREQUENCIES  = ['Monthly'] as const
 const OUTPUT_FMTS  = ['Xlsx'] as const
 const DATE_BASES   = ['EffectiveOrBoundDateGreater', 'EffectiveDate', 'BoundDate'] as const
+const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'] as const
 
 function blankRequest(): UpsertBordereauxProfileRequest {
   return {
@@ -149,7 +150,10 @@ function ProfileForm({
 
         <div style={field}>
           <label style={label}>State Code (optional)</label>
-          <input className="sd-input" value={form.stateCode ?? ''} onChange={e => set('stateCode', e.target.value || null)} placeholder="e.g. TX" maxLength={2} style={{ textTransform: 'uppercase' }} />
+          <select className="sd-input" value={form.stateCode ?? ''} onChange={e => set('stateCode', e.target.value ? e.target.value.toUpperCase() : null)}>
+            <option value="">All states</option>
+            {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
         </div>
 
         <div style={field}>
@@ -217,6 +221,7 @@ export default function AdminBordereauxProfilesPage() {
   const qc = useQueryClient()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
   const [showInactive, setShowInactive] = useState(false)
 
   const { data: profiles = [], isLoading, isError, error, refetch } = useQuery({
@@ -244,6 +249,7 @@ export default function AdminBordereauxProfilesPage() {
       toast.success('Profile saved')
       qc.invalidateQueries({ queryKey: ['bordereaux', 'profiles'] })
       qc.setQueryData(['bordereaux', 'profile', profile.id], profile)
+      setShowEdit(false)
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save profile')),
   })
@@ -264,7 +270,7 @@ export default function AdminBordereauxProfilesPage() {
         <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>Bordereaux Profiles</h1>
-            <button className="sd-btn primary sm" onClick={() => { setShowCreate(true); setSelectedId(null) }}>
+            <button className="sd-btn primary sm" onClick={() => { setShowCreate(true); setShowEdit(false); setSelectedId(null) }}>
               <Plus size={13} /> New
             </button>
           </div>
@@ -286,7 +292,7 @@ export default function AdminBordereauxProfilesPage() {
           {profiles.map(p => (
             <button
               key={p.id}
-              onClick={() => { setSelectedId(p.id); setShowCreate(false) }}
+              onClick={() => { setSelectedId(p.id); setShowCreate(false); setShowEdit(false) }}
               style={{
                 width: '100%', textAlign: 'left', padding: '10px 14px',
                 border: 'none', borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
@@ -321,7 +327,16 @@ export default function AdminBordereauxProfilesPage() {
           />
         )}
 
-        {!showCreate && selected && (
+        {!showCreate && showEdit && selected && (
+          <ProfileForm
+            initial={bordereauxProfileToRequest(selected)}
+            onSave={req => update.mutate({ id: selected.id, req })}
+            onCancel={() => setShowEdit(false)}
+            isSaving={update.isPending}
+          />
+        )}
+
+        {!showCreate && !showEdit && selected && (
           <div>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
               <div>
@@ -333,6 +348,13 @@ export default function AdminBordereauxProfilesPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="sd-btn outline sm"
+                  disabled={update.isPending}
+                  onClick={() => setShowEdit(true)}
+                >
+                  Edit details
+                </button>
                 <button
                   className="sd-btn outline sm"
                   disabled={update.isPending}

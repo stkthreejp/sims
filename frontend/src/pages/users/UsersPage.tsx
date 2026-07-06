@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Search, Users, Plus, X, Check, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { usersApi } from '@/api/users.api'
+import { rolesApi } from '@/api/roles.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -18,8 +19,6 @@ const statusStyles: Record<UserStatus, string> = {
   Locked: 'bg-red-100 text-red-700',
 }
 
-const ALL_ROLES = ['Admin', 'Underwriter', 'CSR', 'ReadOnly']
-
 // ── Edit / Create Modal ───────────────────────────────────────────────────────
 
 function UserModal({
@@ -30,6 +29,11 @@ function UserModal({
   onClose: () => void
 }) {
   const qc = useQueryClient()
+
+  const { data: allRoles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesApi.getAll,
+  })
 
   const [firstName, setFirstName] = useState(user?.firstName ?? '')
   const [lastName, setLastName] = useState(user?.lastName ?? '')
@@ -152,7 +156,7 @@ function UserModal({
           <div>
             <label className="sims-field-label">Roles *</label>
             <div className="flex flex-wrap gap-2">
-              {ALL_ROLES.map((role) => (
+              {Array.from(new Set([...allRoles.map((r) => r.name), ...roles])).map((role) => (
                 <button
                   key={role}
                   type="button"
@@ -299,6 +303,30 @@ export function UsersPage() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {data && data.totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm">
+            <span className="text-slate-500">
+              Page {data.page} of {data.totalPages} · {data.totalCount} users
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={!data.hasPreviousPage}
+                className="px-3 py-1.5 border border-slate-200 rounded-md text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!data.hasNextPage}
+                className="px-3 py-1.5 border border-slate-200 rounded-md text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

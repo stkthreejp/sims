@@ -61,7 +61,7 @@ function ShadowToggle({ lob, enabled, disabled }: { lob: PolicyLineOfBusiness; e
   )
 }
 
-function PlanCard({ plan, shadowEnabled, shadowLoading }: { plan: RatingPlanListItem; shadowEnabled: boolean; shadowLoading: boolean }) {
+function PlanCard({ plan }: { plan: RatingPlanListItem }) {
   return (
     <div className="bg-white border rounded-lg p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
@@ -101,8 +101,7 @@ function PlanCard({ plan, shadowEnabled, shadowLoading }: { plan: RatingPlanList
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-        <ShadowToggle lob={plan.lob} enabled={shadowEnabled} disabled={shadowLoading} />
+      <div className="flex items-center justify-end pt-1 border-t border-slate-100">
         <Link
           to={`/admin/rating/plans/${plan.id}`}
           className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
@@ -126,22 +125,25 @@ function LobSection({ lob, plans, shadowStatus, shadowLoading }: {
 
   return (
     <div>
-      <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+      <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center justify-between gap-2">
         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-100">
           {LOB_LABELS[lob]}
         </span>
+        {shadowKey && <ShadowToggle lob={lob} enabled={shadowEnabled} disabled={shadowLoading} />}
       </h2>
 
       {lobPlans.length === 0 ? (
         <div className="border border-dashed rounded-lg px-4 py-6 text-center">
           <ShieldCheck className="h-7 w-7 text-slate-200 mx-auto mb-2" />
           <p className="text-sm text-slate-400">No rating plan for {LOB_LABELS[lob]}.</p>
-          <p className="text-xs text-slate-300 mt-0.5">Create one via a seed migration.</p>
+          <p className="text-xs text-slate-300 mt-0.5">
+            Rating plans are provisioned by engineering. To add one, request it via the rating-plan setup runbook.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {lobPlans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} shadowEnabled={shadowEnabled} shadowLoading={shadowLoading} />
+            <PlanCard key={plan.id} plan={plan} />
           ))}
         </div>
       )}

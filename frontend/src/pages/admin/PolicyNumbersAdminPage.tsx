@@ -35,7 +35,7 @@ const emptyAssignment: PolicyNumberAssignmentUpsert = {
 // Tokens the policy-number generator understands (see PolicyNumberService.BuildBaseNumber).
 const FORMAT_TOKENS: { token: string; hint: string }[] = [
   { token: '{CARRIER}', hint: 'Carrier short name' },
-  { token: '{LOB}', hint: 'Line-of-business code (GL/IM/APD)' },
+  { token: '{LOB}', hint: 'Line-of-business code (GL/IM/AL/APD)' },
   { token: '{STATE}', hint: 'Risk state (2 letters)' },
   { token: '{COMPANY}', hint: 'Writing company' },
   { token: '{YY}', hint: '2-digit year' },
@@ -348,29 +348,47 @@ export function PolicyNumbersAdminPage() {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-1 gap-2 border-b p-4 md:grid-cols-[minmax(150px,1.5fr)_minmax(180px,1.8fr)_minmax(160px,1.3fr)_minmax(140px,1fr)_80px_76px_auto]" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
-            <select value={assignmentForm.programConfigurationId ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, programConfigurationId: e.target.value || undefined, carrierId: '', state: '' }))} className="sims-select">
-              <option value="">All programs</option>
-              {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
-            </select>
-            <select value={assignmentForm.policyNumberSequenceId} onChange={(e) => setAssignmentForm((f) => ({ ...f, policyNumberSequenceId: e.target.value }))} className="sims-select">
-              {sequences.map((sequence) => <option key={sequence.id} value={sequence.id}>{sequence.name}</option>)}
-            </select>
-            <select value={assignmentForm.carrierId} onChange={(e) => setAssignmentForm((f) => ({ ...f, carrierId: e.target.value, state: '' }))} className="sims-select">
-              {assignmentCarrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
-            </select>
-            <select value={assignmentForm.lineOfBusiness} onChange={(e) => setAssignmentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness, state: '' }))} className="sims-select">
-              {assignmentLobOptions.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
-            </select>
-            {assignmentForm.programConfigurationId && selectedProgramLob ? (
-              <select value={assignmentForm.state ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, state: e.target.value }))} className="sims-select">
-                <option value="">All states</option>
-                {assignmentStateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
+          <div className="grid grid-cols-1 items-end gap-2 border-b p-4 md:grid-cols-[minmax(150px,1.5fr)_minmax(180px,1.8fr)_minmax(160px,1.3fr)_minmax(140px,1fr)_80px_76px_auto]" style={{ borderColor: 'var(--line-2)', background: 'var(--surface-2)' }}>
+            <label className="block">
+              <span className="sims-field-label">Program</span>
+              <select value={assignmentForm.programConfigurationId ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, programConfigurationId: e.target.value || undefined, carrierId: '', state: '' }))} className="sims-select">
+                <option value="">All programs</option>
+                {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
               </select>
-            ) : (
-              <input value={assignmentForm.state ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="State" className="sims-input" />
-            )}
-            <input type="number" value={assignmentForm.priority} onChange={(e) => setAssignmentForm((f) => ({ ...f, priority: Number(e.target.value) || 0 }))} className="sims-input" />
+            </label>
+            <label className="block">
+              <span className="sims-field-label">Sequence</span>
+              <select value={assignmentForm.policyNumberSequenceId} onChange={(e) => setAssignmentForm((f) => ({ ...f, policyNumberSequenceId: e.target.value }))} className="sims-select">
+                {sequences.map((sequence) => <option key={sequence.id} value={sequence.id}>{sequence.name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="sims-field-label">Carrier</span>
+              <select value={assignmentForm.carrierId} onChange={(e) => setAssignmentForm((f) => ({ ...f, carrierId: e.target.value, state: '' }))} className="sims-select">
+                {assignmentCarrierOptions.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="sims-field-label">LOB</span>
+              <select value={assignmentForm.lineOfBusiness} onChange={(e) => setAssignmentForm((f) => ({ ...f, lineOfBusiness: e.target.value as PolicyLineOfBusiness, state: '' }))} className="sims-select">
+                {assignmentLobOptions.map((lob) => <option key={lob} value={lob}>{LOB_LABELS[lob]}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="sims-field-label">State</span>
+              {assignmentForm.programConfigurationId && selectedProgramLob ? (
+                <select value={assignmentForm.state ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, state: e.target.value }))} className="sims-select">
+                  <option value="">All states</option>
+                  {assignmentStateOptions.map((state) => <option key={state} value={state}>{state}</option>)}
+                </select>
+              ) : (
+                <input value={assignmentForm.state ?? ''} onChange={(e) => setAssignmentForm((f) => ({ ...f, state: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="State" className="sims-input" />
+              )}
+            </label>
+            <label className="block">
+              <span className="sims-field-label">Priority</span>
+              <input type="number" value={assignmentForm.priority} onChange={(e) => setAssignmentForm((f) => ({ ...f, priority: Number(e.target.value) || 0 }))} className="sims-input" />
+            </label>
             <button onClick={() => saveAssignment.mutate()} disabled={saveAssignment.isPending || !assignmentForm.policyNumberSequenceId || !assignmentForm.carrierId} className="sd-btn primary">
               {editingAssignmentId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {editingAssignmentId ? 'Save' : 'Add'}

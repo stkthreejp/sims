@@ -115,6 +115,22 @@ export function ProgramConfigurationAdminPage() {
     setEditingStateId(null)
   }, [selectedProgram?.id])
 
+  // States already configured on the copy panel's target LOB (the LOB picked in the Add-state form
+  // above, via stateParent). Copying "From" a state that isn't configured here would error server-side,
+  // so the From list is constrained to these (audit A22).
+  const copyParentStates = useMemo(() => {
+    if (!selectedProgram || !stateParent) return []
+    const carrier = selectedProgram.carriers.find((c) => c.id === stateParent.carrierId)
+    const lob = carrier?.linesOfBusiness.find((l) => l.id === stateParent.lobId)
+    return lob?.states.map((s) => s.stateCode) ?? []
+  }, [selectedProgram, stateParent])
+
+  // Drop a stale From state when the copy panel's LOB context changes, so the picker never
+  // shows a state that isn't configured on the newly-selected LOB.
+  useEffect(() => {
+    if (copySource && !copyParentStates.includes(copySource)) setCopySource('')
+  }, [copyParentStates, copySource])
+
   const refreshPrograms = () => {
     qc.invalidateQueries({ queryKey: ['admin', 'program-configurations'] })
     // The quote/PN/forms/BDX screens read the spine under this separate key family;
@@ -480,9 +496,17 @@ export function ProgramConfigurationAdminPage() {
               </SetupForm>
 
               <SetupForm title="Copy state setup">
+                {stateParent ? (
+                  <p className="-mt-1 text-xs text-slate-500">
+                    Copies within the LOB selected in <span className="font-medium">Add state</span> above. Pick a configured From state to clone into a To state.
+                  </p>
+                ) : (
+                  <p className="-mt-1 text-xs text-amber-700">Select an LOB in the <span className="font-medium">Add state</span> form above to enable copying.</p>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <SelectField label="From" value={copySource} onChange={setCopySource}>
-                    {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+                    <option value="">Select configured state</option>
+                    {copyParentStates.map((state) => <option key={state} value={state}>{state}</option>)}
                   </SelectField>
                   <SelectField label="To" value={copyTarget} onChange={setCopyTarget}>
                     {US_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
@@ -491,7 +515,7 @@ export function ProgramConfigurationAdminPage() {
                 <button
                   type="button"
                   onClick={() => copyState.mutate()}
-                  disabled={!stateParent || !copySource || !copyTarget || copySource === copyTarget || copyState.isPending}
+                  disabled={!stateParent || !copySource || !copyParentStates.includes(copySource) || !copyTarget || copySource === copyTarget || copyState.isPending}
                   className="inline-flex w-full items-center justify-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   <Copy className="h-4 w-4" />

@@ -57,10 +57,14 @@ export function WorkflowsAdminPage() {
             <div><label className="text-xs text-slate-500 block mb-1">Name *</label>
               <input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
             <div><label className="text-xs text-slate-500 block mb-1">Trigger Event *</label>
-              <select value={createForm.triggerEventId} onChange={(e) => setCreateForm({ ...createForm, triggerEventId: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
-                <option value="">Select event…</option>
-                {events.map((e) => <option key={e.id} value={e.id}>{e.eventName}</option>)}
-              </select></div>
+              {events.length === 0 ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">No trigger events are configured — workflow automation isn't available yet.</p>
+              ) : (
+                <select value={createForm.triggerEventId} onChange={(e) => setCreateForm({ ...createForm, triggerEventId: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Select event…</option>
+                  {events.map((e) => <option key={e.id} value={e.id}>{e.eventName}</option>)}
+                </select>
+              )}</div>
             <div><label className="text-xs text-slate-500 block mb-1">Entity Type</label>
               <select value={createForm.entityType} onChange={(e) => setCreateForm({ ...createForm, entityType: e.target.value as TaskEntityType })} className="w-full border rounded-lg px-3 py-2 text-sm">
                 {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -166,8 +170,9 @@ function StepEditor({ templateId }: { templateId: string }) {
                       <option key={s.id} value={s.id}>{idx + 1}. {taskTypes.find((t) => t.id === s.taskTypeId)?.name ?? 'Step ' + (idx + 1)}</option>
                     ))}
                   </select></div>
-                <div className="col-span-2"><label className="text-xs text-slate-500 block mb-1">Trigger Condition (e.g. Status=Quoted)</label>
-                  <input value={step.triggerCondition ?? ''} onChange={(e) => updateStep(i, { triggerCondition: e.target.value || undefined })} placeholder="optional" className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+                <div className="col-span-2"><label className="text-xs text-slate-500 block mb-1">Trigger Condition</label>
+                  <input value={step.triggerCondition ?? ''} onChange={(e) => updateStep(i, { triggerCondition: e.target.value || undefined })} placeholder="optional, e.g. Status=Quoted" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <p className="mt-1 text-xs text-slate-400">Format: <code className="text-slate-500">Field=Value</code> (e.g. <code className="text-slate-500">Status=Quoted</code>). Leave blank to always run. Not yet validated server-side.</p></div>
               </div>
             </div>
           ))}

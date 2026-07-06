@@ -48,7 +48,7 @@ function LobToggle({ lob, lobKey, settings }: { lob: PolicyLineOfBusiness; lobKe
         <div style={{ position: 'relative', width: 36, height: 20 }}>
           <input type="checkbox" style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
             checked={enabled} disabled={toggle.isPending} onChange={e => toggle.mutate(e.target.checked)} />
-          <div onClick={() => !toggle.isPending && toggle.mutate(!enabled)} style={{
+          <div style={{
             width: 36, height: 20, borderRadius: 10, cursor: toggle.isPending ? 'not-allowed' : 'pointer',
             background: enabled ? 'var(--accent)' : 'var(--line)', opacity: toggle.isPending ? 0.5 : 1, transition: 'background 0.15s',
           }}>
@@ -254,7 +254,10 @@ export default function AdminShadowRatingPage() {
 
       {/* Cutover checklist */}
       <div style={{ marginTop: 40, borderTop: '1px solid var(--line)', paddingTop: 28 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>Cutover Checklist</h2>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', margin: '0 0 4px' }}>Cutover Checklist</h2>
+        <p style={{ fontSize: 11.5, color: 'var(--ink-4)', margin: '0 0 16px' }}>
+          Reference checklist only — these ticks are not saved and reset when you leave or refresh the page.
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             'CarrierRatingAssignment exists for every carrier currently quoting IM.',
