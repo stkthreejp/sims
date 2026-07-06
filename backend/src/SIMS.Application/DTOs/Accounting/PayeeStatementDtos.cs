@@ -41,3 +41,12 @@ public record ImportPayeeStatementRequest(
     int ApLedgerAccountId);
 
 public record SetLineMatchRequest(long? InvoiceLineId);
+
+public record PayeeStatementLineCandidateDto(
+    long InvoiceLineId,
+    string InvoiceNumber,
+    string PolicyNumber,
+    string FeeDisplayName,
+    decimal Amount,
+    bool PolicyMatches,
+    bool AmountMatches);

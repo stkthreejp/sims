@@ -43,3 +43,20 @@ export interface ImportPayeeStatementRequest {
   referenceNumber?: string
   apLedgerAccountId: number
 }
+
+export interface LedgerAccountOption {
+  id: number
+  internalCode: string
+  externalLabel: string
+  accountType: string
+}
+
+export interface PayeeStatementLineCandidate {
+  invoiceLineId: number
+  invoiceNumber: string
+  policyNumber: string
+  feeDisplayName: string
+  amount: number
+  policyMatches: boolean
+  amountMatches: boolean
+}

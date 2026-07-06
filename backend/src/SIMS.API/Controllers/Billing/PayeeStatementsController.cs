@@ -40,6 +40,17 @@ public class PayeeStatementsController : ControllerBase
         return CreatedAtAction(nameof(Get), new { id = r.Value!.Id }, r.Value);
     }
 
+    [HttpGet("ledger-accounts")]
+    public async Task<IActionResult> GetLedgerAccounts(CancellationToken ct)
+        => Ok(await _svc.GetApLedgerAccountsAsync(ct));
+
+    [HttpGet("{statementId:long}/lines/{lineId:long}/candidates")]
+    public async Task<IActionResult> GetLineCandidates(long statementId, long lineId, CancellationToken ct)
+    {
+        var r = await _svc.GetLineMatchCandidatesAsync(statementId, lineId, ct);
+        return r.IsSuccess ? Ok(r.Value) : NotFound(new { r.ErrorMessage });
+    }
+
     [HttpPut("{statementId:long}/lines/{lineId:long}/match")]
     [Authorize(Policy = AppPermissions.AccountingAdmin)]
     public async Task<IActionResult> SetLineMatch(

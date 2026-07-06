@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { PayeeStatement, PayeeStatementSummary, ImportPayeeStatementRequest } from '@/types/payeeStatement.types'
+import type { PayeeStatement, PayeeStatementSummary, ImportPayeeStatementRequest, LedgerAccountOption, PayeeStatementLineCandidate } from '@/types/payeeStatement.types'
 
 export const payeeStatementsApi = {
   getAll: (): Promise<PayeeStatementSummary[]> =>
@@ -19,6 +19,12 @@ export const payeeStatementsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data)
   },
+
+  getLedgerAccounts: (): Promise<LedgerAccountOption[]> =>
+    apiClient.get('/billing/payee-statements/ledger-accounts').then(r => r.data),
+
+  getLineCandidates: (statementId: number, lineId: number): Promise<PayeeStatementLineCandidate[]> =>
+    apiClient.get(`/billing/payee-statements/${statementId}/lines/${lineId}/candidates`).then(r => r.data),
 
   setLineMatch: (statementId: number, lineId: number, invoiceLineId: number | null): Promise<PayeeStatement> =>
     apiClient.put(`/billing/payee-statements/${statementId}/lines/${lineId}/match`, { invoiceLineId }).then(r => r.data),

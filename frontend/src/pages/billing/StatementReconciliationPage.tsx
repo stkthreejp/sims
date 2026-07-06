@@ -43,6 +43,11 @@ function ImportPanel({ onImported }: { onImported: (s: PayeeStatement) => void }
   const [file, setFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const { data: ledgerAccounts = [] } = useQuery({
+    queryKey: ['payee-statements', 'ledger-accounts'],
+    queryFn: payeeStatementsApi.getLedgerAccounts,
+  })
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => payeeStatementsApi.import(
       {
@@ -87,8 +92,13 @@ function ImportPanel({ onImported }: { onImported: (s: PayeeStatement) => void }
             <input value={form.referenceNumber} onChange={e => setForm(p => ({ ...p, referenceNumber: e.target.value }))} placeholder="Optional" className="sims-input" />
           </label>
           <label className="sims-field">
-            <span className="sims-field-label">AP Ledger Account ID *</span>
-            <input type="number" value={form.apLedgerAccountId} onChange={e => setForm(p => ({ ...p, apLedgerAccountId: e.target.value }))} placeholder="e.g. 42" className="sims-input" />
+            <span className="sims-field-label">AP Ledger Account *</span>
+            <select value={form.apLedgerAccountId} onChange={e => setForm(p => ({ ...p, apLedgerAccountId: e.target.value }))} className="sims-input">
+              <option value="">Select account…</option>
+              {ledgerAccounts.map(a => (
+                <option key={a.id} value={String(a.id)}>{a.internalCode} — {a.externalLabel}</option>
+              ))}
+            </select>
           </label>
         </div>
 
@@ -138,6 +148,24 @@ function ImportPanel({ onImported }: { onImported: (s: PayeeStatement) => void }
 
 function StatementDetail({ statement, onClose }: { statement: PayeeStatement; onClose: () => void }) {
   const qc = useQueryClient()
+  const [matchingLineId, setMatchingLineId] = useState<number | null>(null)
+  const matchingLine = statement.lines.find(l => l.id === matchingLineId) ?? null
+
+  const { data: candidates = [], isLoading: candidatesLoading } = useQuery({
+    queryKey: ['payee-statement', statement.id, 'candidates', matchingLineId],
+    queryFn: () => payeeStatementsApi.getLineCandidates(statement.id, matchingLineId!),
+    enabled: matchingLineId !== null,
+  })
+
+  const matchMutation = useMutation({
+    mutationFn: (invoiceLineId: number) => payeeStatementsApi.setLineMatch(statement.id, matchingLineId!, invoiceLineId),
+    onSuccess: (updated) => {
+      toast.success('Line matched')
+      qc.setQueryData(['payee-statement', statement.id], updated)
+      setMatchingLineId(null)
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to match line'),
+  })
 
   const postMutation = useMutation({
     mutationFn: () => payeeStatementsApi.post(statement.id),
@@ -215,11 +243,20 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
                 </td>
                 {statement.status === 'Imported' && (
                   <td>
-                    {line.matchStatus !== 'Unmatched' && (
+                    {line.matchStatus === 'Unmatched' ? (
+                      <button
+                        onClick={() => setMatchingLineId(line.id)}
+                        className="sd-btn sm"
+                        style={{ color: 'var(--accent-ink)' }}
+                      >
+                        Match
+                      </button>
+                    ) : (
                       <button
                         onClick={() => unmatchMutation.mutate(line.id)}
                         disabled={unmatchMutation.isPending}
                         title="Clear match"
+                        aria-label="Clear match"
                         style={{ color: 'var(--ink-4)', background: 'none', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                       >
                         <X style={{ width: 13, height: 13 }} />
@@ -258,6 +295,52 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
             <CheckCircle2 style={{ width: 13, height: 13 }} />
             {postMutation.isPending ? 'Posting…' : 'Post Reconciliation'}
           </button>
+        </div>
+      )}
+
+      {/* Manual match picker */}
+      {matchingLine && (
+        <div className="sims-modal-backdrop" onClick={() => setMatchingLineId(null)}>
+          <div className="sims-modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+            <div className="sims-modal-head">
+              <span>Match line — {matchingLine.policyNumber} · {fmt.format(matchingLine.amount)}</span>
+              <button onClick={() => setMatchingLineId(null)} className="sims-modal-close" aria-label="Close"><X style={{ width: 16, height: 16 }} /></button>
+            </div>
+            <div className="sims-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {candidatesLoading ? (
+                <div style={{ padding: 24, display: 'grid', placeItems: 'center' }}><LoadingSpinner /></div>
+              ) : candidates.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--ink-3)', padding: '12px 4px' }}>
+                  No candidate invoice lines found for this policy number or amount. Confirm the invoice has been posted, or clear this line if it shouldn't reconcile.
+                </p>
+              ) : (
+                <table className="sd-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice #</th>
+                      <th>Policy</th>
+                      <th>Fee</th>
+                      <th className="num">Amount</th>
+                      <th style={{ width: 60 }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {candidates.map(c => (
+                      <tr key={c.invoiceLineId}>
+                        <td className="id">{c.invoiceNumber}</td>
+                        <td style={{ color: c.policyMatches ? 'var(--pill-bound-fg)' : 'var(--ink-2)' }}>{c.policyNumber}</td>
+                        <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{c.feeDisplayName}</td>
+                        <td className="num" style={{ color: c.amountMatches ? 'var(--pill-bound-fg)' : 'var(--ink)' }}>{fmt.format(c.amount)}</td>
+                        <td>
+                          <button className="sd-btn sm primary" disabled={matchMutation.isPending} onClick={() => matchMutation.mutate(c.invoiceLineId)}>Use</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

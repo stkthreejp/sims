@@ -149,6 +149,51 @@ public class PayeeStatementService : IPayeeStatementService
         return Result<PayeeStatementDto>.Success(await BuildDtoAsync(statementId, db, ct));
     }
 
+    public async Task<Result<IReadOnlyList<PayeeStatementLineCandidateDto>>> GetLineMatchCandidatesAsync(
+        long statementId, long lineId, CancellationToken ct = default)
+    {
+        var db = Db;
+        var line = await db.Set<PayeeStatementLine>()
+            .FirstOrDefaultAsync(l => l.Id == lineId && l.PayeeStatementId == statementId, ct);
+        if (line == null)
+            return Result<IReadOnlyList<PayeeStatementLineCandidateDto>>.Failure("NOT_FOUND", "Statement line not found.");
+
+        // Entity-routed invoice fee lines not already claimed by another statement line.
+        // Surface those matching the line's policy number OR its amount so the user can
+        // resolve the cases auto-match missed (formatting drift or amount differences).
+        var candidates = await (
+            from il in db.Set<InvoiceLineEntity>()
+            join inv in db.Set<Invoice>() on il.InvoiceId equals inv.Id
+            join pt in db.Set<PolicyTransaction>() on (Guid?)inv.PolicyTransactionId equals (Guid?)pt.Id
+            join pol in db.Set<Policy>() on pt.PolicyId equals pol.Id
+            where il.PayableRouting == "Entity"
+                && (pol.PolicyNumber == line.PolicyNumber || il.Amount == line.Amount)
+                && !db.Set<PayeeStatementLine>().Any(psl =>
+                    psl.Id != line.Id
+                    && psl.MatchedInvoiceLineId == il.Id
+                    && psl.MatchStatus != "Unmatched")
+            select new PayeeStatementLineCandidateDto(
+                il.Id, inv.InvoiceNumber, pol.PolicyNumber, il.FeeDisplayName, il.Amount,
+                pol.PolicyNumber == line.PolicyNumber, il.Amount == line.Amount)
+        )
+        .OrderByDescending(c => c.PolicyMatches)
+        .ThenByDescending(c => c.AmountMatches)
+        .Take(100)
+        .ToListAsync(ct);
+
+        return Result<IReadOnlyList<PayeeStatementLineCandidateDto>>.Success(candidates);
+    }
+
+    public async Task<IReadOnlyList<LedgerAccountOptionDto>> GetApLedgerAccountsAsync(CancellationToken ct = default)
+    {
+        var db = Db;
+        return await db.Set<LedgerAccount>()
+            .Where(a => a.TenantId == 1 && a.IsActive)
+            .OrderBy(a => a.InternalCode)
+            .Select(a => new LedgerAccountOptionDto(a.Id, a.InternalCode, a.ExternalLabel, a.AccountType))
+            .ToListAsync(ct);
+    }
+
     public async Task<Result<PayeeStatementDto>> PostReconciliationAsync(
         long id, Guid userId, CancellationToken ct = default)
     {
