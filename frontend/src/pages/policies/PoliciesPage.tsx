@@ -7,6 +7,7 @@ import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, type PolicyStatus, type PolicyListItem } from '@/types/policy.types'
 import { formatCurrency, parseDateOnly } from '@/lib/utils'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 
 type SortKey = 'policyNumber' | 'insuredName' | 'expirationDate' | 'totalPremium'
 type SortDir = 'asc' | 'desc'
@@ -66,7 +67,7 @@ export function PoliciesPage() {
   const [page, setPage] = useState(1)
   const pageSize = 25
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['policies', 'list-all'],
     queryFn:  () => policiesApi.getAll({ pageSize: 500, sortBy: 'expirationDate', sortDir: 'asc' }),
   })
@@ -161,6 +162,22 @@ export function PoliciesPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="subs-wrap">
+        <header className="subs-page-head">
+          <div>
+            <h1 className="subs-h1">Policies</h1>
+            <div className="subs-sub">All bound policies</div>
+          </div>
+        </header>
+        <div className="subs-table-card">
+          <ErrorState error={error} onRetry={refetch} />
         </div>
       </div>
     )

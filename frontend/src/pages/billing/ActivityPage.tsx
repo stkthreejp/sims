@@ -11,6 +11,8 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import type { ActivityEvent, ActivityFilter } from '@/types/activity.types'
 import { useAuthStore } from '@/store/authStore'
 
@@ -67,7 +69,7 @@ function VoidModal({ event, onClose, onVoided }: VoidModalProps) {
       onVoided()
       onClose()
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   return (
@@ -262,7 +264,7 @@ export function ActivityPage() {
   const [selectedEvent, setSelectedEvent] = useState<ActivityEvent | null>(null)
   const [voidTarget, setVoidTarget] = useState<ActivityEvent | null>(null)
 
-  const { data: events = [], isLoading } = useQuery({
+  const { data: events = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['activity', filter],
     queryFn: () => getActivity(filter),
   })
@@ -342,6 +344,8 @@ export function ActivityPage() {
       {/* Results */}
       {isLoading ? (
         <LoadingSpinner />
+      ) : isError ? (
+        <ErrorState error={error} onRetry={refetch} />
       ) : events.length === 0 ? (
         <EmptyState icon={Activity} title="No activity found" description="Try adjusting the date range or filters." />
       ) : (

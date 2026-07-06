@@ -14,6 +14,8 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly } from '@/lib/utils'
 import type { NettedPayee, BatchSummary } from '@/types/cashDistribution.types'
 
@@ -35,7 +37,7 @@ const BATCH_LABEL: Record<string, string> = { PdfGenerated: 'PDF Ready' }
 
 function PendingQueue() {
   const qc = useQueryClient()
-  const { data: payees = [], isLoading } = useQuery({
+  const { data: payees = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['cash-distribution-pending'],
     queryFn: getPendingInstructions,
   })
@@ -50,7 +52,7 @@ function PendingQueue() {
       qc.invalidateQueries({ queryKey: ['cash-distribution-pending'] })
       qc.invalidateQueries({ queryKey: ['cash-distribution-batches'] })
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const toggleAll = () => {
@@ -77,6 +79,7 @@ function PendingQueue() {
   const selectedPayees = payees.filter((p) => selected.has(p.payeeId))
   const selectedTotal = selectedPayees.reduce((s, p) => s + p.totalAmount, 0)
 
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
   if (isLoading) return <LoadingSpinner />
 
   if (payees.length === 0) {
@@ -236,7 +239,7 @@ function PendingQueue() {
 
 function BatchList() {
   const qc = useQueryClient()
-  const { data: batches = [], isLoading } = useQuery({
+  const { data: batches = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['cash-distribution-batches'],
     queryFn: getBatches,
   })
@@ -260,7 +263,7 @@ function BatchList() {
       qc.invalidateQueries({ queryKey: ['cash-distribution-batches'] })
       qc.invalidateQueries({ queryKey: ['cash-distribution-batch', showExecuteModal] })
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const openPdf = async (id: number) => {
@@ -272,6 +275,7 @@ function BatchList() {
     }
   }
 
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
   if (isLoading) return <LoadingSpinner />
 
   if (batches.length === 0) {

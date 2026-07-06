@@ -14,6 +14,8 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { OpenPayable, AgingRow } from '@/types/disbursement.types'
 
@@ -71,7 +73,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
       qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
       onCreated()
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const handleSubmit = () => {
@@ -178,7 +180,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
 // ---------- Aging Tab ----------
 
 function AgingTab() {
-  const { data: aging, isLoading } = useQuery({
+  const { data: aging, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['disbursements-aging'],
     queryFn: getAging,
   })
@@ -218,6 +220,7 @@ function AgingTab() {
     return map
   }, [aging?.payables])
 
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
   if (isLoading || !aging) return <LoadingSpinner />
 
   const buckets = [
@@ -360,7 +363,7 @@ function AgingTab() {
 
 function DisbursementsTab() {
   const qc = useQueryClient()
-  const { data: disbursements = [], isLoading } = useQuery({
+  const { data: disbursements = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['disbursements'],
     queryFn: getDisbursements,
   })
@@ -380,7 +383,7 @@ function DisbursementsTab() {
       qc.invalidateQueries({ queryKey: ['disbursement-detail', d.id] })
       qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const voidMutation = useMutation({
@@ -391,9 +394,10 @@ function DisbursementsTab() {
       qc.invalidateQueries({ queryKey: ['disbursement-detail', d.id] })
       qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
   if (isLoading) return <LoadingSpinner />
 
   if (disbursements.length === 0) {

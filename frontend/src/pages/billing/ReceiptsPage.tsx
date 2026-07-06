@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { CreateReceiptRequest, ReceiptDetail } from '@/types/receipt.types'
 
@@ -37,7 +39,7 @@ function NewReceiptModal({ onClose, onCreated }: { onClose: () => void; onCreate
       toast.success(`Receipt ${r.receiptNumber} logged`)
       onCreated(r)
     },
-    onError: () => toast.error('Failed to log receipt'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to log receipt')),
   })
 
   const set = (field: keyof CreateReceiptRequest, value: unknown) =>
@@ -202,7 +204,7 @@ export function ReceiptsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [showNew, setShowNew] = useState(false)
 
-  const { data: receipts = [], isLoading } = useQuery({
+  const { data: receipts = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['billing', 'receipts'],
     queryFn: getReceipts,
   })
@@ -215,6 +217,22 @@ export function ReceiptsPage() {
   }
 
   if (selectedId !== null) return <ReceiptDetailView id={selectedId} onBack={() => setSelectedId(null)} />
+
+  if (isError) {
+    return (
+      <div className="subs-wrap">
+        <div className="subs-page-head">
+          <PageHeader title="Receipts" />
+          <button className="sd-btn primary" onClick={() => setShowNew(true)}>
+            <Plus style={{ width: 13, height: 13 }} />
+            Log Receipt
+          </button>
+        </div>
+        <ErrorState error={error} onRetry={refetch} />
+        {showNew && <NewReceiptModal onClose={() => setShowNew(false)} onCreated={handleCreated} />}
+      </div>
+    )
+  }
 
   const totalOpen = receipts
     .filter(r => r.status !== 'Applied' && r.status !== 'Voided')

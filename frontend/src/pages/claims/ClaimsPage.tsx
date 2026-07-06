@@ -4,10 +4,22 @@ import { FileUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { usePermissions } from '@/hooks/usePermissions'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { getClaims, getImportBatches, importClaims } from '@/api/claims.api'
 import type { ClaimStatus, ImportClaimsRequest, UnifiedClaimImportRow } from '@/types/claim.types'
 
 const STATUSES: ClaimStatus[] = ['Open', 'Closed', 'Reopened', 'Denied', 'Subrogation', 'Withdrawn']
+
+// errorSummaryJson can be malformed; parse defensively so a bad batch row can't crash the page (audit O14).
+function safeParse(json: string | null | undefined): string[] | null {
+  if (!json) return null
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 function money(value: number) {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
@@ -154,7 +166,7 @@ export function ClaimsPage() {
       const note = batch.errorCount > 0 ? ` (${batch.errorCount} errors — see batch detail)` : ''
       toast.success(`Imported ${batch.fileName}: ${batch.createdCount} created, ${batch.updatedCount} updated, ${batch.skippedCount} skipped${note}`)
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Import failed'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Import failed')),
   })
 
   const totals = useMemo(() => ({
@@ -344,7 +356,7 @@ export function ClaimsPage() {
               </thead>
               <tbody>
                 {batches.map((b) => (
-                  <tr key={b.id} title={b.errorSummaryJson ? JSON.parse(b.errorSummaryJson).join('\n') : undefined}>
+                  <tr key={b.id} title={safeParse(b.errorSummaryJson)?.join('\n') ?? undefined}>
                     <td>{b.fileName}</td>
                     <td>{[b.carrierName, b.tpaName].filter(Boolean).join(' / ') || '—'}</td>
                     <td>{fmtDate(b.valuationDate)}</td>

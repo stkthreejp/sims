@@ -6,6 +6,8 @@ import { payeeStatementsApi } from '@/api/payeeStatements.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import type { PayeeStatement, PayeeStatementSummary } from '@/types/payeeStatement.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
@@ -64,7 +66,7 @@ function ImportPanel({ onImported }: { onImported: (s: PayeeStatement) => void }
       setFile(null)
       onImported(stmt)
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Import failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Import failed')),
   })
 
   const canSubmit = form.payeeName && form.statementDate && form.apLedgerAccountId && file && !isPending
@@ -164,7 +166,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
       qc.setQueryData(['payee-statement', statement.id], updated)
       setMatchingLineId(null)
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to match line'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Failed to match line')),
   })
 
   const postMutation = useMutation({
@@ -174,7 +176,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
       qc.setQueryData(['payee-statement', statement.id], updated)
       qc.invalidateQueries({ queryKey: ['payee-statements'] })
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Post failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Post failed')),
   })
 
   const unmatchMutation = useMutation({
@@ -183,7 +185,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
       toast.success('Match cleared')
       qc.setQueryData(['payee-statement', statement.id], updated)
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to clear match'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Failed to clear match')),
   })
 
   const unmatchedCount = statement.lines.filter(l => l.matchStatus === 'Unmatched').length
@@ -351,7 +353,7 @@ export function StatementReconciliationPage() {
   const qc = useQueryClient()
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
-  const { data: statements = [], isLoading } = useQuery({
+  const { data: statements = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['payee-statements'],
     queryFn: payeeStatementsApi.getAll,
   })
@@ -368,6 +370,7 @@ export function StatementReconciliationPage() {
     setSelectedId(stmt.id)
   }
 
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
   if (isLoading) return <LoadingSpinner />
 
   return (

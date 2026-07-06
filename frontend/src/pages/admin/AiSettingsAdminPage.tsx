@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import axios from 'axios'
 import { Bot, Save, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { aiSettingsApi } from '@/api/aiSettings.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { getApiErrorMessage } from '@/lib/apiError'
 import type { AiUseCaseModelSetting } from '@/types/aiSettings.types'
 
 const USE_CASE_LABELS: Record<string, string> = {
@@ -28,12 +29,12 @@ export function AiSettingsAdminPage() {
   const qc = useQueryClient()
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
 
-  const { data: models = [], isLoading: loadingModels } = useQuery({
+  const { data: models = [], isLoading: loadingModels, isError: modelsError, error: modelsErr, refetch: refetchModels } = useQuery({
     queryKey: ['admin', 'ai-settings', 'models'],
     queryFn: aiSettingsApi.getModels,
   })
 
-  const { data: settings = [], isLoading: loadingSettings } = useQuery({
+  const { data: settings = [], isLoading: loadingSettings, isError: settingsError, error: settingsErr, refetch: refetchSettings } = useQuery({
     queryKey: ['admin', 'ai-settings', 'settings'],
     queryFn: aiSettingsApi.getSettings,
   })
@@ -65,14 +66,23 @@ export function AiSettingsAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'ai-settings'] })
     },
     onError: (err) => {
-      const message = axios.isAxiosError(err)
-        ? err.response?.data?.errorMessage ?? 'AI model setting could not be saved'
-        : 'AI model setting could not be saved'
-      toast.error(message)
+      toast.error(getApiErrorMessage(err, 'AI model setting could not be saved'))
     },
   })
 
   if (loadingModels || loadingSettings) return <LoadingSpinner />
+  if (modelsError || settingsError) return (
+    <div className="p-6 space-y-5">
+      <PageHeader
+        title="AI Settings"
+        subtitle="Approved model choices for underwriting AI workflows"
+      />
+      <ErrorState
+        error={modelsError ? modelsErr : settingsErr}
+        onRetry={() => { refetchModels(); refetchSettings() }}
+      />
+    </div>
+  )
 
   const orderedSettings = [...settings].sort((a, b) => sortUseCase(a.useCase) - sortUseCase(b.useCase))
 

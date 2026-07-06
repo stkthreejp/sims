@@ -5,13 +5,15 @@ import { toast } from 'sonner'
 import { adminHolidayCalendarApi } from '@/api/admin.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 
 export function HolidayCalendarAdminPage() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ date: '', name: '' })
 
-  const { data: holidays = [], isLoading } = useQuery({
+  const { data: holidays = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'holiday-calendar'],
     queryFn: adminHolidayCalendarApi.getAll,
   })
@@ -24,16 +26,22 @@ export function HolidayCalendarAdminPage() {
       setShowForm(false)
       setForm({ date: '', name: '' })
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Add failed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Add failed')),
   })
 
   const { mutate: remove } = useMutation({
     mutationFn: (id: string) => adminHolidayCalendarApi.delete(id),
     onSuccess: () => { toast.success('Removed'); qc.invalidateQueries({ queryKey: ['admin', 'holiday-calendar'] }) },
-    onError: () => toast.error('Delete failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Delete failed')),
   })
 
   if (isLoading) return <LoadingSpinner />
+  if (isError) return (
+    <div className="p-6 space-y-5">
+      <PageHeader title="Holiday Calendar" />
+      <ErrorState error={error} onRetry={refetch} />
+    </div>
+  )
 
   const grouped = holidays.reduce<Record<string, typeof holidays>>((acc, h) => {
     const year = h.date.slice(0, 4)

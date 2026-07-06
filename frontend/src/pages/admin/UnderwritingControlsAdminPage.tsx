@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import axios from 'axios'
 import { Archive, Check, FileSearch, Loader2, Pencil, Plus, Rocket, Save, ShieldAlert, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { attachmentsApi } from '@/api/attachments.api'
@@ -8,6 +7,8 @@ import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { underwritingGuidelinesApi } from '@/api/underwritingGuidelines.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { PageHeader } from '@/components/common/PageHeader'
 import type { Attachment } from '@/types/attachment.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
@@ -150,7 +151,7 @@ export function UnderwritingControlsAdminPage() {
   const aiJsonFileInputRef = useRef<HTMLInputElement | null>(null)
   const controlEditorRef = useRef<HTMLDivElement | null>(null)
 
-  const { data: documents = [], isLoading: loadingDocuments } = useQuery({
+  const { data: documents = [], isLoading: loadingDocuments, isError: documentsError, error: documentsErrorObj, refetch: refetchDocuments } = useQuery({
     queryKey: ['admin', 'underwriting-guidelines', 'documents'],
     queryFn: underwritingGuidelinesApi.getDocuments,
   })
@@ -504,6 +505,17 @@ export function UnderwritingControlsAdminPage() {
   const supportedGuidelineAttachments = guidelineAttachments.filter(isSupportedGuidelineAttachment)
 
   if (loadingDocuments) return <LoadingSpinner />
+  if (documentsError) {
+    return (
+      <div className="p-6 space-y-5">
+        <PageHeader
+          title="Underwriting Controls"
+          subtitle="Guideline-scoped rules, blockers, referrals, and document checklist controls"
+        />
+        <ErrorState error={documentsErrorObj} onRetry={refetchDocuments} />
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-5">
@@ -1121,15 +1133,6 @@ export function UnderwritingControlsAdminPage() {
       </section>
     </div>
   )
-}
-
-function getApiErrorMessage(e: unknown, fallback: string) {
-  if (axios.isAxiosError(e)) {
-    const data = e.response?.data
-    if (typeof data === 'string') return data
-    return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
-  }
-  return fallback
 }
 
 function isSupportedGuidelineAttachment(attachment: Attachment) {

@@ -9,21 +9,10 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { AddressAutocomplete } from '@/components/common/AddressAutocomplete'
 import { rhfValidators, formatPhoneInput } from '@/lib/validators'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { BUSINESS_ENTITY_TYPE_LABELS, type InsuredUpdate } from '@/types/insured.types'
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
-
-function getSaveErrorMessage(err: any, fallback: string) {
-  const data = err?.response?.data
-  const errors = data?.errors
-  if (errors && typeof errors === 'object') {
-    const first = Object.entries(errors).flatMap(([field, messages]) =>
-      Array.isArray(messages) ? messages.map((m) => `${field}: ${m}`) : [`${field}: ${messages}`]
-    )[0]
-    if (first) return first
-  }
-  return data?.errorMessage ?? data?.detail ?? data?.title ?? fallback
-}
 
 export function InsuredEditPage() {
   const { id } = useParams<{ id: string }>()
@@ -42,7 +31,7 @@ export function InsuredEditPage() {
       queryClient.invalidateQueries({ queryKey: ['insureds'] })
       navigate(`/insureds/${id}`)
     },
-    onError: (err: any) => toast.error(getSaveErrorMessage(err, 'Failed to update insured')),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Failed to update insured')),
   })
 
   if (isLoading) return <LoadingSpinner />

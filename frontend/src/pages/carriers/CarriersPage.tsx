@@ -8,6 +8,8 @@ import { queryClient } from '@/lib/queryClient'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { LOB_LABELS, ACTIVE_LOBS } from '@/types/quote.types'
 import type { CarrierCreate } from '@/types/carrier.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
@@ -51,7 +53,7 @@ export function CarriersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<CarrierCreate>(EMPTY_FORM)
 
-  const { data: carriers, isLoading } = useQuery({
+  const { data: carriers, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['carriers'],
     queryFn: () => carriersApi.getAll(false),
   })
@@ -70,7 +72,7 @@ export function CarriersPage() {
       setForm(EMPTY_FORM)
       navigate(`/carriers/${carrier.id}`)
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to create carrier'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to create carrier')),
   })
 
   const deleteMutation = useMutation({
@@ -79,7 +81,7 @@ export function CarriersPage() {
       toast.success('Carrier deleted')
       queryClient.invalidateQueries({ queryKey: ['carriers'] })
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Cannot delete — carrier has policies. Deactivate instead.'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Cannot delete — carrier has policies. Deactivate instead.')),
   })
 
   const set = (k: keyof CarrierCreate) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -111,6 +113,8 @@ export function CarriersPage() {
       <div className="subs-table-card">
         {isLoading ? (
           <LoadingSpinner />
+        ) : isError ? (
+          <ErrorState error={error} onRetry={refetch} />
         ) : carriers?.length === 0 ? (
           <EmptyState icon={Building2} title="No carriers yet" description="Add your first carrier to get started." />
         ) : (

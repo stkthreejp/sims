@@ -6,6 +6,8 @@ import { policyNumbersApi } from '@/api/policyNumbers.api'
 import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { PolicyNumberAssignment, PolicyNumberAssignmentUpsert, PolicyNumberSequence, PolicyNumberSequenceUpsert } from '@/types/policyNumber.types'
 
@@ -69,12 +71,12 @@ export function PolicyNumbersAdminPage() {
   const [assignmentForm, setAssignmentForm] = useState<PolicyNumberAssignmentUpsert>(emptyAssignment)
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
 
-  const { data: sequences = [], isLoading: loadingSequences } = useQuery({
+  const { data: sequences = [], isLoading: loadingSequences, isError: sequencesError, error: sequencesErr, refetch: refetchSequences } = useQuery({
     queryKey: ['policy-number-sequences'],
     queryFn: () => policyNumbersApi.getSequences(true),
   })
 
-  const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
+  const { data: assignments = [], isLoading: loadingAssignments, isError: assignmentsError, error: assignmentsErr, refetch: refetchAssignments } = useQuery({
     queryKey: ['policy-number-assignments'],
     queryFn: () => policyNumbersApi.getAssignments(true),
   })
@@ -157,7 +159,7 @@ export function PolicyNumbersAdminPage() {
       resetSequenceForm()
       toast.success('Policy number sequence saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Sequence could not be saved'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Sequence could not be saved')),
   })
 
   const deleteSequence = useMutation({
@@ -166,7 +168,7 @@ export function PolicyNumbersAdminPage() {
       qc.invalidateQueries({ queryKey: ['policy-number-sequences'] })
       toast.success('Sequence removed')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Sequence could not be removed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Sequence could not be removed')),
   })
 
   const saveAssignment = useMutation({
@@ -181,7 +183,7 @@ export function PolicyNumbersAdminPage() {
       resetAssignmentForm()
       toast.success('Assignment saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Assignment could not be saved'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Assignment could not be saved')),
   })
 
   const deleteAssignment = useMutation({
@@ -190,7 +192,7 @@ export function PolicyNumbersAdminPage() {
       qc.invalidateQueries({ queryKey: ['policy-number-assignments'] })
       toast.success('Assignment removed')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Assignment could not be removed'),
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Assignment could not be removed')),
   })
 
   const resetSequenceForm = () => {
@@ -238,6 +240,8 @@ export function PolicyNumbersAdminPage() {
   }
 
   if (loadingSequences || loadingAssignments) return <LoadingSpinner />
+  if (sequencesError) return <ErrorState error={sequencesErr} onRetry={refetchSequences} />
+  if (assignmentsError) return <ErrorState error={assignmentsErr} onRetry={refetchAssignments} />
 
   return (
     <div className="space-y-5 p-6">

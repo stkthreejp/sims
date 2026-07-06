@@ -4,6 +4,8 @@ import { ShieldCheck, ArrowRight, Users, FlaskConical } from 'lucide-react'
 import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { ACTIVE_LOBS, LOB_LABELS } from '@/types/quote.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 import type { RatingPlanListItem, ShadowRatingStatus } from '@/types/rating.types'
@@ -38,7 +40,7 @@ function ShadowToggle({ lob, enabled, disabled }: { lob: PolicyLineOfBusiness; e
       const lobLabel = LOB_LABELS[lob]
       toast.success(enabled ? `Shadow mode off for ${lobLabel}` : `Shadow mode on for ${lobLabel}`)
     },
-    onError: () => toast.error('Failed to update shadow mode'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update shadow mode')),
   })
 
   return (
@@ -148,7 +150,7 @@ function LobSection({ lob, plans, shadowStatus, shadowLoading }: {
 }
 
 export function AdminRatingPage() {
-  const { data: plans = [], isLoading } = useQuery({
+  const { data: plans = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['rating-plans'],
     queryFn: () => ratingApi.getPlans(),
   })
@@ -159,6 +161,7 @@ export function AdminRatingPage() {
   })
 
   if (isLoading) return <LoadingSpinner />
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
 
   return (
     <div className="p-6 space-y-8 max-w-5xl">

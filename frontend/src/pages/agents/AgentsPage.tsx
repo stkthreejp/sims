@@ -8,6 +8,8 @@ import type { AgentCreate } from '@/types/agent.types'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { isValidEmail, isValidPhone, formatPhoneInput } from '@/lib/validators'
 
 function MetricCard({
@@ -60,7 +62,7 @@ export function AgentsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<NewAgentForm>(emptyForm())
 
-  const { data: agents = [], isLoading } = useQuery({
+  const { data: agents = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['agents'],
     queryFn: () => agentsApi.getAll(),
   })
@@ -79,7 +81,7 @@ export function AgentsPage() {
       toast.success('Agent created')
       navigate(`/agents/${agent.id}`)
     },
-    onError: () => toast.error('Failed to create agent'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to create agent')),
   })
 
   const deleteMutation = useMutation({
@@ -91,7 +93,7 @@ export function AgentsPage() {
     onError: (err: any) => {
       const msg = err?.response?.data?.errorCode === 'HAS_SUBMISSIONS'
         ? 'Cannot delete — agent has submissions'
-        : 'Failed to delete agent'
+        : getApiErrorMessage(err, 'Failed to delete agent')
       toast.error(msg)
     },
   })
@@ -149,6 +151,8 @@ export function AgentsPage() {
       <div className="subs-table-card">
         {isLoading ? (
           <LoadingSpinner />
+        ) : isError ? (
+          <ErrorState error={error} onRetry={refetch} />
         ) : agents.length === 0 ? (
           <EmptyState icon={UserCircle} title="No agents yet" description="Add your first agent to get started." />
         ) : (

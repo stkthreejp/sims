@@ -6,6 +6,7 @@ import { insuredsApi } from '@/api/insureds.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 import { usePermissions } from '@/hooks/usePermissions'
 import type { InsuredListItem } from '@/types/insured.types'
 
@@ -34,7 +35,7 @@ export function InsuredsPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['insureds', 'list', { search, page }],
     queryFn: () => insuredsApi.getAll({ search, page, pageSize: 500 }),
   })
@@ -96,6 +97,8 @@ export function InsuredsPage() {
       <div className="subs-table-card">
         {isLoading ? (
           <LoadingSpinner />
+        ) : isError ? (
+          <ErrorState error={error} onRetry={refetch} />
         ) : (sorted?.length ?? 0) === 0 ? (
           <EmptyState icon={Building2} title="No insureds found" description="Add your first insured to get started." />
         ) : (

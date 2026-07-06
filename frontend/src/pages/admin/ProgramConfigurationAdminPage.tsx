@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import axios from 'axios'
 import { Check, Copy, Layers3, Pencil, Plus, Save, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { carriersApi } from '@/api/carriers.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
 import { PageHeader } from '@/components/common/PageHeader'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { todayLocal } from '@/lib/utils'
 import type {
   ProgramCarrier,
@@ -82,7 +83,7 @@ export function ProgramConfigurationAdminPage() {
   const [copySource, setCopySource] = useState('TX')
   const [copyTarget, setCopyTarget] = useState('SC')
 
-  const { data: programs = [], isLoading } = useQuery({
+  const { data: programs = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'program-configurations'],
     queryFn: () => programConfigurationsApi.getAll(true),
   })
@@ -260,6 +261,7 @@ export function ProgramConfigurationAdminPage() {
   }
 
   if (isLoading) return <LoadingSpinner />
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
 
   return (
     <div className="space-y-5 p-6">
@@ -699,14 +701,4 @@ function cleanState(state: ProgramCarrierLobStateUpsert): ProgramCarrierLobState
     expirationDate: state.expirationDate || null,
     notes: state.notes?.trim() ? state.notes : null,
   }
-}
-
-function getApiErrorMessage(e: unknown, fallback: string) {
-  if (axios.isAxiosError(e)) {
-    const data = e.response?.data
-    if (typeof data === 'string') return data
-    return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
-  }
-  if (e instanceof Error) return e.message
-  return fallback
 }

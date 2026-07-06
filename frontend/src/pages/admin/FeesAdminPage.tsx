@@ -8,6 +8,8 @@ import { premiumChargesApi } from '@/api/premiumCharges.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { FeeDefinition, FeeRuleVersion } from '@/types/fee.types'
 import type { ProgramConfiguration } from '@/types/programConfiguration.types'
@@ -104,7 +106,7 @@ export function FeesAdminPage() {
   const [editingPremiumChargeId, setEditingPremiumChargeId] = useState<string | null>(null)
   const [premiumChargeForm, setPremiumChargeForm] = useState<PremiumChargeForm>(emptyPremiumChargeForm())
 
-  const { data: definitions = [], isLoading } = useQuery({
+  const { data: definitions = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'fees', 'definitions'],
     queryFn: () => feesApi.getDefinitions(),
   })
@@ -150,7 +152,7 @@ export function FeesAdminPage() {
   const { mutate: createDef, isPending: savingDef } = useMutation({
     mutationFn: () => feesApi.createDefinition(defForm as any),
     onSuccess: () => { toast.success('Fee type created'); qc.invalidateQueries({ queryKey: ['admin', 'fees', 'definitions'] }); setShowNewDef(false) },
-    onError: () => toast.error('Save failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
 
   const { mutate: saveVersion, isPending: savingVersion } = useMutation({
@@ -162,19 +164,19 @@ export function FeesAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'fees', 'versions', selectedDef?.id] })
       setEditingVersion(saved); setView('edit-version'); setNewVersionFrom(undefined)
     },
-    onError: () => toast.error('Save failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
 
   const { mutate: disableVersion } = useMutation({
     mutationFn: () => feesApi.disableVersion(editingVersion!.id, todayLocal()),
     onSuccess: () => { toast.success('Version disabled'); qc.invalidateQueries({ queryKey: ['admin', 'fees', 'versions', selectedDef?.id] }); setView('versions') },
-    onError: () => toast.error('Failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed')),
   })
 
   const { mutate: saveTaxability } = useMutation({
     mutationFn: () => feesApi.setStateTaxability(selectedDef!.id, nonTaxableEdit),
     onSuccess: () => { toast.success('Saved'); qc.invalidateQueries({ queryKey: ['admin', 'fees', 'versions', selectedDef?.id] }); setShowTaxability(false) },
-    onError: () => toast.error('Save failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
 
   const { mutate: savePremiumCharge, isPending: savingPremiumCharge } = useMutation({
@@ -188,7 +190,7 @@ export function FeesAdminPage() {
       setEditingPremiumChargeId(null)
       setPremiumChargeForm(emptyPremiumChargeForm())
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Save failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
 
   const { mutate: deletePremiumCharge } = useMutation({
@@ -197,7 +199,7 @@ export function FeesAdminPage() {
       toast.success('Premium charge removed')
       qc.invalidateQueries({ queryKey: ['admin', 'premium-charges', 'additional-interests'] })
     },
-    onError: () => toast.error('Delete failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Delete failed')),
   })
 
   function openNewVersion(cloneFrom?: FeeRuleVersion) {
@@ -297,6 +299,7 @@ export function FeesAdminPage() {
   const isSuperseded = (v: FeeRuleVersion) => v.disabledDate !== null && parseDateOnly(v.disabledDate) <= new Date()
 
   if (isLoading) return <LoadingSpinner />
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
 
   const missingVendorPayee = form.payableRouting === 'Entity' && !form.payablePayeeId
   const selectedProgram = programs.find(program => program.id === form.programConfigurationId) ?? null

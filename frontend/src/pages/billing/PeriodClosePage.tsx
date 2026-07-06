@@ -9,6 +9,8 @@ import {
 } from '@/api/periodClose.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import type { AccountingPeriod, ChecklistItem } from '@/types/periodClose.types'
 import { useAuthStore } from '@/store/authStore'
 
@@ -97,7 +99,7 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
   const evaluateMutation = useMutation({
     mutationFn: () => evaluateChecklist(period.id),
     onSuccess: (p) => { onUpdated(p); toast.success('Checklist refreshed') },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const closeMutation = useMutation({
@@ -108,7 +110,7 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
       toast.success(`${periodLabel(period)} closed`)
       setShowCloseForm(false)
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const reopenMutation = useMutation({
@@ -119,7 +121,7 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
       toast.success(`${periodLabel(period)} reopened`)
       setShowReopenForm(false)
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   return (
@@ -272,7 +274,7 @@ export function PeriodClosePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [periods, setPeriods] = useState<AccountingPeriod[]>([])
 
-  const { isLoading, data: periodsData } = useQuery({
+  const { isLoading, isError, error, refetch, data: periodsData } = useQuery({
     queryKey: ['periods'],
     queryFn: getPeriods,
   })
@@ -296,7 +298,7 @@ export function PeriodClosePage() {
       setSelectedId(p.id)
       qc.invalidateQueries({ queryKey: ['periods'] })
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const updatePeriod = (p: AccountingPeriod) => {
@@ -327,7 +329,9 @@ export function PeriodClosePage() {
         }
       />
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState error={error} onRetry={refetch} />
+      ) : isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner /></div>
       ) : (
         <div className="flex gap-6">

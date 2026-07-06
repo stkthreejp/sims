@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { adminEscalationRulesApi, adminTaskTypesApi } from '@/api/admin.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import type { EscalationRule } from '@/types/task.types'
 
 interface FormState {
@@ -23,7 +25,7 @@ export function EscalationRulesAdminPage() {
   const [form, setForm] = useState<FormState>(EMPTY)
   const [showForm, setShowForm] = useState(false)
 
-  const { data: rules = [], isLoading } = useQuery({
+  const { data: rules = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'escalation-rules'],
     queryFn: adminEscalationRulesApi.getAll,
   })
@@ -42,13 +44,13 @@ export function EscalationRulesAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'escalation-rules'] })
       setEditing(null); setShowForm(false); setForm(EMPTY)
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Save failed'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Save failed')),
   })
 
   const { mutate: remove } = useMutation({
     mutationFn: (id: string) => adminEscalationRulesApi.delete(id),
     onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['admin', 'escalation-rules'] }) },
-    onError: () => toast.error('Delete failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Delete failed')),
   })
 
   function openEdit(r: EscalationRule) {
@@ -57,6 +59,7 @@ export function EscalationRulesAdminPage() {
   }
 
   if (isLoading) return <LoadingSpinner />
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
 
   return (
     <div className="p-6 space-y-5">

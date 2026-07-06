@@ -12,6 +12,8 @@ import {
   type LegalTrackedSource,
 } from '@/api/legalRequirements.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { PageHeader } from '@/components/common/PageHeader'
 
 const ALL = 'All'
@@ -86,7 +88,7 @@ export function LegalRequirementsPage() {
       toast.success(`Oden import completed: ${run.possibleChanges} possible changes found`)
       invalidateLegalQueries(queryClient)
     },
-    onError: () => toast.error('Oden import could not be processed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Oden import could not be processed')),
   })
   const simulateMutation = useMutation({
     mutationFn: legalRequirementsApi.simulateChange,
@@ -95,7 +97,7 @@ export function LegalRequirementsPage() {
       invalidateLegalQueries(queryClient)
       setActiveTab('scans')
     },
-    onError: () => toast.error('Simulated change could not be created'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Simulated change could not be created')),
   })
   const scanSourceMutation = useMutation({
     mutationFn: legalRequirementsApi.scanSource,
@@ -123,6 +125,7 @@ export function LegalRequirementsPage() {
   })
 
   if (summaryQuery.isLoading) return <LoadingSpinner />
+  if (summaryQuery.isError) return <ErrorState error={summaryQuery.error} onRetry={summaryQuery.refetch} />
 
   return (
     <div className="p-6 space-y-5">
@@ -758,7 +761,7 @@ function ScanReviewDrawer({ result, onClose }: { result: LegalSourceScanResult; 
       invalidateLegalQueries(queryClient)
       onClose()
     },
-    onError: () => toast.error('Scan result could not be approved'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Scan result could not be approved')),
   })
   const reject = useMutation({
     mutationFn: () => legalRequirementsApi.rejectScanResult(result.id, comment),
@@ -767,7 +770,7 @@ function ScanReviewDrawer({ result, onClose }: { result: LegalSourceScanResult; 
       invalidateLegalQueries(queryClient)
       onClose()
     },
-    onError: () => toast.error('Scan result could not be rejected'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Scan result could not be rejected')),
   })
   const proposedText = result.suggestedRequirementText ?? result.sourceText
   const canReview = result.reviewStatus === 'Pending'
@@ -1128,10 +1131,4 @@ function formatDate(value: string) {
 
 function invalidateLegalQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ['legal-requirements'] })
-}
-
-function getApiErrorMessage(e: unknown, fallback: string) {
-  const data = (e as { response?: { data?: { errorMessage?: string; message?: string; title?: string } } })
-    ?.response?.data
-  return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
 }

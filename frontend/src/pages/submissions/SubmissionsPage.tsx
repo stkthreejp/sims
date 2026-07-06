@@ -8,6 +8,7 @@ import {
 import { submissionsApi } from '@/api/submissions.api'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus } from '@/types/submission.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
 import { parseDateOnly } from '@/lib/utils'
 
 type SortKey = 'submissionNumber' | 'insuredName' | 'status' | 'effectiveDate' | 'createdAt'
@@ -90,7 +91,7 @@ export function SubmissionsPage() {
   const [page, setPage] = useState(1)
   const pageSize = 25
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['submissions', 'list-all'],
     queryFn:  () => submissionsApi.getAll({ pageSize: 500, sortBy: 'createdAt', sortDir: 'desc' }),
   })
@@ -170,6 +171,22 @@ export function SubmissionsPage() {
   }
 
   if (isLoading) return <LoadingSpinner />
+
+  if (isError) {
+    return (
+      <div className="subs-wrap">
+        <header className="subs-page-head">
+          <div>
+            <h1 className="subs-h1">Submissions</h1>
+            <div className="subs-sub">All submissions across your book</div>
+          </div>
+        </header>
+        <div className="subs-table-card">
+          <ErrorState error={error} onRetry={refetch} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="subs-wrap">

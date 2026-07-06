@@ -10,6 +10,7 @@ import { authApi } from '@/api/auth.api'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
+import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 
 // Auth
@@ -173,18 +174,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+// Shown in place of the page when the user is authenticated but lacks permission —
+// a clear no-access message beats a silent redirect that teleports the user away (audit O10).
+const NoAccess = () => (
+  <div className="flex items-center justify-center h-full">
+    <ErrorState title="You don't have access to this page." />
+  </div>
+)
+
 function PermissionRoute({ permission, children }: { permission: string | string[]; children: React.ReactNode }) {
   const hasPermission = useAuthStore((s) => s.hasPermission)
   const required = Array.isArray(permission) ? permission : [permission]
 
-  return required.some(hasPermission) ? <>{children}</> : <Navigate to="/dashboard" replace />
+  return required.some(hasPermission) ? <>{children}</> : <NoAccess />
 }
 
 // All listed permissions must be present (AND logic) — mirrors compound sidebar guards
 function PermissionAllRoute({ permissions, children }: { permissions: string[]; children: React.ReactNode }) {
   const hasPermission = useAuthStore((s) => s.hasPermission)
 
-  return permissions.every(hasPermission) ? <>{children}</> : <Navigate to="/dashboard" replace />
+  return permissions.every(hasPermission) ? <>{children}</> : <NoAccess />
 }
 
 const withPermission = (permission: string | string[], children: React.ReactNode) => (

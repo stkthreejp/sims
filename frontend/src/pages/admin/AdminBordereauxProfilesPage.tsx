@@ -13,19 +13,10 @@ import {
   BordereauxProfileSetupPanel,
   bordereauxProfileToRequest,
 } from '@/components/bordereaux/BordereauxProfileSetupPanel'
-import axios from 'axios'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { LOB_LABELS } from '@/types/quote.types'
 import { DEFAULT_BDX_TXN_TYPES, type BordereauxProfile, type UpsertBordereauxProfileRequest } from '@/types/bordereaux.types'
-
-function getApiErrorMessage(e: unknown, fallback: string) {
-  if (axios.isAxiosError(e)) {
-    const data = e.response?.data
-    if (typeof data === 'string') return data
-    return data?.errorMessage ?? data?.detail ?? data?.title ?? data?.message ?? fallback
-  }
-  if (e instanceof Error) return e.message
-  return fallback
-}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 // Values must match the backend enums exactly (BordereauxReportType /
@@ -228,7 +219,7 @@ export default function AdminBordereauxProfilesPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [showInactive, setShowInactive] = useState(false)
 
-  const { data: profiles = [], isLoading } = useQuery({
+  const { data: profiles = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['bordereaux', 'profiles', showInactive],
     queryFn: () => getBordereauxProfiles({ includeInactive: showInactive }),
   })
@@ -285,7 +276,8 @@ export default function AdminBordereauxProfilesPage() {
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {isLoading && <p style={{ padding: 16, fontSize: 13, color: 'var(--ink-3)' }}>Loading…</p>}
-          {!isLoading && profiles.length === 0 && (
+          {isError && <ErrorState error={error} onRetry={refetch} />}
+          {!isLoading && !isError && profiles.length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
               <FileText size={24} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
               No profiles yet. Click New to create one.

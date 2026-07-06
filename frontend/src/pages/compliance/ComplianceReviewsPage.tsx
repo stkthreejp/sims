@@ -5,6 +5,7 @@ import { ArrowLeft, AlertTriangle, CalendarClock, CheckCircle2, Search } from 'l
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { DOCUMENT_STATUS } from '@/constants/compliance'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { formatDate } from '@/lib/utils'
@@ -21,6 +22,7 @@ export function ComplianceReviewsPage() {
     queryKey: ['compliance-documents', 'review-queue'],
     queryFn: () => complianceDocumentsApi.getAll({}),
   })
+  const { isError: documentsError, error: documentsErrorObj, refetch: refetchDocuments } = documentsQuery
 
   const queue = useMemo(() => {
     const today = startOfToday()
@@ -114,7 +116,9 @@ export function ComplianceReviewsPage() {
           </label>
         </div>
 
-        {documentsQuery.isLoading ? (
+        {documentsError ? (
+          <div className="p-6"><ErrorState error={documentsErrorObj} onRetry={refetchDocuments} /></div>
+        ) : documentsQuery.isLoading ? (
           <div className="p-8"><LoadingSpinner /></div>
         ) : queue.length === 0 ? (
           <div className="p-6">

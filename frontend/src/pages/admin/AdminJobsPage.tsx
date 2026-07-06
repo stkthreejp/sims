@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import axios from 'axios'
 import { AlertCircle, CheckCircle2, Clock3, DatabaseZap, Play, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { adminJobsApi } from '@/api/admin.api'
 import type { FmcsaAnalyticsImportBatch } from '@/api/admin.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 
 export function AdminJobsPage() {
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'jobs', 'safety'],
     queryFn: adminJobsApi.getSafetyStatus,
     refetchInterval: (query) => query.state.data?.hasRunningImport ? 10000 : false,
@@ -20,6 +21,15 @@ export function AdminJobsPage() {
   const enrichInspections = useJobMutation(adminJobsApi.enrichInspectionDetails, 'Inspection detail enrichment completed')
 
   if (isLoading) return <LoadingSpinner />
+  if (isError) return (
+    <div className="p-6 space-y-5">
+      <PageHeader
+        title="Admin Jobs"
+        subtitle="Recurring data pulls and operational imports"
+      />
+      <ErrorState error={error} onRetry={refetch} />
+    </div>
+  )
 
   const running = data?.hasRunningImport || smsSample.isPending || smsFull.isPending || refreshImported.isPending || enrichInspections.isPending
 
@@ -91,10 +101,7 @@ function useJobMutation(action: () => Promise<unknown>, successMessage: string) 
       qc.invalidateQueries({ queryKey: ['admin', 'jobs', 'safety'] })
     },
     onError: (err) => {
-      const message = axios.isAxiosError(err)
-        ? err.response?.data?.errorMessage ?? 'Job could not be started'
-        : 'Job could not be started'
-      toast.error(message)
+      toast.error(getApiErrorMessage(err, 'Job could not be started'))
     },
   })
 }

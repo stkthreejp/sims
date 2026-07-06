@@ -5,7 +5,9 @@ import { toast } from 'sonner'
 import { usersApi } from '@/api/users.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
 import { EmptyState } from '@/components/common/EmptyState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { formatDateTime } from '@/lib/utils'
 import type { User, UserStatus, UserCreate, UserUpdate } from '@/types/user.types'
 
@@ -50,7 +52,7 @@ function UserModal({
       toast.success('User created')
       onClose()
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to create user'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to create user')),
   })
 
   const updateMutation = useMutation({
@@ -60,7 +62,7 @@ function UserModal({
       toast.success('User updated')
       onClose()
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to update user'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update user')),
   })
 
   const isPending = createMutation.isPending || updateMutation.isPending
@@ -195,7 +197,7 @@ export function UsersPage() {
   const [page, setPage] = useState(1)
   const [editingUser, setEditingUser] = useState<User | null | undefined>(undefined) // undefined=closed, null=create, User=edit
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['users', 'list', { search, page }],
     queryFn: () => usersApi.getAll({ search, page, pageSize: 25 }),
   })
@@ -206,7 +208,7 @@ export function UsersPage() {
       qc.invalidateQueries({ queryKey: ['users'] })
       toast.success('User deleted')
     },
-    onError: () => toast.error('Failed to delete user'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to delete user')),
   })
 
   return (
@@ -232,7 +234,9 @@ export function UsersPage() {
           </button>
         </div>
 
-        {isLoading ? <LoadingSpinner /> : data?.items.length === 0 ? (
+        {isLoading ? <LoadingSpinner /> : isError ? (
+          <ErrorState error={error} onRetry={refetch} />
+        ) : data?.items.length === 0 ? (
           <EmptyState icon={Users} title="No users found" />
         ) : (
           <table className="w-full text-sm">

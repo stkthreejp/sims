@@ -6,8 +6,10 @@ import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { ATTESTATION_STATUS } from '@/constants/compliance'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { ComplianceAttestationCampaign, ComplianceAttestationRecipient } from '@/types/compliance.types'
@@ -23,6 +25,7 @@ export function ComplianceAttestationsPage() {
     queryKey: ['compliance-documents', 'my-attestations'],
     queryFn: () => complianceDocumentsApi.getAttestationCampaigns(),
   })
+  const { isError: campaignsError, error: campaignsErrorObj, refetch: refetchCampaigns } = campaignsQuery
 
   const assigned = useMemo(() => {
     return (campaignsQuery.data ?? [])
@@ -79,7 +82,9 @@ export function ComplianceAttestationsPage() {
           ))}
         </div>
 
-        {campaignsQuery.isLoading ? (
+        {campaignsError ? (
+          <div className="p-6"><ErrorState error={campaignsErrorObj} onRetry={refetchCampaigns} /></div>
+        ) : campaignsQuery.isLoading ? (
           <div className="p-8"><LoadingSpinner /></div>
         ) : visible.length === 0 ? (
           <div className="p-6">
@@ -126,7 +131,7 @@ function AttestationRow({
       qc.invalidateQueries({ queryKey: ['compliance-documents', campaign.documentId, 'attestations'] })
       qc.invalidateQueries({ queryKey: ['compliance-documents'] })
     },
-    onError: () => toast.error('Could not record attestation'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not record attestation')),
   })
 
   const pending = recipient.status === ATTESTATION_STATUS.PENDING

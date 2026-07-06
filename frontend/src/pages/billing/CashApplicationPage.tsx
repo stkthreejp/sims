@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { getReceipts, getOpenInvoices, applyCash } from '@/api/receipts.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly } from '@/lib/utils'
 import type { OpenInvoice, ApplicationLineRequest } from '@/types/receipt.types'
 
@@ -149,12 +151,12 @@ export function CashApplicationPage() {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null)
   const [gridRows, setGridRows] = useState<GridRow[]>([])
 
-  const { data: receipts = [], isLoading: receiptsLoading } = useQuery({
+  const { data: receipts = [], isLoading: receiptsLoading, isError: receiptsError, error: receiptsErr, refetch: refetchReceipts } = useQuery({
     queryKey: ['billing', 'receipts'],
     queryFn: getReceipts,
   })
 
-  const { data: openInvoices = [], isLoading: invoicesLoading } = useQuery({
+  const { data: openInvoices = [], isLoading: invoicesLoading, isError: invoicesError, error: invoicesErr, refetch: refetchInvoices } = useQuery({
     queryKey: ['billing', 'cash-application', 'open-invoices'],
     queryFn: getOpenInvoices,
   })
@@ -169,8 +171,8 @@ export function CashApplicationPage() {
       setGridRows([])
       setSelectedReceiptId(null)
     },
-    onError: (err: { response?: { data?: { errorMessage?: string } } }) => {
-      toast.error(err?.response?.data?.errorMessage ?? 'Failed to apply cash')
+    onError: (err) => {
+      toast.error(getApiErrorMessage(err, 'Failed to apply cash'))
     },
   })
 
@@ -210,6 +212,9 @@ export function CashApplicationPage() {
   }
 
   const isLoading = receiptsLoading || invoicesLoading
+  const isError = receiptsError || invoicesError
+  const error = receiptsErr ?? invoicesErr
+  const refetch = () => { refetchReceipts(); refetchInvoices() }
 
   return (
     <div className="subs-wrap">
@@ -219,6 +224,8 @@ export function CashApplicationPage() {
 
       {isLoading ? (
         <LoadingSpinner />
+      ) : isError ? (
+        <ErrorState error={error} onRetry={refetch} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Step 1: Select Receipt */}

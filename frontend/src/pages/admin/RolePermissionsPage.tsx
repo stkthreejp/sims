@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { rolesApi } from '@/api/roles.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import type { Role, Permission } from '@/types/role.types'
 
 // Friendly display order for categories
@@ -37,12 +39,12 @@ function buildDraft(roles: Role[], permissions: Permission[]): Draft {
 export function RolePermissionsPage() {
   const qc = useQueryClient()
 
-  const { data: roles, isLoading: rolesLoading } = useQuery({
+  const { data: roles, isLoading: rolesLoading, isError: rolesError, error: rolesErr, refetch: refetchRoles } = useQuery({
     queryKey: ['roles'],
     queryFn: rolesApi.getAll,
   })
 
-  const { data: permissions, isLoading: permsLoading } = useQuery({
+  const { data: permissions, isLoading: permsLoading, isError: permsError, error: permsErr, refetch: refetchPerms } = useQuery({
     queryKey: ['permissions'],
     queryFn: rolesApi.getPermissions,
   })
@@ -77,8 +79,8 @@ export function RolePermissionsPage() {
       qc.invalidateQueries({ queryKey: ['roles'] })
       toast.success('Permissions saved')
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.errorMessage ?? 'Failed to save permissions'),
+    onError: (err) =>
+      toast.error(getApiErrorMessage(err, 'Failed to save permissions')),
   })
 
   const toggle = (roleId: string, permId: number) => {
@@ -95,6 +97,21 @@ export function RolePermissionsPage() {
   const save = (role: Role) => {
     if (!draft) return
     saveMutation.mutate({ roleId: role.id, ids: Array.from(draft[role.id]) })
+  }
+
+  if (rolesError || permsError) {
+    return (
+      <div>
+        <PageHeader
+          title="Role Permissions"
+          subtitle="Control which sections and actions each role can access. Changes take effect on next login."
+        />
+        <ErrorState
+          error={rolesError ? rolesErr : permsErr}
+          onRetry={() => { refetchRoles(); refetchPerms() }}
+        />
+      </div>
+    )
   }
 
   if (rolesLoading || permsLoading || !draft || !roles || !permissions) {

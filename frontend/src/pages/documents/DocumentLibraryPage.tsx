@@ -7,6 +7,8 @@ import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
 import { importWordDocument } from '@/lib/wordImport'
 import type { DocumentTemplateKind, DocumentTemplateListItem } from '@/types/documentTemplate.types'
@@ -50,7 +52,7 @@ export function DocumentLibraryPage() {
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
 
-  const { data: templates = [], isLoading } = useQuery({
+  const { data: templates = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['document-templates', { filter, kindFilter, showInactive }],
     queryFn: () => documentTemplatesApi.getAll(
       filter === 'All' ? undefined : filter,
@@ -65,7 +67,7 @@ export function DocumentLibraryPage() {
       qc.invalidateQueries({ queryKey: ['document-templates'] })
       toast.success('Template deleted')
     },
-    onError: () => toast.error('Failed to delete template'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to delete template')),
   })
 
   const displayed = templates.filter((t) =>
@@ -88,14 +90,18 @@ export function DocumentLibraryPage() {
     if (!file) return
     e.target.value = ''
 
-    const importedHtml = await importWordDocument(file)
+    try {
+      const importedHtml = await importWordDocument(file)
 
-    navigate('/document-library/new', {
-      state: {
-        importedHtml,
-        importedName: file.name.replace(/\.(doc|docx)$/i, ''),
-      },
-    })
+      navigate('/document-library/new', {
+        state: {
+          importedHtml,
+          importedName: file.name.replace(/\.(doc|docx)$/i, ''),
+        },
+      })
+    } catch (e) {
+      toast.error(getApiErrorMessage(e))
+    }
   }
 
   return (
@@ -181,7 +187,9 @@ export function DocumentLibraryPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState error={error} onRetry={refetch} />
+      ) : isLoading ? (
         <LoadingSpinner />
       ) : displayed.length === 0 ? (
         <EmptyState

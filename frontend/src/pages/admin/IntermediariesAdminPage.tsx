@@ -7,8 +7,10 @@ import { intermediariesApi } from '@/api/intermediaries.api'
 import { feesApi } from '@/api/fees.api'
 import { programConfigurationsApi } from '@/api/programConfigurations.api'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { todayLocal } from '@/lib/utils'
 import type { Intermediary, IntermediaryBrokerageSetup, IntermediaryBrokerageSetupUpsert, IntermediaryUpsert } from '@/types/intermediary.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
@@ -199,7 +201,7 @@ export function IntermediariesAdminPage() {
   const [editingSetupId, setEditingSetupId] = useState<string | null>(null)
   const [setupForm, setSetupForm] = useState<SetupForm>(emptySetupForm())
 
-  const { data: intermediaries = [], isLoading: loadingList } = useQuery({
+  const { data: intermediaries = [], isLoading: loadingList, isError: listError, error: listErr, refetch: refetchList } = useQuery({
     queryKey: ['admin', 'intermediaries'],
     queryFn: () => intermediariesApi.getAll(true),
   })
@@ -265,7 +267,7 @@ export function IntermediariesAdminPage() {
       setSelectedId(saved.id)
       setForm(intermediaryToForm(saved))
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Save failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
 
   const deleteIntermediaryMutation = useMutation({
@@ -276,7 +278,7 @@ export function IntermediariesAdminPage() {
       setSelectedId(null)
       setForm(emptyIntermediaryForm())
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Delete failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Delete failed')),
   })
 
   const saveSetupMutation = useMutation({
@@ -292,7 +294,7 @@ export function IntermediariesAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'intermediaries', selectedId] })
       resetSetupForm()
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Save failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
 
   const deleteSetupMutation = useMutation({
@@ -302,7 +304,7 @@ export function IntermediariesAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'intermediaries'] })
       qc.invalidateQueries({ queryKey: ['admin', 'intermediaries', selectedId] })
     },
-    onError: () => toast.error('Delete failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Delete failed')),
   })
 
   function startCreate() {
@@ -343,6 +345,7 @@ export function IntermediariesAdminPage() {
   const selectedName = isCreating ? 'New Intermediary' : intermediary?.name ?? 'Intermediary'
 
   if (loadingList) return <LoadingSpinner />
+  if (listError) return <ErrorState error={listErr} onRetry={refetchList} />
 
   return (
     <div className="p-6 space-y-5">

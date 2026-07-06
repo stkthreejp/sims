@@ -19,6 +19,7 @@ import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/
 import { formatCurrency, todayLocal } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
+import { getApiErrorMessage } from '@/lib/apiError'
 import {
   getCarrierCommissions,
   createCarrierCommission,
@@ -313,7 +314,7 @@ export function CarrierDetailPage() {
       setCommissionForm({ programConfigurationId: '', lineOfBusiness: '', commissionRate: '', smmRetentionRate: '', effectiveDate: todayLocal() })
       toast.success('Commission rate added')
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err) => toast.error(getApiErrorMessage(err)),
   })
 
   const disableCommissionMutation = useMutation({
@@ -322,7 +323,7 @@ export function CarrierDetailPage() {
       qc.invalidateQueries({ queryKey: ['carrier-commissions', id] })
       toast.success('Commission rate disabled')
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err) => toast.error(getApiErrorMessage(err)),
   })
 
   const toAdditionalInterestRateDto = (): CarrierAdditionalInterestRateCreate => ({
@@ -353,7 +354,7 @@ export function CarrierDetailPage() {
       setAdditionalInterestRateForm(emptyAdditionalInterestRateForm())
       toast.success('Additional interest rate saved')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to save additional interest rate'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Failed to save additional interest rate')),
   })
 
   const deleteAdditionalInterestRateMutation = useMutation({
@@ -362,7 +363,7 @@ export function CarrierDetailPage() {
       qc.invalidateQueries({ queryKey: ['carrier-additional-interest-rates', id] })
       toast.success('Additional interest rate removed')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to remove additional interest rate'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Failed to remove additional interest rate')),
   })
 
   const updateBordereauxProfileMutation = useMutation({
@@ -373,7 +374,7 @@ export function CarrierDetailPage() {
         current?.map((profile) => (profile.id === updated.id ? updated : profile)) ?? [updated])
       qc.invalidateQueries({ queryKey: ['bordereaux', 'profiles'] })
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Could not save BDX profile setup'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Could not save BDX profile setup')),
   })
 
   const createBordereauxProfileMutation = useMutation({
@@ -406,7 +407,7 @@ export function CarrierDetailPage() {
       setShowBordereauxProfileForm(false)
       setBordereauxProfileForm(emptyBordereauxProfileForm())
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Could not create BDX profile'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Could not create BDX profile')),
   })
 
   const { data: ratingAssignments = [] } = useQuery({
@@ -435,7 +436,7 @@ export function CarrierDetailPage() {
       setRatingPickerLob(null)
       toast.success('Rating plan assigned')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to assign rating plan'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Failed to assign rating plan')),
   })
 
   const updateAssignmentMutation = useMutation({
@@ -448,7 +449,7 @@ export function CarrierDetailPage() {
       setRatingPickerLob(null)
       toast.success('Rating plan updated')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to update rating plan'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Failed to update rating plan')),
   })
 
   const deleteAssignmentMutation = useMutation({
@@ -457,7 +458,7 @@ export function CarrierDetailPage() {
       qc.invalidateQueries({ queryKey: ['carrier-rating-assignments', id] })
       toast.success('Rating plan assignment removed')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to remove assignment'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Failed to remove assignment')),
   })
 
   const openAddRatingModal = () => {
@@ -519,7 +520,7 @@ export function CarrierDetailPage() {
       setEditingInfo(false)
       toast.success('Carrier updated')
     },
-    onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to update carrier'),
+    onError: (err: any) => toast.error(getApiErrorMessage(err, 'Failed to update carrier')),
   })
 
   const startEditInfo = () => {
@@ -550,7 +551,7 @@ export function CarrierDetailPage() {
       setNewContactForm(emptyContactForm())
       toast.success('Contact added')
     },
-    onError: () => toast.error('Failed to add contact'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to add contact')),
   })
 
   const updateContactMutation = useMutation({
@@ -561,7 +562,7 @@ export function CarrierDetailPage() {
       setEditingContactId(null)
       toast.success('Contact updated')
     },
-    onError: () => toast.error('Failed to update contact'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update contact')),
   })
 
   const deleteContactMutation = useMutation({
@@ -571,7 +572,7 @@ export function CarrierDetailPage() {
       qc.invalidateQueries({ queryKey: ['carriers'] })
       toast.success('Contact deleted')
     },
-    onError: () => toast.error('Failed to delete contact'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to delete contact')),
   })
 
   const formToContactInput = (f: ContactFormData): CarrierContactInput => ({

@@ -5,6 +5,7 @@ import { AlertTriangle, CheckSquare, Clock, ExternalLink, Search } from 'lucide-
 import { tasksApi } from '@/api/tasks.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
 import { TaskDetailDrawer } from './TaskDetailDrawer'
 import type { TaskInstanceListItem, TaskInstanceStatus, TaskPriority } from '@/types/task.types'
 
@@ -55,7 +56,7 @@ export function TaskQueuePage() {
   const [filterPriority, setFilterPriority] = useState<TaskPriority | ''>('')
   const [search, setSearch] = useState('')
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: tasks = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tasks', 'my-queue'],
     queryFn: tasksApi.getMyQueue,
   })
@@ -79,6 +80,7 @@ export function TaskQueuePage() {
   })
   const hasFilters = Boolean(filterStatus || filterPriority || search)
 
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
   if (isLoading) return <LoadingSpinner />
 
   return (

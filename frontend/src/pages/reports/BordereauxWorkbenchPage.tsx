@@ -21,6 +21,7 @@ import type {
   BordereauxRun,
   ReconcileBordereauxRunRequest,
 } from '@/types/bordereaux.types'
+import { getApiErrorMessage } from '@/lib/apiError'
 
 function money(value: number) {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
@@ -257,7 +258,7 @@ function ReconciliationPanel({ run, onReconciled }: { run?: BordereauxRun; onRec
       toast.success(updated.reconciliationStatus === 'Matched' ? 'BDX and Account Current match' : 'Reconciliation mismatch recorded')
       onReconciled(updated)
     },
-    onError: () => toast.error('Could not reconcile this run'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not reconcile this run')),
   })
 
   if (!run) return null
@@ -363,7 +364,7 @@ export function BordereauxWorkbenchPage() {
       queryClient.invalidateQueries({ queryKey: ['bordereaux', 'runs', profileId] })
       queryClient.invalidateQueries({ queryKey: ['bordereaux', 'run', run.id] })
     },
-    onError: () => toast.error('Could not create the monthly run'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not create the monthly run')),
   })
 
   const generatePackage = useMutation({
@@ -373,7 +374,7 @@ export function BordereauxWorkbenchPage() {
       queryClient.setQueryData(['bordereaux', 'run', run.id], run)
       queryClient.invalidateQueries({ queryKey: ['bordereaux', 'runs', profileId] })
     },
-    onError: () => toast.error('Could not generate the export package'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not generate the export package')),
   })
 
   const downloadFile = useMutation({
@@ -387,7 +388,7 @@ export function BordereauxWorkbenchPage() {
       }
     },
     onSuccess: ({ url, fileName }) => openDownload(url, fileName),
-    onError: () => toast.error('Could not get the download link'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not get the download link')),
   })
 
   const selectedProfile = premiumProfiles.find((profile) => profile.id === profileId)
@@ -510,8 +511,8 @@ export function BordereauxWorkbenchPage() {
                       <button
                         className="sd-btn outline"
                         onClick={() =>
-                          downloadBordereauxRunCsv(selectedRun.id).catch(() =>
-                            toast.error('Could not download CSV'))
+                          downloadBordereauxRunCsv(selectedRun.id).catch((err) =>
+                            toast.error(getApiErrorMessage(err, 'Could not download CSV')))
                         }
                       >
                         <Download size={14} />

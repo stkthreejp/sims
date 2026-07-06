@@ -21,6 +21,7 @@ import { isValidEmail, isValidPhone, isValidZip, formatPhoneInput } from '@/lib/
 import { todayLocal } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { usePermissions } from '@/hooks/usePermissions'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { getAgentCommissions, createAgentCommission, disableAgentCommission } from '@/api/agentCommissions.api'
 import type { AgentCommission } from '@/types/agentCommission.types'
 
@@ -343,7 +344,7 @@ export function AgentDetailPage() {
 
   const invalidateCompliance = () => qc.invalidateQueries({ queryKey: ['agents', id, 'compliance'] })
   const complianceError = (e: unknown) =>
-    toast.error((e as { response?: { data?: { errorMessage?: string } } })?.response?.data?.errorMessage ?? 'Failed to update compliance doc')
+    toast.error(getApiErrorMessage(e, 'Failed to update compliance doc'))
 
   const upsertComplianceMutation = useMutation({
     mutationFn: ({ docType, data }: { docType: string; data: AgentComplianceDocUpsert }) =>
@@ -403,7 +404,7 @@ export function AgentDetailPage() {
       setLogForm({ logDate: '', logType: 'Call', contactName: '', notes: '' })
       toast.success('Interaction logged')
     },
-    onError: () => toast.error('Failed to log interaction'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to log interaction')),
   })
 
   const deleteLogMutation = useMutation({
@@ -412,7 +413,7 @@ export function AgentDetailPage() {
       qc.invalidateQueries({ queryKey: ['agents', id, 'contact-log'] })
       toast.success('Log entry deleted')
     },
-    onError: () => toast.error('Failed to delete log entry'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to delete log entry')),
   })
 
   const updateInfoMutation = useMutation({
@@ -430,7 +431,7 @@ export function AgentDetailPage() {
       setEditingInfo(false)
       toast.success('Agent updated')
     },
-    onError: () => toast.error('Failed to update agent'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update agent')),
   })
 
   const startEditInfo = () => {
@@ -455,7 +456,7 @@ export function AgentDetailPage() {
       setNewLocForm(emptyLocationForm())
       toast.success('Office added')
     },
-    onError: () => toast.error('Failed to add office'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to add office')),
   })
 
   const updateLocationMutation = useMutation({
@@ -467,7 +468,7 @@ export function AgentDetailPage() {
       setEditingLocationId(null)
       toast.success('Office updated')
     },
-    onError: () => toast.error('Failed to update office'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update office')),
   })
 
   const deleteLocationMutation = useMutation({
@@ -477,7 +478,7 @@ export function AgentDetailPage() {
       qc.invalidateQueries({ queryKey: ['agents'] })
       toast.success('Office deleted')
     },
-    onError: () => toast.error('Failed to delete office'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to delete office')),
   })
 
   const addContactMutation = useMutation({
@@ -490,7 +491,7 @@ export function AgentDetailPage() {
       setNewContactForm(emptyContactForm())
       toast.success('Contact added')
     },
-    onError: () => toast.error('Failed to add contact'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to add contact')),
   })
 
   const updateContactMutation = useMutation({
@@ -501,7 +502,7 @@ export function AgentDetailPage() {
       setEditingContact(null)
       toast.success('Contact updated')
     },
-    onError: () => toast.error('Failed to update contact'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update contact')),
   })
 
   const deleteContactMutation = useMutation({
@@ -512,7 +513,7 @@ export function AgentDetailPage() {
       qc.invalidateQueries({ queryKey: ['agents'] })
       toast.success('Contact deleted')
     },
-    onError: () => toast.error('Failed to delete contact'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to delete contact')),
   })
 
   const addCommissionMutation = useMutation({
@@ -530,7 +531,7 @@ export function AgentDetailPage() {
       setCommissionForm({ programConfigurationId: '', carrierId: '', lineOfBusiness: '', stateCode: '', rate: '', effectiveDate: '' })
       toast.success('Commission rate added')
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const disableCommissionMutation = useMutation({
@@ -539,7 +540,7 @@ export function AgentDetailPage() {
       qc.invalidateQueries({ queryKey: ['agent-commissions', id] })
       toast.success('Commission rate disabled')
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const toggleLob = (key: string) => {

@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { adminWorkflowsApi, adminSystemEventsApi, adminTaskTypesApi } from '@/api/admin.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import type { WorkflowTemplate, WorkflowStep, TaskEntityType } from '@/types/task.types'
 
 const ENTITY_TYPES: TaskEntityType[] = ['Submission', 'Policy', 'PolicyTransaction', 'Account']
@@ -15,7 +17,7 @@ export function WorkflowsAdminPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', description: '', isActive: true, triggerEventId: '', entityType: 'Submission' as TaskEntityType })
 
-  const { data: templates = [], isLoading } = useQuery({ queryKey: ['admin', 'workflows'], queryFn: adminWorkflowsApi.getAll })
+  const { data: templates = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['admin', 'workflows'], queryFn: adminWorkflowsApi.getAll })
   const { data: events = [] } = useQuery({ queryKey: ['admin', 'system-events'], queryFn: adminSystemEventsApi.getAll })
 
   const { mutate: create, isPending: creating } = useMutation({
@@ -24,16 +26,17 @@ export function WorkflowsAdminPage() {
       toast.success('Template created'); qc.invalidateQueries({ queryKey: ['admin', 'workflows'] })
       setShowCreate(false); setSelectedId(t.id)
     },
-    onError: () => toast.error('Create failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Create failed')),
   })
 
   const { mutate: remove } = useMutation({
     mutationFn: (id: string) => adminWorkflowsApi.delete(id),
     onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['admin', 'workflows'] }); if (selectedId) setSelectedId(null) },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Delete failed'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Delete failed')),
   })
 
   if (isLoading) return <LoadingSpinner />
+  if (isError) return <ErrorState error={error} onRetry={refetch} />
 
   return (
     <div className="p-6 space-y-5">
@@ -112,7 +115,7 @@ function StepEditor({ templateId }: { templateId: string }) {
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: () => adminWorkflowsApi.setSteps(templateId, displaySteps.map((s, i) => ({ ...s, stepOrder: i + 1 }))),
     onSuccess: () => { toast.success('Steps saved'); qc.invalidateQueries({ queryKey: ['admin', 'workflow', templateId] }); setSteps(null) },
-    onError: () => toast.error('Save failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
 
   function addStep() { setSteps([...displaySteps, { stepOrder: displaySteps.length + 1, taskTypeId: '', triggerCondition: '' }]) }

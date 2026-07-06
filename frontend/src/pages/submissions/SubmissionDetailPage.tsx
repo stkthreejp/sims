@@ -28,6 +28,7 @@ import { formatCurrency, parseDateOnly } from '@/lib/utils'
 import { DocumentsSection } from '@/components/documents/DocumentsSection'
 import { GenerateDocumentModal } from '@/components/documents/GenerateDocumentModal'
 import { usePermissions } from '@/hooks/usePermissions'
+import { getApiErrorMessage } from '@/lib/apiError'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -47,18 +48,6 @@ const LOB_SHORT: Record<string, string> = {
 }
 
 const getLobLabel = (lob: string) => LOB_LABELS[lob as PolicyLineOfBusiness] ?? lob
-
-function getSaveErrorMessage(err: any, fallback: string) {
-  const data = err?.response?.data
-  const errors = data?.errors
-  if (errors && typeof errors === 'object') {
-    const first = Object.entries(errors).flatMap(([field, messages]) =>
-      Array.isArray(messages) ? messages.map((m) => `${field}: ${m}`) : [`${field}: ${messages}`]
-    )[0]
-    if (first) return first
-  }
-  return data?.errorMessage ?? data?.detail ?? data?.title ?? fallback
-}
 
 const STATUS_PILL: Record<SubmissionStatus, string> = {
   New: 'new',
@@ -408,7 +397,7 @@ export function SubmissionDetailPage() {
     },
     onError: (e: any) => {
       qc.invalidateQueries({ queryKey: ['submission-outbound-communications'] })
-      toast.error(e?.response?.data?.errorMessage ?? 'Failed to send email')
+      toast.error(getApiErrorMessage(e, 'Failed to send email'))
     },
   })
 
@@ -594,7 +583,7 @@ export function SubmissionDetailPage() {
         toast.error('Extraction failed again — please fill in the fields manually below')
       }
     },
-    onError: () => toast.error('Re-extraction request failed'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Re-extraction request failed')),
   })
 
   const setLobsMutation = useMutation({
@@ -603,7 +592,7 @@ export function SubmissionDetailPage() {
       qc.invalidateQueries({ queryKey: ['submissions', id] })
       setShowLobEditor(false)
     },
-    onError: () => toast.error('Failed to update lines of business'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update lines of business')),
   })
 
   const updateSubmissionMutation = useMutation({
@@ -614,7 +603,7 @@ export function SubmissionDetailPage() {
       setSubmissionForm(null)
       toast.success('Submission updated')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to update submission'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to update submission')),
   })
 
   const evaluateClearanceMutation = useMutation({
@@ -624,7 +613,7 @@ export function SubmissionDetailPage() {
       setShowClearanceOverride(false)
       toast.success(result.overallStatus === 'Blocked' ? 'Clearance blocked' : 'Clearance evaluated')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to evaluate clearance'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to evaluate clearance')),
   })
 
   const overrideClearanceMutation = useMutation({
@@ -635,7 +624,7 @@ export function SubmissionDetailPage() {
       setClearanceOverrideReason('')
       toast.success('Clearance override recorded')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to override clearance'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to override clearance')),
   })
 
   const decideReferralMutation = useMutation({
@@ -647,7 +636,7 @@ export function SubmissionDetailPage() {
       setReferralDecisionNotes('')
       toast.success('Referral decision recorded')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to record referral decision'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to record referral decision')),
   })
 
   const createQuoteMutation = useMutation({
@@ -659,7 +648,7 @@ export function SubmissionDetailPage() {
       setQuoteForm(emptyQuoteForm())
       toast.success('Quote created')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to create quote'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to create quote')),
   })
 
   const deleteQuoteMutation = useMutation({
@@ -668,7 +657,7 @@ export function SubmissionDetailPage() {
       qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', id] })
       toast.success('Quote deleted')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to delete quote'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to delete quote')),
   })
 
   const saveDriverMutation = useMutation({
@@ -681,7 +670,7 @@ export function SubmissionDetailPage() {
       setShowDriverForm(false); setDriverForm(emptyDriverForm()); setEditingDriverId(null)
       toast.success('Driver saved')
     },
-    onError: () => toast.error('Failed to save driver'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save driver')),
   })
   const deleteDriverMutation = useMutation({
     mutationFn: (dId: string) => submissionDriversApi.delete(id!, dId),
@@ -698,7 +687,7 @@ export function SubmissionDetailPage() {
       setShowVehicleForm(false); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null)
       toast.success('Vehicle saved')
     },
-    onError: () => toast.error('Failed to save vehicle'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save vehicle')),
   })
   const deleteVehicleMutation = useMutation({
     mutationFn: (vId: string) => submissionVehiclesApi.delete(id!, vId),
@@ -715,7 +704,7 @@ export function SubmissionDetailPage() {
       setShowLocationForm(false); setLocationForm(emptyLocationForm()); setEditingLocationId(null)
       toast.success('Risk location saved')
     },
-    onError: (e: any) => toast.error(getSaveErrorMessage(e, 'Failed to save risk location')),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to save risk location')),
   })
   const deleteLocationMutation = useMutation({
     mutationFn: (locationId: string) => submissionLocationsApi.delete(id!, locationId),
@@ -735,7 +724,7 @@ export function SubmissionDetailPage() {
       setShowCarrierForm(false); setCarrierForm(emptyCarrierForm()); setEditingCarrierId(null)
       toast.success('Prior carrier saved')
     },
-    onError: () => toast.error('Failed to save prior carrier'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save prior carrier')),
   })
   const deletePriorCarrierMutation = useMutation({
     mutationFn: (cId: string) => submissionPriorCarriersApi.delete(id!, cId),
@@ -752,7 +741,7 @@ export function SubmissionDetailPage() {
       setShowAdditionalInterestForm(false); setAdditionalInterestForm(emptyAdditionalInterestForm()); setEditingAdditionalInterestId(null)
       toast.success('Additional interest saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Failed to save additional interest'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to save additional interest')),
   })
   const deleteAdditionalInterestMutation = useMutation({
     mutationFn: (aiId: string) => submissionAdditionalInterestsApi.delete(id!, aiId),
@@ -766,7 +755,7 @@ export function SubmissionDetailPage() {
       qc.invalidateQueries({ queryKey: ['submission-additional-interest-blankets', id] })
       toast.success('Blanket request saved')
     },
-    onError: () => toast.error('Failed to save blanket request'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save blanket request')),
   })
 
   const saveEquipmentMutation = useMutation({
@@ -787,7 +776,7 @@ export function SubmissionDetailPage() {
       setShowEquipmentForm(false); setEquipmentForm(emptyEquipmentForm()); setEditingEquipmentId(null)
       toast.success('Equipment saved')
     },
-    onError: (e: any) => toast.error(getSaveErrorMessage(e, 'Failed to save equipment')),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Failed to save equipment')),
   })
   const deleteEquipmentMutation = useMutation({
     mutationFn: (eId: string) => submissionIMApi.deleteEquipment(id!, eId),
@@ -806,7 +795,7 @@ export function SubmissionDetailPage() {
       setSupplementalDirty(false)
       toast.success('Supplemental info saved')
     },
-    onError: () => toast.error('Failed to save supplemental info'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save supplemental info')),
   })
 
   const saveGlCovMutation = useMutation({
@@ -816,7 +805,7 @@ export function SubmissionDetailPage() {
       setGlCovDirty(false)
       toast.success('GL coverages saved')
     },
-    onError: () => toast.error('Failed to save GL coverages'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save GL coverages')),
   })
 
   const saveGlClassMutation = useMutation({
@@ -829,7 +818,7 @@ export function SubmissionDetailPage() {
       setShowGlClassForm(false); setGlClassForm(emptyGlClassForm()); setEditingGlClassId(null)
       toast.success('GL exposure saved')
     },
-    onError: () => toast.error('Failed to save GL exposure'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save GL exposure')),
   })
   const deleteGlClassMutation = useMutation({
     mutationFn: (classId: string) => submissionGLApi.deleteClassification(id!, classId),

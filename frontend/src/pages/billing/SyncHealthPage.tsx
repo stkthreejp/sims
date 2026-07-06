@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { getRollups, triggerRollup, resyncRollup, getRollupDownloadUrl, getXeroStatus } from '@/api/rollup.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
 import type { RollupSummary, PendingJournalSync } from '@/types/rollup.types'
 import { useAuthStore } from '@/store/authStore'
@@ -153,7 +155,7 @@ function TriggerModal({ onClose, xeroConnected }: TriggerModalProps) {
       qc.invalidateQueries({ queryKey: ['xero-status'] })
       onClose()
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const years = Array.from({ length: 3 }, (_, i) => today.getFullYear() - i)
@@ -250,7 +252,7 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
       qc.invalidateQueries({ queryKey: ['rollups'] })
       qc.invalidateQueries({ queryKey: ['xero-status'] })
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e) => toast.error(getApiErrorMessage(e)),
   })
 
   const handleDownload = async () => {
@@ -259,7 +261,7 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
       const url = await getRollupDownloadUrl(rollup.id)
       window.open(url, '_blank')
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Download failed')
+      toast.error(getApiErrorMessage(e, 'Download failed'))
     } finally {
       setDownloading(false)
     }
@@ -339,7 +341,7 @@ export function SyncHealthPage() {
   const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false)
   const [showTrigger, setShowTrigger] = useState(false)
 
-  const { data: rollups = [], isLoading } = useQuery({
+  const { data: rollups = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['rollups'],
     queryFn: getRollups,
   })
@@ -407,7 +409,9 @@ export function SyncHealthPage() {
         </div>
       )}
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState error={error} onRetry={refetch} />
+      ) : isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner /></div>
       ) : rollups.length === 0 ? (
         <div className="text-center py-16" style={{ color: 'var(--ink-4)' }}>

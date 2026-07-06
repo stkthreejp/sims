@@ -9,6 +9,7 @@ import { policiesApi } from '@/api/policies.api'
 import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { proposalDocumentsApi } from '@/api/proposalDocuments.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { PolicyListItem } from '@/types/policy.types'
 import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageFormUpsert } from '@/types/policyForm.types'
@@ -187,12 +188,6 @@ function describeTriggerCondition(config: TriggerConfig) {
     ? (config.value ? 'Yes' : 'No')
     : config.value
   return `${field.label} ${operatorLabels[config.operator]} ${value}`
-}
-
-function getApiErrorMessage(e: any, fallback: string) {
-  const data = e?.response?.data
-  if (typeof data === 'string') return data
-  return data?.errorMessage ?? data?.message ?? data?.title ?? fallback
 }
 
 export function PolicyFormsAdminPage() {
@@ -408,7 +403,7 @@ export function PolicyFormsAdminPage() {
       setTemplateForm(emptyTemplate)
       toast.success('Policy form saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy form could not be saved'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Policy form could not be saved')),
   })
 
   const uploadTemplateFile = useMutation({
@@ -418,7 +413,7 @@ export function PolicyFormsAdminPage() {
       qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
       toast.success('Policy form file uploaded')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Policy form file could not be uploaded'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Policy form file could not be uploaded')),
   })
 
   const testMergeTemplate = useMutation({
@@ -427,7 +422,7 @@ export function PolicyFormsAdminPage() {
       window.open(data.url, '_blank', 'noopener,noreferrer')
       toast.success('Test merge created')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Test merge could not be created'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Test merge could not be created')),
   })
 
   const openTemplateFile = async (templateId: string) => {
@@ -435,7 +430,7 @@ export function PolicyFormsAdminPage() {
       const data = await policyFormsApi.getTemplateDownloadUrl(templateId)
       window.open(data.url, '_blank', 'noopener,noreferrer')
     } catch (e: any) {
-      toast.error(e?.response?.data?.errorMessage ?? 'Policy form file could not be opened')
+      toast.error(getApiErrorMessage(e, 'Policy form file could not be opened'))
     }
   }
 
@@ -453,7 +448,7 @@ export function PolicyFormsAdminPage() {
       setPackageRows([])
       toast.success('Package created')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Package could not be saved'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Package could not be saved')),
   })
 
   const savePackageRows = useMutation({
@@ -489,7 +484,7 @@ export function PolicyFormsAdminPage() {
       qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
       toast.success('Field mappings saved')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.errorMessage ?? 'Field mappings could not be saved'),
+    onError: (e: any) => toast.error(getApiErrorMessage(e, 'Field mappings could not be saved')),
   })
 
   const saveProposalDocument = useMutation({

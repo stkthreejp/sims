@@ -6,10 +6,11 @@ import { inboundEmailsApi } from '@/api/inboundEmails.api'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 
 export function InboxPage() {
   const navigate = useNavigate()
-  const { data: emails = [], isLoading } = useQuery({
+  const { data: emails = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['inbound-emails', 'unprocessed'],
     queryFn: inboundEmailsApi.getUnprocessed,
     refetchInterval: 60_000,
@@ -23,7 +24,9 @@ export function InboxPage() {
       </div>
 
       <div className="subs-table-card">
-        {isLoading ? (
+        {isError ? (
+          <ErrorState error={error} onRetry={refetch} />
+        ) : isLoading ? (
           <LoadingSpinner />
         ) : emails.length === 0 ? (
           <EmptyState icon={Inbox} title="No unprocessed emails" description="New submission emails will appear here." />

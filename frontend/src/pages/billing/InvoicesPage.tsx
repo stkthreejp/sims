@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { StatusBadge } from '@/components/common/StatusBadge'
+import { ErrorState } from '@/components/common/ErrorState'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { CreateInvoiceRequest, InvoiceDetail } from '@/types/invoice.types'
 
@@ -41,7 +43,7 @@ function NewInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const { mutate, isPending } = useMutation({
     mutationFn: () => createInvoice(form),
     onSuccess: (inv) => { toast.success(`Invoice ${inv.invoiceNumber} posted`); onCreated(inv) },
-    onError: () => toast.error('Failed to create invoice'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to create invoice')),
   })
   const set = (field: keyof CreateInvoiceRequest, value: unknown) => setForm(f => ({ ...f, [field]: value }))
 
@@ -291,7 +293,7 @@ export function InvoicesPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [showNew, setShowNew] = useState(false)
 
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data: invoices = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['billing', 'invoices'],
     queryFn: getInvoices,
   })
@@ -305,6 +307,26 @@ export function InvoicesPage() {
 
   if (selectedId !== null) {
     return <InvoiceDetailView id={selectedId} onBack={() => setSelectedId(null)} />
+  }
+
+  if (isError) {
+    return (
+      <div className="subs-wrap">
+        <header className="subs-page-head">
+          <div>
+            <h1 className="subs-h1">Invoices</h1>
+            <div className="subs-sub">Couldn't load</div>
+          </div>
+          <button onClick={() => setShowNew(true)} className="sd-btn primary">
+            <Plus size={14} /> New Invoice
+          </button>
+        </header>
+        <ErrorState error={error} onRetry={refetch} />
+        {showNew && (
+          <NewInvoiceModal onClose={() => setShowNew(false)} onCreated={handleCreated} />
+        )}
+      </div>
+    )
   }
 
   const today = new Date(); today.setHours(0, 0, 0, 0)

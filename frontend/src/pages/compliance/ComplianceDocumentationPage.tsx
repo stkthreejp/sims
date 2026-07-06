@@ -5,8 +5,10 @@ import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileCheck2,
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
+import { getApiErrorMessage } from '@/lib/apiError'
 import { DOCUMENT_CATEGORIES, DOCUMENT_STATUS, DOCUMENT_STATUS_LIST } from '@/constants/compliance'
 import { useDebounce } from '@/hooks/useDebounce'
 import { formatDate } from '@/lib/utils'
@@ -38,6 +40,7 @@ export function ComplianceDocumentationPage() {
       search: debouncedSearch.trim() || undefined,
     }),
   })
+  const { isError: documentsError, error: documentsErrorObj, refetch: refetchDocuments } = documentsQuery
 
   const createMutation = useMutation({
     mutationFn: () => complianceDocumentsApi.create({
@@ -53,7 +56,7 @@ export function ComplianceDocumentationPage() {
       toast.success('Compliance document created')
       navigate(`/compliance-documentation/${document.id}`)
     },
-    onError: () => toast.error('Could not create compliance document'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Could not create compliance document')),
   })
 
   const documents = useMemo(() => documentsQuery.data ?? [], [documentsQuery.data])
@@ -139,7 +142,9 @@ export function ComplianceDocumentationPage() {
           </label>
         </div>
 
-        {documentsQuery.isLoading ? (
+        {documentsError ? (
+          <div className="p-6"><ErrorState error={documentsErrorObj} onRetry={refetchDocuments} /></div>
+        ) : documentsQuery.isLoading ? (
           <div className="p-8"><LoadingSpinner /></div>
         ) : filteredDocuments.length === 0 ? (
           <div className="p-6">
