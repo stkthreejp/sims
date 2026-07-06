@@ -1270,11 +1270,15 @@ export function QuoteDetailPage() {
   const canBind = bindUnavailableReason == null
   const showBindAction = quote.status !== 'Bound' && quote.status !== 'Declined' && quote.status !== 'Cancelled' && quote.status !== 'Expired'
 
-  // Commission: show the rated premium basis when a rating snapshot exists.
+  // Commission: show the rated premium basis when a rating snapshot exists. When a
+  // give-back override is present the server-provided amounts are authoritative — they
+  // diverge from the recompute — so prefer them and fall back to the computed values.
   const agentCommRate = quote.commissionOverride?.agentRate ?? quote.agentCommissionRate
   const agentCommAmt = quote.commissionOverride?.agentCommissionAmount ?? ratedTotalPremium * agentCommRate
-  const carrierCommAmt = ratedTotalPremium * quote.carrierCommissionRate
-  const smmRetentionAmt = ratedTotalPremium * quote.smmRetentionRate
+  const carrierCommRate = quote.commissionOverride?.carrierRate ?? quote.carrierCommissionRate
+  const carrierCommAmt = quote.commissionOverride?.carrierCommissionAmount ?? ratedTotalPremium * quote.carrierCommissionRate
+  const smmRetentionRate = quote.commissionOverride?.smmRate ?? quote.smmRetentionRate
+  const smmRetentionAmt = quote.commissionOverride?.smmRetentionAmount ?? ratedTotalPremium * quote.smmRetentionRate
 
   const ratedEquipmentValues = ratingSnapshot?.lines
     .map((line) => parseLineInputs(line.inputs)?.value)
@@ -2022,8 +2026,8 @@ export function QuoteDetailPage() {
               <div className="px-4 py-3">
                 <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-4)' }}>Commission split</h3>
                 {[
-                  { label: 'Carrier commission', rate: quote.carrierCommissionRate, amt: carrierCommAmt },
-                  { label: 'SMM retention', rate: quote.smmRetentionRate, amt: smmRetentionAmt },
+                  { label: 'Carrier commission', rate: carrierCommRate, amt: carrierCommAmt },
+                  { label: 'SMM retention', rate: smmRetentionRate, amt: smmRetentionAmt },
                   { label: 'Agent commission', rate: agentCommRate, amt: agentCommAmt },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--line-2)' }}>

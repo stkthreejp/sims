@@ -6,6 +6,8 @@ export interface InvoiceSummary {
   grossPremium: number
   totalFees: number
   totalAmount: number
+  openBalance: number
+  dueDate: string
   status: string
   policyTransactionId: string | null
   policyTransactionNumber: string | null

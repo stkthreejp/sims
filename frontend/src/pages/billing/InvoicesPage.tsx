@@ -339,10 +339,10 @@ export function InvoicesPage() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const daysOld = (dateStr: string) => Math.floor((today.getTime() - parseDateOnly(dateStr).getTime()) / 86400000)
 
-  const posted = invoices.filter(i => i.status === 'Posted')
-  const outstanding = posted.reduce((s, i) => s + i.totalAmount, 0)
-  const pastDue = posted.filter(i => daysOld(i.invoiceDate) > 30)
-  const pastDueAmount = pastDue.reduce((s, i) => s + i.totalAmount, 0)
+  const open = invoices.filter(i => i.status === 'Posted' || i.status === 'PartiallyPaid')
+  const outstanding = open.reduce((s, i) => s + i.openBalance, 0)
+  const pastDue = open.filter(i => i.openBalance > 0 && daysOld(i.dueDate) > 0)
+  const pastDueAmount = pastDue.reduce((s, i) => s + i.openBalance, 0)
   const totalBilled = invoices.reduce((s, i) => s + i.totalAmount, 0)
 
   return (
@@ -372,10 +372,10 @@ export function InvoicesPage() {
           <div className="sd-metric accent">
             <div className="k">Outstanding</div>
             <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(outstanding)}</div>
-            <div className="s">{posted.length} posted invoice{posted.length !== 1 ? 's' : ''}</div>
+            <div className="s">{open.length} open invoice{open.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="sd-metric" style={pastDue.length > 0 ? { background: 'var(--bad-bg)', borderColor: 'var(--bad-fg)' } : {}}>
-            <div className="k" style={pastDue.length > 0 ? { color: 'var(--bad-fg)' } : {}}>Past Due (30d+)</div>
+            <div className="k" style={pastDue.length > 0 ? { color: 'var(--bad-fg)' } : {}}>Past Due</div>
             <div className="v" style={{ fontVariantNumeric: 'tabular-nums', ...(pastDue.length > 0 ? { color: 'var(--bad-fg)' } : {}) }}>
               {pastDue.length > 0 ? fmt.format(pastDueAmount) : '—'}
             </div>
@@ -440,10 +440,11 @@ export function InvoicesPage() {
                 </tr>
               )}
               {invoices.map(inv => {
-                const age = daysOld(inv.invoiceDate)
-                const rowBg = inv.status === 'Posted' && age > 30
+                const overdueDays = daysOld(inv.dueDate)
+                const isOpen = inv.openBalance > 0 && inv.status !== 'Paid'
+                const rowBg = isOpen && overdueDays > 0
                   ? 'var(--bad-bg)'
-                  : inv.status === 'Posted' && age > 15
+                  : isOpen && overdueDays > -15
                     ? 'var(--warn-bg)'
                     : undefined
                 return (

@@ -340,6 +340,7 @@ export function IntermediariesAdminPage() {
     if (!carrierOptions.some((carrier) => carrier.id === setupForm.carrierId)) { toast.error('Carrier is not active for this program/date'); return }
     if (setupForm.lineOfBusiness && !lobOptions.some((lob) => lob.lineOfBusiness === setupForm.lineOfBusiness)) { toast.error('LOB is not active for this program/carrier/date'); return }
     if (!setupForm.effectiveDate) { toast.error('Effective date is required'); return }
+    if (setupForm.brokerageRate && Number(setupForm.brokerageRate) > 1) { toast.error('Enter brokerage rate as a decimal, e.g. 0.075 for 7.5%'); return }
     if (setupForm.createPayable && !setupForm.payablePayeeId) { toast.error('Payable payee is required'); return }
     saveSetupMutation.mutate()
   }

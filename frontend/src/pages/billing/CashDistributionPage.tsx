@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly } from '@/lib/utils'
+import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
 import type { NettedPayee, BatchSummary } from '@/types/cashDistribution.types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
@@ -403,7 +404,9 @@ function BatchList() {
       )}
 
       {/* Mark Executed modal */}
-      {showExecuteModal !== null && (
+      {showExecuteModal !== null && (() => {
+        const executeBatch = batches.find((b) => b.id === showExecuteModal)
+        return (
         <div className="sims-modal-backdrop">
           <div className="sims-modal">
             <div className="sims-modal-head">
@@ -411,6 +414,32 @@ function BatchList() {
               <button onClick={() => { setShowExecuteModal(null); setBankRef('') }} className="sims-modal-close">&times;</button>
             </div>
             <div className="sims-modal-body">
+              {executeBatch && (
+                <div style={{
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--line-2)',
+                  borderRadius: 'var(--r-lg)',
+                  padding: '10px 14px',
+                  marginBottom: 14,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  fontSize: 13,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--ink-3)' }}>Batch</span>
+                    <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{executeBatch.batchNumber}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--ink-3)' }}>Wires · Instructions</span>
+                    <span style={{ color: 'var(--ink-2)' }}>{executeBatch.totalWires} · {executeBatch.totalInstructions}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--ink-3)' }}>Total</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(executeBatch.totalAmount)}</span>
+                  </div>
+                </div>
+              )}
               <p style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 14 }}>
                 This will post a sweep journal entry to the ledger for each instruction in the batch,
                 reducing the Trust account and clearing the payable liabilities.
@@ -443,7 +472,8 @@ function BatchList() {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -461,6 +491,7 @@ export function CashDistributionPage() {
         <PageHeader
           title="Cash Distribution"
           subtitle="Pending wire instructions netted by destination · Execute as batch · Mark bank confirmations"
+          action={<CashBalanceBadge />}
         />
       </div>
 

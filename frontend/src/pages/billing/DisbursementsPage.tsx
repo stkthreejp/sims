@@ -15,6 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
+import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { OpenPayable, AgingRow } from '@/types/disbursement.types'
@@ -64,6 +65,8 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
   const [notes, setNotes] = useState('')
 
   const totalAmount = Object.entries(amounts).reduce((s, [, v]) => s + (parseFloat(v) || 0), 0)
+  const isLineOver = (p: OpenPayable) => (parseFloat(amounts[p.id] ?? '0') || 0) > p.balance
+  const hasOverLine = payables.some(isLineOver)
 
   const createMutation = useMutation({
     mutationFn: createDisbursement,
@@ -81,6 +84,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
       .map((p) => ({ payableId: p.id, amount: parseFloat(amounts[p.id] ?? '0') || 0 }))
       .filter((l) => l.amount > 0)
     if (lines.length === 0) { toast.error('Enter an amount for at least one payable'); return }
+    if (hasOverLine) { toast.error('An amount exceeds the payable balance'); return }
     createMutation.mutate({ lines, paymentDate, paymentMethod, reference: reference || undefined, notes: notes || undefined })
   }
 
@@ -121,7 +125,10 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
                           type="number" step="0.01" min="0" max={p.balance}
                           value={amounts[p.id] ?? ''}
                           onChange={(e) => setAmounts((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                          style={{ ...inputStyle, width: 110, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                          style={{
+                            ...inputStyle, width: 110, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12,
+                            ...(isLineOver(p) ? { borderColor: 'var(--bad-fg)', color: 'var(--bad-fg)', background: 'var(--bad-bg)' } : {}),
+                          }}
                         />
                       </td>
                     </tr>
@@ -165,7 +172,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
           <button className="sd-btn outline" onClick={onClose}>Cancel</button>
           <button
             className="sd-btn primary"
-            disabled={createMutation.isPending || totalAmount <= 0}
+            disabled={createMutation.isPending || totalAmount <= 0 || hasOverLine}
             onClick={handleSubmit}
           >
             <DollarSign style={{ width: 13, height: 13 }} />
@@ -525,11 +532,12 @@ export function DisbursementsPage() {
 
   return (
     <div className="subs-wrap">
-      <div className="subs-page-head" style={{ marginBottom: 16 }}>
+      <div className="subs-page-head" style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <PageHeader
           title="Carrier Disbursements"
           subtitle="Payable aging by carrier · check run selection · ledger posting"
         />
+        <CashBalanceBadge />
       </div>
 
       <div className="sd-tabs" style={{ marginBottom: 20 }}>

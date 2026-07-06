@@ -316,6 +316,10 @@ export function FeesAdminPage() {
   const programScopeMissingLob = !!selectedProgram && !!form.stateCode && !form.lineOfBusiness
   const incompleteProgramScope = programScopeMissingCarrier || programScopeMissingLob
 
+  const premiumChargeAmountMissing =
+    (premiumChargeForm.chargeMethod === 'PerInterest' && !(Number(premiumChargeForm.perInterestAmount) > 0)) ||
+    (premiumChargeForm.chargeMethod === 'BlanketFlat' && !(Number(premiumChargeForm.blanketAmount) > 0))
+
   // ── VERSION EDITOR (shared by new + edit) ──────────────────────────────────
   const VersionEditor = (
     <div className="border rounded-lg flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)', background: 'var(--surface)', borderColor: 'var(--line)' }}>
@@ -800,7 +804,15 @@ export function FeesAdminPage() {
                 </label>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => savePremiumCharge()} disabled={savingPremiumCharge} className="sd-btn primary px-4 py-1.5 text-xs disabled:opacity-50">
+                <button
+                  onClick={() => {
+                    if (premiumChargeForm.chargeMethod === 'PerInterest' && !(Number(premiumChargeForm.perInterestAmount) > 0)) { toast.error('Per Interest Amount is required and must be greater than 0 for this charge method'); return }
+                    if (premiumChargeForm.chargeMethod === 'BlanketFlat' && !(Number(premiumChargeForm.blanketAmount) > 0)) { toast.error('Blanket Amount is required and must be greater than 0 for this charge method'); return }
+                    savePremiumCharge()
+                  }}
+                  disabled={savingPremiumCharge || premiumChargeAmountMissing}
+                  className="sd-btn primary px-4 py-1.5 text-xs disabled:opacity-50"
+                >
                   {savingPremiumCharge ? 'Saving...' : 'Save Premium Charge'}
                 </button>
                 <button onClick={() => { setShowPremiumChargeForm(false); setEditingPremiumChargeId(null); setPremiumChargeForm(emptyPremiumChargeForm()) }} className="sd-btn outline px-4 py-1.5 text-xs">Cancel</button>

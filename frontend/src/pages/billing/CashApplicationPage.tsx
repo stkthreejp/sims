@@ -21,12 +21,14 @@ interface GridRow {
   commissionRate: number
 }
 
+// Round commission to cents (2dp) so the posted JE matches the 2-decimal display
+// and payload stay consistent (audit B10). Net is derived from the rounded commission.
 function rowCommission(row: GridRow): number {
-  return Math.round(row.grossApplied * (row.commissionRate / 100) * 10000) / 10000
+  return Math.round(row.grossApplied * (row.commissionRate / 100) * 100) / 100
 }
 
 function rowNet(row: GridRow): number {
-  return Math.round((row.grossApplied - rowCommission(row)) * 10000) / 10000
+  return Math.round((row.grossApplied - rowCommission(row)) * 100) / 100
 }
 
 // ---------- Reconciliation Grid ----------
@@ -96,6 +98,7 @@ function ReconciliationGrid({ rows, onChange }: ReconciliationGridProps) {
             const commission = rowCommission(row)
             const net = rowNet(row)
             const isOver = row.grossApplied > row.invoice.openBalance + 0.005
+            const zeroCommission = row.commissionRate === 0
             return (
               <tr key={row.invoice.id} style={{ background: isOver ? 'var(--bad-bg)' : undefined, cursor: 'default' }}>
                 <td className="id">{row.invoice.invoiceNumber}</td>
@@ -117,6 +120,11 @@ function ReconciliationGrid({ rows, onChange }: ReconciliationGridProps) {
                     value={row.commissionRate}
                     onChange={e => updateRow(idx, { commissionRate: parseFloat(e.target.value) || 0 })}
                   />
+                  {zeroCommission && (
+                    <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3, fontSize: 11, color: 'var(--warn-fg)', marginTop: 2 }}>
+                      <AlertCircle style={{ width: 11, height: 11 }} /> 0% — carrier gets 100%
+                    </p>
+                  )}
                 </td>
                 <td className="num" style={{ color: 'var(--warn-fg)' }}>{fmt.format(commission)}</td>
                 <td className="num primary-cell">{fmt.format(net)}</td>

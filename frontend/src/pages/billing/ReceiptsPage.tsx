@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, ArrowLeft, ChevronRight, Banknote } from 'lucide-react'
 import { toast } from 'sonner'
@@ -92,6 +93,7 @@ function NewReceiptModal({ onClose, onCreated }: { onClose: () => void; onCreate
 // ---------- Receipt Detail ----------
 
 function ReceiptDetailView({ id, onBack }: { id: number; onBack: () => void }) {
+  const navigate = useNavigate()
   const { data: receipt, isLoading } = useQuery({
     queryKey: ['billing', 'receipts', id],
     queryFn: () => getReceipt(id),
@@ -113,6 +115,12 @@ function ReceiptDetailView({ id, onBack }: { id: number; onBack: () => void }) {
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>{receipt.receiptNumber}</h2>
           <StatusBadge status={RECEIPT_PILL[receipt.status] ?? 'draft'} label={RECEIPT_LABEL[receipt.status] ?? receipt.status} />
         </div>
+        {receipt.status !== 'Voided' && remaining > 0 && (
+          <button className="sd-btn primary" onClick={() => navigate('/billing/cash-application')}>
+            <Banknote style={{ width: 13, height: 13 }} />
+            Apply Cash
+          </button>
+        )}
       </div>
 
       <div className="sd-metrics" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 20 }}>

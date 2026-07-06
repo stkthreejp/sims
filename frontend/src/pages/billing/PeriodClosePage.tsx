@@ -12,7 +12,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
 import type { AccountingPeriod, ChecklistItem } from '@/types/periodClose.types'
-import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
 
 const MONTH_NAMES = [
   '', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -92,6 +92,7 @@ function PeriodPanel({ period, isAdmin }: PeriodPanelProps) {
   const qc = useQueryClient()
 
   const isClosed = period.status === 'Closed'
+  const reopenReasonValid = reopenReason.trim().length > 0
 
   // Auto-evaluate close readiness when a period is opened (PeriodPanel is keyed per
   // period, so this remounts on select) instead of gating Close on a manually-
@@ -127,7 +128,7 @@ function PeriodPanel({ period, isAdmin }: PeriodPanelProps) {
   })
 
   const reopenMutation = useMutation({
-    mutationFn: () => reopenPeriod(period.id, reopenReason || undefined),
+    mutationFn: () => reopenPeriod(period.id, reopenReason.trim()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['periods'] })
       qc.invalidateQueries({ queryKey: ['period-checklist', period.id] })
@@ -258,13 +259,13 @@ function PeriodPanel({ period, isAdmin }: PeriodPanelProps) {
                 rows={2}
                 value={reopenReason}
                 onChange={(e) => setReopenReason(e.target.value)}
-                placeholder="Reason for reopening (optional)…"
+                placeholder="Reason for reopening…"
                 className="sd-input w-full px-3 py-2 text-sm"
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => reopenMutation.mutate()}
-                  disabled={reopenMutation.isPending}
+                  disabled={reopenMutation.isPending || !reopenReasonValid}
                   className="sd-btn primary px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   {reopenMutation.isPending ? 'Reopening…' : 'Confirm Reopen'}
@@ -287,7 +288,7 @@ function PeriodPanel({ period, isAdmin }: PeriodPanelProps) {
 // ---------- Main Page ----------
 
 export function PeriodClosePage() {
-  const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false)
+  const { canAdminAccounting: isAdmin } = usePermissions()
   const qc = useQueryClient()
   const today = new Date()
   const [selectedId, setSelectedId] = useState<number | null>(null)

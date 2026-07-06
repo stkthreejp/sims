@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
 import type { ActivityEvent, ActivityFilter } from '@/types/activity.types'
-import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDateTime = (s: string) =>
@@ -50,6 +50,7 @@ interface VoidModalProps {
 function VoidModal({ event, onClose, onVoided }: VoidModalProps) {
   const qc = useQueryClient()
   const [reason, setReason] = useState('')
+  const reasonValid = reason.trim().length > 0
 
   const voidFn = (id: number, r?: string) => {
     switch (event.sourceType) {
@@ -62,7 +63,7 @@ function VoidModal({ event, onClose, onVoided }: VoidModalProps) {
   }
 
   const mutation = useMutation({
-    mutationFn: () => voidFn(event.sourceId, reason || undefined),
+    mutationFn: () => voidFn(event.sourceId, reason.trim()),
     onSuccess: () => {
       toast.success(`${event.sourceNumber} voided successfully`)
       qc.invalidateQueries({ queryKey: ['activity'] })
@@ -98,7 +99,7 @@ function VoidModal({ event, onClose, onVoided }: VoidModalProps) {
             This action cannot be undone.
           </p>
           <label className="sims-field">
-            <span className="sims-field-label">Reason (optional)</span>
+            <span className="sims-field-label">Reason</span>
             <textarea
               rows={3}
               value={reason}
@@ -111,7 +112,7 @@ function VoidModal({ event, onClose, onVoided }: VoidModalProps) {
         </div>
         <div className="sims-modal-foot">
           <button className="sd-btn outline" onClick={onClose}>Cancel</button>
-          <button className="sd-btn danger" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          <button className="sd-btn danger" onClick={() => mutation.mutate()} disabled={mutation.isPending || !reasonValid}>
             {mutation.isPending ? 'Voiding…' : 'Confirm Void'}
           </button>
         </div>
@@ -129,8 +130,7 @@ interface DrawerProps {
 }
 
 function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
-  const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false)
-
+  const { canAdminAccounting } = usePermissions()
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -244,7 +244,7 @@ function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
         {/* Actions */}
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div />
-          {event.postingStatus === 'Posted' && (
+          {event.postingStatus === 'Posted' && canAdminAccounting && (
             event.canVoid ? (
               <button
                 className="sd-btn danger"

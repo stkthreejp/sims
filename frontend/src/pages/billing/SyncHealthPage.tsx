@@ -11,8 +11,8 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { RollupSummary, PendingJournalSync } from '@/types/rollup.types'
-import { useAuthStore } from '@/store/authStore'
 
 const MONTH_NAMES = [
   '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -243,6 +243,7 @@ function TriggerModal({ onClose, xeroConnected }: TriggerModalProps) {
 
 function RollupRow({ rollup }: { rollup: RollupSummary }) {
   const qc = useQueryClient()
+  const { canAdminAccounting } = usePermissions()
   const [downloading, setDownloading] = useState(false)
 
   const resyncMutation = useMutation({
@@ -254,6 +255,21 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
     },
     onError: (e) => toast.error(getApiErrorMessage(e)),
   })
+
+  const handleResync = () => {
+    // Failed rollups may resync freely; a non-Failed rollup is already Posted/Exported,
+    // so re-exporting it risks duplicate posting — require an explicit confirmation.
+    if (
+      rollup.status !== 'Failed' &&
+      !window.confirm(
+        `${MONTH_NAMES[rollup.periodMonth]} ${rollup.periodYear} is already ${rollup.status}. ` +
+        `Resyncing will re-export an already-posted rollup, which may create duplicate journal entries. Continue?`
+      )
+    ) {
+      return
+    }
+    resyncMutation.mutate()
+  }
 
   const handleDownload = async () => {
     setDownloading(true)
@@ -319,16 +335,18 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
               CSV
             </button>
           )}
-          <button
-            onClick={() => resyncMutation.mutate()}
-            disabled={resyncMutation.isPending}
-            title="Re-export this rollup"
-            className="flex items-center gap-1 text-xs border rounded px-2 py-1 disabled:opacity-50"
-            style={{ color: 'var(--ink-3)', borderColor: 'var(--line)' }}
-          >
-            <RefreshCw className={`h-3 w-3 ${resyncMutation.isPending ? 'animate-spin' : ''}`} />
-            Resync
-          </button>
+          {canAdminAccounting && (
+            <button
+              onClick={handleResync}
+              disabled={resyncMutation.isPending}
+              title="Re-export this rollup"
+              className="flex items-center gap-1 text-xs border rounded px-2 py-1 disabled:opacity-50"
+              style={{ color: 'var(--ink-3)', borderColor: 'var(--line)' }}
+            >
+              <RefreshCw className={`h-3 w-3 ${resyncMutation.isPending ? 'animate-spin' : ''}`} />
+              Resync
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -338,7 +356,7 @@ function RollupRow({ rollup }: { rollup: RollupSummary }) {
 // ---------- Main Page ----------
 
 export function SyncHealthPage() {
-  const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false)
+  const { isAdmin } = usePermissions()
   const [showTrigger, setShowTrigger] = useState(false)
 
   const { data: rollups = [], isLoading, isError, error, refetch } = useQuery({
