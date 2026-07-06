@@ -16,6 +16,7 @@ type Props = {
 export function GenerateDocumentModal({ entityType, entityId, attachmentEntityType, attachmentEntityId, onClose }: Props) {
   const qc = useQueryClient()
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
   const storageEntityType = attachmentEntityType ?? storageEntityForTemplate(entityType)
   const storageEntityId = attachmentEntityId ?? entityId
   const documentTypes = storageEntityType ? DOCUMENT_TYPES_BY_ENTITY[storageEntityType] : []
@@ -34,9 +35,11 @@ export function GenerateDocumentModal({ entityType, entityId, attachmentEntityTy
         qc.invalidateQueries({ queryKey: ['attachments', storageEntityType, storageEntityId] })
       }
       qc.invalidateQueries({ queryKey: ['quote-attachments', storageEntityId] })
-      window.open(data.url, '_blank', 'noopener,noreferrer')
+      // Don't auto-window.open here — browsers block popups opened from an async
+      // callback, so the doc silently fails to open and users regenerate duplicates.
+      // Show a success state with a user-clicked link instead (audit O16).
+      setGeneratedUrl(data.url)
       toast.success('Document generated and saved')
-      onClose()
     },
     onError: (e: any) =>
       toast.error(e?.response?.data?.errorMessage ?? 'Failed to generate document'),
@@ -55,6 +58,29 @@ export function GenerateDocumentModal({ entityType, entityId, attachmentEntityTy
           </button>
         </div>
 
+        {generatedUrl ? (
+          <>
+            <div className="sims-modal-body space-y-3">
+              <p style={{ margin: 0, fontSize: 'var(--fs-body)', color: 'var(--ink-2)' }}>
+                Document generated and saved to the entity's files.
+              </p>
+              <a
+                href={generatedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sd-btn primary sm"
+                style={{ display: 'inline-flex', textDecoration: 'none' }}
+              >
+                <FileText size={14} strokeWidth={1.7} />
+                Open document
+              </a>
+            </div>
+            <div className="sims-modal-foot">
+              <button onClick={onClose} className="sd-btn outline sm">Done</button>
+            </div>
+          </>
+        ) : (
+        <>
         <div className="sims-modal-body space-y-4">
           <div>
             <label className="sims-field-label">Template *</label>
@@ -110,6 +136,8 @@ export function GenerateDocumentModal({ entityType, entityId, attachmentEntityTy
             Generate
           </button>
         </div>
+        </>
+        )}
       </div>
     </div>
   )

@@ -1,3 +1,5 @@
+import { usePageTitle } from '@/hooks/usePageTitle'
+
 interface PageHeaderProps {
   title: string
   subtitle?: string
@@ -5,6 +7,7 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, subtitle, action }: PageHeaderProps) {
+  usePageTitle(title)
   return (
     <div className="flex items-start justify-between" style={{ marginBottom: 18 }}>
       <div>

@@ -108,7 +108,7 @@ export function QuoteAutoSafetyPanel({ quoteId }: Props) {
   if (isError || !data) {
     const message = getLoadErrorMessage(error)
     return (
-      <div style={{ padding: '14px 16px', borderBlock: '1px solid #f3c6be', borderLeft: '4px solid #b33a2a', background: 'var(--surface)', color: 'var(--bad-fg)', fontSize: 'var(--fs-body)' }}>
+      <div style={{ padding: '14px 16px', borderBlock: '1px solid var(--danger-border)', borderLeft: '4px solid var(--error-border)', background: 'var(--surface)', color: 'var(--bad-fg)', fontSize: 'var(--fs-body)' }}>
         <div style={{ fontWeight: 600 }}>Auto safety profile could not be loaded.</div>
         <div style={{ marginTop: 4, color: 'var(--bad-fg)' }}>{message}</div>
       </div>

@@ -58,6 +58,15 @@
   --accent-border: #cfe0ef;
   --error-border:  #b33a2a;
 
+  /* Soft status tints — previously referenced only as var(--x-soft, #hex) fallbacks
+     (phantom tokens that always shipped the literal). Defined here so they resolve
+     to the same values instead (audit G3). */
+  --good-soft:   #f0fdf4;
+  --green-soft:  #f0fdf4;
+  --yellow-soft: #fefce8;
+  --warn-soft:   #fffbeb;
+  --red-soft:    #fef2f2;
+
   /* Success action */
   --success-bg:    #1b8754;
   --success-hover: #15643f;
@@ -490,7 +499,6 @@
 .sd-pill.quoted    { background: var(--pill-quoted-bg);   color: var(--pill-quoted-fg); }
 .sd-pill.bound     { background: var(--pill-bound-bg);    color: var(--pill-bound-fg); }
 .sd-pill.declined  { background: var(--pill-declined-bg); color: var(--pill-declined-fg); }
-.sd-pill.cancelled { background: var(--pill-declined-bg); color: var(--pill-declined-fg); }
 .sd-pill.expired   { background: var(--pill-draft-bg);    color: var(--pill-draft-fg); }
 .sd-pill.withdrawn  { background: var(--pill-draft-bg);    color: var(--pill-draft-fg); }
 .sd-pill.active     { background: var(--pill-bound-bg);    color: var(--pill-bound-fg); }
@@ -601,7 +609,7 @@
 .sd-quote:last-child { border-bottom: 0; }
 .sd-quote:hover { background: var(--hover); }
 .sd-quote:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
   background: var(--surface);
   box-shadow: inset 3px 0 0 var(--accent);
@@ -680,7 +688,7 @@
 .sd-metric .k, .subs-metric .k { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 4px; }
 .sd-metric .v, .subs-metric .v { font-size: 20px; font-weight: 600; letter-spacing: -.015em; line-height: 1; font-variant-numeric: tabular-nums; }
 .sd-metric .s, .subs-metric .s { color: var(--ink-3); font-size: 11.5px; margin-top: 5px; }
-.sd-metric.accent, .subs-metric.accent { background: var(--accent-soft); border-color: #cfe0ef; }
+.sd-metric.accent, .subs-metric.accent { background: var(--accent-soft); border-color: var(--accent-border); }
 .sd-metric.accent .v, .subs-metric.accent .v { color: var(--accent-ink); }
 .sd-metric.accent .k, .subs-metric.accent .k { color: var(--accent-ink); opacity: .75; }
 
