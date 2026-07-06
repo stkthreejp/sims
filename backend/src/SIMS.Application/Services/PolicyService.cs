@@ -229,6 +229,8 @@ public class PolicyService : IPolicyService
                 i.GrossPremium,
                 i.TotalFees,
                 i.TotalAmount,
+                i.TotalAmount - i.ClearedAmount,
+                i.InvoiceDate.AddDays(30),
                 i.Status,
                 i.PolicyTransactionId,
                 transaction.TransactionNumber,

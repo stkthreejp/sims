@@ -3086,6 +3086,8 @@ public class PolicyLifecycleRegressionTests
                 req.GrossPremium,
                 0m,
                 req.GrossPremium,
+                req.GrossPremium,
+                DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30),
                 "Posted",
                 req.PolicyTransactionId,
                 null,
