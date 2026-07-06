@@ -262,7 +262,7 @@ export function SubmissionCreatePage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate(insuredIdParam ? `/insureds/${insuredIdParam}` : '/insureds')}
+            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(insuredIdParam ? `/insureds/${insuredIdParam}` : '/submissions'))}
             className="px-4 py-2 border rounded-md text-sm hover:bg-slate-50"
           >
             Cancel

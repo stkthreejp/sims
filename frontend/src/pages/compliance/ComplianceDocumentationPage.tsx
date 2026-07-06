@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileCheck2, FileText, Plus, Search } from 'lucide-react'
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, FileCheck2, FileText, Plus, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -25,6 +25,7 @@ export function ComplianceDocumentationPage() {
   const [category, setCategory] = useState(ALL)
   const [search, setSearch] = useState('')
   const [metricFilter, setMetricFilter] = useState<MetricFilter>('All')
+  const [createOpen, setCreateOpen] = useState(false)
   const debouncedSearch = useDebounce(search, 300)
 
   const summaryQuery = useQuery({
@@ -43,17 +44,18 @@ export function ComplianceDocumentationPage() {
   const { isError: documentsError, error: documentsErrorObj, refetch: refetchDocuments } = documentsQuery
 
   const createMutation = useMutation({
-    mutationFn: () => complianceDocumentsApi.create({
-      title: 'Untitled Compliance Document',
-      category: 'IT',
+    mutationFn: (input: { title: string; category: string }) => complianceDocumentsApi.create({
+      title: input.title,
+      category: input.category,
       documentType: 'Policy',
       reviewCadence: 'Annual',
       tags: [],
-      htmlContent: '<h1>Untitled Compliance Document</h1><p></p>',
+      htmlContent: `<h1>${input.title}</h1><p></p>`,
     }),
     onSuccess: (document) => {
       qc.invalidateQueries({ queryKey: ['compliance-documents'] })
       toast.success('Compliance document created')
+      setCreateOpen(false)
       navigate(`/compliance-documentation/${document.id}`)
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Could not create compliance document')),
@@ -109,8 +111,7 @@ export function ComplianceDocumentationPage() {
             </button>
             <button
               type="button"
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending}
+              onClick={() => setCreateOpen(true)}
               className="sd-btn primary"
             >
               <Plus className="h-4 w-4" />
@@ -198,6 +199,61 @@ export function ComplianceDocumentationPage() {
           </div>
         )}
       </section>
+
+      {createOpen && (
+        <NewDocumentDialog
+          onClose={() => setCreateOpen(false)}
+          onCreate={(title, category) => createMutation.mutate({ title, category })}
+          isPending={createMutation.isPending}
+        />
+      )}
+    </div>
+  )
+}
+
+function NewDocumentDialog({ onClose, onCreate, isPending }: { onClose: () => void; onCreate: (title: string, category: string) => void; isPending: boolean }) {
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState<string>(DOCUMENT_CATEGORIES[0])
+
+  const submit = () => {
+    if (!title.trim()) return
+    onCreate(title.trim(), category)
+  }
+
+  return (
+    <div className="sims-modal-backdrop">
+      <div className="sims-modal">
+        <div className="sims-modal-head">
+          <h2 className="sims-modal-title">New Compliance Document</h2>
+          <button onClick={onClose} className="sims-icon-btn" aria-label="Close"><X size={16} strokeWidth={1.7} /></button>
+        </div>
+        <div className="sims-modal-body space-y-4">
+          <div>
+            <label className="sims-field-label">Title *</label>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
+              placeholder="e.g. Information Security Policy"
+              className="sims-input"
+            />
+          </div>
+          <div>
+            <label className="sims-field-label">Category *</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="sims-select">
+              {DOCUMENT_CATEGORIES.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="sims-modal-foot">
+          <button onClick={onClose} className="sd-btn outline sm">Cancel</button>
+          <button onClick={submit} disabled={isPending || !title.trim()} className="sd-btn primary sm">
+            <Plus className="h-4 w-4" />
+            Create Document
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

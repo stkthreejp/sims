@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, CheckSquare, Clock, ExternalLink, Search } from 'lucide-react'
 import { tasksApi } from '@/api/tasks.api'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -9,7 +9,8 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { TaskDetailDrawer } from './TaskDetailDrawer'
 import type { TaskInstanceListItem, TaskInstanceStatus, TaskPriority } from '@/types/task.types'
 
-const STATUS_OPTIONS: TaskInstanceStatus[] = ['Open', 'InProgress', 'Blocked', 'Closed', 'Cancelled']
+// my-queue only returns Open/InProgress/Blocked, so those are the only filterable statuses.
+const STATUS_OPTIONS: TaskInstanceStatus[] = ['Open', 'InProgress', 'Blocked']
 const PRIORITY_OPTIONS: TaskPriority[] = ['High', 'Medium', 'Low']
 
 const PRIORITY_TONE: Record<TaskPriority, { bg: string; fg: string; border: string }> = {
@@ -51,7 +52,22 @@ function taskAccent(task: TaskInstanceListItem) {
 
 export function TaskQueuePage() {
   const qc = useQueryClient()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedId = searchParams.get('task')
+
+  // Deep-link a task via ?task=<id>: open the drawer on that id, and mirror the
+  // open task back into the URL so the link is shareable (O6).
+  const openTask = (id: string) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('task', id)
+    setSearchParams(next, { replace: true })
+  }
+  const closeTask = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('task')
+    setSearchParams(next, { replace: true })
+  }
+
   const [filterStatus, setFilterStatus] = useState<TaskInstanceStatus | ''>('')
   const [filterPriority, setFilterPriority] = useState<TaskPriority | ''>('')
   const [search, setSearch] = useState('')
@@ -65,7 +81,6 @@ export function TaskQueuePage() {
     open: tasks.filter((t) => t.status === 'Open' || t.status === 'InProgress').length,
     overdue: tasks.filter((t) => t.isOverdue).length,
     blocked: tasks.filter((t) => t.status === 'Blocked').length,
-    closed: tasks.filter((t) => t.status === 'Closed').length,
   }), [tasks])
 
   const filtered = tasks.filter((t) => {
@@ -90,11 +105,10 @@ export function TaskQueuePage() {
         <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{counts.open} open tasks in your queue</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 4 }}>
         <TaskMetric label="Open" value={counts.open} tone="open" />
         <TaskMetric label="Overdue" value={counts.overdue} tone={counts.overdue > 0 ? 'attention' : 'muted'} />
         <TaskMetric label="Blocked" value={counts.blocked} tone={counts.blocked > 0 ? 'warning' : 'muted'} />
-        <TaskMetric label="Closed" value={counts.closed} tone="muted" />
       </div>
 
       <div className="subs-toolbar">
@@ -153,7 +167,7 @@ export function TaskQueuePage() {
               {filtered.map((task) => (
                 <tr
                   key={task.id}
-                  onClick={() => setSelectedId(task.id)}
+                  onClick={() => openTask(task.id)}
                   style={{ boxShadow: `inset 3px 0 0 ${taskAccent(task)}` }}
                 >
                   <td className="primary-cell">
@@ -204,7 +218,7 @@ export function TaskQueuePage() {
       {selectedId && (
         <TaskDetailDrawer
           taskId={selectedId}
-          onClose={() => setSelectedId(null)}
+          onClose={closeTask}
           onUpdated={() => qc.invalidateQueries({ queryKey: ['tasks', 'my-queue'] })}
         />
       )}

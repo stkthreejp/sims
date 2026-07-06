@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, Check, Download, FileText, GitCompare, Loader
 import { toast } from 'sonner'
 import { complianceDocumentsApi } from '@/api/complianceDocuments.api'
 import { usersApi } from '@/api/users.api'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { DOCUMENT_CATEGORIES, DOCUMENT_STATUS, DOCUMENT_STATUS_LIST, REVIEW_CADENCES } from '@/constants/compliance'
@@ -14,6 +15,22 @@ import { AttestationCampaignCard, AuditLogEntry, EvidenceAttachmentRow, HistoryP
 import { AttestationModal, EvidenceAttachmentUploadModal, EvidenceModal, ReviewModal } from './components/ComplianceDocumentModals'
 
 const TYPES = ['Policy', 'Plan', 'Procedure', 'Standard', 'Checklist', 'Evidence']
+
+// Statuses that are only reachable through the review workflow buttons (Submit for
+// Review → Publish / Require Changes). They must not be selectable directly from the
+// sidebar Status dropdown, so Save Details can't bypass the workflow (audit O15).
+const WORKFLOW_MANAGED_STATUSES: string[] = [
+  DOCUMENT_STATUS.UNDER_REVIEW,
+  DOCUMENT_STATUS.ACTIVE,
+  DOCUMENT_STATUS.NEEDS_UPDATE,
+]
+
+// Statuses a user may set manually via the dropdown. The document's current status is
+// always kept as an option so saving other details never forces a status change.
+function statusOptions(current: string): string[] {
+  const editable = DOCUMENT_STATUS_LIST.filter((s) => !WORKFLOW_MANAGED_STATUSES.includes(s))
+  return editable.includes(current) ? editable : [current, ...editable]
+}
 
 export function ComplianceDocumentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -91,6 +108,9 @@ export function ComplianceDocumentDetailPage() {
     setIsDirty(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentQuery.data])
+
+  // Warn on tab close / refresh while there are unsaved editor or metadata edits (audit O15/O3).
+  useUnsavedChangesGuard(isDirty)
 
   // Shared query invalidation helper
   const invalidate = () => {
@@ -240,7 +260,17 @@ export function ComplianceDocumentDetailPage() {
             <div className="sd-card-body space-y-4">
               <SelectField label="Category" value={category} values={[...DOCUMENT_CATEGORIES]} onChange={(v) => { setCategory(v); setIsDirty(true) }} />
               <SelectField label="Type" value={documentType} values={TYPES} onChange={(v) => { setDocumentType(v); setIsDirty(true) }} />
-              <SelectField label="Status" value={status} values={DOCUMENT_STATUS_LIST} onChange={(v) => { setStatus(v); setIsDirty(true) }} />
+              <SelectField
+                label="Status"
+                value={status}
+                values={statusOptions(status)}
+                onChange={(v) => { setStatus(v); setIsDirty(true) }}
+              />
+              {WORKFLOW_MANAGED_STATUSES.includes(status) && (
+                <p className="-mt-2 text-xs" style={{ color: 'var(--ink-4)' }}>
+                  Status is set by the review workflow below (Submit for Review · Publish · Require Changes).
+                </p>
+              )}
               <UserSelectField label="Owner" value={ownerId} users={usersQuery.data?.items ?? []} onChange={(v) => { setOwnerId(v); setIsDirty(true) }} />
               <UserSelectField label="Approver" value={approverId} users={usersQuery.data?.items ?? []} onChange={(v) => { setApproverId(v); setIsDirty(true) }} />
               <SelectField label="Review Cadence" value={reviewCadence} values={[...REVIEW_CADENCES]} onChange={(v) => { setReviewCadence(v); setIsDirty(true) }} />

@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { EmptyState } from '@/components/common/EmptyState'
 import { getApiErrorMessage } from '@/lib/apiError'
+import { usePermissions } from '@/hooks/usePermissions'
 import { formatDateTime } from '@/lib/utils'
 import type { User, UserStatus, UserCreate, UserUpdate } from '@/types/user.types'
 
@@ -193,6 +194,7 @@ function UserModal({
 
 export function UsersPage() {
   const qc = useQueryClient()
+  const { canManageUsers } = usePermissions()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [editingUser, setEditingUser] = useState<User | null | undefined>(undefined) // undefined=closed, null=create, User=edit
@@ -226,12 +228,14 @@ export function UsersPage() {
               className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button
-            onClick={() => setEditingUser(null)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" /> Add User
-          </button>
+          {canManageUsers && (
+            <button
+              onClick={() => setEditingUser(null)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" /> Add User
+            </button>
+          )}
         </div>
 
         {isLoading ? <LoadingSpinner /> : isError ? (
@@ -272,22 +276,24 @@ export function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-500 text-xs">{formatDateTime(u.lastLoginAt)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                      <button
-                        onClick={() => setEditingUser(u)}
-                        className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                        title="Edit"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => { if (confirm(`Delete user "${u.userName}"?`)) deleteMutation.mutate(u.id) }}
-                        className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    {canManageUsers && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                        <button
+                          onClick={() => setEditingUser(u)}
+                          className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm(`Delete user "${u.userName}"?`)) deleteMutation.mutate(u.id) }}
+                          className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

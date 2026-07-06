@@ -180,7 +180,7 @@ type Tab = 'overview' | 'policies' | 'submissions' | 'documents'
 export function InsuredDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { canEditInsureds, canDeleteInsureds, canCreatePolicies, canViewClaims } = usePermissions()
+  const { canEditInsureds, canDeleteInsureds, canCreatePolicies, canViewClaims, canUploadAttachments, canDeleteAttachments } = usePermissions()
   const [tab, setTab] = useState<Tab>('overview')
 
   const { data: insured, isLoading } = useQuery({
@@ -214,7 +214,7 @@ export function InsuredDetailPage() {
   if (!insured) return <p style={{ padding: 24, color: 'var(--ink-3)' }}>Insured not found.</p>
 
   // ── computed metrics ──────────────────────────────────────────────────────
-  const activePolicies = policies.filter((p) => daysUntil(p.expirationDate) >= 0)
+  const activePolicies = policies.filter((p) => p.status === 'Active' && daysUntil(p.expirationDate) >= 0)
   const inForcePremium = activePolicies.reduce((s, p) => s + p.totalPremium, 0)
   const lifetimePremium = policies.reduce((s, p) => s + p.totalPremium, 0)
   const openSubs = submissions.filter((s) => !['Bound', 'Declined', 'Withdrawn'].includes(s.status))
@@ -621,7 +621,7 @@ export function InsuredDetailPage() {
           <div className="sd-card">
             <div className="sd-card-head"><h3>Documents</h3></div>
             <div className="sd-card-body">
-              <DocumentsSection entityId={id!} entityType="Insured" />
+              <DocumentsSection entityId={id!} entityType="Insured" canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
             </div>
           </div>
         )}

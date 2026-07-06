@@ -68,6 +68,10 @@ const QUOTE_STATUS_PILL: Record<QuoteStatus, string> = {
   Expired: 'expired',
 }
 
+// Statuses an underwriter may set by hand in the editor; Quoted/Bound are derived
+// from quote/policy events, and New is the initial state (audit U18).
+const MANUAL_STATUSES: SubmissionStatus[] = ['InProgress', 'Declined', 'Withdrawn']
+
 const STAGES = ['New', 'In Progress', 'Released', 'Quoted', 'Bound']
 const STATUS_TO_STAGE: Record<SubmissionStatus, { idx: number; label: string }> = {
   New:        { idx: 0, label: 'New' },
@@ -175,7 +179,7 @@ export function SubmissionDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const qc = useQueryClient()
-  const { canUploadAttachments, canDeleteAttachments, canCreatePolicies, canDeletePolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
+  const { canEditPolicies, canUploadAttachments, canDeleteAttachments, canCreatePolicies, canDeletePolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
 
   const extractionState = location.state as { extractionStatus?: string; emailId?: string } | null
   const [showExtractionBanner, setShowExtractionBanner] = useState(
@@ -1282,7 +1286,7 @@ export function SubmissionDetailPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
-              { label: 'Program', node: <select value={quoteForm.programId} onChange={setQF('programId')} style={inputStyle}><option value="" disabled>Select a program…</option>{programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select> },
+              { label: 'Program *', node: <select value={quoteForm.programId} onChange={setQF('programId')} style={inputStyle}><option value="" disabled>Select a program…</option>{programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select> },
               { label: 'Carrier *', node: <select value={quoteForm.carrierId} onChange={setQF('carrierId')} style={inputStyle}><option value="">— Select carrier —</option>{quoteCarrierOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select> },
               { label: 'Line of Business *', node: <select value={quoteForm.lineOfBusiness} onChange={setQF('lineOfBusiness')} disabled={!quoteForm.carrierId} style={inputStyle}><option value="">— Select LOB —</option>{availableLobs.map((l) => <option key={l} value={l}>{getLobLabel(l)}</option>)}</select> },
               { label: 'Effective Date *', node: <input type="date" value={quoteForm.effectiveDate} onChange={setQF('effectiveDate')} style={inputStyle} /> },
@@ -1386,9 +1390,11 @@ export function SubmissionDetailPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={openSubmissionEditor} className="sd-btn outline">
-            <Pencil size={13} /> Edit submission
-          </button>
+          {canEditPolicies && (
+            <button onClick={openSubmissionEditor} className="sd-btn outline">
+              <Pencil size={13} /> Edit submission
+            </button>
+          )}
           {canCreatePolicies && (
             <button onClick={() => setShowGenerateModal(true)} className="sd-btn outline">
               <FileText size={13} /> Generate doc
@@ -1416,9 +1422,13 @@ export function SubmissionDetailPage() {
               <div>
                 <label style={labelStyle}>Status</label>
                 <select value={submissionForm.status} onChange={(e) => setSubmissionField('status', e.target.value)} style={inputStyle}>
-                  {(Object.keys(SUBMISSION_STATUS_LABELS) as SubmissionStatus[]).map((status) => (
-                    <option key={status} value={status}>{SUBMISSION_STATUS_LABELS[status]}</option>
-                  ))}
+                  {/* Quoted/Bound are derived from quote/policy events, not hand-set — only offer the
+                      manually-settable statuses, plus whatever the current status is (audit U18). */}
+                  {(Object.keys(SUBMISSION_STATUS_LABELS) as SubmissionStatus[])
+                    .filter((status) => MANUAL_STATUSES.includes(status) || status === submission.status)
+                    .map((status) => (
+                      <option key={status} value={status}>{SUBMISSION_STATUS_LABELS[status]}</option>
+                    ))}
                 </select>
               </div>
               <div>
@@ -1501,11 +1511,13 @@ export function SubmissionDetailPage() {
             {submission.linesOfBusiness.length === 0
               ? <span style={{ color: 'var(--ink-4)', fontStyle: 'italic' }}>None</span>
               : submission.linesOfBusiness.map((l) => <span key={l} className="sd-lob">{LOB_SHORT[l] ?? l}</span>)}
-            <button type="button" onClick={() => setShowLobEditor((v) => !v)} className="sd-btn outline sm" style={{ height: 22, padding: '0 8px' }}>
-              Edit
-            </button>
+            {canEditPolicies && (
+              <button type="button" onClick={() => setShowLobEditor((v) => !v)} className="sd-btn outline sm" style={{ height: 22, padding: '0 8px' }}>
+                Edit
+              </button>
+            )}
           </div>
-          {showLobEditor && (
+          {canEditPolicies && showLobEditor && (
             <div style={{ marginTop: 8, padding: 10, border: '1px solid var(--line-2)', borderRadius: 8, background: 'var(--surface)', boxShadow: '0 8px 24px rgba(15,23,42,.08)' }}>
               <div style={{ display: 'grid', gap: 6 }}>
                 {ACTIVE_LOBS.map((lob) => {
@@ -1826,7 +1838,7 @@ export function SubmissionDetailPage() {
             )}
             <div className="exp-h">
               <div className="exp-h-l">Risk locations <span className="c">{locations.length}</span></div>
-              <button type="button" className="sd-btn ghost sm" onClick={openNewLocationForm}><Plus size={12} /> Add</button>
+              {canEditPolicies && <button type="button" className="sd-btn ghost sm" onClick={openNewLocationForm}><Plus size={12} /> Add</button>}
             </div>
             {locations.length === 0 && !showLocationForm ? (
               <EmptyState icon={FileText} title="No risk locations added yet" description="Add the primary location used for bordereaux and rating setup." />
@@ -1844,10 +1856,12 @@ export function SubmissionDetailPage() {
                         <td>{riskLocation.county ?? '-'}</td>
                         <td>{riskLocation.country ?? '-'}</td>
                         <td style={{ padding: '8px 14px' }}>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button type="button" onClick={() => openEditLocationForm(riskLocation)} className="sims-icon-btn hover:text-sky-600" title="Edit risk location"><Pencil size={12} /></button>
-                            <button type="button" onClick={() => { if (confirm('Remove risk location?')) deleteLocationMutation.mutate(riskLocation.id) }} disabled={deleteLocationMutation.isPending} className="sims-icon-btn hover:text-red-500" title="Remove risk location"><Trash2 size={12} /></button>
-                          </div>
+                          {canEditPolicies && (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button type="button" onClick={() => openEditLocationForm(riskLocation)} className="sims-icon-btn hover:text-sky-600" title="Edit risk location"><Pencil size={12} /></button>
+                              <button type="button" onClick={() => { if (confirm('Remove risk location?')) deleteLocationMutation.mutate(riskLocation.id) }} disabled={deleteLocationMutation.isPending} className="sims-icon-btn hover:text-red-500" title="Remove risk location"><Trash2 size={12} /></button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1880,7 +1894,7 @@ export function SubmissionDetailPage() {
               {/* Drivers section */}
               <div className="exp-h">
                 <div className="exp-h-l">Drivers <span className="c">{drivers.length}</span></div>
-                <button className="sd-btn ghost sm" onClick={() => { setShowDriverForm(true); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }}><Plus size={12} /> Add</button>
+                {canEditPolicies && <button className="sd-btn ghost sm" onClick={() => { setShowDriverForm(true); setDriverForm(emptyDriverForm()); setEditingDriverId(null) }}><Plus size={12} /> Add</button>}
               </div>
               {drivers.length === 0 && !showDriverForm ? (
                 <EmptyState icon={FileText} title="No drivers added yet" description="Add scheduled drivers for auto submissions." />
@@ -1897,10 +1911,12 @@ export function SubmissionDetailPage() {
                         <td>{d.licenseState ?? '—'}</td>
                         <td>{d.dateHired ?? '—'}</td>
                         <td style={{ padding: '8px 14px' }}>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => { setDriverForm({ driverNumber: d.driverNumber, name: d.name, dateOfBirth: d.dateOfBirth ?? undefined, licenseNumber: d.licenseNumber ?? undefined, licenseState: d.licenseState ?? undefined, dateHired: d.dateHired ?? undefined }); setEditingDriverId(d.id); setShowDriverForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit driver"><Pencil size={12} /></button>
-                            <button onClick={() => { if (confirm('Remove driver?')) deleteDriverMutation.mutate(d.id) }} className="sims-icon-btn hover:text-red-500" title="Remove driver"><Trash2 size={12} /></button>
-                          </div>
+                          {canEditPolicies && (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button onClick={() => { setDriverForm({ driverNumber: d.driverNumber, name: d.name, dateOfBirth: d.dateOfBirth ?? undefined, licenseNumber: d.licenseNumber ?? undefined, licenseState: d.licenseState ?? undefined, dateHired: d.dateHired ?? undefined }); setEditingDriverId(d.id); setShowDriverForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit driver"><Pencil size={12} /></button>
+                              <button onClick={() => { if (confirm('Remove driver?')) deleteDriverMutation.mutate(d.id) }} className="sims-icon-btn hover:text-red-500" title="Remove driver"><Trash2 size={12} /></button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1950,7 +1966,7 @@ export function SubmissionDetailPage() {
                 {/* Vehicles section */}
                 <div className="exp-h">
                   <div className="exp-h-l">Vehicles <span className="c">{vehicles.length}</span></div>
-                  <button className="sd-btn ghost sm" onClick={() => { setShowVehicleForm(true); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }}><Plus size={12} /> Add</button>
+                  {canEditPolicies && <button className="sd-btn ghost sm" onClick={() => { setShowVehicleForm(true); setVehicleForm(emptyVehicleForm()); setEditingVehicleId(null) }}><Plus size={12} /> Add</button>}
                 </div>
                 {vehicles.length === 0 && !showVehicleForm ? (
                   <EmptyState icon={FileText} title="No vehicles added yet" description="Add scheduled vehicles for auto submissions." />
@@ -1968,10 +1984,12 @@ export function SubmissionDetailPage() {
                           <td>{v.radius ? OPERATING_RADIUS_LABELS[v.radius] : '—'}</td>
                           <td>{v.apdStatedValue ? formatCurrency(v.apdStatedValue) : '—'}</td>
                           <td style={{ padding: '8px 14px' }}>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined, apdVehicleClass: v.apdVehicleClass ?? undefined, apdRoadType: v.apdRoadType ?? undefined, apdAnnualMiles: v.apdAnnualMiles ?? undefined, apdOperationCode: v.apdOperationCode ?? undefined, apdState: v.apdState ?? undefined, apdStatedValue: v.apdStatedValue ?? undefined, apdCompDeductible: v.apdCompDeductible ?? undefined, apdCollDeductible: v.apdCollDeductible ?? undefined, apdDriverAgeCode: v.apdDriverAgeCode ?? undefined, apdDriverPointsCode: v.apdDriverPointsCode ?? undefined, apdDriverExpMod: v.apdDriverExpMod ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit vehicle"><Pencil size={12} /></button>
-                              <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="sims-icon-btn hover:text-red-500" title="Remove vehicle"><Trash2 size={12} /></button>
-                            </div>
+                            {canEditPolicies && (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button onClick={() => { setVehicleForm({ unitNumber: v.unitNumber, year: v.year ?? undefined, make: v.make ?? undefined, model: v.model ?? undefined, vin: v.vin ?? undefined, gvw: v.gvw ?? undefined, vehicleClass: v.vehicleClass, garagingZip: v.garagingZip ?? undefined, radius: v.radius ?? undefined, apdVehicleClass: v.apdVehicleClass ?? undefined, apdRoadType: v.apdRoadType ?? undefined, apdAnnualMiles: v.apdAnnualMiles ?? undefined, apdOperationCode: v.apdOperationCode ?? undefined, apdState: v.apdState ?? undefined, apdStatedValue: v.apdStatedValue ?? undefined, apdCompDeductible: v.apdCompDeductible ?? undefined, apdCollDeductible: v.apdCollDeductible ?? undefined, apdDriverAgeCode: v.apdDriverAgeCode ?? undefined, apdDriverPointsCode: v.apdDriverPointsCode ?? undefined, apdDriverExpMod: v.apdDriverExpMod ?? undefined }); setEditingVehicleId(v.id); setShowVehicleForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit vehicle"><Pencil size={12} /></button>
+                                <button onClick={() => { if (confirm('Remove vehicle?')) deleteVehicleMutation.mutate(v.id) }} className="sims-icon-btn hover:text-red-500" title="Remove vehicle"><Trash2 size={12} /></button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -2016,7 +2034,7 @@ export function SubmissionDetailPage() {
                         </label>
                       </div>
                     </div>
-                    {supplementalDirty && (
+                    {canEditPolicies && supplementalDirty && (
                       <div style={{ marginTop: 12 }}>
                         <button onClick={() => saveSupplementalMutation.mutate(supplementalForm)} disabled={saveSupplementalMutation.isPending} className="sd-btn primary sm">
                           <Check size={13} /> Save Supplemental Info
@@ -2070,7 +2088,7 @@ export function SubmissionDetailPage() {
               )}
               <div className="exp-h">
                 <div className="exp-h-l">Equipment schedule <span className="c">{equipment.length}</span></div>
-                <button type="button" className="sd-btn ghost sm" onClick={openNewEquipmentForm}><Plus size={12} /> Add</button>
+                {canEditPolicies && <button type="button" className="sd-btn ghost sm" onClick={openNewEquipmentForm}><Plus size={12} /> Add</button>}
               </div>
               {equipment.length === 0 && !showEquipmentForm ? (
                 <EmptyState icon={FileText} title="No equipment scheduled yet" description="Add scheduled equipment for Inland Marine submissions." />
@@ -2091,10 +2109,12 @@ export function SubmissionDetailPage() {
                           <td>{eq.settlementBasis ?? '—'}</td>
                           <td>{eq.territoryCode ?? '—'}</td>
                           <td style={{ padding: '8px 14px' }}>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button type="button" onClick={() => { setEquipmentForm({ itemNumber: eq.itemNumber, year: eq.year ?? undefined, make: eq.make ?? undefined, model: eq.model ?? undefined, description: eq.description ?? undefined, serialNumber: eq.serialNumber ?? undefined, value: eq.value ?? undefined, equipmentTypeId: eq.equipmentTypeId, territoryCode: eq.territoryCode, deductible: eq.deductible, settlementBasis: eq.settlementBasis }); setEditingEquipmentId(eq.id); setShowEquipmentForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit equipment"><Pencil size={12} /></button>
-                              <button type="button" onClick={() => { if (confirm('Remove equipment item?')) deleteEquipmentMutation.mutate(eq.id) }} disabled={deleteEquipmentMutation.isPending} className="sims-icon-btn hover:text-red-500" title="Remove equipment"><Trash2 size={12} /></button>
-                            </div>
+                            {canEditPolicies && (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button type="button" onClick={() => { setEquipmentForm({ itemNumber: eq.itemNumber, year: eq.year ?? undefined, make: eq.make ?? undefined, model: eq.model ?? undefined, description: eq.description ?? undefined, serialNumber: eq.serialNumber ?? undefined, value: eq.value ?? undefined, equipmentTypeId: eq.equipmentTypeId, territoryCode: eq.territoryCode, deductible: eq.deductible, settlementBasis: eq.settlementBasis }); setEditingEquipmentId(eq.id); setShowEquipmentForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit equipment"><Pencil size={12} /></button>
+                                <button type="button" onClick={() => { if (confirm('Remove equipment item?')) deleteEquipmentMutation.mutate(eq.id) }} disabled={deleteEquipmentMutation.isPending} className="sims-icon-btn hover:text-red-500" title="Remove equipment"><Trash2 size={12} /></button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )
@@ -2133,7 +2153,7 @@ export function SubmissionDetailPage() {
               <div style={{ paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
                 <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Terrorism</div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}><input type="checkbox" checked={glCovForm.includeTria} onChange={(e) => { setGlCovForm((f) => ({ ...f, includeTria: e.target.checked })); setGlCovDirty(true) }} /> Include TRIA (2.5%)</label>
-                {glCovDirty && (
+                {canEditPolicies && glCovDirty && (
                   <div style={{ marginTop: 12 }}>
                     <button onClick={() => saveGlCovMutation.mutate(glCovForm)} disabled={saveGlCovMutation.isPending} className="sd-btn primary sm"><Check size={13} /> Save GL Coverages</button>
                   </div>
@@ -2143,16 +2163,18 @@ export function SubmissionDetailPage() {
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
                 <div className="exp-h" style={{ marginLeft: -16, marginRight: -16, borderTop: 0 }}>
                   <div className="exp-h-l">GL classification schedule <span className="c">{glClassifications.length}</span></div>
-                  <button
-                    className="sd-btn ghost sm"
-                    onClick={() => {
-                      setShowGlClassForm(true)
-                      setGlClassForm({ locationNumber: (glClassifications.at(-1)?.locationNumber ?? 0) + 1 })
-                      setEditingGlClassId(null)
-                    }}
-                  >
-                    <Plus size={12} /> Add
-                  </button>
+                  {canEditPolicies && (
+                    <button
+                      className="sd-btn ghost sm"
+                      onClick={() => {
+                        setShowGlClassForm(true)
+                        setGlClassForm({ locationNumber: (glClassifications.at(-1)?.locationNumber ?? 0) + 1 })
+                        setEditingGlClassId(null)
+                      }}
+                    >
+                      <Plus size={12} /> Add
+                    </button>
+                  )}
                 </div>
 
                 {showGlClassForm && (
@@ -2203,26 +2225,28 @@ export function SubmissionDetailPage() {
                           <td>{classification.premiumBasis ?? '-'}</td>
                           <td className="num">{classification.exposure != null ? classification.exposure.toLocaleString() : '-'}</td>
                           <td style={{ padding: '8px 14px' }}>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button
-                                onClick={() => {
-                                  setGlClassForm({
-                                    locationNumber: classification.locationNumber,
-                                    classCode: classification.classCode ?? undefined,
-                                    description: classification.description ?? undefined,
-                                    premiumBasis: classification.premiumBasis ?? undefined,
-                                    exposure: classification.exposure ?? undefined,
-                                  })
-                                  setEditingGlClassId(classification.id)
-                                  setShowGlClassForm(true)
-                                }}
-                                className="sims-icon-btn hover:text-sky-600"
-                                title="Edit GL exposure"
-                              >
-                                <Pencil size={12} />
-                              </button>
-                              <button onClick={() => { if (confirm('Remove GL exposure?')) deleteGlClassMutation.mutate(classification.id) }} className="sims-icon-btn hover:text-red-500" title="Remove GL exposure"><Trash2 size={12} /></button>
-                            </div>
+                            {canEditPolicies && (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button
+                                  onClick={() => {
+                                    setGlClassForm({
+                                      locationNumber: classification.locationNumber,
+                                      classCode: classification.classCode ?? undefined,
+                                      description: classification.description ?? undefined,
+                                      premiumBasis: classification.premiumBasis ?? undefined,
+                                      exposure: classification.exposure ?? undefined,
+                                    })
+                                    setEditingGlClassId(classification.id)
+                                    setShowGlClassForm(true)
+                                  }}
+                                  className="sims-icon-btn hover:text-sky-600"
+                                  title="Edit GL exposure"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button onClick={() => { if (confirm('Remove GL exposure?')) deleteGlClassMutation.mutate(classification.id) }} className="sims-icon-btn hover:text-red-500" title="Remove GL exposure"><Trash2 size={12} /></button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}

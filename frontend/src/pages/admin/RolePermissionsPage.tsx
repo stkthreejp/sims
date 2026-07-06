@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import type { Role, Permission } from '@/types/role.types'
 
 // Friendly display order for categories
@@ -52,6 +53,8 @@ export function RolePermissionsPage() {
   // Local draft — initialized once when data loads
   const [draft, setDraft] = useState<Draft | null>(null)
   const [dirty, setDirty] = useState<Set<string>>(new Set())
+
+  useUnsavedChangesGuard(dirty.size > 0)
 
   // Init draft when data arrives (only once)
   useEffect(() => {

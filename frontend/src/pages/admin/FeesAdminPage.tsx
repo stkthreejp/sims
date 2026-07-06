@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import { parseDateOnly, todayLocal } from '@/lib/utils'
 import type { FeeDefinition, FeeRuleVersion } from '@/types/fee.types'
 import type { ProgramConfiguration } from '@/types/programConfiguration.types'
@@ -97,6 +98,7 @@ export function FeesAdminPage() {
   const [selectedDef, setSelectedDef] = useState<FeeDefinition | null>(null)
   const [editingVersion, setEditingVersion] = useState<FeeRuleVersion | null>(null)
   const [form, setForm] = useState<VersionForm>(EMPTY)
+  const [versionDirty, setVersionDirty] = useState(false)
   const [newVersionFrom, setNewVersionFrom] = useState<number | undefined>()
   const [showNewDef, setShowNewDef] = useState(false)
   const [showTaxability, setShowTaxability] = useState(false)
@@ -105,6 +107,8 @@ export function FeesAdminPage() {
   const [showPremiumChargeForm, setShowPremiumChargeForm] = useState(false)
   const [editingPremiumChargeId, setEditingPremiumChargeId] = useState<string | null>(null)
   const [premiumChargeForm, setPremiumChargeForm] = useState<PremiumChargeForm>(emptyPremiumChargeForm())
+
+  useUnsavedChangesGuard(versionDirty && (view === 'edit-version' || view === 'new-version'))
 
   const { data: definitions = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'fees', 'definitions'],
@@ -162,7 +166,7 @@ export function FeesAdminPage() {
     onSuccess: (saved) => {
       toast.success('Version saved')
       qc.invalidateQueries({ queryKey: ['admin', 'fees', 'versions', selectedDef?.id] })
-      setEditingVersion(saved); setView('edit-version'); setNewVersionFrom(undefined)
+      setEditingVersion(saved); setView('edit-version'); setNewVersionFrom(undefined); setVersionDirty(false)
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Save failed')),
   })
@@ -207,18 +211,21 @@ export function FeesAdminPage() {
       ? { ...cloneFrom, effectiveDate: '', disabledDate: null, feeDefinitionId: selectedDef!.id }
       : { ...EMPTY, feeDefinitionId: selectedDef!.id })
     setNewVersionFrom(cloneFrom?.id)
+    setVersionDirty(false)
     setView('new-version')
   }
 
   function openEditVersion(v: FeeRuleVersion) {
-    setEditingVersion(v); setForm({ ...v }); setView('edit-version')
+    setEditingVersion(v); setForm({ ...v }); setVersionDirty(false); setView('edit-version')
   }
 
   function set<K extends keyof VersionForm>(key: K, val: VersionForm[K]) {
     setForm(p => ({ ...p, [key]: val }))
+    setVersionDirty(true)
   }
 
   function setEffectiveDate(effectiveDate: string) {
+    setVersionDirty(true)
     setForm(p => {
       if (!p.programConfigurationId) return { ...p, effectiveDate }
 
@@ -239,6 +246,7 @@ export function FeesAdminPage() {
   }
 
   function setProgramScope(programConfigurationId: string | null) {
+    setVersionDirty(true)
     setForm(p => ({
       ...p,
       programConfigurationId,
@@ -249,6 +257,7 @@ export function FeesAdminPage() {
   }
 
   function setCarrierScope(carrierId: string | null) {
+    setVersionDirty(true)
     setForm(p => ({
       ...p,
       carrierId,
@@ -258,6 +267,7 @@ export function FeesAdminPage() {
   }
 
   function setLobScope(lineOfBusiness: string | null) {
+    setVersionDirty(true)
     setForm(p => ({
       ...p,
       lineOfBusiness,
@@ -266,6 +276,7 @@ export function FeesAdminPage() {
   }
 
   function setPayableRouting(value: VersionForm['payableRouting']) {
+    setVersionDirty(true)
     setForm(p => ({
       ...p,
       payableRouting: value,

@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { TemplateEditor } from '@/components/editor/TemplateEditor'
 import { ENTITY_TYPE_LABELS, type TemplateEntityType } from '@/lib/templateTags'
 import { importWordDocument } from '@/lib/wordImport'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import type { DocumentTemplateKind } from '@/types/documentTemplate.types'
 
 const ENTITY_TYPES: TemplateEntityType[] = ['General', 'Quote', 'Policy', 'Submission', 'Carrier', 'Agent']
@@ -41,6 +42,8 @@ export function TemplateEditorPage() {
   const [emailBodyHtml, setEmailBodyHtml] = useState('<p></p>')
   const [activeBody, setActiveBody] = useState<'document' | 'email'>('document')
   const [isDirty, setIsDirty] = useState(false)
+
+  useUnsavedChangesGuard(isDirty)
 
   const { data: template, isLoading } = useQuery({
     queryKey: ['document-templates', id],

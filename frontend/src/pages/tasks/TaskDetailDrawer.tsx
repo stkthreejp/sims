@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   X, User, Clock, CheckCircle, AlertTriangle,
   Plus, CornerDownRight, ArrowUpDown, CheckCheck, XCircle,
-  AlertOctagon, Bell, Clock3, FileText, Sparkles,
+  AlertOctagon, Bell, Clock3, FileText, Sparkles, ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { tasksApi } from '@/api/tasks.api'
+import { usersApi } from '@/api/users.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import type { TaskInstanceStatus, TaskAuditAction } from '@/types/task.types'
+import type { TaskInstanceStatus, TaskAuditAction, TaskEntityType } from '@/types/task.types'
 
 const STATUS_OPTIONS: { value: TaskInstanceStatus; label: string }[] = [
   { value: 'Open',       label: 'Open' },
@@ -32,6 +34,18 @@ const ACTION_CONFIG: Partial<Record<TaskAuditAction, { icon: React.ElementType; 
   Note:            { icon: Sparkles,       label: 'Note' },
 }
 
+// PolicyTransaction has no standalone page (shown as plain text below), so it
+// is intentionally absent — callers must null-check.
+function entityUrl(entityType: TaskEntityType, entityId: string): string | null {
+  switch (entityType) {
+    case 'Submission':         return `/submissions/${entityId}`
+    case 'Policy':             return `/policies/${entityId}`
+    case 'ComplianceDocument': return `/compliance-documentation/${entityId}`
+    case 'Account':            return `/insureds/${entityId}`
+    default:                   return null
+  }
+}
+
 interface Props {
   taskId: string
   onClose: () => void
@@ -42,6 +56,8 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const qc = useQueryClient()
   const [notes, setNotes] = useState('')
+  const [reassignOpen, setReassignOpen] = useState(false)
+  const [reassignUserId, setReassignUserId] = useState('')
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -55,6 +71,13 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
     queryFn: () => tasksApi.getById(taskId),
   })
 
+  const { data: usersData } = useQuery({
+    queryKey: ['users', { pageSize: 100 }],
+    queryFn: () => usersApi.getAll({ pageSize: 100 }),
+    enabled: reassignOpen,
+  })
+  const users = usersData?.items ?? []
+
   const { mutate: updateStatus, isPending: updatingStatus } = useMutation({
     mutationFn: ({ status }: { status: TaskInstanceStatus }) =>
       tasksApi.updateStatus(taskId, status, notes || undefined),
@@ -65,6 +88,18 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
       setNotes('')
     },
     onError: () => toast.error('Failed to update task'),
+  })
+
+  const { mutate: reassign, isPending: reassigning } = useMutation({
+    mutationFn: (newUserId: string) => tasksApi.reassign(taskId, newUserId),
+    onSuccess: () => {
+      toast.success('Task reassigned')
+      qc.invalidateQueries({ queryKey: ['task', taskId] })
+      onUpdated()
+      setReassignOpen(false)
+      setReassignUserId('')
+    },
+    onError: () => toast.error('Failed to reassign task'),
   })
 
   return (
@@ -103,7 +138,12 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
               <MetaRow icon={<AlertTriangle size={14} />} label="Escalation" value={`Level ${task.escalationLevel}`} accent />
             )}
             {task.entityType && (
-              <MetaRow icon={<></>} label="Entity" value={`${task.entityType}`} />
+              <MetaRow
+                icon={<></>}
+                label="Entity"
+                value={task.entityType}
+                href={entityUrl(task.entityType, task.entityId) ?? undefined}
+              />
             )}
             {task.policyTransactionNumber && (
               <MetaRow icon={<FileText className="h-3.5 w-3.5" />} label="Transaction" value={`${task.policyTransactionNumber} ${task.policyTransactionType ?? ''}`.trim()} />
@@ -112,6 +152,48 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
               <MetaRow icon={<CheckCircle className="h-3.5 w-3.5" />} label="Txn status" value={task.policyTransactionStatus} />
             )}
           </div>
+
+          {/* Reassign */}
+          {task.status !== 'Closed' && task.status !== 'Cancelled' && (
+            <div className="space-y-2">
+              {!reassignOpen ? (
+                <button
+                  onClick={() => { setReassignOpen(true); setReassignUserId(task.assignedUserId ?? '') }}
+                  className="sd-btn ghost sm inline-flex items-center gap-1.5"
+                >
+                  <CornerDownRight size={14} /> Reassign
+                </button>
+              ) : (
+                <>
+                  <p className="sims-field-label">Reassign to</p>
+                  <select
+                    value={reassignUserId}
+                    onChange={(e) => setReassignUserId(e.target.value)}
+                    className="sims-select"
+                  >
+                    <option value="">— Select user —</option>
+                    {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={reassigning || !reassignUserId || reassignUserId === task.assignedUserId}
+                      onClick={() => reassign(reassignUserId)}
+                      className="sd-btn primary sm"
+                    >
+                      Confirm reassign
+                    </button>
+                    <button
+                      disabled={reassigning}
+                      onClick={() => { setReassignOpen(false); setReassignUserId('') }}
+                      className="sd-btn ghost sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Status update */}
           {task.status !== 'Closed' && task.status !== 'Cancelled' && (
@@ -136,6 +218,13 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
                 rows={2}
                 className="sims-textarea"
               />
+              <button
+                disabled={updatingStatus || !notes.trim()}
+                onClick={() => updateStatus({ status: task.status })}
+                className="sd-btn outline sm inline-flex items-center gap-1.5"
+              >
+                <Sparkles size={14} /> Add note
+              </button>
             </div>
           )}
 
@@ -174,13 +263,19 @@ export function TaskDetailDrawer({ taskId, onClose, onUpdated }: Props) {
   )
 }
 
-function MetaRow({ icon, label, value, accent = false }: { icon: React.ReactNode; label: string; value: string; accent?: boolean }) {
+function MetaRow({ icon, label, value, accent = false, href }: { icon: React.ReactNode; label: string; value: string; accent?: boolean; href?: string }) {
   return (
     <div className="flex items-start gap-1.5">
       <span className="mt-0.5 shrink-0" style={{ color: accent ? 'var(--bad-fg)' : 'var(--ink-3)' }}>{icon}</span>
       <div>
         <p style={{ margin: 0, color: 'var(--ink-4)', fontSize: 'var(--fs-xs)' }}>{label}</p>
-        <p style={{ margin: 0, color: accent ? 'var(--bad-fg)' : 'var(--ink-2)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>{value}</p>
+        {href ? (
+          <Link to={href} className="flex items-center gap-1" style={{ margin: 0, color: 'var(--accent)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>
+            {value} <ExternalLink style={{ width: 11, height: 11 }} />
+          </Link>
+        ) : (
+          <p style={{ margin: 0, color: accent ? 'var(--bad-fg)' : 'var(--ink-2)', fontSize: 'var(--fs-body)', fontWeight: 600 }}>{value}</p>
+        )}
       </div>
     </div>
   )

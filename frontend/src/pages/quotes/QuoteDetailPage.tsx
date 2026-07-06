@@ -26,6 +26,7 @@ import type { UnderwritingReferralSummary } from '@/types/submission.types'
 import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
 import { formatCurrency, formatDate, formatPercent, todayLocal } from '@/lib/utils'
 import { usePermissions } from '@/hooks/usePermissions'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -623,6 +624,20 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
     effectiveDate: effectiveDate.slice(0, 10),
     expirationDate: expirationDate.slice(0, 10),
   })
+
+  // Bind creates a policy + invoice, so guard against date mistakes that would be
+  // expensive to unwind: expiration must be after effective, and a bound date far in
+  // the future is almost always a typo (audit U20).
+  const dateError = (() => {
+    if (!form.boundDate || !form.effectiveDate || !form.expirationDate) return null
+    if (form.expirationDate <= form.effectiveDate) return 'Expiration date must be after the effective date.'
+    const boundFuture = new Date(`${form.boundDate}T00:00:00`)
+    const futureLimit = new Date(`${todayLocal()}T00:00:00`)
+    futureLimit.setDate(futureLimit.getDate() + 90)
+    if (boundFuture > futureLimit) return 'Bound date is more than 90 days in the future — check the date before binding.'
+    return null
+  })()
+
   const bindMutation = useMutation({
     mutationFn: () => quotesApi.bind(quoteId, form),
     onSuccess: (bound) => {
@@ -682,12 +697,17 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
               />
             </label>
           ))}
+          {dateError && (
+            <div className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: 'var(--bad-fg)', background: 'var(--bad-bg)', color: 'var(--bad-fg)' }}>
+              {dateError}
+            </div>
+          )}
         </div>
         <div className="sims-modal-foot">
           <Btn variant="outline" onClick={onClose}>Cancel</Btn>
           <Btn
             variant="primary"
-            disabled={bindMutation.isPending || !form.boundDate || !form.effectiveDate || !form.expirationDate}
+            disabled={bindMutation.isPending || !form.boundDate || !form.effectiveDate || !form.expirationDate || !!dateError}
             onClick={() => bindMutation.mutate()}
           >
             {bindMutation.isPending ? 'Binding…' : 'Confirm bind'}
@@ -817,7 +837,7 @@ function NotesCard({ quoteId }: { quoteId: string }) {
 
 // ── Documents card ─────────────────────────────────────────────────────────────
 
-function DocumentsCard({ quoteId }: { quoteId: string }) {
+function DocumentsCard({ quoteId, canUpload, canDelete }: { quoteId: string; canUpload: boolean; canDelete: boolean }) {
   const qc = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
@@ -871,17 +891,19 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
         title="Documents"
         count={attachments.length || undefined}
         right={
-          <>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={onFileChange} />
-            <Btn variant="outline" onClick={() => setShowGenerateModal(true)}>
-              <FileOutput className="h-3.5 w-3.5" />
-              Generate
-            </Btn>
-            <Btn variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending}>
-              <Upload className="h-3.5 w-3.5" />
-              {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
-            </Btn>
-          </>
+          canUpload && (
+            <>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={onFileChange} />
+              <Btn variant="outline" onClick={() => setShowGenerateModal(true)}>
+                <FileOutput className="h-3.5 w-3.5" />
+                Generate
+              </Btn>
+              <Btn variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending}>
+                <Upload className="h-3.5 w-3.5" />
+                {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
+              </Btn>
+            </>
+          )
         }
       />
       {showGenerateModal && (
@@ -935,13 +957,15 @@ function DocumentsCard({ quoteId }: { quoteId: string }) {
                     >
                       <Download className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      onClick={() => { if (confirm('Delete this document?')) deleteMutation.mutate(a.id) }}
-                      className="sims-icon-btn hover:text-red-500"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => { if (confirm('Delete this document?')) deleteMutation.mutate(a.id) }}
+                        className="sims-icon-btn hover:text-red-500"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -1045,7 +1069,7 @@ export function QuoteDetailPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { canCreatePolicies, canEditPolicies, canBindPolicies, canManageUnderwriting, canOverrideClearance } = usePermissions()
+  const { canCreatePolicies, canEditPolicies, canBindPolicies, canManageUnderwriting, canOverrideClearance, canUploadAttachments, canDeleteAttachments } = usePermissions()
   const [showBind, setShowBind] = useState(false)
   const [showRating, setShowRating] = useState(false)
   const [showReduce, setShowReduce] = useState(false)
@@ -1089,6 +1113,14 @@ export function QuoteDetailPage() {
     setWriteupPayload({ ...EMPTY_PAYLOAD, ...(writeup.payload ?? {}) })
     setWriteupConditions(writeup.conditions ?? [])
   }, [writeup])
+
+  // Warn before a tab close/refresh drops unsaved inline writeup edits (audit U7).
+  // Dirty = local editable state diverges from what the loaded writeup would seed.
+  const inlineWriteupDirty = !!writeup && writeup.status === 'Draft' && (
+    JSON.stringify(writeupPayload) !== JSON.stringify({ ...EMPTY_PAYLOAD, ...(writeup.payload ?? {}) }) ||
+    JSON.stringify(writeupConditions) !== JSON.stringify(writeup.conditions ?? [])
+  )
+  useUnsavedChangesGuard(inlineWriteupDirty)
 
   const { data: siblingQuotes = [] } = useQuery({
     queryKey: ['quotes', 'by-submission', quote?.submissionId],
@@ -1912,7 +1944,7 @@ export function QuoteDetailPage() {
             <ChecklistCard quoteId={quoteId!} />
 
             {/* Documents */}
-            <DocumentsCard quoteId={quoteId!} />
+            <DocumentsCard quoteId={quoteId!} canUpload={canUploadAttachments} canDelete={canDeleteAttachments} />
 
             {/* Activity */}
             <ActivityCard quoteId={quoteId!} />

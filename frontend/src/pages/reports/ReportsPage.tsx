@@ -2,6 +2,8 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { usePermissions } from '@/hooks/usePermissions'
+import { getApiErrorMessage } from '@/lib/apiError'
+import { ErrorState } from '@/components/common/ErrorState'
 import { todayLocal } from '@/lib/utils'
 import {
   getTrustReconciliation,
@@ -136,11 +138,15 @@ const tdStyle: React.CSSProperties = { padding: '7px 12px', color: 'var(--ink)' 
 function ReportShell({ title, children, isLoading, error }: {
   title: string; children: React.ReactNode; isLoading?: boolean; error?: Error | null
 }) {
+  const status = (error as any)?.response?.status
+  const errorTitle = status === 403
+    ? 'You do not have access to this report.'
+    : error ? getApiErrorMessage(error, "This report didn't load. Please try again.") : undefined
   return (
     <div style={{ padding: '24px 28px', maxWidth: 1100 }}>
       <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: '0 0 20px' }}>{title}</h2>
       {isLoading && <div style={{ color: 'var(--ink-4)', fontSize: 13 }}>Loading…</div>}
-      {error && <div style={{ color: 'var(--bad-fg)', fontSize: 13 }}>Error: {error.message}</div>}
+      {error && <ErrorState title={errorTitle} />}
       {!isLoading && !error && children}
     </div>
   )
@@ -1683,13 +1689,13 @@ const REPORT_CATEGORIES = [
   {
     label: 'Accounting',
     reports: [
-      { id: 'trust-reconciliation', label: 'Trust Reconciliation' },
-      { id: 'carrier-payable-aging', label: 'Carrier Payable Aging' },
-      { id: 'sl-tax-aging', label: 'SL Tax Payable Aging' },
-      { id: 'broker-ar-aging', label: 'Broker AR Aging' },
-      { id: 'commission-summary', label: 'Commission Summary' },
-      { id: 'invoice-totals-by-program', label: 'Invoice Totals by Program' },
-      { id: 'invoice-totals-by-transaction', label: 'Invoice Totals by Transaction' },
+      { id: 'trust-reconciliation', label: 'Trust Reconciliation', requires: 'accounting' },
+      { id: 'carrier-payable-aging', label: 'Carrier Payable Aging', requires: 'accounting' },
+      { id: 'sl-tax-aging', label: 'SL Tax Payable Aging', requires: 'accounting' },
+      { id: 'broker-ar-aging', label: 'Broker AR Aging', requires: 'accounting' },
+      { id: 'commission-summary', label: 'Commission Summary', requires: 'accounting' },
+      { id: 'invoice-totals-by-program', label: 'Invoice Totals by Program', requires: 'accounting' },
+      { id: 'invoice-totals-by-transaction', label: 'Invoice Totals by Transaction', requires: 'accounting' },
       { id: 'bordereaux-workbench', label: 'Bordereaux Workbench', external: '/reports/bordereaux', requires: 'accountingAdmin' },
       { id: 'qb-sync-health', label: 'QB Sync Health', external: '/billing/sync-health', requires: 'billing' },
     ],
@@ -1746,14 +1752,25 @@ function renderReport(id: string) {
 export function ReportsPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
-  const { canAdminAccounting, canViewBilling } = usePermissions()
-  const activeId = params.get('r') ?? 'trust-reconciliation'
+  const { canManageAccounting, canAdminAccounting, canViewBilling } = usePermissions()
 
   function canSee(r: { requires?: string }) {
+    if (r.requires === 'accounting') return canManageAccounting || canAdminAccounting
     if (r.requires === 'accountingAdmin') return canAdminAccounting
     if (r.requires === 'billing') return canViewBilling
     return true
   }
+
+  // Keep Trust Reconciliation as the default for accounting viewers, but send a plain
+  // reports-viewer without accounting to a production report instead (audit O18).
+  const canSeeAccounting = canManageAccounting || canAdminAccounting
+  const defaultReportId = canSeeAccounting ? 'trust-reconciliation' : 'written-premium'
+  const requestedId = params.get('r')
+  const requested = REPORT_CATEGORIES.flatMap((c) => c.reports).find((r) => r.id === requestedId)
+  // Fall back to the default if the requested report is hidden for this viewer.
+  const activeId = requested && !(requested as any).external && canSee(requested)
+    ? requestedId!
+    : defaultReportId
 
   function select(id: string, external?: string) {
     if (external) { navigate(external); return }

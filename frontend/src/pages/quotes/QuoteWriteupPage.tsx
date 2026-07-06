@@ -8,6 +8,8 @@ import { uwWriteupApi } from '@/api/uwWriteup.api'
 import type { IMWriteupPayload, WriteupCondition, UWWriteupDto } from '@/types/uwWriteup.types'
 import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
 import { LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
@@ -159,6 +161,7 @@ function NumericField({
 export default function QuoteWriteupPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const qc = useQueryClient()
+  const { canManageUnderwriting } = usePermissions()
 
   const { data: writeup, error, isError, isLoading } = useQuery({
     queryKey: ['uw-writeup', quoteId],
@@ -184,6 +187,14 @@ export default function QuoteWriteupPage() {
   }, [writeup])
 
   const isReadOnly = writeup?.status !== 'Draft'
+
+  // Warn before a tab close/refresh drops unsaved writeup edits (audit U7). Dirty =
+  // local editable state diverges from what the loaded draft would seed.
+  const isDirty = !!writeup && writeup.status === 'Draft' && (
+    JSON.stringify(payload) !== JSON.stringify({ ...EMPTY_PAYLOAD, ...(writeup.payload ?? {}) }) ||
+    JSON.stringify(conditions) !== JSON.stringify(writeup.conditions ?? [])
+  )
+  useUnsavedChangesGuard(isDirty)
 
   const saveMutation = useMutation({
     mutationFn: () => uwWriteupApi.save(quoteId!, { payload, conditions }),
@@ -782,15 +793,21 @@ export default function QuoteWriteupPage() {
 
       {writeup.status === 'Submitted' && (
         <div className="sticky bottom-0 -mx-6 flex items-center justify-end gap-3 border-t px-6 py-3 shadow-sm backdrop-blur" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-          <button
-            type="button"
-            onClick={() => approveMutation.mutate()}
-            disabled={approveMutation.isPending}
-            className="sd-btn primary"
-          >
-            <ThumbsUp className="h-4 w-4" />
-            {approveMutation.isPending ? 'Approving…' : 'Approve'}
-          </button>
+          {canManageUnderwriting ? (
+            <button
+              type="button"
+              onClick={() => approveMutation.mutate()}
+              disabled={approveMutation.isPending}
+              className="sd-btn primary"
+            >
+              <ThumbsUp className="h-4 w-4" />
+              {approveMutation.isPending ? 'Approving…' : 'Approve'}
+            </button>
+          ) : (
+            <span className="text-xs" style={{ color: 'var(--ink-4)' }}>
+              Underwriting approval permission required to approve this writeup.
+            </span>
+          )}
         </div>
       )}
 

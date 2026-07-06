@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Calendar, ChevronRight, Clock, Star, FileText } from 'lucide-react'
+import { Plus, ChevronRight, Clock } from 'lucide-react'
 import { quotesApi } from '@/api/quotes.api'
 import { submissionsApi } from '@/api/submissions.api'
 import { insuredsApi } from '@/api/insureds.api'
 import { tasksApi } from '@/api/tasks.api'
 import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
+import { ErrorState } from '@/components/common/ErrorState'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { parseDateOnly } from '@/lib/utils'
 import type { SubmissionListItem } from '@/types/submission.types'
 import type { QuoteListItem } from '@/types/quote.types'
@@ -59,8 +62,8 @@ function buildSparkline(quotes: QuoteListItem[]): number[] {
     const idx = weeks - 1 - Math.floor(age)
     if (idx >= 0 && idx < weeks) buckets[idx] += q.totalPremium
   }
-  // forward-fill zeros so we have a non-flat line
-  for (let i = 1; i < weeks; i++) if (!buckets[i]) buckets[i] = buckets[i - 1]
+  // Return real weekly totals — weeks with no bound premium stay zero. (Do not
+  // forward-fill: fabricating a carried-forward value misrepresents the data.)
   return buckets
 }
 
@@ -200,20 +203,27 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const firstName = user?.fullName?.split(' ')[0] ?? 'there'
+  const { canViewSubmissions, canViewPolicies, canViewInsureds, canManageUnderwriting } = usePermissions()
 
-  const { data: subsData } = useQuery({
+  // Only fetch what the user is allowed to see — an ungated fetch would 403 and
+  // then render as an empty/"0 items" panel, which reads as "nothing to do"
+  // rather than "you can't see this" (audit O8).
+  const subsQuery = useQuery({
     queryKey: ['submissions', 'dashboard'],
     queryFn: () => submissionsApi.getAll({ pageSize: 200, page: 1, sortBy: 'createdAt', sortDir: 'asc' }),
+    enabled: canViewSubmissions,
   })
 
-  const { data: quotesData } = useQuery({
+  const quotesQuery = useQuery({
     queryKey: ['quotes', 'dashboard'],
     queryFn: () => quotesApi.getAll({ pageSize: 500, page: 1, sortBy: 'createdAt', sortDir: 'desc' }),
+    enabled: canViewPolicies,
   })
 
-  const { data: insuredsData } = useQuery({
+  const insuredsQuery = useQuery({
     queryKey: ['insureds', 'dashboard-count'],
     queryFn: () => insuredsApi.getAll({ pageSize: 1, page: 1, sortBy: 'createdAt', sortDir: 'desc' }),
+    enabled: canViewInsureds,
   })
 
   const { data: myTasks = [] } = useQuery({
@@ -221,8 +231,15 @@ export function DashboardPage() {
     queryFn: tasksApi.getMyQueue,
   })
 
-  const allSubs = subsData?.items ?? []
-  const allQuotes = quotesData?.items ?? []
+  const allSubs = subsQuery.data?.items ?? []
+  const allQuotes = quotesQuery.data?.items ?? []
+
+  // A permitted-but-still-loading section shouldn't flash a "0" metric, and a
+  // failed fetch shouldn't masquerade as an empty result (audit O8).
+  const subsLoading = canViewSubmissions && subsQuery.isLoading
+  const subsError = canViewSubmissions && subsQuery.isError
+  const quotesLoading = canViewPolicies && quotesQuery.isLoading
+  const quotesError = canViewPolicies && quotesQuery.isError
 
   // KPIs
   const boundQuotes = allQuotes.filter((q) => q.status === 'Bound')
@@ -278,108 +295,165 @@ export function DashboardPage() {
             {greeting()}, {firstName}
           </h1>
           <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 4 }}>
-            You have{' '}
-            <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{highPriority} items</b> needing attention
-            {effSoon.length > 0 && (
-              <> · <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{effSoon.length} quotes</b> with effective dates in the next 3 days</>
+            {subsLoading ? (
+              'Loading your queue…'
+            ) : subsError ? (
+              <span style={{ color: 'var(--bad-fg)' }}>Couldn't load your queue.</span>
+            ) : canViewSubmissions ? (
+              <>
+                You have{' '}
+                <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{highPriority} items</b> needing attention
+                {canViewPolicies && effSoon.length > 0 && (
+                  <> · <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{effSoon.length} quotes</b> with effective dates in the next 3 days</>
+                )}
+              </>
+            ) : (
+              'Welcome back.'
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 32,
-              borderRadius: 'var(--r)', fontSize: 'var(--fs-base)', fontWeight: 500,
-              color: 'var(--ink-2)', border: '1px solid var(--line)', background: 'var(--surface)',
-              cursor: 'pointer',
-            }}
-          >
-            <Calendar style={{ width: 13, height: 13 }} /> Today
-          </button>
-          <button
-            onClick={() => navigate('/submissions/new')}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 32,
-              borderRadius: 'var(--r)', fontSize: 'var(--fs-base)', fontWeight: 500,
-              color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer',
-            }}
-          >
-            <Plus style={{ width: 13, height: 13 }} /> New submission
-          </button>
-        </div>
-      </div>
-
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
-        {/* Hero — bound premium */}
-        <div style={{
-          background: 'linear-gradient(180deg,var(--accent-soft) 0%,var(--surface) 70%)',
-          border: '1px solid var(--accent-border)', borderRadius: 'var(--r-lg)', padding: '14px 16px',
-          boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 6,
-        }}>
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
-            Bound Premium · All Time
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: 'var(--accent-ink)' }}>
-            {fmtMoney(boundPremium)}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--ink-3)', marginTop: 'auto' }}>
-            <span style={{ color: 'var(--ink-3)' }}>{boundQuotes.length} bound policies</span>
-            {spark.some((v) => v > 0) && <Sparkline data={spark} width={140} height={36} />}
-          </div>
-        </div>
-
-        {/* Open submissions */}
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)',
-          padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 6,
-        }}>
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
-            Open Submissions
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: 'var(--ink)' }}>
-            {openSubs.length}
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 'auto' }}>
-            {allSubs.length} total across all statuses
-          </div>
-        </div>
-
-        {/* Insureds */}
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)',
-          padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 6,
-        }}>
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
-            Total Insureds
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: 'var(--ink)' }}>
-            {insuredsData?.totalCount ?? '—'}
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 'auto' }}>
-            in the book
-          </div>
-        </div>
-
-        {/* Eff. date soon — alert card */}
-        <div style={{
-          background: effSoon.length > 0 ? 'var(--bad-bg)' : 'var(--surface)',
-          border: `1px solid ${effSoon.length > 0 ? 'var(--danger-border)' : 'var(--line)'}`,
-          borderRadius: 'var(--r-lg)', padding: '14px 16px', boxShadow: 'var(--shadow-sm)',
-          display: 'flex', flexDirection: 'column', gap: 6,
-        }}>
-          <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
-            Eff. Date in 3 Days
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: effSoon.length > 0 ? 'var(--bad-fg)' : 'var(--ink)' }}>
-            {effSoon.length}
-          </div>
-          <div style={{ fontSize: 11.5, marginTop: 'auto' }}>
-            <button style={{ color: 'var(--accent)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 12 }}>
-              View all →
+        {canManageUnderwriting && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => navigate('/submissions/new')}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 32,
+                borderRadius: 'var(--r)', fontSize: 'var(--fs-base)', fontWeight: 500,
+                color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer',
+              }}
+            >
+              <Plus style={{ width: 13, height: 13 }} /> New submission
             </button>
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* KPI strip — each card is gated on the permission that drives its data,
+          and clicking a card deep-links to the relevant list (audit O8/O26). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10, marginBottom: 18 }}>
+        {/* Hero — bound premium (quotes/policies data) */}
+        {canViewPolicies && (
+          <div
+            onClick={() => navigate('/policies')}
+            style={{
+              gridColumn: 'span 2', minWidth: 0,
+              background: 'linear-gradient(180deg,var(--accent-soft) 0%,var(--surface) 70%)',
+              border: '1px solid var(--accent-border)', borderRadius: 'var(--r-lg)', padding: '14px 16px',
+              boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
+              Bound Premium · All Time
+            </div>
+            {quotesError ? (
+              <div style={{ fontSize: 13, color: 'var(--bad-fg)', fontWeight: 500 }}>Failed to load</div>
+            ) : quotesLoading ? (
+              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Loading…</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: 'var(--accent-ink)' }}>
+                  {fmtMoney(boundPremium)}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--ink-3)', marginTop: 'auto' }}>
+                  <span style={{ color: 'var(--ink-3)' }}>{boundQuotes.length} bound policies</span>
+                  {spark.some((v) => v > 0) && <Sparkline data={spark} width={140} height={36} />}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Open submissions */}
+        {canViewSubmissions && (
+          <div
+            onClick={() => navigate('/submissions')}
+            style={{
+              minWidth: 0,
+              background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)',
+              padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
+              Open Submissions
+            </div>
+            {subsError ? (
+              <div style={{ fontSize: 13, color: 'var(--bad-fg)', fontWeight: 500 }}>Failed to load</div>
+            ) : subsLoading ? (
+              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Loading…</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: 'var(--ink)' }}>
+                  {openSubs.length}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 'auto' }}>
+                  {allSubs.length} total across all statuses
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Insureds */}
+        {canViewInsureds && (
+          <div
+            onClick={() => navigate('/insureds')}
+            style={{
+              minWidth: 0,
+              background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)',
+              padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
+              Total Insureds
+            </div>
+            {insuredsQuery.isError ? (
+              <div style={{ fontSize: 13, color: 'var(--bad-fg)', fontWeight: 500 }}>Failed to load</div>
+            ) : insuredsQuery.isLoading ? (
+              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Loading…</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: 'var(--ink)' }}>
+                  {insuredsQuery.data?.totalCount ?? '—'}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 'auto' }}>
+                  in the book
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Eff. date soon — alert card (quotes data) */}
+        {canViewPolicies && (
+          <div
+            onClick={() => navigate('/submissions')}
+            style={{
+              minWidth: 0,
+              background: !quotesLoading && !quotesError && effSoon.length > 0 ? 'var(--bad-bg)' : 'var(--surface)',
+              border: `1px solid ${!quotesLoading && !quotesError && effSoon.length > 0 ? 'var(--danger-border)' : 'var(--line)'}`,
+              borderRadius: 'var(--r-lg)', padding: '14px 16px', boxShadow: 'var(--shadow-sm)',
+              display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>
+              Eff. Date in 3 Days
+            </div>
+            {quotesError ? (
+              <div style={{ fontSize: 13, color: 'var(--bad-fg)', fontWeight: 500 }}>Failed to load</div>
+            ) : quotesLoading ? (
+              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Loading…</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1, color: effSoon.length > 0 ? 'var(--bad-fg)' : 'var(--ink)' }}>
+                  {effSoon.length}
+                </div>
+                <div style={{ fontSize: 11.5, marginTop: 'auto', color: 'var(--accent)', fontWeight: 500 }}>
+                  View all →
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main 2-column grid */}
@@ -389,6 +463,7 @@ export function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* My queue / needs attention */}
+          {canViewSubmissions && (
           <Card>
             <CardHead>
               <CardTitle eyebrow="PRIORITY" title="Needs attention today" />
@@ -406,7 +481,11 @@ export function DashboardPage() {
               </div>
             </CardHead>
 
-            {queue.length === 0 ? (
+            {subsError ? (
+              <ErrorState error={subsQuery.error} onRetry={subsQuery.refetch} />
+            ) : subsLoading ? (
+              <LoadingSpinner />
+            ) : queue.length === 0 ? (
               <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
                 No open submissions — your queue is clear.
               </div>
@@ -444,9 +523,24 @@ export function DashboardPage() {
               </div>
             )}
           </Card>
+          )}
+
+          {/* Quotes effective soon (quotes data) */}
+          {canViewPolicies && (quotesLoading || quotesError) && (
+            <Card>
+              <CardHead>
+                <CardTitle eyebrow="FOLLOW-UP" title="Quotes with effective date in next 3 days" />
+              </CardHead>
+              {quotesError ? (
+                <ErrorState error={quotesQuery.error} onRetry={quotesQuery.refetch} />
+              ) : (
+                <LoadingSpinner />
+              )}
+            </Card>
+          )}
 
           {/* Quotes effective soon */}
-          {effSoon.length > 0 && (
+          {canViewPolicies && !quotesLoading && !quotesError && effSoon.length > 0 && (
             <Card>
               <CardHead>
                 <CardTitle
@@ -501,7 +595,7 @@ export function DashboardPage() {
           )}
 
           {/* Fallback when no eff-soon quotes */}
-          {effSoon.length === 0 && (
+          {canViewPolicies && !quotesLoading && !quotesError && effSoon.length === 0 && (
             <Card>
               <CardHead>
                 <CardTitle eyebrow="FOLLOW-UP" title="Quotes with effective date in next 3 days" />
@@ -559,8 +653,8 @@ export function DashboardPage() {
             )}
           </Card>
 
-          {/* Pipeline funnel */}
-          {funnel.length > 0 && (
+          {/* Pipeline funnel (submissions data) */}
+          {canViewSubmissions && !subsLoading && !subsError && funnel.length > 0 && (
             <Card>
               <CardHead>
                 <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Pipeline</h3>
@@ -570,13 +664,18 @@ export function DashboardPage() {
             </Card>
           )}
 
-          {/* Recent bound policies */}
+          {/* Recent bound policies (quotes data) */}
+          {canViewPolicies && (
           <Card>
             <CardHead>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Recent Bound Policies</h3>
               <CardAction onClick={() => navigate('/policies')}>All →</CardAction>
             </CardHead>
-            {boundQuotes.length === 0 ? (
+            {quotesError ? (
+              <ErrorState error={quotesQuery.error} onRetry={quotesQuery.refetch} />
+            ) : quotesLoading ? (
+              <LoadingSpinner />
+            ) : boundQuotes.length === 0 ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
                 No bound policies yet.
               </div>
@@ -608,6 +707,7 @@ export function DashboardPage() {
               </div>
             )}
           </Card>
+          )}
 
         </div>
       </div>
