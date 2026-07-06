@@ -470,6 +470,9 @@
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
+  /* Default so an unmapped status still renders a visible pill, not a transparent one */
+  background: var(--pill-draft-bg);
+  color: var(--pill-draft-fg);
 }
 .sd-pill::before {
   content: "";
