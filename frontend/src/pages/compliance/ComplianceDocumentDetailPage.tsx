@@ -29,7 +29,7 @@ const WORKFLOW_MANAGED_STATUSES: string[] = [
 // always kept as an option so saving other details never forces a status change.
 function statusOptions(current: string): string[] {
   const editable = DOCUMENT_STATUS_LIST.filter((s) => !WORKFLOW_MANAGED_STATUSES.includes(s))
-  return editable.includes(current) ? editable : [current, ...editable]
+  return (editable as string[]).includes(current) ? editable : [current, ...editable]
 }
 
 export function ComplianceDocumentDetailPage() {

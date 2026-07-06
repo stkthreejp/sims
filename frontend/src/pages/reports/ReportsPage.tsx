@@ -1664,7 +1664,8 @@ function UwWorkloadReport() {
 
 // ── Sidebar config ──────────────────────────────────────────────────────────
 
-const REPORT_CATEGORIES = [
+type ReportDef = { id: string; label: string; requires?: string; external?: string }
+const REPORT_CATEGORIES: { label: string; reports: ReportDef[] }[] = [
   {
     label: 'Operations',
     reports: [
@@ -1744,7 +1745,7 @@ export function ReportsPage() {
   const navigate = useNavigate()
   const { canManageAccounting, canAdminAccounting, canViewBilling } = usePermissions()
 
-  function canSee(r: { requires?: string }) {
+  function canSee(r: ReportDef) {
     if (r.requires === 'accounting') return canManageAccounting || canAdminAccounting
     if (r.requires === 'accountingAdmin') return canAdminAccounting
     if (r.requires === 'billing') return canViewBilling
