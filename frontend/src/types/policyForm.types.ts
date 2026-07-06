@@ -38,6 +38,8 @@ export interface PolicyFormTemplate {
   isFillable: boolean
   isActive: boolean
   notes: string | null
+  documentTemplateId: string | null
+  documentTemplateName: string | null
   fieldMappings: PolicyFormFieldMapping[]
   updatedAt: string
 }
@@ -53,6 +55,7 @@ export interface PolicyFormTemplateUpsert {
   isFillable: boolean
   isActive: boolean
   notes?: string
+  documentTemplateId?: string | null
 }
 
 export interface PolicyPackageForm {

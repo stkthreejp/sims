@@ -101,6 +101,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         var template = await _db.PolicyFormTemplates
             .AsNoTracking()
             .Include(t => t.FieldMappings)
+            .Include(t => t.DocumentTemplate)
             .FirstOrDefaultAsync(t => t.Id == templateId);
 
         if (template == null)
@@ -162,6 +163,8 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             .AsNoTracking()
             .Include(f => f.PolicyFormTemplate)
                 .ThenInclude(t => t.FieldMappings)
+            .Include(f => f.PolicyFormTemplate)
+                .ThenInclude(t => t.DocumentTemplate)
             .Where(f => f.QuoteId == quoteId && f.IsIncluded)
             .OrderBy(f => f.SequenceOrder)
             .ToListAsync();
@@ -169,6 +172,22 @@ public class PolicyAssemblyService : IPolicyAssemblyService
     private async Task<Result<byte[]>> PrepareFormPdfAsync(QuotePolicyFormSelection form, DocumentMergeData data)
     {
         var template = form.PolicyFormTemplate;
+
+        // F16: an authored Document Library template renders from its HTML (merge fields +
+        // repeat blocks) rather than an uploaded binary.
+        if (template.DocumentTemplate is { } authored)
+        {
+            try
+            {
+                var merged = _merge.MergeHtml(authored.HtmlContent, data);
+                return Result<byte[]>.Success(await _htmlToPdf.ConvertAsync(merged));
+            }
+            catch (Exception ex)
+            {
+                return Result<byte[]>.Failure("HTML_CONVERSION_FAILED", $"Authored form '{template.Name}' could not be converted to PDF: {ex.Message}");
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(template.StoragePath) || string.IsNullOrWhiteSpace(template.FileName))
             return Result<byte[]>.Failure("FORM_FILE_REQUIRED", "No file has been uploaded for this form.");
 

@@ -193,6 +193,35 @@ public class PolicyFormServiceTests
     }
 
     [Fact]
+    public async Task CreateTemplateAsync_LinksDocumentLibraryTemplate()
+    {
+        await using var db = CreateDb();
+        var docTemplate = new DocumentTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Dec Page",
+            EntityType = TemplateEntityType.Policy,
+            HtmlContent = "<p>{{Policy.PolicyNumber}}</p>",
+            IsActive = true,
+        };
+        db.Add(docTemplate);
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).CreateTemplateAsync(new PolicyFormTemplateUpsertDto
+        {
+            FormNumber = "DEC-1",
+            Name = "Declarations",
+            DocumentType = DocumentType.PolicyForm,
+            DocumentTemplateId = docTemplate.Id,
+            IsActive = true,
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(docTemplate.Id, result.Value!.DocumentTemplateId);
+        Assert.Equal("Dec Page", result.Value.DocumentTemplateName);
+    }
+
+    [Fact]
     public async Task GetDocumentTagsAsync_IncludesVehiclesRepeatBlockWithVin()
     {
         await using var db = CreateDb();

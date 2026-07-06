@@ -19,6 +19,11 @@ public class PolicyFormTemplateConfiguration : IEntityTypeConfiguration<PolicyFo
         builder.Property(f => f.StoragePath).HasMaxLength(1000);
         builder.Property(f => f.Notes).HasMaxLength(1000);
 
+        builder.HasOne(f => f.DocumentTemplate)
+            .WithMany()
+            .HasForeignKey(f => f.DocumentTemplateId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(f => new { f.FormNumber, f.EditionDate, f.IsDeleted });
     }
 }

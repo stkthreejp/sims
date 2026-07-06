@@ -42,6 +42,7 @@ public class PolicyFormService : IPolicyFormService
     {
         var q = Db.Set<PolicyFormTemplate>()
             .Include(f => f.FieldMappings)
+            .Include(f => f.DocumentTemplate)
             .AsQueryable();
 
         if (!includeInactive)
@@ -59,6 +60,7 @@ public class PolicyFormService : IPolicyFormService
     {
         var form = await Db.Set<PolicyFormTemplate>()
             .Include(f => f.FieldMappings)
+            .Include(f => f.DocumentTemplate)
             .FirstOrDefaultAsync(f => f.Id == id);
 
         return form == null
@@ -452,6 +454,7 @@ public class PolicyFormService : IPolicyFormService
         form.IsFillable = dto.IsFillable;
         form.IsActive = dto.IsActive;
         form.Notes = dto.Notes?.Trim();
+        form.DocumentTemplateId = dto.DocumentTemplateId;
     }
 
     private static void ApplyPackage(PolicyPackageConfiguration package, PolicyPackageConfigurationUpsertDto dto, ResolvedPolicyPackageProgramScope scope)
@@ -479,6 +482,8 @@ public class PolicyFormService : IPolicyFormService
         IsFillable = f.IsFillable,
         IsActive = f.IsActive,
         Notes = f.Notes,
+        DocumentTemplateId = f.DocumentTemplateId,
+        DocumentTemplateName = f.DocumentTemplate?.Name,
         FieldMappings = f.FieldMappings.OrderBy(m => m.PdfFieldName).Select(MapMapping).ToList(),
         UpdatedAt = f.UpdatedAt,
     };

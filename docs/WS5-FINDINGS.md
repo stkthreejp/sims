@@ -377,7 +377,7 @@ Related: WS12 W17 (`FilingRequired`→`quote.IsFilingState`) and W19 (fee-link c
 
 ## F16 — No form builder for data-bearing policy forms (dec page); converge on the Doc Library
 
-**Status: DECIDED (author in Doc Library, reference from Policy Forms; build NOW) — queued**
+**Status: DEPLOYED — a policy-package form may reference a Doc Library `DocumentTemplate`; PolicyAssemblyService renders its HTML (merge + repeat blocks) into the packet. Policy Forms page has an "Authored template" picker (Policy-scoped templates) as an alternative to file upload.**
 
 `PolicyFormTemplate` is upload-only (`StoragePath`/`FileName`/`ContentType`/`IsFillable` +
 `FieldMappings`) — no `HtmlContent`, no in-app editor. The visual TipTap builder (drag-in

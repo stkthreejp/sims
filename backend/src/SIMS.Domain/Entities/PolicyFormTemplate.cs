@@ -15,5 +15,10 @@ public class PolicyFormTemplate : BaseEntity
     public bool IsActive { get; set; } = true;
     public string? Notes { get; set; }
 
+    // F16: instead of an uploaded binary, a form may be an authored Document Library template
+    // (HTML + merge fields), rendered into the packet by PolicyAssemblyService.
+    public Guid? DocumentTemplateId { get; set; }
+    public DocumentTemplate? DocumentTemplate { get; set; }
+
     public ICollection<PolicyFormFieldMapping> FieldMappings { get; set; } = new List<PolicyFormFieldMapping>();
 }

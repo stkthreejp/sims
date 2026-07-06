@@ -104,6 +104,7 @@ const emptyTemplate = {
   isFillable: false,
   isActive: true,
   notes: '',
+  documentTemplateId: '',
 }
 
 const emptyPackage = {
@@ -224,6 +225,12 @@ export function PolicyFormsAdminPage() {
   const { data: proposalTemplates = [] } = useQuery({
     queryKey: ['document-templates', 'quote', 'proposal-documents'],
     queryFn: () => documentTemplatesApi.getAll('Quote', false),
+  })
+
+  // F16: Policy-scoped Doc Library templates a policy form can be authored from.
+  const { data: policyDocTemplates = [] } = useQuery({
+    queryKey: ['document-templates', 'policy', 'form-authoring'],
+    queryFn: () => documentTemplatesApi.getAll('Policy', false),
   })
 
   const { data: carriers = [] } = useQuery({
@@ -394,6 +401,7 @@ export function PolicyFormsAdminPage() {
       contentType: templateForm.contentType || undefined,
       storagePath: templateForm.storagePath || undefined,
       notes: templateForm.notes || undefined,
+      documentTemplateId: templateForm.documentTemplateId || null,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['policy-form-templates'] })
@@ -612,11 +620,21 @@ export function PolicyFormsAdminPage() {
               <input value={templateForm.editionDate} onChange={(e) => setTemplateForm((f) => ({ ...f, editionDate: e.target.value }))} placeholder="Edition" className="border rounded px-2 py-1.5 text-sm" />
             </div>
             <input value={templateForm.name} onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))} placeholder="Form name" className="w-full border rounded px-2 py-1.5 text-sm" />
-            <input value={templateForm.storagePath} onChange={(e) => setTemplateForm((f) => ({ ...f, storagePath: e.target.value }))} placeholder="Storage path or document reference" className="w-full border rounded px-2 py-1.5 text-sm" />
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" checked={templateForm.isFillable} onChange={(e) => setTemplateForm((f) => ({ ...f, isFillable: e.target.checked }))} />
-              Fillable PDF
-            </label>
+            <select value={templateForm.documentTemplateId} onChange={(e) => setTemplateForm((f) => ({ ...f, documentTemplateId: e.target.value }))} className="w-full border rounded px-2 py-1.5 text-sm">
+              <option value="">Uploaded file (PDF / DOCX / HTML)</option>
+              {policyDocTemplates.map((t) => <option key={t.id} value={t.id}>Authored template: {t.name}</option>)}
+            </select>
+            {templateForm.documentTemplateId ? (
+              <p className="text-xs text-slate-400">Authored in the Document Library (visual builder — tags + repeat blocks). Rendered into the packet automatically; no file upload needed.</p>
+            ) : (
+              <>
+                <input value={templateForm.storagePath} onChange={(e) => setTemplateForm((f) => ({ ...f, storagePath: e.target.value }))} placeholder="Storage path or document reference" className="w-full border rounded px-2 py-1.5 text-sm" />
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" checked={templateForm.isFillable} onChange={(e) => setTemplateForm((f) => ({ ...f, isFillable: e.target.checked }))} />
+                  Fillable PDF
+                </label>
+              </>
+            )}
             <button onClick={() => createTemplate.mutate()} disabled={createTemplate.isPending || !templateForm.formNumber || !templateForm.name} className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded disabled:opacity-50">
               <Plus className="h-4 w-4" /> Add form
             </button>
@@ -643,7 +661,7 @@ export function PolicyFormsAdminPage() {
                 onOpen={() => openTemplateFile(template.id)}
                 onMap={() => selectTemplateMappings(template)}
                 onTest={() => testMergeTemplate.mutate(template.id)}
-                canTest={Boolean(testPolicyId && template.storagePath)}
+                canTest={Boolean(testPolicyId && (template.storagePath || template.documentTemplateId))}
                 testing={testMergeTemplate.isPending}
               />
             ))}

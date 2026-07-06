@@ -15,6 +15,8 @@ public class PolicyFormTemplateDto
     public bool IsFillable { get; set; }
     public bool IsActive { get; set; }
     public string? Notes { get; set; }
+    public Guid? DocumentTemplateId { get; set; }
+    public string? DocumentTemplateName { get; set; }
     public List<PolicyFormFieldMappingDto> FieldMappings { get; set; } = [];
     public DateTime UpdatedAt { get; set; }
 }
@@ -31,6 +33,7 @@ public class PolicyFormTemplateUpsertDto
     public bool IsFillable { get; set; }
     public bool IsActive { get; set; } = true;
     public string? Notes { get; set; }
+    public Guid? DocumentTemplateId { get; set; }
 }
 
 public class PolicyFormTestMergeDto
