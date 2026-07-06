@@ -538,6 +538,11 @@
   line-height: 1;
   cursor: pointer;
   border: 0;
+  /* The `outline` modifier class collides with Tailwind's .outline utility
+     (outline-style: solid), which drew a bold dark UA outline on every
+     .sd-btn.outline. Neutralize it here; keyboard focus is shown via the
+     :focus-visible box-shadow ring instead. */
+  outline: 0;
   background: none;
   font-family: inherit;
 }
