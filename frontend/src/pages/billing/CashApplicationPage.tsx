@@ -196,6 +196,7 @@ export function CashApplicationPage() {
   // application — allowed, with the remainder left on the receipt (audit B1).
   const isOverReceipt = variance < -0.005
   const isUnderApplied = variance > 0.005
+  const isBalanced = Math.abs(variance) < 0.005
   const canPost = selectedReceiptId !== null && gridRows.length > 0 && !hasOverApply && !isOverReceipt
 
   const handlePost = () => {
