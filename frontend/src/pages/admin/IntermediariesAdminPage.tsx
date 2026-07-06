@@ -210,6 +210,8 @@ export function IntermediariesAdminPage() {
     queryKey: ['admin', 'intermediaries', selectedId],
     queryFn: () => intermediariesApi.getById(selectedId!),
     enabled: !!selectedId && !isCreating,
+    // Seeds the editable intermediary form (incl. banking fields); a focus refetch would clobber unsaved edits.
+    refetchOnWindowFocus: false,
   })
 
   const { data: programs = [] } = useQuery({

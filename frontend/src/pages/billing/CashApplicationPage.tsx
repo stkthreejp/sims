@@ -168,6 +168,12 @@ export function CashApplicationPage() {
       qc.invalidateQueries({ queryKey: ['billing', 'receipts'] })
       qc.invalidateQueries({ queryKey: ['billing', 'cash-application'] })
       qc.invalidateQueries({ queryKey: ['billing', 'invoices'] })
+      // Applying cash generates distribution instructions and reduces payable balances —
+      // refresh the distribution queue and disbursements aging so they aren't stale (audit).
+      qc.invalidateQueries({ queryKey: ['cash-distribution-pending'] })
+      qc.invalidateQueries({ queryKey: ['disbursements'] })
+      qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
+      qc.invalidateQueries({ queryKey: ['trust-balance'] })
       setGridRows([])
       setSelectedReceiptId(null)
     },

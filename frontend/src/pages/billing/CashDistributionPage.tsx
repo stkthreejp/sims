@@ -262,6 +262,9 @@ function BatchList() {
       setBankRef('')
       qc.invalidateQueries({ queryKey: ['cash-distribution-batches'] })
       qc.invalidateQueries({ queryKey: ['cash-distribution-batch', showExecuteModal] })
+      // Executing a batch posts sweep JEs from trust — refresh activity + trust (audit).
+      qc.invalidateQueries({ queryKey: ['activity'] })
+      qc.invalidateQueries({ queryKey: ['trust-balance'] })
     },
     onError: (e) => toast.error(getApiErrorMessage(e)),
   })

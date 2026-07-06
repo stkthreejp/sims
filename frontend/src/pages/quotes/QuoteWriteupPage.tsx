@@ -165,6 +165,8 @@ export default function QuoteWriteupPage() {
     queryFn: () => uwWriteupApi.get(quoteId!),
     enabled: !!quoteId,
     retry: false,
+    // Seeds the full editable UW writeup form; a focus refetch would wipe unsaved narratives.
+    refetchOnWindowFocus: false,
   })
 
   const [payload, setPayload] = useState<IMWriteupPayload>(EMPTY_PAYLOAD)

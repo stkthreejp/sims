@@ -1075,6 +1075,9 @@ export function QuoteDetailPage() {
     queryKey: ['uw-writeup', quoteId],
     queryFn: () => uwWriteupApi.get(quoteId!),
     enabled: !!quoteId,
+    // Seeds the editable inline writeup form; don't let a focus refetch clobber
+    // unsaved edits (its save mutation keeps the cache fresh via setQueryData).
+    refetchOnWindowFocus: false,
   })
 
   const [writeupPayload, setWriteupPayload] = useState<IMWriteupPayload>(EMPTY_PAYLOAD)

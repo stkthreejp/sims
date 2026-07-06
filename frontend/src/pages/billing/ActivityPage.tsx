@@ -66,6 +66,15 @@ function VoidModal({ event, onClose, onVoided }: VoidModalProps) {
     onSuccess: () => {
       toast.success(`${event.sourceNumber} voided successfully`)
       qc.invalidateQueries({ queryKey: ['activity'] })
+      // A void reverses an invoice/receipt/cash-application/disbursement — refresh every
+      // money view that showed the now-reversed item so it can't be acted on again (audit).
+      qc.invalidateQueries({ queryKey: ['billing', 'invoices'] })
+      qc.invalidateQueries({ queryKey: ['billing', 'receipts'] })
+      qc.invalidateQueries({ queryKey: ['billing', 'cash-application'] })
+      qc.invalidateQueries({ queryKey: ['disbursements'] })
+      qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
+      qc.invalidateQueries({ queryKey: ['cash-distribution-pending'] })
+      qc.invalidateQueries({ queryKey: ['trust-balance'] })
       onVoided()
       onClose()
     },

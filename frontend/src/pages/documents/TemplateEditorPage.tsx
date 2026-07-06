@@ -46,6 +46,8 @@ export function TemplateEditorPage() {
     queryKey: ['document-templates', id],
     queryFn: () => documentTemplatesApi.getById(id!),
     enabled: !isNew,
+    // Seeds the editable template (name, TipTap body, email fields); a focus refetch would wipe unsaved edits.
+    refetchOnWindowFocus: false,
   })
 
   const { data: approvedTags = [] } = useQuery({

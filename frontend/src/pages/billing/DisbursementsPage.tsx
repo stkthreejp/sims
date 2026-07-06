@@ -382,6 +382,9 @@ function DisbursementsTab() {
       qc.invalidateQueries({ queryKey: ['disbursements'] })
       qc.invalidateQueries({ queryKey: ['disbursement-detail', d.id] })
       qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
+      // Posting a payment moves trust and writes a JE — refresh activity + trust (audit).
+      qc.invalidateQueries({ queryKey: ['activity'] })
+      qc.invalidateQueries({ queryKey: ['trust-balance'] })
     },
     onError: (e) => toast.error(getApiErrorMessage(e)),
   })
@@ -393,6 +396,8 @@ function DisbursementsTab() {
       qc.invalidateQueries({ queryKey: ['disbursements'] })
       qc.invalidateQueries({ queryKey: ['disbursement-detail', d.id] })
       qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
+      qc.invalidateQueries({ queryKey: ['activity'] })
+      qc.invalidateQueries({ queryKey: ['trust-balance'] })
     },
     onError: (e) => toast.error(getApiErrorMessage(e)),
   })

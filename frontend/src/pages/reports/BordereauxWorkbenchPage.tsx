@@ -354,6 +354,8 @@ export function BordereauxWorkbenchPage() {
     queryKey: ['bordereaux', 'run', selectedRunId],
     queryFn: () => getBordereauxRun(selectedRunId!),
     enabled: Boolean(selectedRunId),
+    // Feeds the editable Account Current reconcile figures; a focus refetch would overwrite hand-keyed numbers.
+    refetchOnWindowFocus: false,
   })
 
   const createRun = useMutation({

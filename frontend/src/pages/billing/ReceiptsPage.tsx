@@ -212,6 +212,9 @@ export function ReceiptsPage() {
   const handleCreated = (r: ReceiptDetail) => {
     qc.invalidateQueries({ queryKey: ['billing', 'receipts'] })
     qc.setQueryData(['billing', 'receipts', r.id], r)
+    // Logging a receipt posts a cash-in JE to trust — refresh activity + trust (audit).
+    qc.invalidateQueries({ queryKey: ['activity'] })
+    qc.invalidateQueries({ queryKey: ['trust-balance'] })
     setShowNew(false)
     setSelectedId(r.id)
   }

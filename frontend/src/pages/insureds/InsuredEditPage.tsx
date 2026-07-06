@@ -17,7 +17,9 @@ const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','
 export function InsuredEditPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { data: insured, isLoading } = useQuery({ queryKey: ['insureds', id], queryFn: () => insuredsApi.getById(id!) })
+  // refetchOnWindowFocus off: this observer seeds the edit form via reset(); a focus
+  // refetch would overwrite unsaved edits. (The read-only detail page keeps focus refetch.)
+  const { data: insured, isLoading } = useQuery({ queryKey: ['insureds', id], queryFn: () => insuredsApi.getById(id!), refetchOnWindowFocus: false })
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<InsuredUpdate>()
 
   useEffect(() => { if (insured) reset(insured as unknown as InsuredUpdate) }, [insured, reset])

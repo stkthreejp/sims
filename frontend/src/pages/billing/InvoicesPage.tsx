@@ -301,6 +301,13 @@ export function InvoicesPage() {
   const handleCreated = (inv: InvoiceDetail) => {
     qc.invalidateQueries({ queryKey: ['billing', 'invoices'] })
     qc.setQueryData(['billing', 'invoices', inv.id], inv)
+    // A posted invoice is a new open receivable + carrier payable + GL posting —
+    // refresh cash application, disbursements aging, activity, and trust (audit).
+    qc.invalidateQueries({ queryKey: ['billing', 'cash-application'] })
+    qc.invalidateQueries({ queryKey: ['disbursements'] })
+    qc.invalidateQueries({ queryKey: ['disbursements-aging'] })
+    qc.invalidateQueries({ queryKey: ['activity'] })
+    qc.invalidateQueries({ queryKey: ['trust-balance'] })
     setShowNew(false)
     setSelectedId(inv.id)
   }

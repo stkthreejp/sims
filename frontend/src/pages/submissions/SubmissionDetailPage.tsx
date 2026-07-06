@@ -331,12 +331,16 @@ export function SubmissionDetailPage() {
     queryKey: ['submission-supplemental', id],
     queryFn: () => submissionSupplementalApi.get(id!),
     enabled: !!id && supplementalOpen,
+    // Seeds a dirty-tracked form; a focus refetch would clobber unsaved edits.
+    refetchOnWindowFocus: false,
   })
 
   const { data: glCoverages } = useQuery({
     queryKey: ['submission-gl-coverages', id],
     queryFn: () => submissionGLApi.getCoverages(id!),
     enabled: !!id,
+    // Seeds a dirty-tracked form; a focus refetch would clobber unsaved edits.
+    refetchOnWindowFocus: false,
   })
 
   const { data: glClassifications = [] } = useQuery({
@@ -591,7 +595,8 @@ export function SubmissionDetailPage() {
   const setLobsMutation = useMutation({
     mutationFn: (lobs: string[]) => submissionsApi.setLinesOfBusiness(id!, lobs),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['submissions', id] })
+      // LOB set shows on the submissions list — invalidate the root, not just the detail (audit).
+      qc.invalidateQueries({ queryKey: ['submissions'] })
       setShowLobEditor(false)
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to update lines of business')),
@@ -600,7 +605,8 @@ export function SubmissionDetailPage() {
   const updateSubmissionMutation = useMutation({
     mutationFn: (dto: SubmissionUpdate) => submissionsApi.update(id!, dto),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['submissions', id] })
+      // Status/dates/insured show on the submissions list + dashboard — invalidate the root (audit).
+      qc.invalidateQueries({ queryKey: ['submissions'] })
       setShowSubmissionEditor(false)
       setSubmissionForm(null)
       toast.success('Submission updated')
