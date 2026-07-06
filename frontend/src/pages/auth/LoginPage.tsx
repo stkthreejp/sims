@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { authApi } from '@/api/auth.api'
@@ -9,6 +9,9 @@ import { ensureMsalInitialized, loginRequest, msalInstance } from '@/lib/msalCon
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  // Where the user was headed before being bounced to login (audit O9); default to dashboard.
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/dashboard'
   const setAuth = useAuthStore((s) => s.setAuth)
   const [loading, setLoading] = useState(false)
   const [msLoading, setMsLoading] = useState(false)
@@ -20,7 +23,7 @@ export function LoginPage() {
     try {
       const res = await authApi.login(data)
       setAuth(res.user, res.accessToken)
-      navigate('/dashboard')
+      navigate(from, { replace: true })
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { errorMessage?: string } } })
         ?.response?.data?.errorMessage ?? 'Login failed'
@@ -42,7 +45,7 @@ export function LoginPage() {
       }
       const res = await authApi.loginWithMicrosoft(idToken)
       setAuth(res.user, res.accessToken)
-      navigate('/dashboard')
+      navigate(from, { replace: true })
     } catch (err: unknown) {
       const code = (err as { errorCode?: string })?.errorCode
       if (code === 'user_cancelled' || code === 'popup_window_error') return

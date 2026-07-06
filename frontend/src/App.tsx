@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from 'react'
 import axios from 'axios'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toaster } from 'sonner'
@@ -144,16 +144,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const setAuth = useAuthStore((s) => s.setAuth)
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const location = useLocation()
   const [checkingSession, setCheckingSession] = useState(true)
 
   useEffect(() => {
     let cancelled = false
 
-    if (!isAuthenticated || accessToken) {
+    // Already have a live token — nothing to restore.
+    if (accessToken) {
       setCheckingSession(false)
       return
     }
 
+    // No token: try the refresh cookie before giving up. This runs even when the
+    // store isn't "authenticated" yet, so a fresh tab / middle-click restores the
+    // session from the httpOnly refresh cookie instead of forcing a re-login (audit O17).
     setCheckingSession(true)
     authApi.refreshSession()
       .then((session) => {
@@ -168,10 +173,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       })
 
     return () => { cancelled = true }
-  }, [accessToken, clearAuth, isAuthenticated, setAuth])
+  }, [accessToken, clearAuth, setAuth])
 
   if (checkingSession) return <PageFallback />
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
+  // Preserve where the user was headed so login can send them back (audit O9).
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace state={{ from: location }} />
 }
 
 // Shown in place of the page when the user is authenticated but lacks permission —
@@ -259,7 +265,9 @@ export default function App() {
               <Route path="/document-library/new" element={withPermission(Permissions.NavDocumentLibrary, <TemplateEditorPage />)} />
               <Route path="/document-library/:id" element={withPermission(Permissions.NavDocumentLibrary, <TemplateEditorPage />)} />
               <Route path="/compliance-documentation" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceDocumentationPage />)} />
-              <Route path="/compliance-documentation/attestations" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceAttestationsPage />)} />
+              {/* Auth-only: attestation campaigns target any active user, who may not hold the
+                  compliance-documentation nav permission — don't lock recipients out (audit O5). */}
+              <Route path="/compliance-documentation/attestations" element={<ComplianceAttestationsPage />} />
               <Route path="/compliance-documentation/reviews" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceReviewsPage />)} />
               <Route path="/compliance-documentation/:id/report" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceEvidenceReportPage />)} />
               <Route path="/compliance-documentation/:id" element={withPermission(Permissions.NavComplianceDocumentation, <ComplianceDocumentDetailPage />)} />
@@ -303,9 +311,11 @@ export default function App() {
               <Route path="/reports" element={withAllPermissions([Permissions.NavReports, Permissions.ReportsView], <ReportsPage />)} />
               <Route path="/reports/bordereaux" element={withAllPermissions([Permissions.NavReports, Permissions.AccountingAdmin], <BordereauxWorkbenchPage />)} />
               <Route path="/claims" element={withPermission(Permissions.ClaimsView, <ClaimsPage />)} />
-            </Route>
 
-            <Route path="*" element={<NotFoundPage />} />
+              {/* Unknown paths render 404 inside the app shell for logged-in users; logged-out
+                  users are bounced to /login by ProtectedRoute (with return-URL) (audit O27). */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
           </Routes>
         </ErrorBoundary>
       </BrowserRouter>

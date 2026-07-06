@@ -41,7 +41,9 @@ public class TaskInstanceService : ITaskInstanceService
             .Include(t => t.WorkflowStep)
             .Where(t => t.AssignedUserId.HasValue
                      && assigneeIds.Contains(t.AssignedUserId.Value)
-                     && (t.Status == TaskInstanceStatus.Open || t.Status == TaskInstanceStatus.InProgress))
+                     && (t.Status == TaskInstanceStatus.Open
+                         || t.Status == TaskInstanceStatus.InProgress
+                         || t.Status == TaskInstanceStatus.Blocked))
             .OrderByDescending(t => t.Priority)
             .ThenBy(t => t.DueDate)
             .ToListAsync();
