@@ -9,7 +9,7 @@ import { submissionsApi } from '@/api/submissions.api'
 import { SUBMISSION_STATUS_LABELS, type SubmissionStatus } from '@/types/submission.types'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
-import { parseDateOnly } from '@/lib/utils'
+import { formatDate, parseDateOnly } from '@/lib/utils'
 
 type SortKey = 'submissionNumber' | 'insuredName' | 'status' | 'effectiveDate' | 'createdAt'
 type SortDir = 'asc' | 'desc'
@@ -57,12 +57,6 @@ function uwAvatarClass(name: string): string {
   if (!name || name === '—') return 'g0'
   const h = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 3
   return ['', 'g2', 'g3'][h]
-}
-
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = parseDateOnly(iso)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function daysToEff(iso: string | null | undefined): number | null {
@@ -319,7 +313,7 @@ export function SubmissionsPage() {
                     </td>
                     <td>
                       <div className="subs-eff">
-                        {fmtDate(s.effectiveDate)}
+                        {formatDate(s.effectiveDate)}
                         {daysLabel && <small className={daysCls}>{daysLabel}</small>}
                       </div>
                     </td>
@@ -335,7 +329,7 @@ export function SubmissionsPage() {
                       <div style={{ fontSize: 12.5, fontWeight: 500 }}>{s.agentName ?? '—'}</div>
                       {agency && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{agency}</div>}
                     </td>
-                    <td className="subs-muted">{fmtDate(s.createdAt)}</td>
+                    <td className="subs-muted">{formatDate(s.createdAt)}</td>
                     <td>
                       <button className="sd-btn ghost" onClick={e => e.stopPropagation()}>
                         <MoreHorizontal size={14} />

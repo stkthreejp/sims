@@ -4,7 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { usePermissions } from '@/hooks/usePermissions'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { ErrorState } from '@/components/common/ErrorState'
-import { todayLocal } from '@/lib/utils'
+import { todayLocal, formatCurrency } from '@/lib/utils'
+import { StatusBadge } from '@/components/common/StatusBadge'
+import { LOB_LABELS } from '@/types/quote.types'
 import {
   getTrustReconciliation,
   getCarrierPayableAging,
@@ -51,10 +53,6 @@ import type {
 } from '@/types/report.types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function fmt(n: number) {
-  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
-}
 
 function fmtMonth(year: number, month: number) {
   return new Date(year, month - 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
@@ -104,22 +102,22 @@ function AgingTable({ summary, rows, colLabel }: { summary: AgingBucket; rows: (
         <tbody>
           <tr style={{ background: 'var(--surface-2, #f8f9fa)', fontWeight: 600 }}>
             <td style={tdStyle}>Total</td>
-            <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(summary.current)}</td>
-            <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(summary.days31to60)}</td>
-            <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(summary.days61to90)}</td>
-            <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(summary.over90)}</td>
-            <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(summary.total)}</td>
+            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(summary.current)}</td>
+            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(summary.days31to60)}</td>
+            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(summary.days61to90)}</td>
+            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(summary.over90)}</td>
+            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(summary.total)}</td>
           </tr>
           {rows.map((r, i) => {
             const name = 'payeeName' in r ? r.payeeName : r.agentName
             return (
               <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
                 <td style={tdStyle}>{name}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.current)}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.days31to60)}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.days61to90)}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.over90)}</td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(r.total)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(r.current)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(r.days31to60)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(r.days61to90)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(r.over90)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(r.total)}</td>
               </tr>
             )
           })}
@@ -168,12 +166,12 @@ function TrustReconciliationReport() {
       {data && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <KpiCard label="Trust Balance" value={fmt(data.trustBalance)} sub={`As of ${data.asOf}`} />
-            <KpiCard label="Open Invoices (AR)" value={fmt(data.openInvoices)} />
-            <KpiCard label="Unapplied Receipts" value={fmt(data.unappliedReceipts)} />
+            <KpiCard label="Trust Balance" value={formatCurrency(data.trustBalance)} sub={`As of ${data.asOf}`} />
+            <KpiCard label="Open Invoices (AR)" value={formatCurrency(data.openInvoices)} />
+            <KpiCard label="Unapplied Receipts" value={formatCurrency(data.unappliedReceipts)} />
             <KpiCard
               label="Reconciling Difference"
-              value={fmt(diff)}
+              value={formatCurrency(diff)}
               sub={Math.abs(diff) < 0.01 ? 'Reconciled' : diff > 0 ? 'Trust excess' : 'Trust shortage'}
               highlight={diffHighlight}
             />
@@ -195,9 +193,9 @@ function TrustReconciliationReport() {
                     <td style={tdStyle}>{t.effectiveDate}</td>
                     <td style={tdStyle}>{t.sourceType}</td>
                     <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{t.memo ?? '—'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{t.debit ? fmt(t.debit) : '—'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{t.credit ? fmt(t.credit) : '—'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(t.runningBalance)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{t.debit ? formatCurrency(t.debit) : '—'}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{t.credit ? formatCurrency(t.credit) : '—'}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(t.runningBalance)}</td>
                   </tr>
                 ))}
                 {data.recentActivity.length === 0 && (
@@ -225,11 +223,11 @@ function CarrierPayableAgingReport() {
       {data && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <KpiCard label="Current (0–30)" value={fmt(data.summary.current)} />
-            <KpiCard label="31–60 Days" value={fmt(data.summary.days31to60)} highlight={data.summary.days31to60 > 0 ? 'warn' : undefined} />
-            <KpiCard label="61–90 Days" value={fmt(data.summary.days61to90)} highlight={data.summary.days61to90 > 0 ? 'warn' : undefined} />
-            <KpiCard label="Over 90" value={fmt(data.summary.over90)} highlight={data.summary.over90 > 0 ? 'bad' : undefined} />
-            <KpiCard label="Total Outstanding" value={fmt(data.summary.total)} />
+            <KpiCard label="Current (0–30)" value={formatCurrency(data.summary.current)} />
+            <KpiCard label="31–60 Days" value={formatCurrency(data.summary.days31to60)} highlight={data.summary.days31to60 > 0 ? 'warn' : undefined} />
+            <KpiCard label="61–90 Days" value={formatCurrency(data.summary.days61to90)} highlight={data.summary.days61to90 > 0 ? 'warn' : undefined} />
+            <KpiCard label="Over 90" value={formatCurrency(data.summary.over90)} highlight={data.summary.over90 > 0 ? 'bad' : undefined} />
+            <KpiCard label="Total Outstanding" value={formatCurrency(data.summary.total)} />
           </div>
           <AgingTable summary={data.summary} rows={data.rows} colLabel="Carrier" />
         </>
@@ -251,11 +249,11 @@ function SlTaxAgingReport() {
       {data && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <KpiCard label="Current (0–30)" value={fmt(data.summary.current)} />
-            <KpiCard label="31–60 Days" value={fmt(data.summary.days31to60)} highlight={data.summary.days31to60 > 0 ? 'warn' : undefined} />
-            <KpiCard label="61–90 Days" value={fmt(data.summary.days61to90)} highlight={data.summary.days61to90 > 0 ? 'warn' : undefined} />
-            <KpiCard label="Over 90" value={fmt(data.summary.over90)} highlight={data.summary.over90 > 0 ? 'bad' : undefined} />
-            <KpiCard label="Total Outstanding" value={fmt(data.summary.total)} />
+            <KpiCard label="Current (0–30)" value={formatCurrency(data.summary.current)} />
+            <KpiCard label="31–60 Days" value={formatCurrency(data.summary.days31to60)} highlight={data.summary.days31to60 > 0 ? 'warn' : undefined} />
+            <KpiCard label="61–90 Days" value={formatCurrency(data.summary.days61to90)} highlight={data.summary.days61to90 > 0 ? 'warn' : undefined} />
+            <KpiCard label="Over 90" value={formatCurrency(data.summary.over90)} highlight={data.summary.over90 > 0 ? 'bad' : undefined} />
+            <KpiCard label="Total Outstanding" value={formatCurrency(data.summary.total)} />
           </div>
           <AgingTable summary={data.summary} rows={data.rows} colLabel="Payee" />
         </>
@@ -277,11 +275,11 @@ function BrokerArAgingReport() {
       {data && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <KpiCard label="Current (0–30)" value={fmt(data.summary.current)} />
-            <KpiCard label="31–60 Days" value={fmt(data.summary.days31to60)} highlight={data.summary.days31to60 > 0 ? 'warn' : undefined} />
-            <KpiCard label="61–90 Days" value={fmt(data.summary.days61to90)} highlight={data.summary.days61to90 > 0 ? 'warn' : undefined} />
-            <KpiCard label="Over 90" value={fmt(data.summary.over90)} highlight={data.summary.over90 > 0 ? 'bad' : undefined} />
-            <KpiCard label="Total Outstanding" value={fmt(data.summary.total)} />
+            <KpiCard label="Current (0–30)" value={formatCurrency(data.summary.current)} />
+            <KpiCard label="31–60 Days" value={formatCurrency(data.summary.days31to60)} highlight={data.summary.days31to60 > 0 ? 'warn' : undefined} />
+            <KpiCard label="61–90 Days" value={formatCurrency(data.summary.days61to90)} highlight={data.summary.days61to90 > 0 ? 'warn' : undefined} />
+            <KpiCard label="Over 90" value={formatCurrency(data.summary.over90)} highlight={data.summary.over90 > 0 ? 'bad' : undefined} />
+            <KpiCard label="Total Outstanding" value={formatCurrency(data.summary.total)} />
           </div>
           <AgingTable summary={data.summary} rows={data.rows} colLabel="Agent / Broker" />
         </>
@@ -303,10 +301,10 @@ function CommissionSummaryReport() {
       {data && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <KpiCard label="Total Earned" value={fmt(data.totalEarned)} />
-            <KpiCard label="Agent Paid Out" value={fmt(data.totalAgentPaid)} />
-            <KpiCard label="Net Retained (SMM)" value={fmt(data.totalNetRetained)} />
-            <KpiCard label="Cash Received" value={fmt(data.totalCashReceived)} />
+            <KpiCard label="Total Earned" value={formatCurrency(data.totalEarned)} />
+            <KpiCard label="Agent Paid Out" value={formatCurrency(data.totalAgentPaid)} />
+            <KpiCard label="Net Retained (SMM)" value={formatCurrency(data.totalNetRetained)} />
+            <KpiCard label="Cash Received" value={formatCurrency(data.totalCashReceived)} />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -323,10 +321,10 @@ function CommissionSummaryReport() {
                   <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
                     <td style={tdStyle}>{fmtMonth(p.year, p.month)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{p.invoiceCount}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.earned)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.agentPaid)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(p.netRetained)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.cashReceived)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.earned)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.agentPaid)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(p.netRetained)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.cashReceived)}</td>
                   </tr>
                 ))}
                 {data.periods.length === 0 && (
@@ -359,7 +357,7 @@ function InvoiceTotalsByPolicyTransactionReport() {
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
             <KpiCard label="Transactions" value={data.rows.length.toLocaleString()} />
             <KpiCard label="Invoices" value={totalInvoices.toLocaleString()} />
-            <KpiCard label="Total Amount" value={fmt(totalAmount)} />
+            <KpiCard label="Total Amount" value={formatCurrency(totalAmount)} />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -378,9 +376,9 @@ function InvoiceTotalsByPolicyTransactionReport() {
                     <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{row.policyTransactionType ?? '-'}</td>
                     <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{row.policyVersionNumber ? `v${row.policyVersionNumber}` : '-'}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{row.invoiceCount}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.grossPremium)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.totalFees)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(row.totalAmount)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(row.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(row.totalFees)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(row.totalAmount)}</td>
                   </tr>
                 ))}
                 {data.rows.length === 0 && (
@@ -437,8 +435,8 @@ function InvoiceTotalsByProgramReport() {
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
             <KpiCard label="Programs" value={data.rows.length.toLocaleString()} />
             <KpiCard label="Invoices" value={totalInvoices.toLocaleString()} />
-            <KpiCard label="Total Amount" value={fmt(totalAmount)} />
-            <KpiCard label="Net Retained" value={fmt(totalNetRetained)} />
+            <KpiCard label="Total Amount" value={formatCurrency(totalAmount)} />
+            <KpiCard label="Net Retained" value={formatCurrency(totalNetRetained)} />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -458,12 +456,12 @@ function InvoiceTotalsByProgramReport() {
                       {row.programCode && <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{row.programCode}</div>}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{row.invoiceCount}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.grossPremium)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.totalFees)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(row.totalAmount)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.commissionAmount)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(row.agentCommissionAmount)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(row.netRetained)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(row.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(row.totalFees)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(row.totalAmount)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(row.commissionAmount)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(row.agentCommissionAmount)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(row.netRetained)}</td>
                   </tr>
                 ))}
                 {data.rows.length === 0 && (
@@ -675,7 +673,7 @@ function AuthorityApprovalActivityReport() {
                   <tr key={row.id} style={{ borderBottom: '1px solid var(--line)', verticalAlign: 'top' }}>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <StatusBadge status={row.status} />
+                        <StatusBadge status={row.status} variant={approvalStatusVariant(row.status)} />
                         {row.isOverride && <OverrideBadge />}
                       </div>
                       <div style={{ fontWeight: 600, marginTop: 6 }}>{row.actionLabel}</div>
@@ -1240,14 +1238,12 @@ function WorkTypeBadge({ type }: { type: string }) {
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const bg = status === 'Pending' ? 'var(--yellow-soft, #fefce8)' : status === 'Declined' || status === 'Cancelled' ? 'var(--red-soft, #fef2f2)' : 'var(--green-soft, #f0fdf4)'
-  const color = status === 'Pending' ? '#8a5a00' : status === 'Declined' || status === 'Cancelled' ? 'var(--danger)' : 'var(--good-fg)'
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--r-sm)', padding: '3px 7px', fontSize: 11, fontWeight: 700, background: bg, color }}>
-      {status}
-    </span>
-  )
+// Approval status → nearest shared .sd-pill variant, preserving the prior colors
+// (Pending≈warn, Declined/Cancelled≈danger, else≈good) (audit X15).
+function approvalStatusVariant(status: string): string {
+  if (status === 'Pending') return 'expiring'
+  if (status === 'Declined' || status === 'Cancelled') return 'declined'
+  return 'good'
 }
 
 function OverrideBadge() {
@@ -1261,13 +1257,7 @@ function OverrideBadge() {
 // ── Helpers (production reports) ────────────────────────────────────────────
 
 function lobLabel(lob: string) {
-  const map: Record<string, string> = {
-    GeneralLiability: 'General Liability',
-    InlandMarine: 'Inland Marine',
-    AutoLiability: 'Auto Liability',
-    AutoPhysicalDamage: 'Auto Physical Damage',
-  }
-  return map[lob] ?? lob
+  return (LOB_LABELS as Record<string, string>)[lob] ?? lob
 }
 
 function DateRangeFilter({ dateFrom, dateTo, onFrom, onTo }: {
@@ -1340,7 +1330,7 @@ function RenewalsUpcomingReport() {
                     <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{fmtDate(r.effectiveDate)}</td>
                     <td style={tdStyle}>{fmtDate(r.expirationDate)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: r.daysUntilExpiry <= 30 ? 'var(--bad-fg)' : r.daysUntilExpiry <= 60 ? 'var(--warn-fg)' : 'var(--ink-3)' }}>{r.daysUntilExpiry}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(r.premiumAmount)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(r.premiumAmount)}</td>
                     <td style={{ ...tdStyle, color: r.hasRenewalSubmission ? 'var(--good-fg)' : 'var(--ink-4)' }}>{r.hasRenewalSubmission ? 'Started' : '—'}</td>
                   </tr>
                 ))}
@@ -1376,7 +1366,7 @@ function BoundByPeriodReport() {
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
             <KpiCard label="Policies Bound" value={data.totalPolicies.toLocaleString()} />
-            <KpiCard label="Gross Premium" value={fmt(data.totalGrossPremium)} />
+            <KpiCard label="Gross Premium" value={formatCurrency(data.totalGrossPremium)} />
           </div>
 
           <h3 style={{ ...sectionHead, marginBottom: 12 }}>By Month</h3>
@@ -1394,8 +1384,8 @@ function BoundByPeriodReport() {
                   <tr key={i} style={{ borderBottom: '1px solid var(--line-2)' }}>
                     <td style={tdStyle}>{fmtMonth(p.year, p.month)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{p.policyCount}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.grossPremium)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(p.totalPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(p.totalPremium)}</td>
                   </tr>
                 ))}
                 {data.periods.length === 0 && (
@@ -1422,8 +1412,8 @@ function BoundByPeriodReport() {
                     <td style={tdStyle}>{r.carrierName}</td>
                     <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{lobLabel(r.lineOfBusiness)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.policyCount}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.grossPremium)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(r.totalPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(r.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(r.totalPremium)}</td>
                   </tr>
                 ))}
                 {data.breakdown.length === 0 && (
@@ -1519,7 +1509,7 @@ function WrittenPremiumReport() {
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
             <KpiCard label="Policies Bound" value={data.totalPolicies.toLocaleString()} />
-            <KpiCard label="Written Premium" value={fmt(data.totalGrossPremium)} highlight="good" />
+            <KpiCard label="Written Premium" value={formatCurrency(data.totalGrossPremium)} highlight="good" />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -1539,8 +1529,8 @@ function WrittenPremiumReport() {
                     <td style={{ ...tdStyle, color: 'var(--ink-3)' }}>{lobLabel(r.lineOfBusiness)}</td>
                     <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{r.state}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--ink-3)' }}>{r.policyCount}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(r.grossPremium)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(r.totalPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(r.grossPremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatCurrency(r.totalPremium)}</td>
                   </tr>
                 ))}
                 {data.rows.length === 0 && (
@@ -1635,7 +1625,7 @@ function UwWorkloadReport() {
             <KpiCard label="Open Submissions" value={data.totalOpenSubmissions.toLocaleString()} />
             <KpiCard label="Pending Quotes" value={data.totalPendingQuotes.toLocaleString()} />
             <KpiCard label="Open Tasks" value={data.totalOpenTasks.toLocaleString()} highlight={data.totalOpenTasks > 20 ? 'warn' : undefined} />
-            <KpiCard label="Pipeline Premium" value={fmt(data.totalPipelinePremium)} highlight="good" />
+            <KpiCard label="Pipeline Premium" value={formatCurrency(data.totalPipelinePremium)} highlight="good" />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -1657,7 +1647,7 @@ function UwWorkloadReport() {
                     <td style={{ ...tdStyle, textAlign: 'right', color: r.overdueTasks > 0 ? 'var(--bad-fg)' : 'var(--ink-4)', fontWeight: r.overdueTasks > 0 ? 600 : 400 }}>{r.overdueTasks}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: r.referralsPending > 0 ? 'var(--warn-fg)' : 'var(--ink-4)' }}>{r.referralsPending}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: r.authApprovalsPending > 0 ? 'var(--warn-fg)' : 'var(--ink-4)' }}>{r.authApprovalsPending}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(r.pipelinePremium)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(r.pipelinePremium)}</td>
                   </tr>
                 ))}
                 {data.rows.length === 0 && (

@@ -15,14 +15,9 @@ import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, type PolicyListItem } from '@/types/policy.types'
 import { usePermissions } from '@/hooks/usePermissions'
 import { getGoogleMapsApiKey } from '@/lib/clientConfig'
-import { parseDateOnly } from '@/lib/utils'
+import { formatCurrency, parseDateOnly } from '@/lib/utils'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-function fmtMoney(n: number | null | undefined): string {
-  if (n == null) return '—'
-  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
 
 function fmtMoneyK(n: number | null | undefined): string {
   if (n == null) return '—'
@@ -128,7 +123,7 @@ function PolicyTable({ policies }: { policies: PolicyListItem[] }) {
                 )}
               </td>
               <td><span className={`sd-pill ${variant}`}>{label}</span></td>
-              <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(p.totalPremium)}</td>
+              <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(p.totalPremium, { cents: false })}</td>
               <td />
             </tr>
           )

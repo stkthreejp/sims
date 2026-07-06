@@ -9,10 +9,9 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
-import { parseDateOnly, todayLocal } from '@/lib/utils'
+import { parseDateOnly, todayLocal, formatCurrency, formatDate } from '@/lib/utils'
+import { US_STATES } from '@/constants/usStates'
 import type { CreateInvoiceRequest, InvoiceDetail } from '@/types/invoice.types'
-
-const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']
 
 const EMPTY_FORM: CreateInvoiceRequest = {
   effectiveDate: todayLocal(),
@@ -33,8 +32,15 @@ const CATEGORY_PILL: Record<string, string> = {
   Other: 'draft',
 }
 
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+// Map invoice status → nearest .sd-pill variant so Paid/PartiallyPaid render
+// colored instead of the neutral fallback (audit B8). Posted/Voided already
+// match known variant names; Paid→bound, PartiallyPaid→inprogress.
+const INVOICE_PILL: Record<string, string> = {
+  Paid: 'bound',
+  PartiallyPaid: 'inprogress',
+  Posted: 'posted',
+  Voided: 'voided',
+}
 
 // ---------- New Invoice Modal ----------
 
@@ -152,26 +158,26 @@ function InvoiceDetailView({ id, onBack }: { id: number; onBack: () => void }) {
             <div className="subs-sub">Invoice detail</div>
           </div>
         </div>
-        <StatusBadge status={inv.status} />
+        <StatusBadge status={inv.status} variant={INVOICE_PILL[inv.status]} />
       </header>
 
       {/* Summary metrics */}
       <div className="sd-metrics" style={{ marginBottom: 18 }}>
         <div className="sd-metric">
           <div className="k">Invoice Date</div>
-          <div className="v">{fmtDate(inv.invoiceDate)}</div>
+          <div className="v">{formatDate(inv.invoiceDate)}</div>
         </div>
         <div className="sd-metric">
           <div className="k">Effective Date</div>
-          <div className="v">{fmtDate(inv.effectiveDate)}</div>
+          <div className="v">{formatDate(inv.effectiveDate)}</div>
         </div>
         <div className="sd-metric">
           <div className="k">Gross Premium</div>
-          <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(inv.grossPremium)}</div>
+          <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(inv.grossPremium)}</div>
         </div>
         <div className="sd-metric accent">
           <div className="k">Invoice Total</div>
-          <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(inv.totalAmount)}</div>
+          <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(inv.totalAmount)}</div>
         </div>
       </div>
 
@@ -203,7 +209,7 @@ function InvoiceDetailView({ id, onBack }: { id: number; onBack: () => void }) {
       <div className="sd-card" style={{ marginBottom: 18, overflow: 'hidden' }}>
         <div className="sd-card-head">
           <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Fee Lines</h3>
-          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{fmt.format(inv.totalFees)} total fees</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{formatCurrency(inv.totalFees)} total fees</span>
         </div>
         <table className="sd-table">
           <thead>
@@ -226,13 +232,13 @@ function InvoiceDetailView({ id, onBack }: { id: number; onBack: () => void }) {
                   <span className={`sd-pill ${CATEGORY_PILL[l.feeCategory] ?? 'draft'}`}>{l.feeCategory}</span>
                 </td>
                 <td style={{ color: 'var(--ink-3)' }}>{l.accountCode} — {l.accountLabel}</td>
-                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(l.amount)}</td>
+                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(l.amount)}</td>
                 <td style={{ textAlign: 'center', fontSize: 11 }}>{l.isTaxable ? '✓' : '—'}</td>
               </tr>
             ))}
             <tr style={{ background: 'var(--surface-2)', fontWeight: 600 }}>
               <td colSpan={3} style={{ textAlign: 'right', padding: '11px 14px', color: 'var(--ink-3)' }}>Total Fees</td>
-              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(inv.totalFees)}</td>
+              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(inv.totalFees)}</td>
               <td />
             </tr>
           </tbody>
@@ -262,20 +268,20 @@ function InvoiceDetailView({ id, onBack }: { id: number; onBack: () => void }) {
                   <span style={{ color: 'var(--ink-2)' }}>{e.accountLabel}</span>
                 </td>
                 <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{e.memo}</td>
-                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{e.debit > 0 ? fmt.format(e.debit) : '—'}</td>
-                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{e.credit > 0 ? fmt.format(e.credit) : '—'}</td>
+                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{e.debit > 0 ? formatCurrency(e.debit) : '—'}</td>
+                <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{e.credit > 0 ? formatCurrency(e.credit) : '—'}</td>
               </tr>
             ))}
             <tr style={{ background: 'var(--surface-2)', fontWeight: 600, borderTop: '2px solid var(--line)' }}>
               <td colSpan={2} style={{ textAlign: 'right', padding: '11px 14px', color: 'var(--ink-3)' }}>Totals</td>
-              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(totalDebit)}</td>
-              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(totalCredit)}</td>
+              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(totalDebit)}</td>
+              <td className="num" style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(totalCredit)}</td>
             </tr>
             <tr>
               <td colSpan={4} style={{ textAlign: 'right', padding: '6px 14px' }}>
                 {Math.abs(totalDebit - totalCredit) < 0.001
                   ? <span style={{ fontSize: 11, color: 'var(--pill-bound-fg)', fontWeight: 500 }}>✓ Balanced</span>
-                  : <span style={{ fontSize: 11, color: 'var(--bad-fg)', fontWeight: 500 }}>✗ Out of balance by {fmt.format(Math.abs(totalDebit - totalCredit))}</span>
+                  : <span style={{ fontSize: 11, color: 'var(--bad-fg)', fontWeight: 500 }}>✗ Out of balance by {formatCurrency(Math.abs(totalDebit - totalCredit))}</span>
                 }
               </td>
             </tr>
@@ -371,19 +377,19 @@ export function InvoicesPage() {
         <div className="sd-metrics" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div className="sd-metric accent">
             <div className="k">Outstanding</div>
-            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(outstanding)}</div>
+            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(outstanding)}</div>
             <div className="s">{open.length} open invoice{open.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="sd-metric" style={pastDue.length > 0 ? { background: 'var(--bad-bg)', borderColor: 'var(--bad-fg)' } : {}}>
             <div className="k" style={pastDue.length > 0 ? { color: 'var(--bad-fg)' } : {}}>Past Due</div>
             <div className="v" style={{ fontVariantNumeric: 'tabular-nums', ...(pastDue.length > 0 ? { color: 'var(--bad-fg)' } : {}) }}>
-              {pastDue.length > 0 ? fmt.format(pastDueAmount) : '—'}
+              {pastDue.length > 0 ? formatCurrency(pastDueAmount) : '—'}
             </div>
             <div className="s">{pastDue.length > 0 ? `${pastDue.length} invoice${pastDue.length !== 1 ? 's' : ''}` : 'None'}</div>
           </div>
           <div className="sd-metric">
             <div className="k">Total Billed (all time)</div>
-            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt.format(totalBilled)}</div>
+            <div className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(totalBilled)}</div>
             <div className="s">{invoices.length} invoice{invoices.length !== 1 ? 's' : ''}</div>
           </div>
         </div>
@@ -458,12 +464,12 @@ export function InvoicesPage() {
                       <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>v{inv.policyVersionNumber}</div>
                     )}
                   </td>
-                  <td className="subs-eff">{fmtDate(inv.invoiceDate)}</td>
-                  <td className="subs-eff">{fmtDate(inv.effectiveDate)}</td>
-                  <td className="subs-eff num">{fmt.format(inv.grossPremium)}</td>
-                  <td className="subs-eff num subs-muted">{fmt.format(inv.totalFees)}</td>
-                  <td className="subs-eff num" style={{ fontWeight: 600 }}>{fmt.format(inv.totalAmount)}</td>
-                  <td><StatusBadge status={inv.status} /></td>
+                  <td className="subs-eff">{formatDate(inv.invoiceDate)}</td>
+                  <td className="subs-eff">{formatDate(inv.effectiveDate)}</td>
+                  <td className="subs-eff num">{formatCurrency(inv.grossPremium)}</td>
+                  <td className="subs-eff num subs-muted">{formatCurrency(inv.totalFees)}</td>
+                  <td className="subs-eff num" style={{ fontWeight: 600 }}>{formatCurrency(inv.totalAmount)}</td>
+                  <td><StatusBadge status={inv.status} variant={INVOICE_PILL[inv.status]} /></td>
                 </tr>
                 )
               })}

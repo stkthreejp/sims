@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { usePermissions } from '@/hooks/usePermissions'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { getClaims, getImportBatches, importClaims } from '@/api/claims.api'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import type { ClaimStatus, ImportClaimsRequest, UnifiedClaimImportRow } from '@/types/claim.types'
 
 const STATUSES: ClaimStatus[] = ['Open', 'Closed', 'Reopened', 'Denied', 'Subrogation', 'Withdrawn']
@@ -19,15 +20,6 @@ function safeParse(json: string | null | undefined): string[] | null {
   } catch {
     return null
   }
-}
-
-function money(value: number) {
-  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
-
-function fmtDate(value?: string | null) {
-  if (!value) return '—'
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 // ── CSV parsing (Unified_Claims_Import layout) ───────────────────────────────
@@ -235,10 +227,10 @@ export function ClaimsPage() {
             </label>
             <div style={{ flex: 1 }} />
             <div style={{ display: 'flex', gap: 14, fontSize: 12.5, color: 'var(--ink-3)' }}>
-              <span>Paid <strong style={{ color: 'var(--ink)' }}>{money(totals.paid)}</strong></span>
-              <span>Reserved <strong style={{ color: 'var(--ink)' }}>{money(totals.reserved)}</strong></span>
-              <span>Expense <strong style={{ color: 'var(--ink)' }}>{money(totals.expense)}</strong></span>
-              <span>Incurred <strong style={{ color: 'var(--ink)' }}>{money(totals.incurred)}</strong></span>
+              <span>Paid <strong style={{ color: 'var(--ink)' }}>{formatCurrency(totals.paid)}</strong></span>
+              <span>Reserved <strong style={{ color: 'var(--ink)' }}>{formatCurrency(totals.reserved)}</strong></span>
+              <span>Expense <strong style={{ color: 'var(--ink)' }}>{formatCurrency(totals.expense)}</strong></span>
+              <span>Incurred <strong style={{ color: 'var(--ink)' }}>{formatCurrency(totals.incurred)}</strong></span>
             </div>
           </div>
 
@@ -275,14 +267,14 @@ export function ClaimsPage() {
                       </td>
                       <td>{c.policyNumber ?? c.sourcePolicyReference ?? '—'}</td>
                       <td>{c.insuredName ?? '—'}</td>
-                      <td>{fmtDate(c.dateOfLoss)}</td>
+                      <td>{formatDate(c.dateOfLoss)}</td>
                       <td><StatusPill status={c.status} /></td>
                       <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.lossCause ?? '—'}</td>
-                      <td style={{ textAlign: 'right' }}>{money(c.paid)}</td>
-                      <td style={{ textAlign: 'right' }}>{money(c.reserved)}</td>
-                      <td style={{ textAlign: 'right' }}>{money(c.expense)}</td>
-                      <td style={{ textAlign: 'right' }}>{money(c.incurred)}</td>
-                      <td>{fmtDate(c.lastValuationDate)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(c.paid)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(c.reserved)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(c.expense)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(c.incurred)}</td>
+                      <td>{formatDate(c.lastValuationDate)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -359,7 +351,7 @@ export function ClaimsPage() {
                   <tr key={b.id} title={safeParse(b.errorSummaryJson)?.join('\n') ?? undefined}>
                     <td>{b.fileName}</td>
                     <td>{[b.carrierName, b.tpaName].filter(Boolean).join(' / ') || '—'}</td>
-                    <td>{fmtDate(b.valuationDate)}</td>
+                    <td>{formatDate(b.valuationDate)}</td>
                     <td style={{ textAlign: 'right' }}>{b.recordCount}</td>
                     <td style={{ textAlign: 'right' }}>{b.createdCount}</td>
                     <td style={{ textAlign: 'right' }}>{b.updatedCount}</td>

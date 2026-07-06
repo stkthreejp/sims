@@ -5,18 +5,18 @@ import { ArrowLeft, ArrowRight, CheckCircle, XCircle, Users, Plus } from 'lucide
 import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { StatusBadge } from '@/components/common/StatusBadge'
 import { useAuthStore } from '@/store/authStore'
 import { todayLocal } from '@/lib/utils'
 import type { RatingPlanVersionSummary, PlanStatus } from '@/types/rating.types'
 
-function StatusBadge({ status }: { status: PlanStatus }) {
-  const map: Record<PlanStatus, { label: string; cls: string }> = {
-    Active:  { label: 'Active',  cls: 'bg-emerald-100 text-emerald-700' },
-    Draft:   { label: 'Draft',   cls: 'bg-amber-100 text-amber-700' },
-    Retired: { label: 'Retired', cls: 'bg-slate-100 text-slate-500' },
-  }
-  const { label, cls } = map[status]
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{label}</span>
+// Nearest .sd-pill variant per status, chosen to preserve the prior colors:
+// Active (emerald) → good (green); Draft (amber) → expiring (amber/warn);
+// Retired (slate) → expired (neutral gray).
+const STATUS_PILL_VARIANT: Record<PlanStatus, string> = {
+  Active: 'good',
+  Draft: 'expiring',
+  Retired: 'expired',
 }
 
 function EffectiveRange({ v }: { v: RatingPlanVersionSummary }) {
@@ -190,7 +190,7 @@ export function AdminRatingPlanDetailPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-semibold text-slate-900">{plan.name}</h1>
-              <StatusBadge status={plan.status} />
+              <StatusBadge status={plan.status} variant={STATUS_PILL_VARIANT[plan.status]} />
             </div>
             <div className="flex items-center gap-3 text-sm text-slate-500">
               <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-100">{plan.lobLabel}</span>
@@ -241,7 +241,7 @@ export function AdminRatingPlanDetailPage() {
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-slate-700 font-mono">v{v.versionNumber}</span>
-                      <StatusBadge status={v.status} />
+                      <StatusBadge status={v.status} variant={STATUS_PILL_VARIANT[v.status]} />
                       <span className="text-xs text-slate-500">
                         <EffectiveRange v={v} />
                       </span>

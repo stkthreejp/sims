@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { todayLocal } from '@/lib/utils'
+import { US_STATES } from '@/constants/usStates'
 import type {
   ProgramCarrier,
   ProgramCarrierLineOfBusiness,
@@ -21,8 +22,6 @@ import type {
   ProgramOrphanIssue,
 } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
-
-const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WV','WI','WY','DC']
 
 const emptyProgram: ProgramConfigurationUpsert = {
   name: '',

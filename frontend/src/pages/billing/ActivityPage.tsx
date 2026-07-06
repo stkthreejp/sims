@@ -13,14 +13,12 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import type { ActivityEvent, ActivityFilter } from '@/types/activity.types'
 import { usePermissions } from '@/hooks/usePermissions'
 
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const fmtDateTime = (s: string) =>
   new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-const fmtDate = (s: string) =>
-  new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const SOURCE_TYPES = ['Invoice', 'Receipt', 'CashApplication', 'Disbursement', 'Distribution']
 
@@ -152,7 +150,7 @@ function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--line-2)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <p style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 2 }}>Effective date</p>
-            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{fmtDate(event.effectiveDate)}</p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{formatDate(event.effectiveDate)}</p>
           </div>
           <div>
             <p style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 2 }}>Posted at</p>
@@ -223,10 +221,10 @@ function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
                     {line.memo && <p style={{ color: 'var(--ink-4)', marginTop: 2, fontSize: 11, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line.memo}</p>}
                   </td>
                   <td style={{ padding: '8px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
-                    {line.debit > 0 ? fmt.format(line.debit) : '—'}
+                    {line.debit > 0 ? formatCurrency(line.debit) : '—'}
                   </td>
                   <td style={{ padding: '8px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
-                    {line.credit > 0 ? fmt.format(line.credit) : '—'}
+                    {line.credit > 0 ? formatCurrency(line.credit) : '—'}
                   </td>
                 </tr>
               ))}
@@ -234,8 +232,8 @@ function DetailDrawer({ event, onClose, onVoidClick }: DrawerProps) {
             <tfoot>
               <tr style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--line)', fontWeight: 700 }}>
                 <td style={{ padding: '8px 20px', fontSize: 12, color: 'var(--ink-3)' }}>Totals</td>
-                <td style={{ padding: '8px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{fmt.format(event.totalDebits)}</td>
-                <td style={{ padding: '8px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{fmt.format(event.totalCredits)}</td>
+                <td style={{ padding: '8px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{formatCurrency(event.totalDebits)}</td>
+                <td style={{ padding: '8px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{formatCurrency(event.totalCredits)}</td>
               </tr>
             </tfoot>
           </table>
@@ -382,7 +380,7 @@ export function ActivityPage() {
                   }}
                   onClick={() => setSelectedEvent(evt)}
                 >
-                  <td style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{fmtDate(evt.effectiveDate)}</td>
+                  <td style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{formatDate(evt.effectiveDate)}</td>
                   <td><StatusBadge status={SOURCE_PILL[evt.sourceType] ?? 'draft'} label={SOURCE_LABEL[evt.sourceType] ?? evt.sourceType} /></td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
@@ -395,7 +393,7 @@ export function ActivityPage() {
                     {evt.sourcePolicyTransactionNumber ?? evt.sourceDescription ?? '—'}
                   </td>
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
-                    {fmt.format(evt.totalDebits)}
+                    {formatCurrency(evt.totalDebits)}
                   </td>
                   <td><StatusBadge status={POSTING_PILL[evt.postingStatus] ?? 'draft'} label={evt.postingStatus} /></td>
                   <td style={{ color: 'var(--ink-4)' }}><ChevronRight style={{ width: 14, height: 14 }} /></td>

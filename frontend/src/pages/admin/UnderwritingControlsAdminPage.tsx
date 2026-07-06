@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { PageHeader } from '@/components/common/PageHeader'
+import { US_STATES } from '@/constants/usStates'
 import type { Attachment } from '@/types/attachment.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type {
@@ -24,13 +25,7 @@ import type {
   UpdateUnderwritingGuidelineControlRequest,
 } from '@/types/underwritingGuidelines.types'
 
-const US_STATES = [
-  'ALL', 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC',
-]
+const STATE_OPTIONS = ['ALL', ...US_STATES]
 
 const ITEM_TYPES: UnderwritingControlItemType[] = ['AppetiteRule', 'ReferralTrigger', 'AuthorityLimit', 'DocumentChecklistItem', 'AppetiteNote']
 const STAGES: UnderwritingControlStage[] = ['Submission', 'Quote', 'Bind', 'Issue', 'PostBind', 'Renewal']
@@ -596,7 +591,7 @@ export function UnderwritingControlsAdminPage() {
                   onChange={(e) => setDocumentForm((f) => ({ ...f, stateCode: e.target.value }))}
                   className={inputCls}
                 >
-                  {US_STATES.map((state) => (
+                  {STATE_OPTIONS.map((state) => (
                     <option key={state} value={state}>{state}</option>
                   ))}
                 </select>

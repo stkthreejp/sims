@@ -110,11 +110,6 @@ const emptyQuoteForm = (): QuoteForm => ({
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function fmtMoney(n: number | null | undefined) {
-  if (n == null) return '—'
-  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
-
 function fmtMoneyK(n: number | null | undefined) {
   if (n == null) return '—'
   if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M'
@@ -1247,7 +1242,7 @@ export function SubmissionDetailPage() {
                       <div className="s">Quoted premium</div>
                       {q.totalPremium == null || q.totalPremium === 0
                         ? <div className="v" style={{ color: 'var(--ink-4)' }}>—</div>
-                        : <div className="v">{fmtMoney(q.totalPremium)}</div>}
+                        : <div className="v">{formatCurrency(q.totalPremium, { cents: false })}</div>}
                     </div>
                   </div>
                   <div className="meta">
@@ -2412,7 +2407,7 @@ export function SubmissionDetailPage() {
                         <td>{p.lineOfBusiness ? <span className="sd-lob">{LOB_SHORT[p.lineOfBusiness] ?? p.lineOfBusiness}</span> : '—'}</td>
                         <td className="id">{p.policyNumber ?? '—'}</td>
                         <td>{p.expirationDate ?? '—'}</td>
-                        <td className="num">{p.premium != null ? fmtMoney(p.premium) : '—'}</td>
+                        <td className="num">{p.premium != null ? formatCurrency(p.premium, { cents: false }) : '—'}</td>
                         <td style={{ padding: '8px 14px' }}>
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button onClick={() => { setCarrierForm({ carrierName: p.carrierName, lineOfBusiness: p.lineOfBusiness ?? undefined, policyNumber: p.policyNumber ?? undefined, expirationDate: p.expirationDate ?? undefined, premium: p.premium ?? undefined }); setEditingCarrierId(p.id); setShowCarrierForm(true) }} className="sims-icon-btn hover:text-sky-600" title="Edit prior carrier"><Pencil size={12} /></button>

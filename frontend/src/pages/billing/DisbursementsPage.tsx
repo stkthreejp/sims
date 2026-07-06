@@ -17,12 +17,9 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
 import { getApiErrorMessage } from '@/lib/apiError'
-import { parseDateOnly, todayLocal } from '@/lib/utils'
+import { todayLocal, formatCurrency, formatDate } from '@/lib/utils'
 import type { OpenPayable, AgingRow } from '@/types/disbursement.types'
 
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) =>
-  parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 const payeeSubledgerKey = (payee: { payeeId: number | null; payeeName: string }) =>
   payee.payeeId ? `payee:${payee.payeeId}` : `name:${payee.payeeName}`
 
@@ -119,7 +116,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
                     <tr key={p.id} style={{ cursor: 'default' }}>
                       <td className="id">{p.invoiceNumber}</td>
                       <td style={{ color: 'var(--ink-2)', fontSize: 12 }}>{p.payeeName}</td>
-                      <td className="num">{fmt.format(p.balance)}</td>
+                      <td className="num">{formatCurrency(p.balance)}</td>
                       <td className="num">
                         <input
                           type="number" step="0.01" min="0" max={p.balance}
@@ -137,7 +134,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
                 <tfoot style={{ borderTop: '2px solid var(--line)', background: 'var(--surface-2)' }}>
                   <tr>
                     <td colSpan={3} style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--ink-2)', fontSize: 13 }}>Total</td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(totalAmount)}</td>
+                    <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(totalAmount)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -176,7 +173,7 @@ function CreateDisbursementModal({ payables, onClose, onCreated }: CreateModalPr
             onClick={handleSubmit}
           >
             <DollarSign style={{ width: 13, height: 13 }} />
-            {createMutation.isPending ? 'Creating…' : `Create — ${fmt.format(totalAmount)}`}
+            {createMutation.isPending ? 'Creating…' : `Create — ${formatCurrency(totalAmount)}`}
           </button>
         </div>
       </div>
@@ -244,7 +241,7 @@ function AgingTab() {
         {buckets.map(({ label, value, border, color }) => (
           <div key={label} className="sd-metric" style={{ borderColor: border }}>
             <p className="k" style={{ color }}>{label}</p>
-            <p className="v" style={{ color }}>{fmt.format(value)}</p>
+            <p className="v" style={{ color }}>{formatCurrency(value)}</p>
           </div>
         ))}
       </div>
@@ -257,7 +254,7 @@ function AgingTab() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <p style={{ fontSize: 13, color: 'var(--ink-2)' }}>
               {aging.payables.length} payable{aging.payables.length !== 1 ? 's' : ''} ·{' '}
-              {fmt.format(aging.summary.total)} outstanding
+              {formatCurrency(aging.summary.total)} outstanding
             </p>
             <button
               className="sd-btn primary"
@@ -310,11 +307,11 @@ function AgingTab() {
                           {isExpanded ? <ChevronDown style={{ width: 14, height: 14 }} /> : <ChevronRight style={{ width: 14, height: 14 }} />}
                         </td>
                         <td style={{ fontWeight: 600, color: 'var(--ink)' }}>{row.payeeName}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>{row.current > 0 ? fmt.format(row.current) : '—'}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--warn-fg)' }}>{row.days31to60 > 0 ? fmt.format(row.days31to60) : '—'}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--bad-fg)' }}>{row.days61to90 > 0 ? fmt.format(row.days61to90) : '—'}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--bad-fg)' }}>{row.over90 > 0 ? fmt.format(row.over90) : '—'}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(row.total)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>{row.current > 0 ? formatCurrency(row.current) : '—'}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--warn-fg)' }}>{row.days31to60 > 0 ? formatCurrency(row.days31to60) : '—'}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--bad-fg)' }}>{row.days61to90 > 0 ? formatCurrency(row.days61to90) : '—'}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--bad-fg)' }}>{row.over90 > 0 ? formatCurrency(row.over90) : '—'}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(row.total)}</td>
                       </tr>
 
                       {isExpanded && rowPayables.map((p) => (
@@ -326,13 +323,13 @@ function AgingTab() {
                           <td />
                           <td style={{ paddingLeft: 28 }}>
                             <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>{p.invoiceNumber}</span>
-                            <span style={{ color: 'var(--ink-4)', marginLeft: 8 }}>{fmtDate(p.invoiceDate)}</span>
+                            <span style={{ color: 'var(--ink-4)', marginLeft: 8 }}>{formatDate(p.invoiceDate)}</span>
                             <span style={{ marginLeft: 8 }}><AgeBadge days={p.daysOutstanding} /></span>
                             <span style={{ marginLeft: 8 }}><StatusBadge status={DISB_PILL[p.status] ?? 'draft'} label={DISB_LABEL[p.status] ?? p.status} /></span>
                           </td>
                           <td colSpan={4} />
                           <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
-                            {fmt.format(p.balance)}
+                            {formatCurrency(p.balance)}
                           </td>
                         </tr>
                       ))}
@@ -343,11 +340,11 @@ function AgingTab() {
               <tfoot style={{ borderTop: '2px solid var(--line)', background: 'var(--surface-2)' }}>
                 <tr>
                   <td colSpan={3} style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--ink-2)', fontSize: 13 }}>Total Outstanding</td>
-                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink-2)' }}>{fmt.format(aging.summary.current)}</td>
-                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--warn-fg)' }}>{fmt.format(aging.summary.days31to60)}</td>
-                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--bad-fg)' }}>{fmt.format(aging.summary.days61to90)}</td>
-                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--bad-fg)' }}>{fmt.format(aging.summary.over90)}</td>
-                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(aging.summary.total)}</td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink-2)' }}>{formatCurrency(aging.summary.current)}</td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--warn-fg)' }}>{formatCurrency(aging.summary.days31to60)}</td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--bad-fg)' }}>{formatCurrency(aging.summary.days61to90)}</td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--bad-fg)' }}>{formatCurrency(aging.summary.over90)}</td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(aging.summary.total)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -442,9 +439,9 @@ function DisbursementsTab() {
                 >
                   <td className="subs-id">{d.disbursementNumber}</td>
                   <td style={{ color: 'var(--ink)' }}>{d.payeeName}</td>
-                  <td style={{ color: 'var(--ink-2)' }}>{fmtDate(d.paymentDate)}</td>
+                  <td style={{ color: 'var(--ink-2)' }}>{formatDate(d.paymentDate)}</td>
                   <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{d.paymentMethod}{d.reference ? ` · ${d.reference}` : ''}</td>
-                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmt.format(d.totalAmount)}</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(d.totalAmount)}</td>
                   <td><StatusBadge status={DISB_PILL[d.status] ?? 'draft'} label={DISB_LABEL[d.status] ?? d.status} /></td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: 6 }}>
@@ -453,7 +450,7 @@ function DisbursementsTab() {
                           className="sd-btn sm"
                           disabled={postMutation.isPending}
                           onClick={() => {
-                            if (confirm(`Post ${d.disbursementNumber} — pay ${d.payeeName} ${fmt.format(d.totalAmount)}?\n\nThis posts the payment journal entry and cannot be edited afterward.`)) postMutation.mutate(d.id)
+                            if (confirm(`Post ${d.disbursementNumber} — pay ${d.payeeName} ${formatCurrency(d.totalAmount)}?\n\nThis posts the payment journal entry and cannot be edited afterward.`)) postMutation.mutate(d.id)
                           }}
                           style={{ color: 'var(--pill-bound-fg)' }}
                         >
@@ -466,7 +463,7 @@ function DisbursementsTab() {
                           className="sd-btn sm"
                           disabled={voidMutation.isPending}
                           onClick={() => {
-                            const reason = prompt(`Void ${d.disbursementNumber} (${d.payeeName}, ${fmt.format(d.totalAmount)})?\n\nEnter a reason:`)
+                            const reason = prompt(`Void ${d.disbursementNumber} (${d.payeeName}, ${formatCurrency(d.totalAmount)})?\n\nEnter a reason:`)
                             if (reason && reason.trim()) voidMutation.mutate({ id: d.id, reason: reason.trim() })
                           }}
                           style={{ color: 'var(--bad-fg)' }}
@@ -508,12 +505,12 @@ function DisbursementsTab() {
               {detail.lines.map((l) => (
                 <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>{l.invoiceNumber}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{fmt.format(l.amount)}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{formatCurrency(l.amount)}</span>
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, borderTop: '1px solid var(--line-2)', paddingTop: 6, marginTop: 4 }}>
                 <span style={{ color: 'var(--ink-2)' }}>Total</span>
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{fmt.format(detail.totalAmount)}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{formatCurrency(detail.totalAmount)}</span>
               </div>
             </div>
           </div>

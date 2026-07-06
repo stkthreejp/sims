@@ -5,7 +5,7 @@ import { Search, FileText } from 'lucide-react'
 import { policiesApi } from '@/api/policies.api'
 import { LOB_LABELS } from '@/types/quote.types'
 import { POLICY_STATUS_LABELS, type PolicyStatus, type PolicyListItem } from '@/types/policy.types'
-import { formatCurrency, parseDateOnly } from '@/lib/utils'
+import { formatCurrency, formatDate, parseDateOnly } from '@/lib/utils'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 
@@ -36,10 +36,6 @@ function daysToExp(iso: string): number {
   now.setHours(0, 0, 0, 0)
   exp.setHours(0, 0, 0, 0)
   return Math.round((exp.getTime() - now.getTime()) / 86_400_000)
-}
-
-function fmtDate(iso: string): string {
-  return parseDateOnly(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function tabKey(p: PolicyListItem): TabKey {
@@ -282,7 +278,7 @@ export function PoliciesPage() {
                   <td className="subs-muted">{p.carrierName}</td>
                   <td className="subs-muted">{LOB_LABELS[p.lineOfBusiness] ?? p.lineOfBusiness}</td>
                   <td className="subs-eff">
-                    {fmtDate(p.expirationDate)}
+                    {formatDate(p.expirationDate)}
                     {days !== null && days <= 90 && (
                       <small className={days <= 30 ? 'soon' : ''}>
                         {days < 0 ? `${Math.abs(days)}d ago` : days === 0 ? 'today' : `in ${days}d`}

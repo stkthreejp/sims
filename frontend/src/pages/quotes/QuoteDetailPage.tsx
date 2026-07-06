@@ -52,12 +52,12 @@ const STATUS_PILL: Record<QuoteStatus, string> = {
 
 function fmt(n: number | null | undefined) {
   if (n == null) return '—'
-  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
+  return formatCurrency(n, { cents: false })
 }
 
 function fmtFull(n: number | null | undefined) {
   if (n == null) return '—'
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return formatCurrency(n)
 }
 
 function formatRequiredChecklistBlockers(items: QuoteChecklistItem[], stageLabel: string) {

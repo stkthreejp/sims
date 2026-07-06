@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import { parseDateOnly, todayLocal } from '@/lib/utils'
+import { US_STATES } from '@/constants/usStates'
 import type { FeeDefinition, FeeRuleVersion } from '@/types/fee.types'
 import type { ProgramConfiguration } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
@@ -25,8 +26,6 @@ import type {
   CarrierAdditionalInterestRate,
   CarrierAdditionalInterestRateCreate,
 } from '@/types/submissionLob.types'
-
-const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']
 
 type View = 'list' | 'versions' | 'edit-version' | 'new-version'
 type AdminTab = 'fees' | 'premium-charges'

@@ -10,6 +10,7 @@ import {
 import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
+import { StatusBadge } from '@/components/common/StatusBadge'
 import { getApiErrorMessage } from '@/lib/apiError'
 import type { AccountingPeriod, ChecklistItem } from '@/types/periodClose.types'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -19,22 +20,22 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
+// Preserve each status's original color via the nearest shared .sd-pill variant:
+// Open→good (green), Closing→expiring (amber), Closed→draft (grey),
+// Reopened→submitted (grey-blue).
+const PERIOD_PILL: Record<AccountingPeriod['status'], string> = {
+  Open: 'good',
+  Closing: 'expiring',
+  Closed: 'draft',
+  Reopened: 'submitted',
+}
+
 function periodLabel(p: AccountingPeriod) {
   return `${MONTH_NAMES[p.periodMonth]} ${p.periodYear}`
 }
 
-function StatusBadge({ status }: { status: AccountingPeriod['status'] }) {
-  const styles: Record<string, React.CSSProperties> = {
-    Open:     { background: 'var(--good-bg)', color: 'var(--good-fg)' },
-    Closing:  { background: 'var(--warn-bg)', color: 'var(--warn-fg)' },
-    Closed:   { background: 'var(--surface-2)', color: 'var(--ink-3)' },
-    Reopened: { background: 'var(--surface-2)', color: 'var(--accent-ink)' },
-  }
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={styles[status] ?? { background: 'var(--surface-2)', color: 'var(--ink-3)' }}>
-      {status}
-    </span>
-  )
+function PeriodStatusBadge({ status }: { status: AccountingPeriod['status'] }) {
+  return <StatusBadge status={status} variant={PERIOD_PILL[status] ?? 'draft'} />
 }
 
 function ChecklistRow({ item }: { item: ChecklistItem }) {
@@ -144,7 +145,7 @@ function PeriodPanel({ period, isAdmin }: PeriodPanelProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>{periodLabel(period)}</h2>
-          <StatusBadge status={period.status} />
+          <PeriodStatusBadge status={period.status} />
         </div>
         {!isClosed && (
           <button
@@ -360,7 +361,7 @@ export function PeriodClosePage() {
                   }
                 >
                   <span className="font-medium">{periodLabel(p)}</span>
-                  <StatusBadge status={p.status} />
+                  <PeriodStatusBadge status={p.status} />
                 </button>
               ))
             )}

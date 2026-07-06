@@ -10,11 +10,8 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
-import { parseDateOnly, todayLocal } from '@/lib/utils'
+import { todayLocal, formatCurrency, formatDate } from '@/lib/utils'
 import type { CreateReceiptRequest, ReceiptDetail } from '@/types/receipt.types'
-
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const RECEIPT_PILL: Record<string, string> = {
   Open: 'quoted',
@@ -125,10 +122,10 @@ function ReceiptDetailView({ id, onBack }: { id: number; onBack: () => void }) {
 
       <div className="sd-metrics" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 20 }}>
         {[
-          { label: 'Received Date', value: fmtDate(receipt.receivedDate) },
+          { label: 'Received Date', value: formatDate(receipt.receivedDate) },
           { label: 'Payer', value: receipt.payerName },
-          { label: 'Amount', value: fmt.format(receipt.amount) },
-          { label: 'Remaining', value: fmt.format(remaining) },
+          { label: 'Amount', value: formatCurrency(receipt.amount) },
+          { label: 'Remaining', value: formatCurrency(remaining) },
         ].map(({ label, value }) => (
           <div key={label} className="sd-metric">
             <p className="k">{label}</p>
@@ -162,17 +159,17 @@ function ReceiptDetailView({ id, onBack }: { id: number; onBack: () => void }) {
               {receipt.applications.map(a => (
                 <tr key={a.id} style={{ cursor: 'default' }}>
                   <td className="id">{a.invoiceNumber}</td>
-                  <td className="num">{fmt.format(a.grossApplied)}</td>
-                  <td className="num" style={{ color: 'var(--warn-fg)' }}>{fmt.format(a.commissionAmount)}</td>
-                  <td className="num primary-cell">{fmt.format(a.netApplied)}</td>
+                  <td className="num">{formatCurrency(a.grossApplied)}</td>
+                  <td className="num" style={{ color: 'var(--warn-fg)' }}>{formatCurrency(a.commissionAmount)}</td>
+                  <td className="num primary-cell">{formatCurrency(a.netApplied)}</td>
                   <td style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{new Date(a.createdAt).toLocaleString()}</td>
                 </tr>
               ))}
               <tr style={{ background: 'var(--surface-2)', fontWeight: 600, cursor: 'default' }}>
                 <td style={{ textAlign: 'right', color: 'var(--ink-2)', padding: '11px 14px' }}>Totals</td>
-                <td className="num">{fmt.format(receipt.applications.reduce((s, a) => s + a.grossApplied, 0))}</td>
-                <td className="num" style={{ color: 'var(--warn-fg)' }}>{fmt.format(receipt.applications.reduce((s, a) => s + a.commissionAmount, 0))}</td>
-                <td className="num">{fmt.format(receipt.appliedAmount)}</td>
+                <td className="num">{formatCurrency(receipt.applications.reduce((s, a) => s + a.grossApplied, 0))}</td>
+                <td className="num" style={{ color: 'var(--warn-fg)' }}>{formatCurrency(receipt.applications.reduce((s, a) => s + a.commissionAmount, 0))}</td>
+                <td className="num">{formatCurrency(receipt.appliedAmount)}</td>
                 <td />
               </tr>
             </tbody>
@@ -267,12 +264,12 @@ export function ReceiptsPage() {
           </div>
           <div className="sd-metric">
             <p className="k">Total Received</p>
-            <p className="v">{fmt.format(receipts.reduce((s, r) => s + r.amount, 0))}</p>
+            <p className="v">{formatCurrency(receipts.reduce((s, r) => s + r.amount, 0))}</p>
           </div>
           <div className="sd-metric">
             <p className="k">Unapplied Balance</p>
             <p className="v" style={{ color: totalOpen > 0 ? 'var(--warn-fg)' : 'var(--pill-bound-fg)' }}>
-              {fmt.format(totalOpen)}
+              {formatCurrency(totalOpen)}
             </p>
           </div>
         </div>
@@ -305,11 +302,11 @@ export function ReceiptsPage() {
               receipts.map(r => (
                 <tr key={r.id} className="subs-row" onClick={() => setSelectedId(r.id)}>
                   <td className="subs-id">{r.receiptNumber}</td>
-                  <td style={{ color: 'var(--ink-2)' }}>{fmtDate(r.receivedDate)}</td>
+                  <td style={{ color: 'var(--ink-2)' }}>{formatDate(r.receivedDate)}</td>
                   <td style={{ color: 'var(--ink)' }}>{r.payerName}</td>
-                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt.format(r.amount)}</td>
-                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--ink-3)' }}>{fmt.format(r.appliedAmount)}</td>
-                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt.format(r.amount - r.appliedAmount)}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(r.amount)}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--ink-3)' }}>{formatCurrency(r.appliedAmount)}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{formatCurrency(r.amount - r.appliedAmount)}</td>
                   <td><StatusBadge status={RECEIPT_PILL[r.status] ?? 'draft'} label={RECEIPT_LABEL[r.status] ?? r.status} /></td>
                   <td style={{ color: 'var(--ink-4)' }}><ChevronRight style={{ width: 14, height: 14 }} /></td>
                 </tr>

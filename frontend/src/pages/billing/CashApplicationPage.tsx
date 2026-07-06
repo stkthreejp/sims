@@ -7,11 +7,8 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
-import { parseDateOnly } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import type { OpenInvoice, ApplicationLineRequest } from '@/types/receipt.types'
-
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 // ---------- Row state ----------
 
@@ -102,8 +99,8 @@ function ReconciliationGrid({ rows, onChange }: ReconciliationGridProps) {
             return (
               <tr key={row.invoice.id} style={{ background: isOver ? 'var(--bad-bg)' : undefined, cursor: 'default' }}>
                 <td className="id">{row.invoice.invoiceNumber}</td>
-                <td style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{fmtDate(row.invoice.invoiceDate)}</td>
-                <td className="num">{fmt.format(row.invoice.openBalance)}</td>
+                <td style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{formatDate(row.invoice.invoiceDate)}</td>
+                <td className="num">{formatCurrency(row.invoice.openBalance)}</td>
                 <td className="num">
                   <input
                     type="number" step="0.01" min="0" max={row.invoice.openBalance}
@@ -126,8 +123,8 @@ function ReconciliationGrid({ rows, onChange }: ReconciliationGridProps) {
                     </p>
                   )}
                 </td>
-                <td className="num" style={{ color: 'var(--warn-fg)' }}>{fmt.format(commission)}</td>
-                <td className="num primary-cell">{fmt.format(net)}</td>
+                <td className="num" style={{ color: 'var(--warn-fg)' }}>{formatCurrency(commission)}</td>
+                <td className="num primary-cell">{formatCurrency(net)}</td>
                 <td style={{ textAlign: 'center' }}>
                   <button
                     onClick={() => onChange(rows.filter((_, i) => i !== idx))}
@@ -140,10 +137,10 @@ function ReconciliationGrid({ rows, onChange }: ReconciliationGridProps) {
           <tr style={{ background: 'var(--surface-2)', fontWeight: 600, cursor: 'default', borderTop: '2px solid var(--line)' }}>
             <td colSpan={2} style={{ textAlign: 'right', color: 'var(--ink-2)', padding: '11px 14px' }}>Totals</td>
             <td />
-            <td className="num">{fmt.format(totals.gross)}</td>
+            <td className="num">{formatCurrency(totals.gross)}</td>
             <td />
-            <td className="num" style={{ color: 'var(--warn-fg)' }}>{fmt.format(totals.commission)}</td>
-            <td className="num">{fmt.format(totals.net)}</td>
+            <td className="num" style={{ color: 'var(--warn-fg)' }}>{formatCurrency(totals.commission)}</td>
+            <td className="num">{formatCurrency(totals.net)}</td>
             <td />
           </tr>
         </tbody>
@@ -275,10 +272,10 @@ export function CashApplicationPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: isSelected ? 'var(--accent-ink)' : 'var(--ink)' }}>{r.receiptNumber}</span>
                           <span style={{ color: 'var(--ink-2)' }}>{r.payerName}</span>
-                          <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>{fmtDate(r.receivedDate)}</span>
+                          <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>{formatDate(r.receivedDate)}</span>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: isSelected ? 'var(--accent-ink)' : 'var(--ink)' }}>{fmt.format(r.amount - r.appliedAmount)}</div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: isSelected ? 'var(--accent-ink)' : 'var(--ink)' }}>{formatCurrency(r.amount - r.appliedAmount)}</div>
                           <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>remaining</div>
                         </div>
                       </button>
@@ -296,10 +293,10 @@ export function CashApplicationPage() {
                 <h3>2 — Match Invoices</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 13 }}>
                   <span style={{ color: 'var(--ink-3)' }}>
-                    Receipt remaining: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(receiptRemaining)}</span>
+                    Receipt remaining: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(receiptRemaining)}</span>
                   </span>
                   <span style={{ color: 'var(--ink-3)' }}>
-                    Gross applied: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(totals.gross)}</span>
+                    Gross applied: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(totals.gross)}</span>
                   </span>
                   <span style={{
                     display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600,
@@ -307,7 +304,7 @@ export function CashApplicationPage() {
                   }}>
                     {isBalanced && gridRows.length > 0
                       ? <><CheckCircle style={{ width: 14, height: 14 }} /> Balanced</>
-                      : <><AlertCircle style={{ width: 14, height: 14 }} /> Variance: {fmt.format(Math.abs(variance))}</>
+                      : <><AlertCircle style={{ width: 14, height: 14 }} /> Variance: {formatCurrency(Math.abs(variance))}</>
                     }
                   </span>
                 </div>
@@ -335,7 +332,7 @@ export function CashApplicationPage() {
                         >
                           <Link style={{ width: 11, height: 11, color: 'var(--ink-3)' }} />
                           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-ink)', fontWeight: 600 }}>{inv.invoiceNumber}</span>
-                          <span style={{ color: 'var(--ink-3)' }}>{fmt.format(inv.openBalance)}</span>
+                          <span style={{ color: 'var(--ink-3)' }}>{formatCurrency(inv.openBalance)}</span>
                         </button>
                       ))}
                     </div>
@@ -348,12 +345,12 @@ export function CashApplicationPage() {
                   </button>
                   {isOverReceipt && gridRows.length > 0 && (
                     <p style={{ fontSize: 12, color: 'var(--bad-fg)' }}>
-                      Applied ({fmt.format(totals.gross)}) exceeds receipt remaining ({fmt.format(receiptRemaining)}). Reduce before posting.
+                      Applied ({formatCurrency(totals.gross)}) exceeds receipt remaining ({formatCurrency(receiptRemaining)}). Reduce before posting.
                     </p>
                   )}
                   {isUnderApplied && gridRows.length > 0 && !isOverReceipt && (
                     <p style={{ fontSize: 12, color: 'var(--warn-fg)' }}>
-                      Partial application — {fmt.format(variance)} will remain on the receipt as unapplied.
+                      Partial application — {formatCurrency(variance)} will remain on the receipt as unapplied.
                     </p>
                   )}
                 </div>
@@ -382,10 +379,10 @@ export function CashApplicationPage() {
                   {openInvoices.map(inv => (
                     <tr key={inv.id} style={{ cursor: 'default' }}>
                       <td className="id">{inv.invoiceNumber}</td>
-                      <td style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{fmtDate(inv.invoiceDate)}</td>
-                      <td className="num">{fmt.format(inv.totalAmount)}</td>
-                      <td className="num" style={{ color: 'var(--ink-3)' }}>{fmt.format(inv.clearedAmount)}</td>
-                      <td className="num primary-cell">{fmt.format(inv.openBalance)}</td>
+                      <td style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{formatDate(inv.invoiceDate)}</td>
+                      <td className="num">{formatCurrency(inv.totalAmount)}</td>
+                      <td className="num" style={{ color: 'var(--ink-3)' }}>{formatCurrency(inv.clearedAmount)}</td>
+                      <td className="num primary-cell">{formatCurrency(inv.openBalance)}</td>
                       <td>
                         <span className={`sd-pill ${inv.status === 'PartiallyPaid' ? 'inprogress' : 'quoted'}`}>
                           {inv.status === 'PartiallyPaid' ? 'Partial' : inv.status}

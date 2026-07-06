@@ -10,6 +10,7 @@ import { documentTemplatesApi } from '@/api/documentTemplates.api'
 import { proposalDocumentsApi } from '@/api/proposalDocuments.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { getApiErrorMessage } from '@/lib/apiError'
+import { US_STATES } from '@/constants/usStates'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { PolicyListItem } from '@/types/policy.types'
 import type { DocumentTag, PolicyFormFieldMappingUpsert, PolicyFormTemplate, PolicyFormType, PolicyPackageConfiguration, PolicyPackageConfigurationUpsert, PolicyPackageFormUpsert } from '@/types/policyForm.types'
@@ -20,14 +21,6 @@ const PROPOSAL_DOCUMENT_ROLE_LABELS: Record<ProposalDocumentRole, string> = {
   Proposal: 'Proposal',
   StateNotice: 'State notice',
 }
-const US_STATES = [
-  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
-  'DC',
-]
 const TRIGGER_FIELDS = [
   { path: 'Quote.PremiumAmount', label: 'Base premium', kind: 'number' },
   { path: 'Quote.TotalPremium', label: 'Total premium', kind: 'number' },

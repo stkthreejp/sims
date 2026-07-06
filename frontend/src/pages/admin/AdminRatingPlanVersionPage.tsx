@@ -8,6 +8,8 @@ import {
 import { toast } from 'sonner'
 import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { StatusBadge } from '@/components/common/StatusBadge'
+import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type {
   PlanStatus, FactorTable, FactorRow, RatingImpactPreview, UpdateVersionMetaDto,
@@ -15,14 +17,13 @@ import type {
 
 type Tab = 'schedule' | 'factors' | 'eligibility' | 'impact' | 'audit'
 
-function StatusBadge({ status }: { status: PlanStatus }) {
-  const map: Record<PlanStatus, { label: string; style: React.CSSProperties }> = {
-    Active:  { label: 'Active',  style: { background: 'var(--good-bg)', color: 'var(--good-fg)' } },
-    Draft:   { label: 'Draft',   style: { background: 'var(--warn-bg)', color: 'var(--warn-fg)' } },
-    Retired: { label: 'Retired', style: { background: 'var(--surface-2)', color: 'var(--ink-3)' } },
-  }
-  const { label, style } = map[status]
-  return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={style}>{label}</span>
+// Nearest .sd-pill variant per status, chosen to preserve the prior colors:
+// Active (--good-*) → good (exact); Draft (--warn-*) → expiring (exact --warn-*);
+// Retired (--surface-2/--ink-3) → expired (--pill-draft-*, matching gray/ink).
+const STATUS_PILL_VARIANT: Record<PlanStatus, string> = {
+  Active: 'good',
+  Draft: 'expiring',
+  Retired: 'expired',
 }
 
 // ─── Editable factor table panel ─────────────────────────────────────────────
@@ -332,8 +333,7 @@ function ImpactPreviewPanel({
     onError: (err: any) => toast.error(err?.response?.data?.errorMessage ?? 'Failed to compute preview'),
   })
 
-  const fmtCurrency = (n: number) =>
-    n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+  const fmtCurrency = (n: number) => formatCurrency(n, { cents: false })
 
   const fmtPct = (n: number) => {
     const sign = n > 0 ? '+' : ''
@@ -727,7 +727,7 @@ export function AdminRatingPlanVersionPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-semibold" style={{ color: 'var(--ink)' }}>{version.planName}</h1>
               <span className="font-mono text-sm" style={{ color: 'var(--ink-4)' }}>v{version.versionNumber}</span>
-              <StatusBadge status={version.status} />
+              <StatusBadge status={version.status} variant={STATUS_PILL_VARIANT[version.status]} />
             </div>
             <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--ink-3)' }}>
               <span className="px-2 py-0.5 rounded text-xs" style={{ background: 'var(--surface-2)', color: 'var(--accent-ink)', borderColor: 'var(--line-2)', border: '1px solid' }}>{version.lobLabel}</span>
@@ -942,7 +942,7 @@ export function AdminRatingPlanVersionPage() {
           <dl className="space-y-4 text-sm">
             <div>
               <dt className="text-xs font-medium mb-0.5" style={{ color: 'var(--ink-3)' }}>Status</dt>
-              <dd><StatusBadge status={version.status} /></dd>
+              <dd><StatusBadge status={version.status} variant={STATUS_PILL_VARIANT[version.status]} /></dd>
             </div>
             {version.promotedAt && (
               <>

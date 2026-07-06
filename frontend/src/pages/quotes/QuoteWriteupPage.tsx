@@ -8,10 +8,9 @@ import { uwWriteupApi } from '@/api/uwWriteup.api'
 import type { IMWriteupPayload, WriteupCondition, UWWriteupDto } from '@/types/uwWriteup.types'
 import { EMPTY_PAYLOAD } from '@/types/uwWriteup.types'
 import { LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
+import { formatCurrency } from '@/lib/utils'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
-
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
 // ── Small shared components ──────────────────────────────────────────────────
 
@@ -316,7 +315,7 @@ export default function QuoteWriteupPage() {
                   {pc.carrierName}
                   {pc.policyNumber && <span style={{ color: 'var(--ink-4)' }}> · {pc.policyNumber}</span>}
                   {pc.expirationDate && <span style={{ color: 'var(--ink-4)' }}> · exp {pc.expirationDate}</span>}
-                  {pc.premiumAmount && <span style={{ color: 'var(--ink-4)' }}> · {fmt.format(pc.premiumAmount)}</span>}
+                  {pc.premiumAmount && <span style={{ color: 'var(--ink-4)' }}> · {formatCurrency(pc.premiumAmount, { cents: false })}</span>}
                 </div>
               ))}
             </div>
@@ -471,8 +470,8 @@ export default function QuoteWriteupPage() {
       <Section title={isAutoPhysicalDamage ? 'Vehicles, Values & CAB' : 'Equipment & Values'}>
         <div className="grid grid-cols-4 gap-3 text-center">
           {[
-            { label: 'Total TIV', value: fmt.format(eq.totalTiv) },
-            { label: 'Largest Unit', value: fmt.format(eq.largestUnitTiv) },
+            { label: 'Total TIV', value: formatCurrency(eq.totalTiv, { cents: false }) },
+            { label: 'Largest Unit', value: formatCurrency(eq.largestUnitTiv, { cents: false }) },
             { label: 'Cutters', value: eq.countCutter },
             { label: 'Skidders', value: eq.countSkidder },
             { label: 'Loaders', value: eq.countLoader },

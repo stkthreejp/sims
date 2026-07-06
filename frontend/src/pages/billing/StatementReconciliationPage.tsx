@@ -8,11 +8,8 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import type { PayeeStatement, PayeeStatementSummary } from '@/types/payeeStatement.types'
-
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) =>
-  new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const STMT_PILL: Record<string, string> = {
   Imported: 'inprogress',
@@ -201,7 +198,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(statement.statementTotal)}</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(statement.statementTotal)}</div>
             <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{statement.lines.filter(l => l.matchStatus !== 'Unmatched').length}/{statement.lines.length} matched</div>
           </div>
           <button onClick={onClose} style={{ color: 'var(--ink-3)', background: 'none', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
@@ -211,7 +208,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
       </div>
 
       <div style={{ padding: '6px 16px 8px', display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-3)', borderBottom: '1px solid var(--line-2)' }}>
-        <span>{fmtDate(statement.statementDate)}</span>
+        <span>{formatDate(statement.statementDate)}</span>
         {statement.referenceNumber && <span>Ref: {statement.referenceNumber}</span>}
         <span>AP: {statement.apLedgerAccountName}</span>
       </div>
@@ -235,7 +232,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
               <tr key={line.id} style={{ background: line.matchStatus === 'Unmatched' ? 'var(--bad-bg)' : undefined, cursor: 'default' }}>
                 <td className="id">{line.policyNumber}</td>
                 <td style={{ color: 'var(--ink-2)' }}>{line.stateCode}</td>
-                <td className="num">{fmt.format(line.amount)}</td>
+                <td className="num">{formatCurrency(line.amount)}</td>
                 <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{line.description ?? '—'}</td>
                 <td><MatchBadge status={line.matchStatus} /></td>
                 <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>
@@ -272,7 +269,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
           <tfoot style={{ borderTop: '2px solid var(--line)', background: 'var(--surface-2)' }}>
             <tr>
               <td colSpan={2} style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--ink-2)', fontSize: 13 }}>Total</td>
-              <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(statement.statementTotal)}</td>
+              <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(statement.statementTotal)}</td>
               <td colSpan={statement.status === 'Imported' ? 4 : 3} />
             </tr>
           </tfoot>
@@ -305,7 +302,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
         <div className="sims-modal-backdrop" onClick={() => setMatchingLineId(null)}>
           <div className="sims-modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
             <div className="sims-modal-head">
-              <span>Match line — {matchingLine.policyNumber} · {fmt.format(matchingLine.amount)}</span>
+              <span>Match line — {matchingLine.policyNumber} · {formatCurrency(matchingLine.amount)}</span>
               <button onClick={() => setMatchingLineId(null)} className="sims-modal-close" aria-label="Close"><X style={{ width: 16, height: 16 }} /></button>
             </div>
             <div className="sims-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
@@ -332,7 +329,7 @@ function StatementDetail({ statement, onClose }: { statement: PayeeStatement; on
                         <td className="id">{c.invoiceNumber}</td>
                         <td style={{ color: c.policyMatches ? 'var(--pill-bound-fg)' : 'var(--ink-2)' }}>{c.policyNumber}</td>
                         <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{c.feeDisplayName}</td>
-                        <td className="num" style={{ color: c.amountMatches ? 'var(--pill-bound-fg)' : 'var(--ink)' }}>{fmt.format(c.amount)}</td>
+                        <td className="num" style={{ color: c.amountMatches ? 'var(--pill-bound-fg)' : 'var(--ink)' }}>{formatCurrency(c.amount)}</td>
                         <td>
                           <button className="sd-btn sm primary" disabled={matchMutation.isPending} onClick={() => matchMutation.mutate(c.invoiceLineId)}>Use</button>
                         </td>
@@ -409,8 +406,8 @@ export function StatementReconciliationPage() {
                     <StatusBadge status={STMT_PILL[s.status] ?? 'draft'} label={s.status} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)' }}>
-                    <span>{fmtDate(s.statementDate)}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(s.statementTotal)}</span>
+                    <span>{formatDate(s.statementDate)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(s.statementTotal)}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, marginTop: 2 }}>
                     <span style={{ color: s.matchedLines === s.totalLines ? 'var(--pill-bound-fg)' : 'var(--warn-fg)' }}>

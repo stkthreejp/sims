@@ -6,6 +6,7 @@ import { ratingApi } from '@/api/rating.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
+import { StatusBadge } from '@/components/common/StatusBadge'
 import { ACTIVE_LOBS, LOB_LABELS } from '@/types/quote.types'
 import type { PolicyLineOfBusiness } from '@/types/quote.types'
 import type { RatingPlanListItem, ShadowRatingStatus } from '@/types/rating.types'
@@ -18,17 +19,13 @@ const LOB_SHADOW_KEY: Partial<Record<PolicyLineOfBusiness, keyof ShadowRatingSta
   AutoPhysicalDamage:'apd',
 }
 
-function StatusBadge({ status }: { status: RatingPlanListItem['status'] }) {
-  const styles: Record<RatingPlanListItem['status'], string> = {
-    Active: 'bg-emerald-100 text-emerald-700',
-    Draft: 'bg-amber-100 text-amber-700',
-    Retired: 'bg-slate-100 text-slate-500',
-  }
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  )
+// Nearest .sd-pill variant per status, chosen to preserve the prior colors:
+// Active (emerald) → good (green); Draft (amber) → expiring (amber/warn);
+// Retired (slate) → expired (neutral gray).
+const STATUS_PILL_VARIANT: Record<RatingPlanListItem['status'], string> = {
+  Active: 'good',
+  Draft: 'expiring',
+  Retired: 'expired',
 }
 
 function ShadowToggle({ lob, enabled, disabled }: { lob: PolicyLineOfBusiness; enabled: boolean; disabled: boolean }) {
@@ -69,7 +66,7 @@ function PlanCard({ plan }: { plan: RatingPlanListItem }) {
           <p className="text-sm font-semibold text-slate-800">{plan.name}</p>
           <p className="text-xs text-slate-400 font-mono mt-0.5">{plan.formulaKey}</p>
         </div>
-        <StatusBadge status={plan.status} />
+        <StatusBadge status={plan.status} variant={STATUS_PILL_VARIANT[plan.status]} />
       </div>
 
       <div className="space-y-1.5 text-xs text-slate-600">

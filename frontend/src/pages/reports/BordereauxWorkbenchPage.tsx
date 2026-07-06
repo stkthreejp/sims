@@ -22,10 +22,7 @@ import type {
   ReconcileBordereauxRunRequest,
 } from '@/types/bordereaux.types'
 import { getApiErrorMessage } from '@/lib/apiError'
-
-function money(value: number) {
-  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { formatCurrency } from '@/lib/utils'
 
 function formatDate(value?: string | null) {
   if (!value) return '-'
@@ -214,10 +211,10 @@ function PreviewTable({ preview }: { preview?: BordereauxPremiumPreview }) {
               <td style={td}>{row.transactionType}</td>
               <td style={td}>{row.insuredName}</td>
               <td style={td}>{row.insuredState}</td>
-              <td style={{ ...td, textAlign: 'right' }}>{money(row.grossPremium)}</td>
-              <td style={{ ...td, textAlign: 'right' }}>{money(row.grossCommission)}</td>
-              <td style={{ ...td, textAlign: 'right' }}>{money(row.fees)}</td>
-              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{money(row.netDueCarrier)}</td>
+              <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(row.grossPremium)}</td>
+              <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(row.grossCommission)}</td>
+              <td style={{ ...td, textAlign: 'right' }}>{formatCurrency(row.fees)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(row.netDueCarrier)}</td>
             </tr>
           ))}
           {rows.length === 0 && (
@@ -450,9 +447,9 @@ export function BordereauxWorkbenchPage() {
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
           <Metric label="Rows" value={String(rows.length)} />
-          <Metric label="Gross Premium" value={money(previewQuery.data?.grossPremiumTotal ?? 0)} />
-          <Metric label="Commission" value={money(previewQuery.data?.grossCommissionTotal ?? 0)} />
-          <Metric label="Net Due" value={money(previewQuery.data?.netDueCarrierTotal ?? 0)} />
+          <Metric label="Gross Premium" value={formatCurrency(previewQuery.data?.grossPremiumTotal ?? 0)} />
+          <Metric label="Commission" value={formatCurrency(previewQuery.data?.grossCommissionTotal ?? 0)} />
+          <Metric label="Net Due" value={formatCurrency(previewQuery.data?.netDueCarrierTotal ?? 0)} />
         </div>
         <PreviewTable preview={previewQuery.data} />
       </section>

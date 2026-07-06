@@ -16,13 +16,9 @@ import { StatusBadge } from '@/components/common/StatusBadge'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
-import { parseDateOnly } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { CashBalanceBadge } from '@/components/accounting/CashBalanceBadge'
 import type { NettedPayee, BatchSummary } from '@/types/cashDistribution.types'
-
-const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const fmtDate = (s: string) =>
-  parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const BATCH_PILL: Record<string, string> = {
   Open: 'submitted',
@@ -100,7 +96,7 @@ function PendingQueue() {
         <p style={{ fontSize: 13, color: 'var(--ink-2)' }}>
           {payees.length} payee{payees.length !== 1 ? 's' : ''} ·{' '}
           {payees.reduce((s, p) => s + p.instructionCount, 0)} instructions ·{' '}
-          {fmt.format(payees.reduce((s, p) => s + p.totalAmount, 0))} pending
+          {formatCurrency(payees.reduce((s, p) => s + p.totalAmount, 0))} pending
         </p>
         <button
           className="sd-btn primary"
@@ -130,7 +126,7 @@ function PendingQueue() {
           <span>
             {selected.size} payee{selected.size !== 1 ? 's' : ''} selected ·{' '}
             {selectedPayees.reduce((s, p) => s + p.instructionCount, 0)} instructions ·{' '}
-            {fmt.format(selectedTotal)}
+            {formatCurrency(selectedTotal)}
           </span>
           <button
             onClick={() => setSelected(new Set())}
@@ -189,7 +185,7 @@ function PendingQueue() {
                   <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{payee.payeeType}</td>
                   <td style={{ textAlign: 'right', color: 'var(--ink-2)' }}>{payee.instructionCount}</td>
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>
-                    {fmt.format(payee.totalAmount)}
+                    {formatCurrency(payee.totalAmount)}
                   </td>
                 </tr>
                 {expanded.has(payee.payeeId) && (
@@ -208,7 +204,7 @@ function PendingQueue() {
                             <tr key={inst.id} style={{ borderTop: '1px solid var(--line-2)' }}>
                               <td style={{ padding: '4px 16px 4px 0', fontFamily: 'var(--font-mono)' }}>{inst.receiptNumber}</td>
                               <td style={{ padding: '4px 16px 4px 0' }}>{inst.feeDisplayName}</td>
-                              <td style={{ padding: '4px 0', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt.format(inst.amount)}</td>
+                              <td style={{ padding: '4px 0', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatCurrency(inst.amount)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -226,7 +222,7 @@ function PendingQueue() {
                 {payees.reduce((s, p) => s + p.instructionCount, 0)}
               </td>
               <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>
-                {fmt.format(payees.reduce((s, p) => s + p.totalAmount, 0))}
+                {formatCurrency(payees.reduce((s, p) => s + p.totalAmount, 0))}
               </td>
             </tr>
           </tfoot>
@@ -317,9 +313,9 @@ function BatchList() {
                   onClick={() => setSelectedBatch(b.id === selectedBatch ? null : b.id)}
                 >
                   <td className="subs-id">{b.batchNumber}</td>
-                  <td style={{ color: 'var(--ink-2)' }}>{fmtDate(b.createdAt)}</td>
+                  <td style={{ color: 'var(--ink-2)' }}>{formatDate(b.createdAt)}</td>
                   <td style={{ textAlign: 'right', color: 'var(--ink-2)' }}>{b.totalWires}</td>
-                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmt.format(b.totalAmount)}</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(b.totalAmount)}</td>
                   <td><StatusBadge status={BATCH_PILL[b.status] ?? 'draft'} label={BATCH_LABEL[b.status] ?? b.status} /></td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -368,7 +364,7 @@ function BatchList() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
               <span style={{ color: 'var(--ink-3)' }}>Total</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{fmt.format(batchDetail.totalAmount)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{formatCurrency(batchDetail.totalAmount)}</span>
             </div>
             {batchDetail.bankReference && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -379,7 +375,7 @@ function BatchList() {
             {batchDetail.executedAt && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: 'var(--ink-3)' }}>Executed</span>
-                <span>{fmtDate(batchDetail.executedAt)}</span>
+                <span>{formatDate(batchDetail.executedAt)}</span>
               </div>
             )}
             <div style={{ paddingTop: 8, borderTop: '1px solid var(--line-2)' }}>
@@ -388,12 +384,12 @@ function BatchList() {
                 <div key={w.payeeId} style={{ marginBottom: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
                     <span>{w.payeeName}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(w.netAmount)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(w.netAmount)}</span>
                   </div>
                   {w.instructions.map((inst) => (
                     <div key={inst.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', paddingLeft: 8, marginTop: 2 }}>
                       <span>{inst.receiptNumber} · {inst.feeDisplayName}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)' }}>{fmt.format(inst.amount)}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(inst.amount)}</span>
                     </div>
                   ))}
                 </div>
@@ -436,7 +432,7 @@ function BatchList() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--ink-3)' }}>Total</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{fmt.format(executeBatch.totalAmount)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)' }}>{formatCurrency(executeBatch.totalAmount)}</span>
                   </div>
                 </div>
               )}

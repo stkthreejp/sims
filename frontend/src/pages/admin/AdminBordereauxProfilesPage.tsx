@@ -15,7 +15,8 @@ import {
 } from '@/components/bordereaux/BordereauxProfileSetupPanel'
 import { ErrorState } from '@/components/common/ErrorState'
 import { getApiErrorMessage } from '@/lib/apiError'
-import { LOB_LABELS } from '@/types/quote.types'
+import { US_STATES } from '@/constants/usStates'
+import { ACTIVE_LOBS, LOB_LABELS } from '@/types/quote.types'
 import { DEFAULT_BDX_TXN_TYPES, type BordereauxProfile, type UpsertBordereauxProfileRequest } from '@/types/bordereaux.types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -27,7 +28,6 @@ const REPORT_TYPES = ['Premium'] as const
 const FREQUENCIES  = ['Monthly'] as const
 const OUTPUT_FMTS  = ['Xlsx'] as const
 const DATE_BASES   = ['EffectiveOrBoundDateGreater', 'EffectiveDate', 'BoundDate'] as const
-const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'] as const
 
 function blankRequest(): UpsertBordereauxProfileRequest {
   return {
@@ -107,7 +107,7 @@ function ProfileForm({
     queryFn: () => carriersApi.getAll(true),
   })
 
-  const lobOptions = Object.entries(LOB_LABELS) as Array<[string, string]>
+  const lobOptions = ACTIVE_LOBS.map((lob) => [lob, LOB_LABELS[lob]] as [string, string])
 
   const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 }
   const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }
