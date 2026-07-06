@@ -10,15 +10,22 @@ const KNOWN_PILL_VARIANTS = new Set([
 interface StatusBadgeProps {
   status: string
   label?: string
+  /**
+   * Explicit pill variant (one of the .sd-pill.<variant> classes) when the domain
+   * status doesn't match a known variant name. Lets pages replace bespoke local
+   * StatusBadge clones without losing their colors (audit X15). Defaults to
+   * status.toLowerCase().
+   */
+  variant?: string
 }
 
-export function StatusBadge({ status, label }: StatusBadgeProps) {
-  const variant = status.toLowerCase()
-  if (import.meta.env.DEV && status && !KNOWN_PILL_VARIANTS.has(variant)) {
-    console.warn(`[StatusBadge] no pill variant for status "${status}" — rendering neutral fallback`)
+export function StatusBadge({ status, label, variant }: StatusBadgeProps) {
+  const cls = (variant ?? status).toLowerCase()
+  if (import.meta.env.DEV && cls && !KNOWN_PILL_VARIANTS.has(cls)) {
+    console.warn(`[StatusBadge] no pill variant for "${variant ?? status}" — rendering neutral fallback`)
   }
   return (
-    <span className={`sd-pill ${variant}`}>
+    <span className={`sd-pill ${cls}`}>
       {label ?? status}
     </span>
   )

@@ -31,6 +31,24 @@ export const LOB_LABELS: Record<PolicyLineOfBusiness, string> = {
   Other: 'Other',
 }
 
+// Compact LOB codes for dense tables/chips. Canonical map replacing the private
+// abbreviation copies scattered across pages (audit X13).
+export const LOB_ABBREVIATIONS: Record<PolicyLineOfBusiness, string> = {
+  GeneralLiability: 'GL',
+  InlandMarine: 'IM',
+  AutoLiability: 'AL',
+  AutoPhysicalDamage: 'APD',
+  Property: 'PROP',
+  CommercialAuto: 'CA',
+  BusinessOwners: 'BOP',
+  WorkersCompensation: 'WC',
+  ProfessionalLiability: 'PL',
+  Umbrella: 'UMB',
+  Cyber: 'CYB',
+  ExcessLiability: 'XS',
+  Other: 'OTH',
+}
+
 // Active lines SMM writes today. Use this in pickers / filters for new records.
 export const ACTIVE_LOBS: PolicyLineOfBusiness[] = [
   'GeneralLiability', 'InlandMarine', 'AutoLiability', 'AutoPhysicalDamage',
