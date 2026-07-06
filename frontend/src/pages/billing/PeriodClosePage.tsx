@@ -82,31 +82,44 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
 interface PeriodPanelProps {
   period: AccountingPeriod
   isAdmin: boolean
-  onUpdated: (p: AccountingPeriod) => void
 }
 
-function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
+function PeriodPanel({ period, isAdmin }: PeriodPanelProps) {
   const [closeNotes, setCloseNotes] = useState('')
   const [reopenReason, setReopenReason] = useState('')
   const [showCloseForm, setShowCloseForm] = useState(false)
   const [showReopenForm, setShowReopenForm] = useState(false)
   const qc = useQueryClient()
 
-  const hasBlockers = period.checklist.some(c => c.isBlocking && !c.passed)
-  const hasWarnings = period.checklist.some(c => !c.isBlocking && !c.passed)
-  const checklistEvaluated = period.checklist.length > 0
+  const isClosed = period.status === 'Closed'
 
-  const evaluateMutation = useMutation({
-    mutationFn: () => evaluateChecklist(period.id),
-    onSuccess: (p) => { onUpdated(p); toast.success('Checklist refreshed') },
-    onError: (e) => toast.error(getApiErrorMessage(e)),
+  // Auto-evaluate close readiness when a period is opened (PeriodPanel is keyed per
+  // period, so this remounts on select) instead of gating Close on a manually-
+  // refreshed, possibly-stale checklist (audit B17). POST-backed, so we don't refetch
+  // on window focus — only on select (mount) and the explicit Refresh button.
+  const {
+    data: liveChecklist,
+    isFetching: evaluating,
+    refetch: refetchChecklist,
+  } = useQuery({
+    queryKey: ['period-checklist', period.id],
+    queryFn: () => evaluateChecklist(period.id).then((p) => p.checklist),
+    enabled: !isClosed,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   })
+
+  // Closed periods keep the snapshot persisted at close time.
+  const checklist = isClosed ? period.checklist : (liveChecklist ?? [])
+  const checklistEvaluated = checklist.length > 0
+  const hasBlockers = checklist.some(c => c.isBlocking && !c.passed)
+  const hasWarnings = checklist.some(c => !c.isBlocking && !c.passed)
 
   const closeMutation = useMutation({
     mutationFn: () => closePeriod(period.id, closeNotes || undefined),
-    onSuccess: (p) => {
-      onUpdated(p)
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['periods'] })
+      qc.invalidateQueries({ queryKey: ['period-checklist', period.id] })
       toast.success(`${periodLabel(period)} closed`)
       setShowCloseForm(false)
     },
@@ -115,9 +128,9 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
 
   const reopenMutation = useMutation({
     mutationFn: () => reopenPeriod(period.id, reopenReason || undefined),
-    onSuccess: (p) => {
-      onUpdated(p)
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['periods'] })
+      qc.invalidateQueries({ queryKey: ['period-checklist', period.id] })
       toast.success(`${periodLabel(period)} reopened`)
       setShowReopenForm(false)
     },
@@ -132,25 +145,31 @@ function PeriodPanel({ period, isAdmin, onUpdated }: PeriodPanelProps) {
           <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>{periodLabel(period)}</h2>
           <StatusBadge status={period.status} />
         </div>
-        <button
-          onClick={() => evaluateMutation.mutate()}
-          disabled={evaluateMutation.isPending}
-          className="flex items-center gap-1.5 text-xs border rounded px-2.5 py-1.5 disabled:opacity-50"
-          style={{ color: 'var(--ink-3)', borderColor: 'var(--line)' }}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${evaluateMutation.isPending ? 'animate-spin' : ''}`} />
-          Refresh checklist
-        </button>
+        {!isClosed && (
+          <button
+            onClick={() => refetchChecklist()}
+            disabled={evaluating}
+            className="flex items-center gap-1.5 text-xs border rounded px-2.5 py-1.5 disabled:opacity-50"
+            style={{ color: 'var(--ink-3)', borderColor: 'var(--line)' }}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${evaluating ? 'animate-spin' : ''}`} />
+            Refresh checklist
+          </button>
+        )}
       </div>
 
       {/* Checklist */}
-      {!checklistEvaluated ? (
+      {evaluating && !checklistEvaluated ? (
         <p className="text-sm italic px-1" style={{ color: 'var(--ink-4)' }}>
-          Click "Refresh checklist" to evaluate close readiness.
+          Evaluating close readiness…
+        </p>
+      ) : !checklistEvaluated ? (
+        <p className="text-sm italic px-1" style={{ color: 'var(--ink-4)' }}>
+          No checklist available for this period.
         </p>
       ) : (
         <div className="space-y-2">
-          {period.checklist.map(item => (
+          {checklist.map(item => (
             <ChecklistRow key={item.checkKey} item={item} />
           ))}
         </div>
@@ -272,38 +291,27 @@ export function PeriodClosePage() {
   const qc = useQueryClient()
   const today = new Date()
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [periods, setPeriods] = useState<AccountingPeriod[]>([])
 
   const { isLoading, isError, error, refetch, data: periodsData } = useQuery({
     queryKey: ['periods'],
     queryFn: getPeriods,
   })
+  // Query cache is the single source of truth — no local copy to fork or get
+  // clobbered by a background refetch / another tab (audit B17).
+  const periods = periodsData ?? []
 
   useEffect(() => {
-    if (periodsData) {
-      setPeriods(periodsData)
-      if (periodsData.length > 0) {
-        setSelectedId((current) => (current === null ? periodsData[0].id : current))
-      }
-    }
-  }, [periodsData])
+    if (selectedId === null && periods.length > 0) setSelectedId(periods[0].id)
+  }, [periods, selectedId])
 
   const openCurrentMutation = useMutation({
     mutationFn: () => getOrCreatePeriod(today.getFullYear(), today.getMonth() + 1),
     onSuccess: (p) => {
-      setPeriods((prev) => {
-        const exists = prev.find(x => x.id === p.id)
-        return exists ? prev.map(x => x.id === p.id ? p : x) : [p, ...prev]
-      })
       setSelectedId(p.id)
       qc.invalidateQueries({ queryKey: ['periods'] })
     },
     onError: (e) => toast.error(getApiErrorMessage(e)),
   })
-
-  const updatePeriod = (p: AccountingPeriod) => {
-    setPeriods((prev) => prev.map(x => x.id === p.id ? p : x))
-  }
 
   const selectedPeriod = periods.find(p => p.id === selectedId) ?? null
 
@@ -361,9 +369,9 @@ export function PeriodClosePage() {
           <div className="flex-1 border rounded-lg p-6" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
             {selectedPeriod ? (
               <PeriodPanel
+                key={selectedPeriod.id}
                 period={selectedPeriod}
                 isAdmin={isAdmin}
-                onUpdated={updatePeriod}
               />
             ) : (
               <p className="text-sm italic" style={{ color: 'var(--ink-4)' }}>Select a period or open the current month.</p>

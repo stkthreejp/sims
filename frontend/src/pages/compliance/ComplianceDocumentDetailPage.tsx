@@ -71,10 +71,12 @@ export function ComplianceDocumentDetailPage() {
     queryFn: () => usersApi.getAll({ page: 1, pageSize: 200 }),
   })
 
-  // Sync form state when document loads
+  // Sync form state when the document loads. Bail while the user has unsaved edits so
+  // a background refetch (metadata Save Details invalidates the detail; focus refetch)
+  // doesn't clobber in-progress editor content (audit O2).
   useEffect(() => {
     const doc = documentQuery.data
-    if (!doc) return
+    if (!doc || isDirty) return
     setTitle(doc.title)
     setCategory(doc.category)
     setDocumentType(doc.documentType)
@@ -87,6 +89,7 @@ export function ComplianceDocumentDetailPage() {
     setContent(doc.currentDraftVersion?.htmlContent || doc.currentPublishedVersion?.htmlContent || '<p></p>')
     setChangeSummary(doc.currentDraftVersion?.changeSummary ?? '')
     setIsDirty(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentQuery.data])
 
   // Shared query invalidation helper
