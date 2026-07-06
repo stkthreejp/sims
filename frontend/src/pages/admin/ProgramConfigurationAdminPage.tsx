@@ -115,7 +115,12 @@ export function ProgramConfigurationAdminPage() {
     setEditingStateId(null)
   }, [selectedProgram?.id])
 
-  const refreshPrograms = () => qc.invalidateQueries({ queryKey: ['admin', 'program-configurations'] })
+  const refreshPrograms = () => {
+    qc.invalidateQueries({ queryKey: ['admin', 'program-configurations'] })
+    // The quote/PN/forms/BDX screens read the spine under this separate key family;
+    // invalidate it too or their pickers show the pre-save spine for up to 5 min (audit A7).
+    qc.invalidateQueries({ queryKey: ['program-configurations'] })
+  }
 
   const [orphanIssues, setOrphanIssues] = useState<ProgramOrphanIssue[] | null>(null)
   const orphanAudit = useMutation({

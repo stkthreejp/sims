@@ -150,7 +150,7 @@ export function PolicyDetailPage() {
     mutationFn: (data: { effectiveDate: string; premiumChange: number; endorsementDescription?: string; notes?: string }) =>
       policiesApi.addEndorsement(id!, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       setActionModal(null)
       toast.success('Endorsement transaction added')
     },
@@ -161,7 +161,7 @@ export function PolicyDetailPage() {
     mutationFn: (data: IssueCancellationNotice) =>
       policiesApi.issueCancellationNotice(id!, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       setActionModal(null)
       toast.success('Cancellation notice issued')
     },
@@ -171,7 +171,7 @@ export function PolicyDetailPage() {
   const markNonRenewalMutation = useMutation({
     mutationFn: (data: MarkNonRenewal) => policiesApi.markForNonRenewal(id!, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       setActionModal(null)
       toast.success('Policy marked for non-renewal')
     },
@@ -181,7 +181,7 @@ export function PolicyDetailPage() {
   const nonRenewMutation = useMutation({
     mutationFn: (data: NonRenewPolicy) => policiesApi.nonRenew(id!, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       setActionModal(null)
       setNonRenewalNoticeTransactionId(null)
       toast.success('Non-renewal notice issued')
@@ -192,7 +192,7 @@ export function PolicyDetailPage() {
   const reinstateMutation = useMutation({
     mutationFn: (data: ReinstatePolicy) => policiesApi.reinstate(id!, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       setActionModal(null)
       toast.success('Policy reinstated')
     },
@@ -202,7 +202,7 @@ export function PolicyDetailPage() {
   const startRewriteMutation = useMutation({
     mutationFn: (data: StartRewritePolicy) => policiesApi.startRewrite(id!, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       setActionModal(null)
       toast.success('Rewrite transaction started')
     },
@@ -212,7 +212,9 @@ export function PolicyDetailPage() {
   const createRenewalQuoteMutation = useMutation({
     mutationFn: () => policiesApi.createRenewalQuote(id!),
     onSuccess: (createdQuote) => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
+      qc.invalidateQueries({ queryKey: ['submissions'] })
+      qc.invalidateQueries({ queryKey: ['quotes'] })
       toast.success('Renewal quote started')
       navigate(`/quotes/${createdQuote.id}`)
     },
@@ -222,7 +224,7 @@ export function PolicyDetailPage() {
   const issuePolicyMutation = useMutation({
     mutationFn: () => policiesApi.issue(id!, { issuedDate: todayLocal() }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', id] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       qc.invalidateQueries({ queryKey: ['policies', id, 'issuance-packet'] })
       qc.invalidateQueries({ queryKey: ['attachments', 'Policy', policy?.boundQuoteId] })
       toast.success('Policy issued and final packet filed')
@@ -1095,7 +1097,7 @@ function TransactionRows({
       premiumChange: t.premiumChange,
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       qc.invalidateQueries({ queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'] })
       toast.success('Endorsement issued')
     },
@@ -1106,7 +1108,7 @@ function TransactionRows({
       completedDate: todayLocal(),
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       qc.invalidateQueries({ queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'] })
       toast.success('Cancellation completed')
     },
@@ -1117,7 +1119,7 @@ function TransactionRows({
       completedDate: todayLocal(),
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', t.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       qc.invalidateQueries({ queryKey: ['policies', t.policyId, 'transactions', t.id, 'artifacts'] })
       toast.success('Non-renewal completed')
     },
@@ -1249,7 +1251,7 @@ function TransactionArtifactDetails({
       notes: 'Replacement policy bound.',
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['policies', artifacts.transaction.policyId] })
+      qc.invalidateQueries({ queryKey: ['policies'] })
       qc.invalidateQueries({ queryKey: ['policies', artifacts.transaction.policyId, 'transactions', artifacts.transaction.id, 'artifacts'] })
       toast.success('Rewrite completed')
     },

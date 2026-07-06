@@ -628,6 +628,11 @@ function BindModal({ quoteId, effectiveDate, expirationDate, onClose }: {
     onSuccess: (bound) => {
       qc.invalidateQueries({ queryKey: ['quotes', quoteId] })
       qc.invalidateQueries({ queryKey: ['quotes', 'by-submission'] })
+      // Bind creates a policy and flips the submission to Bound — refresh those
+      // roots so the new policy shows on /policies and the submission list/detail
+      // reflect the new status (audit X6).
+      qc.invalidateQueries({ queryKey: ['policies'] })
+      qc.invalidateQueries({ queryKey: ['submissions'] })
       toast.success('Quote bound successfully')
       if (bound.policyNumber) {
         toast.info(`Policy ${bound.policyNumber} created`)
@@ -1118,6 +1123,7 @@ export function QuoteDetailPage() {
       qc.invalidateQueries({ queryKey: ['quotes', quoteId] })
       qc.invalidateQueries({ queryKey: ['quotes', 'by-submission', quote?.submissionId] })
       qc.invalidateQueries({ queryKey: ['quote-invoice-preview', quoteId] })
+      qc.invalidateQueries({ queryKey: ['rating-snapshot', quoteId] })
       setShowReduce(false)
       setOverrideInput('')
       toast.success('Commission give-back applied')

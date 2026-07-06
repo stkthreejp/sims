@@ -378,7 +378,9 @@ export function SubmissionDetailPage() {
   })
 
   const { data: insured } = useQuery({
-    queryKey: ['insured', submission?.insuredId],
+    // Align with the canonical ['insureds', id] key so an insured edit (which
+    // invalidates ['insureds']) refreshes this header instead of drifting (audit X7).
+    queryKey: ['insureds', submission?.insuredId],
     queryFn: () => insuredsApi.getById(submission!.insuredId),
     enabled: !!submission?.insuredId,
   })
