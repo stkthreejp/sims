@@ -14,7 +14,7 @@ public class GeminiExtractionService : IGeminiExtractionService
     private readonly IBlobStorageService _blobStorage;
     private readonly HttpClient _httpClient;
     private readonly ILogger<GeminiExtractionService> _logger;
-    private readonly string _apiKey;
+    private readonly string? _apiKey;
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
@@ -33,8 +33,11 @@ public class GeminiExtractionService : IGeminiExtractionService
         _blobStorage = blobStorage;
         _httpClient = httpClientFactory.CreateClient("gemini");
         _logger = logger;
-        _apiKey = config["GeminiApi:ApiKey"]
-            ?? throw new InvalidOperationException("GeminiApi:ApiKey is not configured.");
+        // Don't throw here: this service is in the DI graph of the whole inbound-email
+        // feature, so a missing key would fail controller construction and 500 every
+        // /inbound-emails endpoint (even the list, which does no extraction). Validate
+        // lazily at the actual API call instead.
+        _apiKey = config["GeminiApi:ApiKey"];
     }
 
     public async Task<List<GeminiLobExtraction>?> ExtractFromAttachmentsAsync(
@@ -256,7 +259,8 @@ public class GeminiExtractionService : IGeminiExtractionService
     }
 
     private string GeminiUrl =>
-        $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_apiKey}";
+        $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" +
+        (_apiKey ?? throw new InvalidOperationException("GeminiApi:ApiKey is not configured."));
 
     private static object BuildRequest(byte[] bytes, string mimeType, string prompt) => new
     {
