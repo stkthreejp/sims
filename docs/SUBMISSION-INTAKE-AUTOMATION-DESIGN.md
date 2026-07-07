@@ -124,14 +124,16 @@ Each phase is independently shippable; Phase 1 is the MVP.
 
 **Cost (Claude-vision extraction, ~30 pages/submission ≈ 45K image + ~3K output tokens):** negligible at MGA volume. Per submission ≈ $0.31 (Opus 4.8) / $0.12 (Sonnet 5, intro) / $0.06 (Haiku 4.5) at standard rates — **halved by the Batch API** the worker uses. At 300 submissions/month: ~$45 (Opus 4.8) / ~$18 (Sonnet 5) / ~$9 (Haiku) per month before batch. Cost is not a deciding factor; pick the tier by extraction accuracy. (Rates per the `claude-api` reference; re-baseline with `count_tokens` on real submissions.)
 
-## 9. Decisions needed (Jeremiah)
+## 9. Decisions — ALL RESOLVED (2026-07-07)
 
-1. **Runtime** — Option A (all-.NET intake worker, recommended) vs. B (separate Python worker reusing the skill scripts). Recommend A now that OCR has .NET-native options (Claude vision / the existing Google Doc AI path / Azure Document Intelligence). Sub-decision: which OCR path for the read step — Claude vision (MVP simplicity) vs. Doc-AI text-first (cheaper Claude, PII in a known cloud)?
-2. **PII to Anthropic** — ✅ DECIDED (2026-07-07): first-party Claude API with ZDR + no-training + `inference_geo` (see §7). Remaining action is contractual, not technical — enable ZDR + sign the DPA with Anthropic before real insured data flows. Model is constrained to ZDR-eligible tiers (Opus 4.8 / Sonnet 5 / Haiku).
-3. **Sync vs async** — confirm the async job model (recommended) vs. keeping a synchronous best-effort extraction on `create-submission` for small bundles.
-4. **Skill logic port** — reimplement the skill's stages in .NET (fits Option A; recommended) vs. keep the Python `scripts/` verbatim (only under Option B). The main logic to port is `detect_form_boundaries.py` (the doc-type/LOB boundary map); the rest is orchestration around OCR + Claude + file generation.
-5. **Deliverables destination** — attach to the submission in SIMS (recommended) and/or also drop the folder to a share (as the skill does today)?
-6. **Trigger scope** — auto-run intake on every create-submission-from-email, or a manual "Run intake" button first (safer for rollout)?
+1. **Runtime → all-.NET intake worker** (Option A). No Python service; OCR handled via Claude vision (§3).
+2. **PII → first-party Claude API + ZDR + no-training + `inference_geo`** (§7). Model constrained to ZDR-eligible tiers (Opus 4.8 / Sonnet 5 / Haiku). Remaining action is contractual — enable ZDR + sign the DPA before real insured data flows.
+3. **Execution → async worker.** create-submission stays instant; a background worker (EmailIngestionWorker pattern) drains an intake queue; the UI shows an intake status that updates on completion. Supports retries + long runs.
+4. **OCR/read → Claude vision.** Render pages (PDFium NuGet) → Claude reads + classifies + extracts in one call. No separate OCR engine.
+5. **PDF split → Claude detects boundaries.** Claude returns the page-span → (form, LOB) map from the rendered pages; .NET writes each span to its own PDF. No `detect_form_boundaries.py` port — one model pass does boundary detection + LOB classification + field extraction.
+6. **Deliverables → attached to the SIMS submission** as Attachments (visible in the existing Documents section). No file-share mirror in Phase 1.
+7. **Trigger → auto on every create-submission-from-email**, **behind a feature-flag kill-switch** so intake can be paused instantly if a bad batch appears. (Manual "Run intake" button can still be added later for re-runs.)
+8. **Skill logic → reimplemented in .NET** (fits the all-.NET worker). With Claude doing boundary detection, there is no OCR-ladder to port; the remaining skill logic (loss-run parse, completeness date-math, deliverable builders) is reimplemented in C#.
 
 ## 10. Non-goals (initially)
 Not replacing underwriter judgment (everything is "intake intelligence, verify before binding"); not the Intake Unpacker desktop app; not multi-tenant; not real-time (async, minutes-scale, is fine).
