@@ -107,7 +107,10 @@ Two Claude calls in the worker (Anthropic Messages API, **latest Claude model pe
 
 - **Anthropic API key** (Claude) — Key Vault; the worker degrades gracefully if absent (extraction skipped, submission still created — same principle that fixed the inbox 500).
 - **Google Maps** (geocode + Static Maps aerial) and **OFAC-API** keys — Key Vault; degrade to placeholders like the skill does (address report → map link; OFAC → "screen manually" note).
-- **PII egress depends on the OCR path (§3):** Claude-vision sends all page images to Anthropic; Google Doc AI / Azure Document Intelligence send pages to that cloud (Azure = the same cloud SIMS already runs in); only managed-Tesseract keeps OCR fully local. Whichever path, the Claude judgment/extraction call receives application content — call the data flow out for compliance sign-off.
+- **Data-residency & privacy posture — DECIDED (2026-07-07):** use the **first-party Anthropic API** with **Zero Data Retention (ZDR)**, **no training on our data** (Anthropic commercial-terms default), and **`inference_geo`** pinned to our region (top-level request param, e.g. `inference_geo: "us"`). Insured PII (page images + extracted text) goes to Anthropic only in-flight — under ZDR nothing is retained past serving the request. Two implications that follow from ZDR:
+  1. **Model choice is constrained to ZDR-eligible models.** Fable 5 is *not* available under ZDR (needs 30-day retention). The extractor therefore runs on **Opus 4.8 / Sonnet 5 / Haiku 4.5** — all ZDR-eligible. MVP default: Opus 4.8 (best accuracy on scanned ACORDs); Sonnet 5 to roughly halve cost.
+  2. **We keep the Batch API 50% discount.** ZDR, `inference_geo`, and Batch are all first-party features, so the async worker still gets batch pricing (Bedrock/Vertex/Foundry would have forfeited it).
+  **Action before go-live (not a code setting):** enable ZDR on the org and confirm the DPA / no-training / `inference_geo` region with Anthropic — contractual, must be signed off by compliance before real insured data flows.
 - Reuse the audit's lesson: **no config validation in service constructors** — validate the Anthropic/Maps/OFAC keys lazily at call time so a missing key never breaks unrelated endpoints (see `anti-pattern-ctor-config-throw`).
 
 ## 8. Phasing (ship value early)
@@ -119,10 +122,12 @@ Two Claude calls in the worker (Anthropic Messages API, **latest Claude model pe
 
 Each phase is independently shippable; Phase 1 is the MVP.
 
+**Cost (Claude-vision extraction, ~30 pages/submission ≈ 45K image + ~3K output tokens):** negligible at MGA volume. Per submission ≈ $0.31 (Opus 4.8) / $0.12 (Sonnet 5, intro) / $0.06 (Haiku 4.5) at standard rates — **halved by the Batch API** the worker uses. At 300 submissions/month: ~$45 (Opus 4.8) / ~$18 (Sonnet 5) / ~$9 (Haiku) per month before batch. Cost is not a deciding factor; pick the tier by extraction accuracy. (Rates per the `claude-api` reference; re-baseline with `count_tokens` on real submissions.)
+
 ## 9. Decisions needed (Jeremiah)
 
 1. **Runtime** — Option A (all-.NET intake worker, recommended) vs. B (separate Python worker reusing the skill scripts). Recommend A now that OCR has .NET-native options (Claude vision / the existing Google Doc AI path / Azure Document Intelligence). Sub-decision: which OCR path for the read step — Claude vision (MVP simplicity) vs. Doc-AI text-first (cheaper Claude, PII in a known cloud)?
-2. **PII to Anthropic** — OK to send OCR'd application text (and rare page images) to the Claude API? (Tesseract-first keeps most in-house.) Compliance sign-off needed.
+2. **PII to Anthropic** — ✅ DECIDED (2026-07-07): first-party Claude API with ZDR + no-training + `inference_geo` (see §7). Remaining action is contractual, not technical — enable ZDR + sign the DPA with Anthropic before real insured data flows. Model is constrained to ZDR-eligible tiers (Opus 4.8 / Sonnet 5 / Haiku).
 3. **Sync vs async** — confirm the async job model (recommended) vs. keeping a synchronous best-effort extraction on `create-submission` for small bundles.
 4. **Skill logic port** — reimplement the skill's stages in .NET (fits Option A; recommended) vs. keep the Python `scripts/` verbatim (only under Option B). The main logic to port is `detect_form_boundaries.py` (the doc-type/LOB boundary map); the rest is orchestration around OCR + Claude + file generation.
 5. **Deliverables destination** — attach to the submission in SIMS (recommended) and/or also drop the folder to a share (as the skill does today)?
