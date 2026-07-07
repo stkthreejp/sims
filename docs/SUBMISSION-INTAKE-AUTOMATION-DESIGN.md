@@ -1,6 +1,6 @@
 # SIMS Submission Intake Automation — Design
 
-> **Status:** DRAFT for review (2026-07-07). **Goal:** make SIMS take over what the local `smm-submission-intake` skill does today by hand — turn a raw broker email/PDF bundle into an organized, worked-up, monoline submission — using **deterministic Python tools + Claude** (no Gemini). This doc is the architecture + phased plan; §9 collects the decisions only Jeremiah can make.
+> **Status:** DRAFT for review (2026-07-07). **Goal:** make SIMS take over what the local `smm-submission-intake` skill does today by hand — turn a raw broker email/PDF bundle into an organized, worked-up, monoline submission — using **deterministic tooling + Claude, no Gemini**. Architecture recommendation (see §3): an **all-.NET intake worker** (OCR via Claude vision or the Google Doc-AI path SIMS already has), not a separate Python service. This doc is the architecture + phased plan; §9 collects the decisions only Jeremiah can make.
 
 ---
 
@@ -29,17 +29,30 @@ The `smm-submission-intake` skill (at `~/ClaudeProj/UA Skill/.../smm-submission-
 
 **Decision already made:** no Gemini. `GeminiExtractionService` + the AI-settings "DocumentExtraction" knob are legacy (see `project_submission_intake_direction` memory). LOB detection will be **Claude reading the OCR'd application data and deciding** the line(s) — replacing Gemini's detection pass.
 
-## 3. The core architecture problem: Python + heavy native deps
+## 3. Where the pipeline runs — an all-.NET worker is viable (recommended)
 
-The skill's power is its Python stack — `ocrmypdf`/Tesseract/Ghostscript (OCR), `extract-msg` (.msg), `pdf2image`/`pypdf` (split/render), `reportlab`/`openpyxl` (deliverables). **This cannot live inside the .NET API** (Azure App Service, no Tesseract/Ghostscript). So the central decision is *where the Python runs*.
+The skill is Python because of its native stack — `ocrmypdf`/Tesseract/Ghostscript (OCR), `extract-msg`, `pdf2image`, `reportlab`/`openpyxl`. But **OCR is the only piece that forced Python, and it has strong .NET-native options** — including one SIMS already ships. So the pipeline can run as an **all-.NET background worker** (same pattern as the existing `EmailIngestionWorker`), with **no Python container and no cross-runtime contract**.
 
-| Option | How | Pros | Cons |
-|---|---|---|---|
-| **A. Python intake worker (containerized), queue-triggered** ⭐ recommended | A FastAPI/CLI Python service in its own container (Azure Container App/Instance). .NET enqueues an intake job; the worker runs stages 1–5, calls Claude, writes deliverables to Blob, posts results back to a .NET callback endpoint. | Reuses the skill's scripts almost verbatim; native deps isolated in one image; async fits slow/image-heavy intake; scales independently; .NET stays system-of-record. | New deployable + queue; a callback/auth contract between the two. |
-| B. .NET shells out to Python (subprocess) on a .NET worker | Package Python+deps alongside the API/worker; `Process.Start` the scripts. | No separate service. | Fat/fragile image (Tesseract+Ghostscript in the .NET container); couples runtimes; hard to scale; brittle in App Service. |
-| C. Serverless (Azure Functions/Container Job per submission) | Trigger a Python job per submission. | Pay-per-use; strong isolation. | Cold starts on a heavy image; per-job orchestration/observability overhead. |
+**OCR / read-the-scanned-form options in .NET:**
 
-**Recommendation: Option A** — a dedicated **Python intake worker** triggered by a queue, with the .NET API as orchestrator and system of record. It mirrors how the skill already works (one subagent per submission) and keeps native OCR deps out of the .NET box.
+| Option | How | Trade-off |
+|---|---|---|
+| **Claude vision directly** ⭐ MVP | Render PDF pages → images in .NET (PDFium via `Docnet.Core`/`PDFtoImage` NuGet — no Ghostscript), send to Claude vision → **text + LOB + fields in one call** | Collapses OCR+extraction into the Claude call we're already making; per-page vision tokens; all pages → Anthropic. Server pipeline (per-submission API call), so the skill's context-window token-discipline concern doesn't apply. |
+| **Google Document AI** | **Already wired in SIMS** — `DocumentAiNormalizationService` maps `DocumentAiExtractionResult` → the extraction DTOs. Reuse/extend it; Claude reads the text for judgment/fields. | Proven here; text-first → cheaper Claude calls; PII to Google (skill flags this too). |
+| **Azure AI Document Intelligence** | `Azure.AI.DocumentIntelligence` NuGet (managed, no native binaries) → Claude on the text | Production OCR; PII stays in Azure (same cloud as SIMS); cheaper Claude calls. |
+| Managed Tesseract | `Tesseract` NuGet (offline) | No cloud PII, but ship tessdata/native libs + a rasterizer; most setup. |
+
+**Rest of the Python stack → .NET equivalents:** `.msg` un-nest → **MsgReader**; PDF split by page-span → **PdfSharpCore/iText7/Docnet**; PDF→image → **Docnet.Core/PDFtoImage** (PDFium NuGet); xlsx (loss/equipment) → **ClosedXML/EPPlus**; PDF reports → **QuestPDF**; geocode/aerial + OFAC → `HttpClient`.
+
+**Architecture options:**
+
+| Option | Runtime | Verdict |
+|---|---|---|
+| **A. All-.NET intake worker** ⭐ recommended | One .NET background worker (NuGet OCR/render/xlsx/pdf); OCR = Claude vision (MVP) or the existing Google Doc AI path | Single runtime the codebase already speaks; one deploy; no Python container or callback contract; reuses `EmailIngestionWorker` pattern + `DocumentAiNormalizationService`. |
+| B. Separate Python worker (queue + callback) | Python container reusing the skill's scripts verbatim | Only if we want the skill's exact scripts unchanged and accept a second runtime/deploy + cross-service auth. Fallback, not default. |
+| C. .NET shells out to Python | Python+native deps bundled with .NET | Rejected — fat/fragile image, couples runtimes. |
+
+**Recommendation: Option A — an all-.NET intake worker.** It stays async (a background worker draining an intake queue), keeps the .NET API as orchestrator/system-of-record, and eliminates the polyglot deploy. Reimplement the skill's stages in .NET (they're mostly orchestration around OCR + Claude + file generation), reusing the extraction-DTO mapping SIMS already has.
 
 ## 4. Target flow (async)
 
@@ -50,10 +63,10 @@ Inbound email (Graph)  ─▶  /inbound-emails (Inbox)  ─▶  POST /inbound-em
                                                               ▼
                                             ┌──────────  intake queue  ──────────┐
                                             ▼                                     │
-                            Python Intake Worker (container)                     │
-                            1 un-nest .msg / discard junk                        │
-                            2 OCR ladder → page-span→(form,LOB) map → split PDFs │
-                            2b Claude: read OCR text (+vision only for gaps) →   │
+                            .NET Intake Worker (drains intake queue)             │
+                            1 un-nest .msg (MsgReader) / discard junk            │
+                            2 render/OCR → page-span→(form,LOB) map → split PDFs │
+                            2b Claude: read pages (vision) or Doc-AI text →      │
                                decide LOB(s) + quoting line + extract fields     │
                             3 parse loss runs → Loss_Summary.xlsx                │
                             3b IM: equipment valuation xlsx                      │
@@ -74,12 +87,12 @@ Inbound email (Graph)  ─▶  /inbound-emails (Inbox)  ─▶  POST /inbound-em
 
 Two Claude calls in the worker (Anthropic Messages API, **latest Claude model per the `claude-api` reference**, **tool-use / structured JSON output** so results validate):
 
-1. **LOB decision** — feed Claude the **OCR'd application text** (from the Stage-2 ladder) + broker `EMAIL_BODY.txt`; ask it to identify the line(s) present and **which is the quoting line** (monoline), returning `{ lines: [...], quotingLine, confidence, rationale }`. Vision is used **only** for pages the OCR ladder flagged as unreadable. This is exactly "Claude reads the data and makes the decision."
+1. **LOB decision** — give Claude the application content + broker `EMAIL_BODY.txt` and ask it to identify the line(s) present and **which is the quoting line** (monoline), returning `{ lines: [...], quotingLine, confidence, rationale }`. "Application content" is either the **rendered page images** (Claude-vision path) or **OCR text** (Google Doc AI / Azure path) per §3. This is exactly "Claude reads the data and makes the decision."
 2. **Field extraction per LOB** — Claude extracts into the **existing `GeminiExtractionResult` shapes** (drivers, vehicles, locations, prior carriers, supplemental, GL coverages/classifications, IM coverages, equipment). Reuse those DTOs verbatim; keep `InferLinesOfBusiness()` as the fallback.
 
 **Interface change:** rename `IGeminiExtractionService` → `IDocumentExtractionService` (keep the method shape); add a `ClaudeDocumentExtractionService` implementation used by the worker (or a thin .NET client if extraction stays server-side). The rich DTOs (`GeminiExtractionResult` etc.) get renamed `DocumentExtractionResult` but keep every field. This is a mechanical rename + one new impl; every consumer keeps working.
 
-**Deterministic-first:** doc-type/LOB *boundary* detection is done by the Python OCR ladder (cheap, no model); Claude is used for the *judgment* (which line to quote) and *field extraction*, and vision only as last resort — matching the skill's token discipline.
+**Deterministic-first where it pays:** the cheap steps (page render/split, `.msg` un-nest, and text extraction via Doc AI/Azure when that path is used) run in .NET with no model; Claude is reserved for the *judgment* (which line to quote) and *field extraction*. On the Claude-vision path, the read and the extraction collapse into one call.
 
 ## 6. Data model & API additions
 
@@ -94,12 +107,12 @@ Two Claude calls in the worker (Anthropic Messages API, **latest Claude model pe
 
 - **Anthropic API key** (Claude) — Key Vault; the worker degrades gracefully if absent (extraction skipped, submission still created — same principle that fixed the inbox 500).
 - **Google Maps** (geocode + Static Maps aerial) and **OFAC-API** keys — Key Vault; degrade to placeholders like the skill does (address report → map link; OFAC → "screen manually" note).
-- **PII egress:** OCR runs **locally** in the worker (Tesseract), keeping insured PII in-house; the Claude calls send page text (and, rarely, page images) to Anthropic. That's an intentional data-flow decision — call it out for compliance sign-off (the skill flags the same for its optional Document AI path). Tesseract-first keeps most content off any external service.
+- **PII egress depends on the OCR path (§3):** Claude-vision sends all page images to Anthropic; Google Doc AI / Azure Document Intelligence send pages to that cloud (Azure = the same cloud SIMS already runs in); only managed-Tesseract keeps OCR fully local. Whichever path, the Claude judgment/extraction call receives application content — call the data flow out for compliance sign-off.
 - Reuse the audit's lesson: **no config validation in service constructors** — validate the Anthropic/Maps/OFAC keys lazily at call time so a missing key never breaks unrelated endpoints (see `anti-pattern-ctor-config-throw`).
 
 ## 8. Phasing (ship value early)
 
-- **Phase 1 — Intake spine + LOB + organized file set (highest value):** the Python worker + queue + callback; un-nest `.msg`; OCR ladder + doc-type/LOB split; **Claude LOB decision + field extraction** (replaces Gemini) populating the existing extracted entities; deliverables filed as attachments; **completeness check + account summary**. This alone replaces the manual "split + work up + is it complete" grind.
+- **Phase 1 — Intake spine + LOB + organized file set (highest value):** the .NET intake worker + intake queue; un-nest `.msg`; render/OCR + doc-type/LOB split; **Claude LOB decision + field extraction** (replaces Gemini) populating the existing extracted entities; deliverables filed as attachments; **completeness check + account summary**. This alone replaces the manual "split + work up + is it complete" grind.
 - **Phase 2 — Loss & equipment:** `Loss_Summary.xlsx` (with the loss-ratio worksheet) and IM `Equipment_Valuation.xlsx`.
 - **Phase 3 — Reports:** OFAC screen, address/aerial report, web/business report.
 - **Phase 4 — Polish:** re-intake, outdated-loss-run detection, MVR handling for Auto, multi-submission throughput.
@@ -108,10 +121,10 @@ Each phase is independently shippable; Phase 1 is the MVP.
 
 ## 9. Decisions needed (Jeremiah)
 
-1. **Infra for the Python worker** — Option A (containerized queue worker, recommended) vs. B (bundle Python in .NET) vs. C (serverless job)? Drives the whole build.
+1. **Runtime** — Option A (all-.NET intake worker, recommended) vs. B (separate Python worker reusing the skill scripts). Recommend A now that OCR has .NET-native options (Claude vision / the existing Google Doc AI path / Azure Document Intelligence). Sub-decision: which OCR path for the read step — Claude vision (MVP simplicity) vs. Doc-AI text-first (cheaper Claude, PII in a known cloud)?
 2. **PII to Anthropic** — OK to send OCR'd application text (and rare page images) to the Claude API? (Tesseract-first keeps most in-house.) Compliance sign-off needed.
 3. **Sync vs async** — confirm the async job model (recommended) vs. keeping a synchronous best-effort extraction on `create-submission` for small bundles.
-4. **Reuse the skill scripts as-is** in the worker (fastest) vs. reimplement cleanly? Recommend: vendor the skill's `scripts/` into the worker repo initially, harden over time.
+4. **Skill logic port** — reimplement the skill's stages in .NET (fits Option A; recommended) vs. keep the Python `scripts/` verbatim (only under Option B). The main logic to port is `detect_form_boundaries.py` (the doc-type/LOB boundary map); the rest is orchestration around OCR + Claude + file generation.
 5. **Deliverables destination** — attach to the submission in SIMS (recommended) and/or also drop the folder to a share (as the skill does today)?
 6. **Trigger scope** — auto-run intake on every create-submission-from-email, or a manual "Run intake" button first (safer for rollout)?
 
