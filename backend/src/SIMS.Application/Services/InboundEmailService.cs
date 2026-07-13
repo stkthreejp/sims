@@ -1,6 +1,6 @@
 using System.Text.Json;
 using SIMS.Application.Common;
-using SIMS.Application.DTOs.Gemini;
+using SIMS.Application.DTOs.DocumentExtraction;
 using SIMS.Application.DTOs.InboundEmails;
 using SIMS.Application.DTOs.Submissions;
 using SIMS.Application.Interfaces.Services;
@@ -14,12 +14,12 @@ namespace SIMS.Application.Services;
 public class InboundEmailService : IInboundEmailService
 {
     private readonly Microsoft.EntityFrameworkCore.DbContext _db;
-    private readonly IGeminiExtractionService _gemini;
+    private readonly IDocumentExtractionService _gemini;
     private readonly ILogger<InboundEmailService> _logger;
 
     public InboundEmailService(
         Microsoft.EntityFrameworkCore.DbContext db,
-        IGeminiExtractionService gemini,
+        IDocumentExtractionService gemini,
         ILogger<InboundEmailService> logger)
     {
         _db = db;
@@ -86,7 +86,7 @@ public class InboundEmailService : IInboundEmailService
 
         // Run Gemini extraction — all LOB results merged into one submission
         var extractionStatus = "NotApplicable";
-        List<GeminiLobExtraction>? extractions = null;
+        List<DocumentLobExtraction>? extractions = null;
         try
         {
             extractions = await _gemini.ExtractFromAttachmentsAsync(attachmentsToProcess, lineOfBusiness);
@@ -117,7 +117,7 @@ public class InboundEmailService : IInboundEmailService
 
             // For any result with no detected LOB, try to infer from the data
             foreach (var e in extractions.Where(e => string.IsNullOrEmpty(e.LineOfBusiness)))
-                foreach (var inferred in GeminiExtractionResult.InferLinesOfBusiness(e.Data))
+                foreach (var inferred in DocumentExtractionResult.InferLinesOfBusiness(e.Data))
                     if (!linesOfBusiness.Contains(inferred))
                         linesOfBusiness.Add(inferred);
         }
@@ -169,9 +169,9 @@ public class InboundEmailService : IInboundEmailService
         {
             try
             {
-                var merged = new GeminiExtractionResult();
+                var merged = new DocumentExtractionResult();
                 foreach (var e in extractions)
-                    GeminiExtractionResult.MergeInto(merged, e.Data);
+                    DocumentExtractionResult.MergeInto(merged, e.Data);
                 await ApplyExtractionAsync(submission.Id, resolvedInsuredId, merged, currentUserId);
             }
             catch (Exception ex)
@@ -218,7 +218,7 @@ public class InboundEmailService : IInboundEmailService
 
         var submissionId = email.LinkedSubmissionId.Value;
 
-        List<GeminiLobExtraction>? extractions;
+        List<DocumentLobExtraction>? extractions;
         try
         {
             extractions = await _gemini.ExtractFromAttachmentsAsync(email.Attachments, lineOfBusinessHint: lineOfBusiness);
@@ -243,7 +243,7 @@ public class InboundEmailService : IInboundEmailService
             .Select(e => e.LineOfBusiness)
             .Distinct());
         foreach (var e in extractions.Where(e => string.IsNullOrEmpty(e.LineOfBusiness)))
-            foreach (var inferred in GeminiExtractionResult.InferLinesOfBusiness(e.Data))
+            foreach (var inferred in DocumentExtractionResult.InferLinesOfBusiness(e.Data))
                 if (!linesOfBusiness.Contains(inferred))
                     linesOfBusiness.Add(inferred);
 
@@ -262,9 +262,9 @@ public class InboundEmailService : IInboundEmailService
             : "Completed";
 
         // Merge all LOB results into one and re-apply to the linked submission
-        var merged = new GeminiExtractionResult();
+        var merged = new DocumentExtractionResult();
         foreach (var e in extractions)
-            GeminiExtractionResult.MergeInto(merged, e.Data);
+            DocumentExtractionResult.MergeInto(merged, e.Data);
 
         await ApplyExtractionAsync(submissionId, submission.InsuredId, merged, currentUserId, replaceExisting: true);
 
@@ -276,7 +276,7 @@ public class InboundEmailService : IInboundEmailService
     // -------------------------------------------------------------------------
 
     private async Task ApplyExtractionAsync(
-        Guid submissionId, Guid insuredId, GeminiExtractionResult data, Guid userId, bool replaceExisting = false)
+        Guid submissionId, Guid insuredId, DocumentExtractionResult data, Guid userId, bool replaceExisting = false)
     {
         if (!string.IsNullOrWhiteSpace(data.DescriptionOfOperations))
         {

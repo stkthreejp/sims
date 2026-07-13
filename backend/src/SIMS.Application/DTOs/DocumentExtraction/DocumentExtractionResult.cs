@@ -1,9 +1,9 @@
-namespace SIMS.Application.DTOs.Gemini;
+namespace SIMS.Application.DTOs.DocumentExtraction;
 
 /// <summary>Extraction result for a single line of business, as returned by GeminiExtractionService.</summary>
-public record GeminiLobExtraction(string LineOfBusiness, GeminiExtractionResult Data);
+public record DocumentLobExtraction(string LineOfBusiness, DocumentExtractionResult Data);
 
-public class GeminiExtractionResult
+public class DocumentExtractionResult
 {
     public string? DescriptionOfOperations { get; set; }
     public string? Dba { get; set; }
@@ -23,7 +23,7 @@ public class GeminiExtractionResult
     /// Infers likely lines of business from the data that was actually extracted.
     /// Used as a fallback when Gemini's detection pass returns no LOBs.
     /// </summary>
-    public static List<string> InferLinesOfBusiness(GeminiExtractionResult data)
+    public static List<string> InferLinesOfBusiness(DocumentExtractionResult data)
     {
         var lobs = new List<string>();
         if (data.Drivers.Count > 0 || data.Vehicles.Count > 0 || data.Supplemental != null)
@@ -35,7 +35,7 @@ public class GeminiExtractionResult
         return lobs;
     }
 
-    public static void MergeInto(GeminiExtractionResult target, GeminiExtractionResult source)
+    public static void MergeInto(DocumentExtractionResult target, DocumentExtractionResult source)
     {
         target.DescriptionOfOperations ??= source.DescriptionOfOperations;
         target.Dba ??= source.Dba;

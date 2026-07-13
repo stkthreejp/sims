@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using SIMS.Application.DTOs.Gemini;
+using SIMS.Application.DTOs.DocumentExtraction;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace SIMS.Infrastructure.Services;
 
-public class GeminiExtractionService : IGeminiExtractionService
+public class GeminiExtractionService : IDocumentExtractionService
 {
     private readonly IBlobStorageService _blobStorage;
     private readonly HttpClient _httpClient;
@@ -40,7 +40,7 @@ public class GeminiExtractionService : IGeminiExtractionService
         _apiKey = config["GeminiApi:ApiKey"];
     }
 
-    public async Task<List<GeminiLobExtraction>?> ExtractFromAttachmentsAsync(
+    public async Task<List<DocumentLobExtraction>?> ExtractFromAttachmentsAsync(
         IEnumerable<EmailAttachment> attachments, string? lineOfBusinessHint = null, CancellationToken ct = default)
     {
         var eligible = attachments
@@ -64,7 +64,7 @@ public class GeminiExtractionService : IGeminiExtractionService
         }
 
         // Accumulate results keyed by LOB; same LOB across multiple attachments is merged
-        var resultsByLob = new Dictionary<string, GeminiExtractionResult>(StringComparer.OrdinalIgnoreCase);
+        var resultsByLob = new Dictionary<string, DocumentExtractionResult>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var attachment in eligible)
         {
@@ -140,7 +140,7 @@ public class GeminiExtractionService : IGeminiExtractionService
         }
 
         var results = resultsByLob
-            .Select(kvp => new GeminiLobExtraction(kvp.Key, kvp.Value))
+            .Select(kvp => new DocumentLobExtraction(kvp.Key, kvp.Value))
             .ToList();
 
         _logger.LogInformation("Extraction complete — {Count} LOB(s): {Lobs}",
@@ -153,10 +153,10 @@ public class GeminiExtractionService : IGeminiExtractionService
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static void Accumulate(Dictionary<string, GeminiExtractionResult> dict, string lob, GeminiExtractionResult data)
+    private static void Accumulate(Dictionary<string, DocumentExtractionResult> dict, string lob, DocumentExtractionResult data)
     {
         if (dict.TryGetValue(lob, out var existing))
-            GeminiExtractionResult.MergeInto(existing, data);
+            DocumentExtractionResult.MergeInto(existing, data);
         else
             dict[lob] = data;
     }
@@ -220,7 +220,7 @@ public class GeminiExtractionService : IGeminiExtractionService
         }
     }
 
-    private async Task<GeminiExtractionResult?> ExtractWithPromptAsync(
+    private async Task<DocumentExtractionResult?> ExtractWithPromptAsync(
         byte[] bytes, string mimeType, string prompt, string fileName, CancellationToken ct)
     {
         _logger.LogInformation("Sending {Bytes} bytes to Gemini for {FileName}", bytes.Length, fileName);
@@ -249,7 +249,7 @@ public class GeminiExtractionService : IGeminiExtractionService
 
         try
         {
-            return JsonSerializer.Deserialize<GeminiExtractionResult>(text, JsonOpts);
+            return JsonSerializer.Deserialize<DocumentExtractionResult>(text, JsonOpts);
         }
         catch (Exception ex)
         {

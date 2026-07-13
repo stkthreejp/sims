@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using SIMS.Application.DTOs.DocumentAI;
-using SIMS.Application.DTOs.Gemini;
+using SIMS.Application.DTOs.DocumentExtraction;
 using SIMS.Application.DTOs.Submissions;
 using SIMS.Domain.Enums;
 
@@ -25,7 +25,7 @@ public static partial class DocumentAiNormalizationService
         return preview;
     }
 
-    private static void MapSubmissionFields(GeminiExtractionResult target, List<DocumentAiExtractedField> fields)
+    private static void MapSubmissionFields(DocumentExtractionResult target, List<DocumentAiExtractedField> fields)
     {
         target.DescriptionOfOperations = FirstValue(fields,
             "DESCRIPTION OF PRIMARY OPERATIONS",

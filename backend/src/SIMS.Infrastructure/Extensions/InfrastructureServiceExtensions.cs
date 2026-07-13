@@ -112,7 +112,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IComplianceDocumentService, ComplianceDocumentService>();
         services.AddScoped<IInboundEmailService, InboundEmailService>();
         services.AddScoped<IEmailIngestionService, EmailIngestionService>();
-        services.AddScoped<IGeminiExtractionService, GeminiExtractionService>();
+        services.AddScoped<IDocumentExtractionService, GeminiExtractionService>();
         services.AddScoped<IDocumentAiExtractionService, DocumentAiExtractionService>();
         services.AddScoped<IDocumentAiPreviewService, DocumentAiPreviewService>();
         services.AddScoped<ITaskTypeService, TaskTypeService>();
