@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
+import { BadgeCheck, Pencil, Plus, Save, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { companyLicensesApi } from '@/api/companyLicenses.api'
+import { parseCsv } from '@/lib/csv'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import type { CompanyLicense, UpsertCompanyLicense } from '@/types/companyLicense.types'
 
@@ -23,6 +24,45 @@ const emptyForm: UpsertCompanyLicense = {
   notes: '',
 }
 
+// CSV import: header (case/space/underscore-insensitive) -> field.
+const HEADER_MAP: Record<string, keyof UpsertCompanyLicense> = {
+  holdername: 'holderName',
+  licensenumber: 'licenseNumber',
+  licensestate: 'licenseState',
+  licensetype: 'licenseType',
+  effectivedate: 'effectiveDate',
+  expirationdate: 'expirationDate',
+  isactive: 'isActive',
+  notes: 'notes',
+  addressline1: 'addressLine1',
+  addressline2: 'addressLine2',
+  city: 'city',
+  state: 'state',
+  zipcode: 'zipCode',
+  country: 'country',
+}
+
+function rowsFromCsv(text: string): UpsertCompanyLicense[] {
+  const grid = parseCsv(text)
+  if (grid.length < 2) return []
+  const headers = grid[0].map((h) => HEADER_MAP[h.replace(/[\s_]/g, '').toLowerCase()] ?? null)
+  return grid.slice(1).map((cells) => {
+    const row: UpsertCompanyLicense = {
+      holderName: '', licenseNumber: '', licenseState: '', licenseType: '',
+      effectiveDate: null, expirationDate: null, addressLine1: '', addressLine2: '',
+      city: '', state: '', zipCode: '', country: 'USA', isActive: true, notes: '',
+    }
+    headers.forEach((key, idx) => {
+      if (!key) return
+      const val = (cells[idx] ?? '').trim()
+      if (key === 'isActive') row.isActive = !/^(false|0|no|n)$/i.test(val)
+      else if (key === 'effectiveDate' || key === 'expirationDate') row[key] = val || null
+      else (row as unknown as Record<string, string>)[key] = val
+    })
+    return row
+  })
+}
+
 export function CompanyLicensesAdminPage() {
   const qc = useQueryClient()
   const [form, setForm] = useState<UpsertCompanyLicense>(emptyForm)
@@ -37,6 +77,28 @@ export function CompanyLicensesAdminPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['company-licenses'] })
   const onError = (e: unknown) =>
     toast.error((e as { response?: { data?: { errorMessage?: string } } })?.response?.data?.errorMessage ?? 'Could not save license')
+
+  const importMutation = useMutation({
+    mutationFn: (rows: UpsertCompanyLicense[]) => companyLicensesApi.import(rows),
+    onSuccess: (res) => {
+      invalidate()
+      const parts = [`Imported ${res.created}`]
+      if (res.skipped) parts.push(`${res.skipped} skipped (already present)`)
+      if (res.errors.length) parts.push(`${res.errors.length} error(s)`)
+      toast.success(parts.join(' · '))
+      if (res.errors.length) console.warn('Company license import errors:', res.errors)
+    },
+    onError,
+  })
+
+  const handleImportFile = async (file: File) => {
+    const rows = rowsFromCsv(await file.text())
+    if (rows.length === 0) {
+      toast.error('No rows found — the CSV needs a header row (holderName, licenseNumber, licenseState, licenseType, …) and at least one data row')
+      return
+    }
+    importMutation.mutate(rows)
+  }
 
   const resetForm = () => { setForm(emptyForm); setEditingId(null); setShowForm(false) }
 
@@ -90,9 +152,21 @@ export function CompanyLicensesAdminPage() {
           <h1 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>Company Licenses</h1>
         </div>
         {!showForm && (
-          <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }} className="sd-btn primary">
-            <Plus className="h-4 w-4" /> Add license
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="sd-btn outline cursor-pointer" title="Upload a CSV (holderName, licenseNumber, licenseState, licenseType, effectiveDate, expirationDate, isActive, notes)">
+              <Upload className="h-4 w-4" /> {importMutation.isPending ? 'Importing…' : 'Import CSV'}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                disabled={importMutation.isPending}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = '' }}
+              />
+            </label>
+            <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }} className="sd-btn primary">
+              <Plus className="h-4 w-4" /> Add license
+            </button>
+          </div>
         )}
       </div>
       <p className="mb-5 text-sm" style={{ color: 'var(--ink-3)' }}>

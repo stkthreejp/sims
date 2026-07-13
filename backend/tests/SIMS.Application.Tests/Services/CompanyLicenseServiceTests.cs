@@ -63,6 +63,31 @@ public class CompanyLicenseServiceTests
         Assert.Empty(all);
     }
 
+    [Fact]
+    public async Task ImportAsync_CreatesValidRowsSkipsDuplicatesReportsErrors()
+    {
+        await using var db = CreateDb();
+        await new CompanyLicenseService(db).CreateAsync(Valid(holder: "SMM LLC", state: "TX")); // existing SL-12345/TX
+
+        var rows = new List<UpsertCompanyLicenseRequest>
+        {
+            Valid(holder: "SMM LLC", state: "TX"),   // duplicate holder+number+state -> skipped
+            Valid(holder: "Jeremiah", state: "AL"),   // new
+            Valid(holder: "  ", state: "GA"),         // invalid (no holder) -> error on row 3
+        };
+
+        var result = await new CompanyLicenseService(db).ImportAsync(rows);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.Created);
+        Assert.Equal(1, result.Value.Skipped);
+        var error = Assert.Single(result.Value.Errors);
+        Assert.Equal(3, error.Row);
+
+        var all = await new CompanyLicenseService(db).GetAllAsync(includeInactive: true);
+        Assert.Equal(2, all.Count); // original + the one new row
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

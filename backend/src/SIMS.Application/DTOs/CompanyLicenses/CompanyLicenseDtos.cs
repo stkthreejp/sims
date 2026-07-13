@@ -32,3 +32,9 @@ public record UpsertCompanyLicenseRequest(
     string? Country,
     bool IsActive,
     string? Notes);
+
+public record ImportCompanyLicensesRequest(IReadOnlyList<UpsertCompanyLicenseRequest> Rows);
+
+public record CompanyLicenseImportError(int Row, string Message);
+
+public record ImportCompanyLicensesResult(int Created, int Skipped, IReadOnlyList<CompanyLicenseImportError> Errors);

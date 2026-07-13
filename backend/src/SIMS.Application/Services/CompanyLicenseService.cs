@@ -62,6 +62,55 @@ public class CompanyLicenseService : ICompanyLicenseService
         return Result.Success();
     }
 
+    private const int MaxImportRows = 1000;
+
+    public async Task<Result<ImportCompanyLicensesResult>> ImportAsync(IReadOnlyList<UpsertCompanyLicenseRequest> rows, CancellationToken ct = default)
+    {
+        if (rows.Count == 0)
+            return Result<ImportCompanyLicensesResult>.Failure("EMPTY_IMPORT", "No rows to import.");
+        if (rows.Count > MaxImportRows)
+            return Result<ImportCompanyLicensesResult>.Failure("TOO_MANY_ROWS", $"Import contains {rows.Count} rows; the maximum per file is {MaxImportRows}.");
+
+        // Existing (holder + number + state) keys so a re-import skips duplicates instead of doubling up.
+        var existing = (await _db.Set<CompanyLicense>()
+                .Select(l => new { l.HolderName, l.LicenseNumber, l.LicenseState })
+                .ToListAsync(ct))
+            .Select(l => Key(l.HolderName, l.LicenseNumber, l.LicenseState))
+            .ToHashSet();
+
+        var errors = new List<CompanyLicenseImportError>();
+        var created = 0;
+        var skipped = 0;
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var req = rows[i];
+            var validation = Validate(req);
+            if (validation is not null)
+            {
+                errors.Add(new CompanyLicenseImportError(i + 1, validation.Value.Message));
+                continue;
+            }
+
+            var key = Key(req.HolderName, req.LicenseNumber, req.LicenseState);
+            if (!existing.Add(key))
+            {
+                skipped++;
+                continue;
+            }
+
+            var license = new CompanyLicense();
+            Apply(license, req);
+            _db.Set<CompanyLicense>().Add(license);
+            created++;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return Result<ImportCompanyLicensesResult>.Success(new ImportCompanyLicensesResult(created, skipped, errors));
+    }
+
+    private static string Key(string holder, string number, string state) =>
+        $"{holder.Trim().ToUpperInvariant()}|{number.Trim().ToUpperInvariant()}|{state.Trim().ToUpperInvariant()}";
+
     private static (string Code, string Message)? Validate(UpsertCompanyLicenseRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.HolderName))

@@ -9,4 +9,5 @@ public interface ICompanyLicenseService
     Task<Result<CompanyLicenseDto>> CreateAsync(UpsertCompanyLicenseRequest req, CancellationToken ct = default);
     Task<Result<CompanyLicenseDto>> UpdateAsync(Guid id, UpsertCompanyLicenseRequest req, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<Result<ImportCompanyLicensesResult>> ImportAsync(IReadOnlyList<UpsertCompanyLicenseRequest> rows, CancellationToken ct = default);
 }
