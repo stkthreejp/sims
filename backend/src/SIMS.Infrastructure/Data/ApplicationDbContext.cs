@@ -75,6 +75,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, Guid,
     public DbSet<PolicyTransactionApproval> PolicyTransactionApprovals => Set<PolicyTransactionApproval>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<IntakeJob> IntakeJobs => Set<IntakeJob>();
     public DbSet<QuoteUWWriteup> QuoteUWWriteups => Set<QuoteUWWriteup>();
     public DbSet<QuoteUWWriteupCondition> QuoteUWWriteupConditions => Set<QuoteUWWriteupCondition>();
     public DbSet<QuoteChecklistItem> QuoteChecklistItems => Set<QuoteChecklistItem>();

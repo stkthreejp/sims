@@ -551,6 +551,9 @@ public class InboundEmailService : IInboundEmailService
         EmailAttachmentDocumentType.DecPage => DocumentType.DeclarationsPage,
         EmailAttachmentDocumentType.ScheduleOfValues => DocumentType.StatementOfValues,
         EmailAttachmentDocumentType.SignedApplication => DocumentType.SignedApplication,
+        EmailAttachmentDocumentType.Acord127 => DocumentType.Application,
+        EmailAttachmentDocumentType.Acord146 => DocumentType.StatementOfValues,
+        EmailAttachmentDocumentType.Mvr => DocumentType.Mvr,
         _ => DocumentType.Other,
     };
 

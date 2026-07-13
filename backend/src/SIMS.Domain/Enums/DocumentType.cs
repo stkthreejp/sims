@@ -48,6 +48,9 @@ public enum DocumentType
     IssuedPolicyPacket,
     ProofOfNotice,
     ReinstatementApproval,
+
+    // ── Intake ────────────────────────────────────────────────────────────────
+    AccountSummary,
 }
 
 public enum DocumentEntityType

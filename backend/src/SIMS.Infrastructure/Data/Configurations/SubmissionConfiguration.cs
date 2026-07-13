@@ -13,6 +13,7 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
         builder.Property(s => s.SubmissionNumber).IsRequired().HasMaxLength(50);
         builder.HasIndex(s => s.SubmissionNumber).IsUnique();
         builder.Property(s => s.DescriptionOfOperations).HasMaxLength(2000);
+        builder.Property(s => s.QuotingLineOfBusiness).HasMaxLength(50);
 
         builder.HasOne(s => s.Insured).WithMany(i => i.Submissions)
             .HasForeignKey(s => s.InsuredId).OnDelete(DeleteBehavior.Restrict);
