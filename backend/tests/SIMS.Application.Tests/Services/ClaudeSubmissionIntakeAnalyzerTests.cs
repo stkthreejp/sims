@@ -104,7 +104,7 @@ public class ClaudeSubmissionIntakeAnalyzerTests
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Anthropic:ApiKey"] = withKey ? "test-key" : null,
+                ["ANTHROPIC_API_KEY"] = withKey ? "test-key" : null,
                 ["Anthropic:Model"] = "claude-opus-4-8",
                 ["Anthropic:InferenceGeo"] = "us",
             })

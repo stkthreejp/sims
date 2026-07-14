@@ -35,9 +35,13 @@ public class ClaudeSubmissionIntakeAnalyzer : ISubmissionIntakeAnalyzer
         _logger = logger;
         // Validate the key lazily at the call site, never in the ctor — a service ctor that
         // throws on missing config breaks DI for every consumer (see the inbox-500 fix).
-        _apiKey = config["Anthropic:ApiKey"];
-        _model = config["Anthropic:Model"] ?? "claude-opus-4-8";
-        _inferenceGeo = config["Anthropic:InferenceGeo"] ?? "us";
+        // Key is read the same way as AnthropicGuidelineLlmInterpreterService: the deployed
+        // value is the flat ANTHROPIC_API_KEY app setting, not Anthropic:ApiKey.
+        _apiKey = config["ANTHROPIC_API_KEY"]
+            ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+            ?? config["Anthropic:ApiKey"];
+        _model = config["Anthropic:Model"] ?? config["ANTHROPIC_MODEL"] ?? "claude-opus-4-8";
+        _inferenceGeo = config["Anthropic:InferenceGeo"] ?? config["ANTHROPIC_INFERENCE_GEO"] ?? "us";
     }
 
     public async Task<SubmissionAnalysis?> AnalyzeSubmissionAsync(
