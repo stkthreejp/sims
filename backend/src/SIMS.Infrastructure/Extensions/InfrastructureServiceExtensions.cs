@@ -115,6 +115,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IDocumentExtractionService, GeminiExtractionService>();
         services.AddScoped<IDocumentAiExtractionService, DocumentAiExtractionService>();
         services.AddScoped<ISubmissionIntakeAnalyzer, ClaudeSubmissionIntakeAnalyzer>();
+        services.AddScoped<IPdfPageRenderer, PdfToImagePageRenderer>();
+        services.AddScoped<IIntakeProcessingService, IntakeProcessingService>();
         services.AddScoped<IDocumentAiPreviewService, DocumentAiPreviewService>();
         services.AddScoped<ITaskTypeService, TaskTypeService>();
         services.AddScoped<IDueDateFormulaService, DueDateFormulaService>();
@@ -152,6 +154,7 @@ public static class InfrastructureServiceExtensions
         });
         services.Configure<FmcsaSocrataSettings>(configuration.GetSection("Fmcsa:Socrata"));
         services.Configure<FmcsaJobSettings>(configuration.GetSection("Fmcsa:Jobs"));
+        services.Configure<IntakeSettings>(configuration.GetSection("Intake"));
         services.AddScoped<IXeroTokenService, XeroTokenService>();
         services.AddScoped<IXeroApiClient, XeroApiClient>();
         services.AddScoped<IJournalDriver, CsvJournalDriver>();
@@ -221,6 +224,7 @@ public static class InfrastructureServiceExtensions
         services.AddHostedService<JournalSyncRetryWorker>();
         services.AddHostedService<ShadowRateDailyReportWorker>();
         services.AddHostedService<FmcsaScheduledJobsWorker>();
+        services.AddHostedService<IntakeWorker>();
 
         return services;
     }

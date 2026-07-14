@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SIMS.Application.Common;
+using SIMS.Application.Configuration;
 using SIMS.Application.DTOs.DocumentExtraction;
 using SIMS.Application.DTOs.InboundEmails;
 using SIMS.Application.DTOs.Submissions;
@@ -8,6 +9,7 @@ using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace SIMS.Application.Services;
 
@@ -16,14 +18,17 @@ public class InboundEmailService : IInboundEmailService
     private readonly Microsoft.EntityFrameworkCore.DbContext _db;
     private readonly IDocumentExtractionService _gemini;
     private readonly ILogger<InboundEmailService> _logger;
+    private readonly IntakeSettings _intakeSettings;
 
     public InboundEmailService(
         Microsoft.EntityFrameworkCore.DbContext db,
         IDocumentExtractionService gemini,
+        IOptions<IntakeSettings> intakeSettings,
         ILogger<InboundEmailService> logger)
     {
         _db = db;
         _gemini = gemini;
+        _intakeSettings = intakeSettings.Value;
         _logger = logger;
     }
 
@@ -163,6 +168,13 @@ public class InboundEmailService : IInboundEmailService
         email.ProcessedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
+
+        // Queue automated intake for the new submission (kill-switch: Intake:Enabled).
+        if (_intakeSettings.Enabled)
+        {
+            _db.Set<IntakeJob>().Add(new IntakeJob { SubmissionId = submission.Id, Status = IntakeJobStatus.Queued });
+            await _db.SaveChangesAsync();
+        }
 
         // Merge all LOB extractions and apply to the single submission
         if (extractions?.Count > 0)
