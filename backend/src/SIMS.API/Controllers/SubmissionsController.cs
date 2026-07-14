@@ -21,15 +21,18 @@ public class SubmissionsController : ControllerBase
     private readonly ISubmissionService _submissionService;
     private readonly IUnderwritingClearanceService _clearance;
     private readonly IUnderwritingReferralService _referrals;
+    private readonly IIntakeProcessingService _intake;
 
     public SubmissionsController(
         ISubmissionService submissionService,
         IUnderwritingClearanceService clearance,
-        IUnderwritingReferralService referrals)
+        IUnderwritingReferralService referrals,
+        IIntakeProcessingService intake)
     {
         _submissionService = submissionService;
         _clearance = clearance;
         _referrals = referrals;
+        _intake = intake;
     }
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -48,6 +51,21 @@ public class SubmissionsController : ControllerBase
     {
         var result = await _submissionService.GetByIdAsync(id, CurrentAccess);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.ErrorMessage });
+    }
+
+    [HttpGet("{id:guid}/intake")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> GetIntake(Guid id, CancellationToken ct)
+        => Ok(await _intake.GetLatestForSubmissionAsync(id, ct));
+
+    [HttpPost("{id:guid}/reintake")]
+    [Authorize(Policy = AppPermissions.UnderwritingManage)]
+    public async Task<IActionResult> Reintake(Guid id, CancellationToken ct)
+    {
+        var result = await _intake.RequeueAsync(id, ct);
+        return result.IsSuccess
+            ? Ok(new { jobId = result.Value })
+            : BadRequest(new { result.ErrorCode, result.ErrorMessage });
     }
 
     [HttpGet("{id:guid}/clearance")]

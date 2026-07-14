@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Submission, SubmissionListItem, SubmissionCreate, SubmissionUpdate, UnderwritingClearanceEvaluation, UnderwritingReferral, UnderwritingReferralSummary, UnderwritingReferralStatus } from '@/types/submission.types'
+import type { Submission, SubmissionListItem, SubmissionCreate, SubmissionUpdate, UnderwritingClearanceEvaluation, UnderwritingReferral, UnderwritingReferralSummary, UnderwritingReferralStatus, IntakeJob } from '@/types/submission.types'
 import type { PagedResult, QueryParameters } from '@/types/common.types'
 
 export const submissionsApi = {
@@ -23,6 +23,12 @@ export const submissionsApi = {
 
   getUnderwritingReferrals: (id: string) =>
     apiClient.get<UnderwritingReferralSummary>(`/submissions/${id}/underwriting-referrals`).then((r) => r.data),
+
+  getIntake: (id: string) =>
+    apiClient.get<IntakeJob | null>(`/submissions/${id}/intake`).then((r) => r.data),
+
+  reintake: (id: string) =>
+    apiClient.post<{ jobId: string }>(`/submissions/${id}/reintake`).then((r) => r.data),
 
   decideUnderwritingReferral: (referralId: string, decision: Exclude<UnderwritingReferralStatus, 'Open'>, notes?: string) =>
     apiClient.post<UnderwritingReferral>(`/underwriting/referrals/${referralId}/${decision.toLowerCase()}`, { notes }).then((r) => r.data),

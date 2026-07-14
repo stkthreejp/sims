@@ -1,10 +1,14 @@
 using System.Text.Json;
+using SIMS.Application.Common;
+using SIMS.Application.Configuration;
 using SIMS.Application.DTOs.DocumentExtraction;
+using SIMS.Application.DTOs.Intake;
 using SIMS.Application.Interfaces.Services;
 using SIMS.Domain.Entities;
 using SIMS.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace SIMS.Application.Services;
 
@@ -20,6 +24,7 @@ public class IntakeProcessingService : IIntakeProcessingService
     private readonly IPdfPageRenderer _renderer;
     private readonly ISubmissionIntakeAnalyzer _analyzer;
     private readonly IBlobStorageService _blob;
+    private readonly IntakeSettings _settings;
     private readonly ILogger<IntakeProcessingService> _logger;
 
     public IntakeProcessingService(
@@ -27,13 +32,51 @@ public class IntakeProcessingService : IIntakeProcessingService
         IPdfPageRenderer renderer,
         ISubmissionIntakeAnalyzer analyzer,
         IBlobStorageService blob,
+        IOptions<IntakeSettings> settings,
         ILogger<IntakeProcessingService> logger)
     {
         _db = db;
         _renderer = renderer;
         _analyzer = analyzer;
         _blob = blob;
+        _settings = settings.Value;
         _logger = logger;
+    }
+
+    public async Task<IntakeJobDto?> GetLatestForSubmissionAsync(Guid submissionId, CancellationToken ct = default)
+    {
+        var job = await _db.Set<IntakeJob>()
+            .Where(j => j.SubmissionId == submissionId)
+            .OrderByDescending(j => j.CreatedAt).ThenByDescending(j => j.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return job == null ? null : new IntakeJobDto
+        {
+            Id = job.Id,
+            SubmissionId = job.SubmissionId,
+            Status = job.Status.ToString(),
+            Stage = job.Stage,
+            AttemptCount = job.AttemptCount,
+            StartedAt = job.StartedAt,
+            CompletedAt = job.CompletedAt,
+            ErrorMessage = job.ErrorMessage,
+            CreatedAt = job.CreatedAt,
+        };
+    }
+
+    public async Task<Result<Guid>> RequeueAsync(Guid submissionId, CancellationToken ct = default)
+    {
+        if (!_settings.Enabled)
+            return Result<Guid>.Failure("INTAKE_DISABLED", "Automated intake is currently disabled.");
+
+        var exists = await _db.Set<Submission>().AnyAsync(s => s.Id == submissionId && !s.IsDeleted, ct);
+        if (!exists)
+            return Result<Guid>.Failure("NOT_FOUND", "Submission not found.");
+
+        var job = new IntakeJob { SubmissionId = submissionId, Status = IntakeJobStatus.Queued };
+        _db.Set<IntakeJob>().Add(job);
+        await _db.SaveChangesAsync(ct);
+        return Result<Guid>.Success(job.Id);
     }
 
     public async Task<bool> ProcessNextAsync(CancellationToken ct = default)

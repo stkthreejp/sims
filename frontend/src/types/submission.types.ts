@@ -120,3 +120,17 @@ export interface UnderwritingReferralSummary {
   appetiteResults: UnderwritingAppetiteResult[]
   referrals: UnderwritingReferral[]
 }
+
+export type IntakeJobStatus = 'Queued' | 'Running' | 'NeedsReview' | 'Completed' | 'Failed'
+
+export interface IntakeJob {
+  id: string
+  submissionId: string
+  status: IntakeJobStatus
+  stage: string | null
+  attemptCount: number
+  startedAt: string | null
+  completedAt: string | null
+  errorMessage: string | null
+  createdAt: string
+}
