@@ -119,7 +119,7 @@ namespace SIMS.Infrastructure.Migrations
                             'FROM policies p WHERE p.bound_quote_id = pt.' || quote_ident(
                                 (SELECT column_name FROM information_schema.columns
                                  WHERE table_name = 'policy_transactions'
-                                 AND column_name IN (''QuoteId'', ''quote_id'') LIMIT 1)
+                                 AND column_name IN ('QuoteId', 'quote_id') LIMIT 1)
                             )
                         );
                     END IF;
