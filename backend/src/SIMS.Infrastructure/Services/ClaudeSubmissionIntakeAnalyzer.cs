@@ -204,9 +204,9 @@ public class ClaudeSubmissionIntakeAnalyzer : ISubmissionIntakeAnalyzer
 
         Rules:
         - Page numbers are 1-indexed and inclusive; every span must map to a contiguous run of pages.
-        - "form" ∈ {Acord125, Acord126, Acord127, Acord146, LossRun, ScheduleOfValues, SignedApplication, Other}.
-        - "lineOfBusiness" ∈ {GeneralLiability, InlandMarine, AutoLiability, AutoPhysicalDamage} or null if not line-specific.
-        - Monoline: pick the single most likely quoting line from the forms + the broker note. Still list every other line present in "boundaries".
+        - "form" MUST be EXACTLY one of these literal values, copied verbatim (case-sensitive): "Acord125", "Acord126", "Acord127", "Acord146", "LossRun", "ScheduleOfValues", "SignedApplication", "Other". Any ACORD form NOT in this list (e.g. ACORD 45, 140, 175, 855) and any other or unrecognized document MUST be labeled "Other". Never output a "form" value outside this exact set — do not invent labels like "Acord45".
+        - "lineOfBusiness" MUST be EXACTLY one of these literal values: "GeneralLiability", "InlandMarine", "AutoLiability", "AutoPhysicalDamage" — or null if the span is not line-specific. Never output any other value.
+        - "quotingLineOfBusiness" MUST be one of those same four line values (or null). Monoline: pick the single most likely quoting line from the forms + the broker note. Still list every other line present in "boundaries".
         - In "perLob.data", populate only the fields you can read; leave others null / empty arrays. Use the exact field names shown.
         - If a value is unreadable, omit it rather than guessing.
 
