@@ -31,6 +31,12 @@ public class PolicyNumberAdminService : IPolicyNumberAdminService
         var validation = ValidateSequence(dto);
         if (!validation.IsSuccess) return Result<PolicyNumberSequenceDto>.Failure(validation.ErrorCode!, validation.ErrorMessage!);
 
+        // Friendly duplicate check (A2.1) — the soft-delete query filter means a deleted
+        // sequence's name is free to reuse, matching the new filtered unique index.
+        var name = dto.Name.Trim();
+        if (await _db.Set<PolicyNumberSequence>().AnyAsync(s => s.Name == name))
+            return Result<PolicyNumberSequenceDto>.Failure("DUPLICATE", $"A policy-number sequence named '{name}' already exists.");
+
         var sequence = new PolicyNumberSequence();
         ApplySequence(sequence, dto);
         _db.Set<PolicyNumberSequence>().Add(sequence);

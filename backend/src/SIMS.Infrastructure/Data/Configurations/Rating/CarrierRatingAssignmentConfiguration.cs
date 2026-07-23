@@ -35,12 +35,14 @@ public class CarrierRatingAssignmentConfiguration : IEntityTypeConfiguration<Car
         builder.Property(a => a.ProgramCarrierLineOfBusinessId).HasColumnName("program_carrier_line_of_business_id");
         builder.Property(a => a.RatingPlanVersionId).HasColumnName("rating_plan_version_id");
 
+        // Partial unique indexes must exclude soft-deleted rows, else create->delete->recreate
+        // of the same carrier/LOB collides on a tombstoned row and 500s (WS5-R Batch 2, A2.1).
         builder.HasIndex(a => new { a.CarrierId, a.LineOfBusiness })
             .IsUnique()
-            .HasFilter("program_configuration_id IS NULL");
+            .HasFilter("program_configuration_id IS NULL AND is_deleted = false");
         builder.HasIndex(a => new { a.ProgramConfigurationId, a.CarrierId, a.LineOfBusiness })
             .IsUnique()
-            .HasFilter("program_configuration_id IS NOT NULL");
+            .HasFilter("program_configuration_id IS NOT NULL AND is_deleted = false");
         builder.HasIndex(a => a.ProgramCarrierLineOfBusinessId)
             .HasDatabaseName("ix_carrier_rating_assignment_program_lob_scope");
 

@@ -249,6 +249,45 @@ public class PolicyNumberAdminServiceTests
         Assert.Equal("NEXT_NUMBER_TOO_LOW", result.ErrorCode);
     }
 
+    [Fact]
+    public async Task CreateSequenceAsync_RejectsDuplicateActiveName()
+    {
+        await using var db = CreateDb();
+        var service = new PolicyNumberAdminService(db);
+        var first = await service.CreateSequenceAsync(SequenceDto("DALE GL"));
+        Assert.True(first.IsSuccess);
+
+        var dup = await service.CreateSequenceAsync(SequenceDto("DALE GL"));
+
+        Assert.False(dup.IsSuccess);
+        Assert.Equal("DUPLICATE", dup.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateSequenceAsync_AllowsReusingSoftDeletedName()
+    {
+        await using var db = CreateDb();
+        var service = new PolicyNumberAdminService(db);
+        var created = await service.CreateSequenceAsync(SequenceDto("DALE GL"));
+        Assert.True(created.IsSuccess);
+
+        var deleted = await service.DeleteSequenceAsync(created.Value!.Id);
+        Assert.True(deleted.IsSuccess);
+
+        var recreated = await service.CreateSequenceAsync(SequenceDto("DALE GL"));
+
+        Assert.True(recreated.IsSuccess); // soft-deleted name is free to reuse (A2.1)
+    }
+
+    private static PolicyNumberSequenceUpsertDto SequenceDto(string name) => new()
+    {
+        Name = name,
+        Format = "{CARRIER}-{LOB}-{YY}-{SEQ:00000}",
+        NextNumber = 1,
+        TermSuffixFormat = "-{TERM:00}",
+        IsActive = true,
+    };
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

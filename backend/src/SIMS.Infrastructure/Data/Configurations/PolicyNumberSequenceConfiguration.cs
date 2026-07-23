@@ -14,6 +14,7 @@ public class PolicyNumberSequenceConfiguration : IEntityTypeConfiguration<Policy
         builder.Property(s => s.Format).IsRequired().HasMaxLength(100);
         builder.Property(s => s.TermSuffixFormat).IsRequired().HasMaxLength(30);
         builder.Property(s => s.Notes).HasMaxLength(1000);
-        builder.HasIndex(s => s.Name).IsUnique();
+        // Exclude soft-deleted rows so a deleted sequence's name can be reused (WS5-R Batch 2, A2.1).
+        builder.HasIndex(s => s.Name).IsUnique().HasFilter("\"IsDeleted\" = false");
     }
 }

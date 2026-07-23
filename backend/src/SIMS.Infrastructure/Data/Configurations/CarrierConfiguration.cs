@@ -11,7 +11,8 @@ public class CarrierConfiguration : IEntityTypeConfiguration<Carrier>
         builder.ToTable("carriers");
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Name).IsRequired().HasMaxLength(200);
-        builder.HasIndex(c => c.Name).IsUnique();
+        // Exclude soft-deleted rows so a deleted carrier's name can be reused (WS5-R Batch 2, A2.1).
+        builder.HasIndex(c => c.Name).IsUnique().HasFilter("\"IsDeleted\" = false");
         builder.Property(c => c.Naic).HasMaxLength(20);
         builder.Property(c => c.AmBestRating).HasMaxLength(10);
         builder.Property(c => c.DefaultCurrencyCode).HasMaxLength(3).HasDefaultValue("USD");
