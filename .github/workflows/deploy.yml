@@ -35,7 +35,26 @@ jobs:
         # advisories with no available fix — e.g. CVE-2025-6965 on the SQLite native
         # lib pulled by the test project's EFCore.Sqlite — do not block production
         # deploys. All shipped code is still audited.
-        run: dotnet list backend/src/SIMS.API/SIMS.API.csproj package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt; grep -q "has the following vulnerable packages" /tmp/vuln.txt && exit 1 || true
+        #
+        # Allowlist — transitive advisories with no safe upgrade path, accepted and tracked:
+        #   GHSA-pgww-w46g-26qg  AngleSharp mXSS (Moderate). Pulled transitively by HtmlSanitizer,
+        #     which hard-pins AngleSharp 0.17.x (AngleSharp.Css 0.17.0 requires AngleSharp < 0.18;
+        #     the only AngleSharp.Css supporting AngleSharp 1.x is a prerelease). Fixed in AngleSharp
+        #     1.5.0, unreachable without breaking the sanitizer. Exposure is limited to sanitizing
+        #     staff-authored compliance-document HTML. Revisit when HtmlSanitizer ships against a
+        #     stable AngleSharp 1.x. Any *other* advisory still fails the build.
+        run: |
+          ALLOWLIST="GHSA-pgww-w46g-26qg"
+          dotnet list backend/src/SIMS.API/SIMS.API.csproj package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt
+          if grep -q "has the following vulnerable packages" /tmp/vuln.txt; then
+            UNEXPECTED=$(grep -oE '(GHSA-[A-Za-z0-9-]+|CVE-[0-9-]+)' /tmp/vuln.txt | grep -vxF "$ALLOWLIST" || true)
+            if [ -n "$UNEXPECTED" ]; then
+              echo "::error::Non-allowlisted vulnerable package(s) found:"
+              echo "$UNEXPECTED"
+              exit 1
+            fi
+            echo "Only allowlisted advisories present ($ALLOWLIST); continuing."
+          fi
 
       - name: Frontend install
         run: npm install
