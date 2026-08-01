@@ -542,6 +542,9 @@ public class PolicyFormService : IPolicyFormService
         Tag("Carrier.Name", "Carrier name", "Carrier"),
         Tag("Carrier.Naic", "NAIC", "Carrier"),
 
+        Tag("SurplusLines.StampingWording", "SL stamping wording", "Surplus Lines"),
+        Tag("SurplusLines.RequiredNotice", "SL required notice", "Surplus Lines"),
+
         Tag("ItemNumber", "Item number", "Equipment", "Number", "number", "Equipment"),
         Tag("Description", "Description", "Equipment", repeatBlock: "Equipment"),
         Tag("Year", "Year", "Equipment", "Number", "number", "Equipment"),

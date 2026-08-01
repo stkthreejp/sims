@@ -42,7 +42,8 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             return Result<GeneratedDocumentDto>.Failure("FORMS_REQUIRED", "Review and include at least one policy form before issuing.");
 
         var preparedPdfs = new List<byte[]>();
-        var data = BuildPolicyData(policy, forms);
+        var surplusLines = await ResolveSurplusLinesSetupAsync(policy);
+        var data = BuildPolicyData(policy, forms, surplusLines);
         foreach (var form in forms)
         {
             var prepared = await PrepareFormPdfAsync(form, data);
@@ -108,7 +109,8 @@ public class PolicyAssemblyService : IPolicyAssemblyService
             return Result<GeneratedDocumentDto>.Failure("NOT_FOUND", "Policy form template not found.");
 
         var forms = await LoadIncludedFormsAsync(policy.BoundQuoteId);
-        var data = BuildPolicyData(policy, forms);
+        var surplusLines = await ResolveSurplusLinesSetupAsync(policy);
+        var data = BuildPolicyData(policy, forms, surplusLines);
         var testSelection = new QuotePolicyFormSelection
         {
             PolicyFormTemplateId = template.Id,
@@ -313,7 +315,7 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         return output.ToArray();
     }
 
-    private static DocumentMergeData BuildPolicyData(Policy policy, IReadOnlyList<QuotePolicyFormSelection> forms)
+    private static DocumentMergeData BuildPolicyData(Policy policy, IReadOnlyList<QuotePolicyFormSelection> forms, SurplusLinesStateSetup? surplusLines)
     {
         var quote = policy.BoundQuote;
         var insured = policy.Submission.Insured;
@@ -366,6 +368,10 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         values["Carrier.Name"] = carrier.Name;
         values["Carrier.Naic"] = carrier.Naic;
 
+        // Surplus-lines state wording (stamping/notice) resolved for the policy's filing state.
+        values["SurplusLines.StampingWording"] = surplusLines?.StampingWording;
+        values["SurplusLines.RequiredNotice"] = surplusLines?.RequiredNoticeText;
+
         data.RepeatingValues["Equipment"] = policy.Submission.Equipment
             .OrderBy(e => e.ItemNumber)
             .Select(e => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -410,6 +416,20 @@ public class PolicyAssemblyService : IPolicyAssemblyService
         data.RepeatingValues["Vehicles"] = BuildVehicleRows(policy.Submission.Vehicles);
 
         return data;
+    }
+
+    private async Task<SurplusLinesStateSetup?> ResolveSurplusLinesSetupAsync(Policy policy)
+    {
+        var state = policy.Submission.Insured.State;
+        if (string.IsNullOrWhiteSpace(state))
+            return null;
+
+        var candidates = await _db.Set<SurplusLinesStateSetup>()
+            .Where(s => s.IsActive)
+            .ToListAsync();
+
+        return SurplusLinesSetupResolver.Resolve(
+            candidates, state, policy.ProgramId, policy.CarrierId, policy.LineOfBusiness, policy.EffectiveDate);
     }
 
     private static List<IReadOnlyDictionary<string, object?>> BuildVehicleRows(IEnumerable<SubmissionVehicle> vehicles) =>
