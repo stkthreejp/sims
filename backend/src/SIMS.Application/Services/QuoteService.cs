@@ -579,6 +579,10 @@ public class QuoteService : IQuoteService
         if (!invoiceResult.IsSuccess)
             return Result<QuoteDto>.Failure(invoiceResult.ErrorCode ?? "INVOICE_FAILED", invoiceResult.ErrorMessage ?? "Invoice could not be created.");
 
+        // Surplus-lines compliance follow-ups: if the policy's state setup requires diligent
+        // search and/or an affidavit, queue post-bind tasks (assigned like other bind tasks).
+        await CreateSurplusLinesComplianceTasksAsync(quote, policy, transaction, dto.EffectiveDate);
+
         await dbTransaction.CommitAsync();
 
         await _workflowEngine.FireEventAsync(
@@ -590,6 +594,82 @@ public class QuoteService : IQuoteService
         var dtoResult = MapToDto(quote);
         dtoResult.BoundPolicyId = policy.Id;
         return Result<QuoteDto>.Success(dtoResult);
+    }
+
+    private const string SlDiligentSearchTaskTypeName = "Surplus Lines - Diligent Search";
+    private const string SlAffidavitTaskTypeName = "Surplus Lines - Affidavit";
+
+    // Post-bind compliance tasks driven by the resolved SurplusLinesStateSetup flags.
+    private async Task CreateSurplusLinesComplianceTasksAsync(Quote quote, Policy policy, PolicyTransaction transaction, DateOnly asOf)
+    {
+        var state = quote.Submission?.Insured?.State;
+        if (string.IsNullOrWhiteSpace(state))
+            return;
+
+        var candidates = await Db.Set<SurplusLinesStateSetup>()
+            .Where(s => s.IsActive)
+            .ToListAsync();
+        var setup = SurplusLinesSetupResolver.Resolve(
+            candidates, state, quote.ProgramId, quote.CarrierId, quote.LineOfBusiness, asOf);
+        if (setup == null)
+            return;
+
+        var created = false;
+        if (setup.DiligentSearchRequired)
+        {
+            await AddSurplusLinesTaskAsync(SlDiligentSearchTaskTypeName,
+                "Complete and file the diligent-search / effort documentation for this surplus-lines policy.",
+                quote, policy, transaction);
+            created = true;
+        }
+        if (setup.AffidavitRequired)
+        {
+            await AddSurplusLinesTaskAsync(SlAffidavitTaskTypeName,
+                "Complete and file the surplus-lines affidavit for this policy.",
+                quote, policy, transaction);
+            created = true;
+        }
+
+        if (created)
+            await Db.SaveChangesAsync();
+    }
+
+    private async Task AddSurplusLinesTaskAsync(string taskTypeName, string description, Quote quote, Policy policy, PolicyTransaction transaction)
+    {
+        var taskType = await Db.Set<TaskType>()
+            .FirstOrDefaultAsync(t => t.Name == taskTypeName && !t.IsDeleted);
+        if (taskType == null)
+        {
+            taskType = new TaskType
+            {
+                Name = taskTypeName,
+                Description = description,
+                DefaultPriority = TaskPriority.Medium,
+                AssignedRoleTemplate = "AssistantUW",
+                DueDateFormula = "P1D",
+                IsActive = true,
+            };
+            Db.Set<TaskType>().Add(taskType);
+        }
+        else if (!taskType.IsActive)
+        {
+            taskType.IsActive = true;
+            taskType.UpdatedAt = DateTime.UtcNow;
+        }
+
+        var assistantUwId = quote.Submission?.AssistantUWId;
+        Db.Set<TaskInstance>().Add(new TaskInstance
+        {
+            TaskType = taskType,
+            EntityType = TaskEntityType.PolicyTransaction,
+            EntityId = transaction.Id,
+            AssignedUserId = assistantUwId,
+            AssignedRoleExpression = assistantUwId.HasValue ? null : "AssistantUW",
+            Status = TaskInstanceStatus.Open,
+            Priority = taskType.DefaultPriority,
+            DueDate = DateTime.UtcNow.AddDays(1),
+            ReferenceUrl = $"/policies/{policy.Id}",
+        });
     }
 
     public async Task<Result<InvoicePreviewDto>> GetInvoicePreviewAsync(Guid id, UserAccessScope access)
