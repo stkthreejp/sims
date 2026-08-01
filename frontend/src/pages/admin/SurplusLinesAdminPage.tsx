@@ -11,7 +11,7 @@ import { surplusLinesApi } from '@/api/surplusLines.api'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { todayLocal } from '@/lib/utils'
-import type { FeeDefinition, PayeeOption } from '@/types/fee.types'
+import type { FeeDefinition } from '@/types/fee.types'
 import type { ProgramConfiguration } from '@/types/programConfiguration.types'
 import { ACTIVE_LOBS, LOB_LABELS, type PolicyLineOfBusiness } from '@/types/quote.types'
 import type { SurplusLinesStateSetup, SurplusLinesStateSetupUpsert } from '@/types/surplusLines.types'
@@ -88,10 +88,6 @@ export function SurplusLinesAdminPage() {
     queryKey: ['admin', 'fees', 'definitions'],
     queryFn: feesApi.getDefinitions,
   })
-  const { data: payees = [] } = useQuery({
-    queryKey: ['admin', 'fees', 'payees'],
-    queryFn: () => feesApi.getPayees(),
-  })
   const { data: companyLicenses = [] } = useQuery({
     queryKey: ['company-licenses', 'active'],
     queryFn: () => companyLicensesApi.getAll(false),
@@ -159,18 +155,6 @@ export function SurplusLinesAdminPage() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin', 'surplus-lines', 'setups'] })
 
-  const [newPayeeName, setNewPayeeName] = useState('')
-  const [newPayeeType, setNewPayeeType] = useState('TaxFilingService')
-  const createPayee = useMutation({
-    mutationFn: () => feesApi.createPayee({ name: newPayeeName.trim(), payeeType: newPayeeType }),
-    onSuccess: (payee) => {
-      toast.success(`Payee '${payee.name}' added`)
-      setNewPayeeName('')
-      qc.invalidateQueries({ queryKey: ['admin', 'fees', 'payees'] })
-    },
-    onError: (err) => toast.error(getApiErrorMessage(err, 'Payee could not be added')),
-  })
-
   const saveSetup = useMutation({
     mutationFn: () => editingId
       ? surplusLinesApi.updateSetup(editingId, cleanSetup(form))
@@ -227,14 +211,14 @@ export function SurplusLinesAdminPage() {
       surplusLinesTaxFeeDefinitionId: setup.surplusLinesTaxFeeDefinitionId,
       stampingFeeDefinitionId: setup.stampingFeeDefinitionId,
       filingFeeDefinitionId: setup.filingFeeDefinitionId,
-      statePayeeId: setup.statePayeeId,
-      filingPayeeId: setup.filingPayeeId,
-      createFilingPayable: setup.createFilingPayable,
-      filingPaymentTermsDays: setup.filingPaymentTermsDays,
-      filingFrequency: setup.filingFrequency,
-      filingDueDayOfMonth: setup.filingDueDayOfMonth,
-      filingMethod: setup.filingMethod,
-      filingPortalUrl: setup.filingPortalUrl,
+      statePayeeId: null,
+      filingPayeeId: null,
+      createFilingPayable: false,
+      filingPaymentTermsDays: null,
+      filingFrequency: null,
+      filingDueDayOfMonth: null,
+      filingMethod: null,
+      filingPortalUrl: null,
       requiredFilingFormsJson: setup.requiredFilingFormsJson,
       diligentSearchRequired: setup.diligentSearchRequired,
       diligentSearchNotes: setup.diligentSearchNotes,
@@ -445,82 +429,11 @@ export function SurplusLinesAdminPage() {
           </div>
 
           <div className="border-t pt-5">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Filing handling</div>
-            <div className="mb-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              The SL tax payable recipient is set on the linked SL-tax fee (Admin → Charges &amp; Fees, on the fee's
-              rule version). It's shown read-only on the saved setup below; the payee fields here are optional/legacy.
-            </div>
-            <div className="mb-3 grid items-end gap-3 rounded border border-dashed border-slate-300 bg-slate-50 p-3 md:grid-cols-[1fr_220px_auto]">
-              <TextInput
-                label="New payee name"
-                value={newPayeeName}
-                onChange={setNewPayeeName}
-              />
-              <SelectField label="Payee type" value={newPayeeType} onChange={setNewPayeeType}>
-                <option value="TaxFilingService">Tax filing service</option>
-                <option value="Carrier">Carrier</option>
-                <option value="PremiumFinance">Premium finance</option>
-                <option value="Broker">Broker</option>
-                <option value="Other">Other</option>
-              </SelectField>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                disabled={!newPayeeName.trim() || createPayee.isPending}
-                onClick={() => createPayee.mutate()}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {createPayee.isPending ? 'Adding…' : 'Add payee'}
-              </button>
-            </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              <CheckInput
-                label="Filed by vendor"
-                checked={form.createFilingPayable}
-                onChange={(value) => setForm((f) => ({ ...f, createFilingPayable: value, statePayeeId: value ? null : f.statePayeeId, filingPayeeId: value ? f.filingPayeeId : null }))}
-              />
-              {!form.createFilingPayable ? (
-                <div className="grid gap-3 rounded border border-slate-200 bg-slate-50 p-3 md:col-span-3 md:grid-cols-[minmax(260px,360px)_1fr]">
-                  <PayeeSelect label="State payable recipient" value={form.statePayeeId} payees={payees} onChange={(value) => setForm((f) => ({ ...f, statePayeeId: value }))} />
-                  <div className="self-end rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                    Direct filing handled by SMM; payable to the selected state recipient.
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-3 rounded border border-blue-100 bg-blue-50/40 p-3 md:col-span-4 md:grid-cols-4">
-                  <PayeeSelect label="Vendor payee" value={form.filingPayeeId} payees={payees} onChange={(value) => setForm((f) => ({ ...f, filingPayeeId: value }))} />
-                  <TextInput
-                    label="Payment terms days"
-                    type="number"
-                    value={form.filingPaymentTermsDays?.toString() ?? ''}
-                    onChange={(value) => setForm((f) => ({ ...f, filingPaymentTermsDays: value ? Number(value) : null }))}
-                  />
-                  <SelectField label="Filing frequency" value={form.filingFrequency ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingFrequency: value || null }))}>
-                    <option value="">Not set</option>
-                    <option value="Monthly">Monthly</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="Annual">Annual</option>
-                    <option value="Transaction">Per transaction</option>
-                  </SelectField>
-                  <TextInput
-                    label="Due day of month"
-                    type="number"
-                    value={form.filingDueDayOfMonth?.toString() ?? ''}
-                    onChange={(value) => setForm((f) => ({ ...f, filingDueDayOfMonth: value ? Number(value) : null }))}
-                  />
-                  <SelectField label="Filing method" value={form.filingMethod ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingMethod: value || null }))}>
-                    <option value="">Not set</option>
-                    <option value="Portal">Portal</option>
-                    <option value="Email">Email</option>
-                    <option value="Paper">Paper</option>
-                    <option value="Vendor">Vendor</option>
-                    <option value="Other">Other</option>
-                  </SelectField>
-                  <div className="md:col-span-3">
-                    <TextInput label="Vendor portal URL" value={form.filingPortalUrl ?? ''} onChange={(value) => setForm((f) => ({ ...f, filingPortalUrl: value || null }))} />
-                  </div>
-                </div>
-              )}
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Filing / tax payable</div>
+            <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              The SL tax amount and its payable recipient (tax-filing vendor AP) are configured on the linked
+              SL-tax fee in Admin → Charges &amp; Fees (the fee's rule version). The resolved recipient is shown
+              read-only in the saved setup details below.
             </div>
           </div>
 
@@ -575,9 +488,6 @@ export function SurplusLinesAdminPage() {
             <DetailBlock label="Address" value={[selectedSetup.brokerAddressLine1, selectedSetup.brokerAddressLine2, selectedSetup.brokerCity, selectedSetup.brokerState, selectedSetup.brokerZipCode, selectedSetup.brokerCountry].filter(Boolean).join(', ')} />
             <DetailBlock label="Linked fees" value={[selectedSetup.surplusLinesTaxFeeName, selectedSetup.stampingFeeName, selectedSetup.filingFeeName].filter(Boolean).join(', ') || 'No fee links'} />
             <DetailBlock label="SL tax payable recipient (from fee)" value={selectedSetup.resolvedTaxPayeeName ?? 'Not set on the SL-tax fee'} />
-            <DetailBlock label="Filing handling" value={filingHandlingText(selectedSetup)} />
-            <DetailBlock label="Vendor cadence" value={selectedSetup.createFilingPayable ? [selectedSetup.filingFrequency, selectedSetup.filingDueDayOfMonth ? `Due day ${selectedSetup.filingDueDayOfMonth}` : null, selectedSetup.filingMethod].filter(Boolean).join(' / ') || 'Not set' : 'Not vendor-filed'} />
-            <DetailBlock label="Vendor portal" value={selectedSetup.createFilingPayable ? selectedSetup.filingPortalUrl || 'None' : 'Not vendor-filed'} />
             <DetailBlock label="Required forms" value={formsJsonToText(selectedSetup.requiredFilingFormsJson) || 'None'} />
             {selectedSetup.feeValidationMessages.length > 0 && (
               <div className="rounded border border-amber-200 bg-amber-50 p-3 md:col-span-2 xl:col-span-3">
@@ -638,15 +548,6 @@ function FeeSelect({ label, value, fees, onChange }: { label: string; value: num
   )
 }
 
-function PayeeSelect({ label, value, payees, onChange }: { label: string; value: number | null; payees: PayeeOption[]; onChange: (value: number | null) => void }) {
-  return (
-    <SelectField label={label} value={value?.toString() ?? ''} onChange={(raw) => onChange(raw ? Number(raw) : null)}>
-      <option value="">None</option>
-      {payees.map((payee) => <option key={payee.id} value={payee.id}>{payee.name} ({payee.payeeType})</option>)}
-    </SelectField>
-  )
-}
-
 function CheckInput({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <label className="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
@@ -679,11 +580,7 @@ function dateRange(effectiveDate: string, expirationDate: string | null) {
 }
 
 function filingHandlingText(setup: SurplusLinesStateSetup) {
-  const mode = setup.createFilingPayable
-    ? `Filed by vendor${setup.filingPaymentTermsDays != null ? ` / Net ${setup.filingPaymentTermsDays}` : ''}`
-    : 'Direct filing by SMM'
-  const payee = setup.resolvedTaxPayeeName ? ` · tax payable to ${setup.resolvedTaxPayeeName}` : ''
-  return `${mode}${payee}`
+  return setup.resolvedTaxPayeeName ? `Tax payable to ${setup.resolvedTaxPayeeName}` : 'Tax payee not set on fee'
 }
 
 function cleanSetup(setup: SurplusLinesStateSetupUpsert): SurplusLinesStateSetupUpsert {
