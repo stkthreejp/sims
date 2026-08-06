@@ -54,6 +54,30 @@ public class FeeAdminProgramScopeTests
     }
 
     [Fact]
+    public async Task CreateDefinitionAsync_RejectsDuplicateCodeWithoutServerError()
+    {
+        await using var db = CreateDb();
+        db.Add(new LedgerAccount { Id = 1, InternalCode = "2200", ExternalLabel = "SL Tax Payable", AccountType = "Liability", IsActive = true });
+        db.Add(new FeeDefinition
+        {
+            Code = "TX_SL_TAX",
+            DisplayName = "Texas SLT",
+            FeeCategory = "Tax",
+            IsTaxable = true,
+            CalculationOrder = 10,
+            LedgerAccountId = 1,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await new FeeAdminService(new TestServiceProvider(db)).CreateDefinitionAsync(
+            new CreateFeeDefinitionRequest("TX_SL_TAX", "Duplicate", "Tax", true, 20, 1));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("DUPLICATE_CODE", result.ErrorCode);
+        Assert.Single(await db.Set<FeeDefinition>().ToListAsync());
+    }
+
+    [Fact]
     public async Task CreateVersionAsync_RejectsEntityPayableWithoutPayee()
     {
         await using var db = CreateDb();

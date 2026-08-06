@@ -47,6 +47,10 @@ public class FeeAdminService : IFeeAdminService
             return Result<FeeDefinitionDto>.Failure("FEE_CATEGORY_INVALID", "Fee category must be one of Tax, StampingFee, PolicyFee, BrokerFee, Inspection, or Other.");
         if (!await Db.Set<LedgerAccount>().AnyAsync(a => a.Id == req.LedgerAccountId, ct))
             return Result<FeeDefinitionDto>.Failure("LEDGER_ACCOUNT_NOT_FOUND", "The selected ledger account was not found.");
+        // Pre-check code uniqueness so a duplicate returns a clean 400 instead of a 23505
+        // unique-violation surfacing as a generic 500 (fee-definition code is uniquely indexed).
+        if (await Db.Set<FeeDefinition>().AnyAsync(f => f.Code == req.Code, ct))
+            return Result<FeeDefinitionDto>.Failure("DUPLICATE_CODE", $"A fee definition with code '{req.Code}' already exists.");
 
         var def = new FeeDefinition
         {
