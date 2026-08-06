@@ -326,6 +326,63 @@ public class PolicyLifecycleRegressionTests
     }
 
     [Fact]
+    public async Task QuoteBind_CreatesSurplusLinesComplianceTasks_WhenStateSetupRequiresThem()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        db.Add(new SurplusLinesStateSetup
+        {
+            StateCode = fixture.Insured.State,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            FilingBrokerName = "SMM",
+            LicenseNumber = "SL-1",
+            LicenseState = fixture.Insured.State,
+            DiligentSearchRequired = true,
+            AffidavitRequired = true,
+        });
+        await db.SaveChangesAsync();
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess);
+        var transaction = await db.Set<PolicyTransaction>().SingleAsync();
+        var tasks = await db.Set<TaskInstance>().Include(t => t.TaskType).ToListAsync();
+        Assert.Equal(2, tasks.Count);
+        Assert.All(tasks, t => Assert.Equal(TaskEntityType.PolicyTransaction, t.EntityType));
+        Assert.All(tasks, t => Assert.Equal(transaction.Id, t.EntityId));
+        Assert.All(tasks, t => Assert.True(t.AssignedUserId.HasValue || t.AssignedRoleExpression == "AssistantUW"));
+        Assert.Contains(tasks, t => t.TaskType!.Name == "Surplus Lines - Diligent Search");
+        Assert.Contains(tasks, t => t.TaskType!.Name == "Surplus Lines - Affidavit");
+    }
+
+    [Fact]
+    public async Task QuoteBind_CreatesNoSurplusLinesTasks_WhenFlagsNotSet()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedBindableQuoteAsync(db);
+        db.Add(new SurplusLinesStateSetup
+        {
+            StateCode = fixture.Insured.State,
+            IsActive = true,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            FilingBrokerName = "SMM",
+            LicenseNumber = "SL-1",
+            LicenseState = fixture.Insured.State,
+            DiligentSearchRequired = false,
+            AffidavitRequired = false,
+        });
+        await db.SaveChangesAsync();
+        var quoteService = CreateQuoteService(db, new RecordingInvoicingService());
+
+        var result = await quoteService.BindAsync(fixture.Quote.Id, BindRequest(), UserAccessScope.All(fixture.UserId));
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(await db.Set<TaskInstance>().ToListAsync());
+    }
+
+    [Fact]
     public async Task QuoteBind_CreatesInitialPolicyVersionAndLinksTransaction()
     {
         await using var db = CreateDb();
